@@ -1,5 +1,11 @@
 {
-  "name": "nuxt-ui-template-starter",
+  "name": "jim.klonow.ski",
+  "version": "2025.09.20",
+  "author": {
+    "name": "Jim Klonowski",
+    "email": "jim@klonow.ski",
+    "url": "https://jim.klonow.ski"
+  },
   "private": true,
   "type": "module",
   "scripts": {
