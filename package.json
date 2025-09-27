@@ -1,6 +1,6 @@
 {
   "name": "jim.klonow.ski",
-  "version": "2025.09.20",
+  "version": "2025.09.27",
   "author": {
     "name": "Jim Klonowski",
     "email": "jim@klonow.ski",
@@ -17,22 +17,18 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@nuxt/content": "3.7.1",
     "@nuxt/image": "1.11.0",
-    "@nuxt/scripts": "0.11.13",
-    "@nuxt/ui": "^4.0.0-alpha.2",
+    "@nuxt/ui": "^4.0.0",
     "@unhead/vue": "^2.0.14",
-    "better-sqlite3": "^12.2.0",
     "nuxt": "^4.1.2"
   },
   "devDependencies": {
     "@iconify-json/la": "^1.2.1",
     "@iconify-json/lucide": "^1.2.68",
-    "@iconify-json/simple-icons": "^1.2.52",
     "@nuxt/eslint": "^1.9.0",
     "eslint": "^9.36.0",
     "typescript": "^5.9.2",
-    "vue-tsc": "^3.0.7"
+    "vue-tsc": "^3.0.8"
   },
   "resolutions": {
     "unimport": "4.1.1"
