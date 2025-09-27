@@ -3,9 +3,7 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
-    '@nuxt/content',
-    '@nuxt/image',
-    '@nuxt/scripts'
+    '@nuxt/image'
   ],
 
   devtools: {
@@ -18,11 +16,14 @@ export default defineNuxtConfig({
     '/': { prerender: true }
   },
 
-  compatibilityDate: '2025-01-15',
-
   image: {
-    provider: 'ipx',
+    domains: [
+      'https://jim.klonow.ski'
+    ],
+    provider: 'ipx'
   },
+
+  compatibilityDate: '2025-09-27',
 
   eslint: {
     config: {

@@ -4,4 +4,5 @@
 @theme static {
   --font-sans: "PT Sans", sans-serif;
   --font-serif: "PT Serif", serif;
+  --font-mono: "PT Mono", monospace;
 }
