@@ -4,7 +4,6 @@
       title="jim.klonow.ski"
       description="i like computers and cats and stuff"
       orientation="horizontal"
-      :reverse="isDark"
       :ui="{
         container: 'text-center select-none',
         headline: '',
@@ -20,7 +19,6 @@
         <UColorModeImage
           light="/simon2.jpg"
           dark="/simon3.jpg"
-          @click="colorMode.preference = colorMode.preference === 'light' ? 'dark' : 'light'"
         />
       </template>
     </UPageHero>
