@@ -17,8 +17,8 @@
 
       <template #default>
         <UColorModeImage
-          light="/simon2.jpg"
-          dark="/simon3.jpg"
+          light="/simon3.jpg"
+          dark="/simon2.jpg"
         />
       </template>
     </UPageHero>
