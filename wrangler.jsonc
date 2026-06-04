@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jim-klonow-ski",
+  "account_id": "82c809bb82b0eeaa8d0a77282865a43d",
+  "compatibility_date": "2026-05-13",
+  "observability": {
+    "enabled": true
+  },
+  "main": "./.output/server/index.mjs",
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./.output/public/"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
