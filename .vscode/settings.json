@@ -1,0 +1,47 @@
+{
+  "eslint.useFlatConfig": true,
+  "files.associations": {
+    "tailwind.css": "tailwindcss",
+    "main.css": "tailwindcss",
+    "*.css": "tailwindcss",
+    "*.svg": "xml"
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "i18n-ally.dirStructure": "auto",
+  "i18n-ally.displayLanguage": "en",
+  "i18n-ally.enabledFrameworks": [
+    "vue",
+    "vue-sfc"
+  ],
+  "i18n-ally.enabledParsers": [
+    "json"
+  ],
+  "i18n-ally.extract.autoDetect": true,
+  "i18n-ally.extract.ignored": [
+    "="
+  ],
+  "i18n-ally.localesPaths": [
+    "i18n/locales"
+  ],
+  "i18n-ally.keystyle": "nested",
+  "i18n-ally.namespace": false,
+  "i18n-ally.sortKeys": true,
+  "i18n-ally.sourceLanguage": "en",
+  "tailwindCSS.classAttributes": [
+    "active-class",
+    "inactive-class",
+    "class",
+    "ui"
+  ],
+  "tailwindCSS.experimental.classRegex": [
+    [
+      "ui:\\s*{([^)]*)\\s*}",
+      "(?:'|\"|`)([^']*)(?:'|\"|`)"
+    ]
+  ],
+  "workbench.editorAssociations": {
+    "*.svg": "default"
+  }
+}
