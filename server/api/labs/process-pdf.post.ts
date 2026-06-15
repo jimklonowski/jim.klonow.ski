@@ -82,6 +82,48 @@ BASOPHILS % → basophils_pct
 HS CRP → hs_crp
 HOMOCYSTEINE → homocysteine`
 
+const DEXA_EXTRACTION_PROMPT = `Extract all data from this DEXA/DXA body composition scan report and return ONLY valid JSON — no markdown, no explanation.
+
+Structure (use exactly these field names):
+{
+  "date": "YYYY-MM-DD",
+  "weight_lbs": 155.0,
+  "total": {
+    "body_fat_pct": 20.2,
+    "total_mass_lbs": 157.9,
+    "fat_mass_lbs": 31.9,
+    "lean_mass_lbs": 120.1,
+    "bmc_lbs": 5.9,
+    "fat_free_lbs": 126.0
+  },
+  "regions": {
+    "arms": { "fat_pct": 16.3, "fat_lbs": 3.3, "lean_lbs": 16.3 },
+    "legs": { "fat_pct": 21.8, "fat_lbs": 11.2, "lean_lbs": 37.9 },
+    "trunk": { "fat_pct": 20.4, "fat_lbs": 15.3, "lean_lbs": 58.1 },
+    "android": { "fat_pct": 19.1, "fat_lbs": 2.1 },
+    "gynoid": { "fat_pct": 22.4, "fat_lbs": 5.2 }
+  },
+  "vat": { "volume_in3": 1.21, "fat_mass_lbs": 0.04 },
+  "ag_ratio": 0.84,
+  "bone_density": {
+    "total_bmd": 1.154,
+    "t_score": -0.5,
+    "z_score": -0.1
+  },
+  "symmetry": {
+    "right_arm_lean": 8.4,
+    "left_arm_lean": 8.0,
+    "right_leg_lean": 18.7,
+    "left_leg_lean": 19.1
+  }
+}
+
+Rules:
+- date: scan measurement date in YYYY-MM-DD format
+- weight_lbs: the patient's measured/scale weight (not DEXA total mass)
+- Omit any section not present in the report (vat, bone_density, symmetry are optional)
+- Return ONLY valid JSON`
+
 export default defineEventHandler(async (event) => {
   const authCookie = getCookie(event, 'labs-auth')
   const secret = process.env.LABS_SECRET
@@ -110,6 +152,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'No PDF file found in request' })
   }
 
+  const reportTypePart = formData.find(p => p.name === 'type')
+  const reportType = reportTypePart?.data?.toString() ?? 'bloodwork'
+
+  const prompt = reportType === 'dexa' ? DEXA_EXTRACTION_PROMPT : EXTRACTION_PROMPT
+
   const base64Data = Buffer.from(pdf.data).toString('base64')
 
   const anthropic = new Anthropic({ apiKey })
@@ -124,7 +171,7 @@ export default defineEventHandler(async (event) => {
           type: 'document',
           source: { type: 'base64', media_type: 'application/pdf', data: base64Data }
         },
-        { type: 'text', text: EXTRACTION_PROMPT }
+        { type: 'text', text: prompt }
       ]
     }]
   })
