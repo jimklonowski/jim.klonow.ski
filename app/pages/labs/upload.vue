@@ -34,8 +34,21 @@
 
     <!-- Drop zone -->
     <UCard v-else-if="!processing && !result && !error">
+      <!-- Report type selector -->
+      <div class="flex gap-2 mb-6">
+        <UButton
+          v-for="t in REPORT_TYPES"
+          :key="t.value"
+          :variant="reportType === t.value ? 'solid' : 'outline'"
+          size="sm"
+          :icon="t.icon"
+          @click="reportType = t.value"
+        >
+          {{ t.label }}
+        </UButton>
+      </div>
       <div
-        class="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
+        class="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
         :class="dragging ? 'border-primary bg-primary/5' : 'border-neutral-700 hover:border-neutral-500'"
         @click="fileInput?.click()"
         @dragover.prevent="dragging = true"
@@ -43,7 +56,7 @@
         @drop.prevent="onDrop"
       >
         <UIcon name="i-lucide-upload-cloud" class="w-14 h-14 text-muted mb-4" />
-        <p class="text-lg font-medium">Drop your lab PDF here</p>
+        <p class="text-lg font-medium">Drop your {{ reportType === 'dexa' ? 'DEXA scan' : 'lab' }} PDF here</p>
         <p class="text-sm text-muted mt-1">or click to browse</p>
         <input ref="fileInput" type="file" accept=".pdf,application/pdf" class="hidden" @change="onFileSelect" />
       </div>
@@ -167,6 +180,14 @@ async function submitPin() {
   }
 }
 
+// Report type
+const REPORT_TYPES = [
+  { value: 'bloodwork', label: 'Bloodwork', icon: 'i-lucide-test-tube' },
+  { value: 'dexa', label: 'DEXA Scan', icon: 'i-lucide-scan' }
+] as const
+type ReportType = 'bloodwork' | 'dexa'
+const reportType = ref<ReportType>('bloodwork')
+
 // Upload state
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragging = ref(false)
@@ -201,6 +222,7 @@ async function upload(file: File) {
   try {
     const form = new FormData()
     form.append('pdf', file)
+    form.append('type', reportType.value)
     result.value = await $fetch<LabResult>('/api/labs/process-pdf', { method: 'POST', body: form })
   }
   catch (e: unknown) {
@@ -250,7 +272,7 @@ async function saveToSite() {
   try {
     const res = await $fetch<{ ok: boolean, file: string }>('/api/labs/save-json', {
       method: 'POST',
-      body: result.value
+      body: { ...result.value, _type: reportType.value }
     })
     saveResult.value = { ok: true, file: res.file }
   }
