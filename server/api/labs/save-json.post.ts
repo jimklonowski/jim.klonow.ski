@@ -15,19 +15,22 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'File saving is only available in development mode. Download the JSON and add it to content/labs/ manually.' })
   }
 
-  const body = await readBody<{ date: string }>(event)
+  const body = await readBody<{ date: string, _type?: string }>(event)
   if (!body?.date) {
     throw createError({ statusCode: 400, message: 'Missing date field' })
   }
 
-  const [{ writeFile }, { join }] = await Promise.all([
+  const [{ writeFile, mkdir }, { join }] = await Promise.all([
     import('node:fs/promises'),
     import('node:path')
   ])
 
-  const filename = `${body.date}.json`
-  const filepath = join(process.cwd(), 'content', 'labs', filename)
-  await writeFile(filepath, JSON.stringify(body, null, 2))
+  const folder = body._type === 'dexa' ? 'dexa' : 'labs'
+  const { _type: _, ...data } = body
+  const filename = `${data.date}.json`
+  const dir = join(process.cwd(), 'content', folder)
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, filename), JSON.stringify(data, null, 2))
 
-  return { ok: true, file: `content/labs/${filename}` }
+  return { ok: true, file: `content/${folder}/${filename}` }
 })

@@ -10,7 +10,10 @@
             <UBadge v-if="latest.fasting" variant="subtle" color="neutral" size="xs" class="ml-2">Fasting</UBadge>
           </p>
         </div>
-        <div>
+        <div class="flex gap-2">
+          <UButton variant="outline" size="xs" icon="i-lucide-scan" @click="goToDexa">
+            Body Composition
+          </UButton>
           <UButton to="/labs/upload" variant="outline" size="xs" icon="i-lucide-upload">
             Upload Results
           </UButton>
@@ -103,6 +106,7 @@
 <script setup lang="ts">
 import { BIOMARKERS, CATEGORY_LABELS, PINNED_MARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 definePageMeta({ middleware: 'labs-auth' })
 
@@ -124,13 +128,16 @@ const allSources = computed(() =>
 
 const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin']
 
-const tabItems = [
-  { label: 'Hormones', slot: 'hormones' as const },
-  { label: 'Metabolic', slot: 'metabolic' as const },
-  { label: 'Lipids', slot: 'lipids' as const },
-  { label: 'CBC', slot: 'cbc' as const },
-  { label: CATEGORY_LABELS.inflammation, slot: 'inflammation' as const }
-]
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('sm')
+
+const tabItems = computed(() => [
+  { label: isMobile.value ? undefined : 'Hormones', icon: 'i-lucide-activity', slot: 'hormones' as const },
+  { label: isMobile.value ? undefined : 'Metabolic', icon: 'i-lucide-flask-conical', slot: 'metabolic' as const },
+  { label: isMobile.value ? undefined : 'Lipids', icon: 'i-lucide-heart', slot: 'lipids' as const },
+  { label: isMobile.value ? undefined : 'CBC', icon: 'i-lucide-test-tube', slot: 'cbc' as const },
+  { label: isMobile.value ? undefined : CATEGORY_LABELS.inflammation, icon: 'i-lucide-leaf', slot: 'inflammation' as const }
+])
 
 function byCategory(cat: Category) {
   return Object.entries(BIOMARKERS)
@@ -146,6 +153,8 @@ function chartData(markerKey: string) {
       value: e.markers[markerKey] as number
     }))
 }
+
+function goToDexa() { window.location.href = '/labs/dexa' }
 
 function pdfLabel(src: string) {
   return src.split('/').pop()?.replace(/\.pdf$/i, '') ?? src
