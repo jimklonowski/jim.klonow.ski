@@ -4,6 +4,7 @@
     description="Vibe coding for my health."
     :links="[
       { label: 'Bloodwork Tracker', to: '/labs', icon: 'i-lucide-activity', color: 'primary', size: 'lg' },
+      { label: 'Peptide Journal', to: '/journal', icon: 'i-lucide-book-open', color: 'primary', variant: 'outline', size: 'lg' },
       { label: 'GitHub', to: 'https://github.com/jimklonowski', target: '_blank', icon: 'i-simple-icons-github', color: 'neutral', variant: 'ghost', size: 'lg' }
     ]"
     :ui="{
