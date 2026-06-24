@@ -2,6 +2,41 @@ import { defineCollection, defineContentConfig, z } from '@nuxt/content'
 
 export default defineContentConfig({
   collections: {
+    journal: defineCollection({
+      type: 'data',
+      source: 'journal/*.json',
+      schema: z.object({
+        date: z.string(),
+        day: z.number().optional(),
+        weight_lbs: z.number().nullable().optional(),
+        bp_systolic: z.number().nullable().optional(),
+        bp_diastolic: z.number().nullable().optional(),
+        rhr: z.number().nullable().optional(),
+        hrv: z.number().nullable().optional(),
+        peptides: z.array(z.object({
+          time: z.string(),
+          compound: z.string(),
+          dose: z.number(),
+          unit: z.enum(['mg', 'mcg', 'iu']),
+          site: z.string()
+        })).optional(),
+        food: z.object({
+          breakfast: z.string().optional(),
+          snack: z.string().optional(),
+          lunch: z.string().optional(),
+          dinner: z.string().optional()
+        }).optional(),
+        reconstitutions: z.array(z.object({
+          compound: z.string(),
+          vial_amount: z.number(),
+          vial_unit: z.enum(['mg', 'mcg', 'iu']),
+          supplier: z.string().optional(),
+          bac_water_ml: z.number()
+        })).optional(),
+        workout: z.string().optional(),
+        notes: z.string().optional()
+      })
+    }),
     labs: defineCollection({
       type: 'data',
       source: 'labs/*.json',
