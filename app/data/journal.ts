@@ -42,6 +42,10 @@ export const INJECTION_SITES = [
   { label: 'Left Quad', value: 'left_quad' },
   { label: 'Right Quad', value: 'right_quad' },
   { label: 'Abdomen', value: 'abdomen' },
+  { label: 'Left Love Handle', value: 'left_love_handle' },
+  { label: 'Right Love Handle', value: 'right_love_handle' },
+  { label: 'Left of Navel', value: 'left_navel' },
+  { label: 'Right of Navel', value: 'right_navel' },
   { label: 'Oral', value: 'oral' },
   { label: 'Intranasal', value: 'intranasal' },
   { label: 'Other', value: 'other' }
@@ -55,6 +59,10 @@ export const INJECTION_SITE_LABELS: Record<string, string> = {
   left_quad: 'Left Quad',
   right_quad: 'Right Quad',
   abdomen: 'Abdomen',
+  left_love_handle: 'Left Love Handle',
+  right_love_handle: 'Right Love Handle',
+  left_navel: 'Left of Navel',
+  right_navel: 'Right of Navel',
   oral: 'Oral',
   intranasal: 'Intranasal',
   other: 'Other'
@@ -69,7 +77,7 @@ export const DOSE_UNITS = [
 export const KNOWN_COMPOUNDS = [
   // Peptides
   'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500',
-  'Ipamorelin', 'CJC-1295', 'SS-31', 'Epitalon', 'Humanin',
+  'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
   'Thymosin Alpha-1', 'Thymosin Beta-4',
   // TRT / Hormones
   'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate',
@@ -89,6 +97,7 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'TB-500': '#ec4899',
   'Ipamorelin': '#06b6d4',
   'CJC-1295': '#84cc16',
+  'CJC-1295 / Ipamorelin': '#65a30d',
   'SS-31': '#f97316',
   'Epitalon': '#a855f7',
   'Testosterone Cypionate': '#dc2626',
