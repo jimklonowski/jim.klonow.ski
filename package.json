@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.06.24",
+  "version": "2026.06.29",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.105.0",
+    "@anthropic-ai/sdk": "^0.106.0",
     "@comark/nuxt": "0.4.0",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",
@@ -25,7 +25,7 @@
     "@nuxt/scripts": "1.2.1",
     "@nuxt/ui": "^4.9.0",
     "@nuxtjs/i18n": "10.4.0",
-    "@nuxtjs/seo": "5.3.0",
+    "@nuxtjs/seo": "5.3.1",
     "@pinia/nuxt": "0.11.3",
     "@takumi-rs/core": "^1.8.7",
     "@takumi-rs/wasm": "^1.8.7",
@@ -35,21 +35,21 @@
     "nuxt": "^4.4.8",
     "nuxt-charts": "^2.1.4",
     "pinia": "^3.0.4",
-    "shaders": "^2.5.131",
+    "shaders": "^2.5.132",
     "tailwindcss": "^4.3.1",
-    "vue": "^3.5.38",
+    "vue": "^3.5.39",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.114",
     "@iconify-json/simple-icons": "^1.2.87",
     "@nuxt/eslint": "^1.16.0",
-    "eslint": "^10.5.0",
+    "eslint": "^10.6.0",
     "nitro-cloudflare-dev": "^0.2.2",
     "remark-reading-time": "^2.1.0",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.5",
-    "wrangler": "^4.104.0"
+    "wrangler": "^4.105.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
