@@ -107,12 +107,31 @@
                   :key="slot"
                   class="flex items-center justify-center"
                   :style="{ width: `${cellWidth - 1}px`, height: `${ROW_H}px` }"
-                  :title="labSlots.has(slot) ? `Lab draw · ${labSlotLabel(slot)}` : undefined"
                 >
-                  <div
-                    v-if="labSlots.has(slot)"
-                    class="w-3 h-3 rounded-full border-2 border-amber-400 bg-amber-400/30"
-                  />
+                  <UPopover v-if="labSlots.has(slot)" :content="{ side: 'top', align: 'center' }">
+                    <div
+                      class="w-3 h-3 rounded-full border-2 border-amber-400 bg-amber-400/30 cursor-pointer hover:bg-amber-400/70 transition-colors"
+                      :title="`Lab draw · ${labSlotLabel(slot)}`"
+                    />
+                    <template #content>
+                      <div class="p-3 space-y-2 min-w-48">
+                        <p class="text-xs font-semibold text-muted uppercase tracking-wider">{{ labSlotLabel(slot) }}</p>
+                        <template v-if="labSourcesMap[slot]?.flatMap(l => l.sources).length">
+                          <a
+                            v-for="src in labSourcesMap[slot].flatMap(l => l.sources)"
+                            :key="src"
+                            :href="src"
+                            target="_blank"
+                            class="flex items-center gap-2 text-sm hover:text-primary transition-colors py-0.5"
+                          >
+                            <UIcon name="i-lucide-file-text" class="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                            {{ pdfLabel(src) }}
+                          </a>
+                        </template>
+                        <p v-else class="text-xs text-muted">No PDFs attached</p>
+                      </div>
+                    </template>
+                  </UPopover>
                 </div>
               </div>
             </div>
@@ -220,6 +239,19 @@ const labSlots = computed(() => {
   return set
 })
 
+const labSourcesMap = computed(() => {
+  const map: Record<string, { date: string, sources: string[] }[]> = {}
+  for (const lab of (labsData.value ?? [])) {
+    const l = lab as { date: string, sources?: string[] }
+    const key = zoom.value === 'week'
+      ? getWeekStart(l.date)
+      : l.date.substring(0, 7)
+    if (!map[key]) map[key] = []
+    map[key].push({ date: l.date, sources: l.sources ?? [] })
+  }
+  return map
+})
+
 function labSlotLabel(slot: string): string {
   const lab = (labsData.value ?? []).find((l) => {
     const key = zoom.value === 'week'
@@ -228,6 +260,10 @@ function labSlotLabel(slot: string): string {
     return key === slot
   })
   return lab ? (lab as { date: string }).date : slot
+}
+
+function pdfLabel(src: string): string {
+  return src.replace(/^\/labs\//, '').replace(/\.pdf$/i, '')
 }
 
 const weekSlots = computed((): string[] => {
