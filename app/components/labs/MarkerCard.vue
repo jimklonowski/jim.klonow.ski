@@ -43,6 +43,18 @@
           </span>
         </div>
 
+        <!-- Trend chart -->
+        <div v-if="chartPoints.length >= 2">
+          <ClientOnly>
+            <AreaChart
+              :data="chartPoints"
+              :categories="{ value: { name: meta.label, color: '#22c55e' } }"
+              :height="120"
+              :show-legend="false"
+            />
+          </ClientOnly>
+        </div>
+
         <USeparator />
 
         <!-- History table -->
@@ -129,6 +141,15 @@ const changeColor = computed(() => {
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+const chartPoints = computed(() =>
+  sorted.value
+    .filter(e => e.markers[props.biomarkerKey] != null)
+    .map(e => ({
+      date: formatDate(e.date),
+      value: e.markers[props.biomarkerKey] as number
+    }))
+)
 
 const history = computed(() =>
   sorted.value
