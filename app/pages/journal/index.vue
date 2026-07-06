@@ -26,6 +26,9 @@
           <UButton to="/journal/import" variant="outline" size="xs" icon="i-lucide-upload">
             Import
           </UButton>
+          <UButton to="/journal/calculator" variant="outline" size="xs" icon="i-lucide-calculator">
+            Calculator
+          </UButton>
           <UButton :to="`/journal/${todayDate}`" size="xs" icon="i-lucide-plus">
             New Entry
           </UButton>

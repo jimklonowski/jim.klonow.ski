@@ -35,7 +35,7 @@
           </UCard>
           <UCard>
             <p class="text-xs text-muted uppercase tracking-wider mb-1">First Used</p>
-            <p class="text-lg font-bold font-mono">{{ formatDate(onDays[0].date) }}</p>
+            <p class="text-lg font-bold font-mono">{{ formatDate(onDays[0]!.date) }}</p>
           </UCard>
           <UCard>
             <p class="text-xs text-muted uppercase tracking-wider mb-1">Last Used</p>
@@ -43,6 +43,89 @@
             <p class="text-xs text-muted mt-1">{{ daysAgo }} days ago</p>
           </UCard>
         </div>
+
+        <!-- Compound info -->
+        <section v-if="info">
+          <div class="flex items-baseline justify-between mb-4">
+            <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">About {{ compoundName }}</h2>
+            <UBadge variant="subtle" size="sm">{{ info.category }}</UBadge>
+          </div>
+          <UCard>
+            <div class="space-y-5">
+              <p v-if="info.aka" class="text-xs text-muted -mt-1">Also known as: {{ info.aka }}</p>
+              <p class="text-sm leading-relaxed">{{ info.summary }}</p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Typical Dosing</p>
+                  <p class="text-sm font-medium">{{ info.dosing.range }}</p>
+                  <p class="text-xs text-muted mt-0.5">{{ info.dosing.frequency }}</p>
+                  <p v-if="info.dosing.timing" class="text-xs text-muted mt-0.5">{{ info.dosing.timing }}</p>
+                  <p v-if="info.dosing.notes" class="text-xs text-muted mt-0.5">{{ info.dosing.notes }}</p>
+                </div>
+                <div v-if="info.reconstitution">
+                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Reconstitution</p>
+                  <p class="text-sm">{{ info.reconstitution.instructions }}</p>
+                  <p v-if="info.reconstitution.measuring" class="text-xs text-muted mt-0.5">{{ info.reconstitution.measuring }}</p>
+                </div>
+                <div v-if="info.cycling">
+                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Cycling</p>
+                  <p class="text-sm">{{ info.cycling }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Storage</p>
+                  <p class="text-sm">{{ info.storage }}</p>
+                </div>
+                <div v-if="info.halfLife">
+                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Half-Life</p>
+                  <p class="text-sm">{{ info.halfLife }}</p>
+                </div>
+              </div>
+
+              <p v-if="info.caution" class="text-xs text-warning border-t border-default pt-3">{{ info.caution }}</p>
+              <p class="text-xs text-muted italic border-t border-default pt-3">{{ GENERAL_DISCLAIMER }}</p>
+            </div>
+          </UCard>
+        </section>
+
+        <!-- Syringe units -->
+        <section v-if="currentMix">
+          <div class="flex items-baseline justify-between mb-4">
+            <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Syringe Units (Your Mix)</h2>
+            <UButton
+              :to="calculatorLink"
+              variant="ghost"
+              size="xs"
+              icon="i-lucide-calculator"
+            >
+              Open in Calculator
+            </UButton>
+          </div>
+          <UCard>
+            <template #header>
+              <p class="text-sm font-medium">
+                {{ currentMix.vial_amount }}{{ currentMix.vial_unit }} vial + {{ currentMix.bac_water_ml }}mL BAC water
+              </p>
+              <p class="text-xs text-muted">
+                ≈ {{ concentrationPerMl }} {{ currentMix.vial_unit }}/mL · 1 unit (0.01 mL) ≈ {{ mcgPerUnit }} {{ unit }}
+              </p>
+            </template>
+            <ClientOnly>
+              <BarChart
+                :data="syringeChart"
+                :categories="{ units: { name: 'Units', color: getCompoundColor(compoundName) } }"
+                :y-axis="['units']"
+                x-axis="dose"
+                :height="180"
+                :hide-legend="true"
+                :radius="4"
+              />
+            </ClientOnly>
+            <p class="text-xs text-muted mt-4">
+              Based on your most recently logged mix ({{ formatDate(currentMix.date) }}). Units shown are for a U-100 insulin syringe (1 unit = 0.01 mL) — recalculate if you switch to a different vial size or dilution.
+            </p>
+          </UCard>
+        </section>
 
         <!-- Vitals impact -->
         <section v-if="hasVitalsData">
@@ -163,11 +246,14 @@
 
 <script setup lang="ts">
 import { getCompoundColor, formatSite } from '~/data/journal'
+import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
+import { calcUnits, type MixUnit } from '~/utils/peptideCalc'
 
 definePageMeta({ middleware: 'journal-auth' })
 
 const route = useRoute()
 const compoundName = computed(() => decodeURIComponent(route.params.name as string))
+const info = computed(() => getCompoundInfo(compoundName.value))
 
 const { data, refresh } = await useAsyncData('/journal', () =>
   queryCollection('journal').order('date', 'ASC').all(),
@@ -270,6 +356,62 @@ const doseChart = computed(() =>
     return { date: e.date.substring(5), dose: total }
   })
 )
+
+// --- Syringe units ---
+type Reconstitution = { compound: string; vial_amount: number; vial_unit: MixUnit; bac_water_ml: number }
+
+const reconstitutions = computed(() =>
+  entries.value
+    .flatMap(e =>
+      (e.reconstitutions ?? [])
+        .filter((r: Reconstitution) => r.compound === compoundName.value)
+        .map((r: Reconstitution) => ({ ...r, date: e.date }))
+    )
+    .sort((a, b) => a.date.localeCompare(b.date))
+)
+
+const currentMix = computed(() => reconstitutions.value.at(-1) ?? null)
+
+const concentrationPerMl = computed(() => {
+  const mix = currentMix.value
+  if (!mix || !mix.bac_water_ml) return null
+  return Math.round((mix.vial_amount / mix.bac_water_ml) * 1000) / 1000
+})
+
+const mcgPerUnit = computed(() => {
+  const mix = currentMix.value
+  if (!mix) return null
+  const units = calcUnits(1, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
+  if (!units) return null
+  return Math.round((1 / units) * 1000) / 1000
+})
+
+const syringeChart = computed(() => {
+  const mix = currentMix.value
+  if (!mix) return []
+  const doses = [...new Set(allInjections.value.map(p => p.dose))].sort((a, b) => a - b)
+  return doses
+    .map(dose => {
+      const units = calcUnits(dose, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
+      return { dose: `${dose} ${unit.value}`, units: units != null ? Math.round(units * 10) / 10 : null }
+    })
+    .filter((d): d is { dose: string, units: number } => d.units != null)
+})
+
+const calculatorLink = computed(() => {
+  const mix = currentMix.value
+  if (!mix) return '/journal/calculator'
+  return {
+    path: '/journal/calculator',
+    query: {
+      vialAmount: mix.vial_amount,
+      vialUnit: mix.vial_unit,
+      bacWaterMl: mix.bac_water_ml,
+      dose: avgDose.value,
+      doseUnit: unit.value
+    }
+  }
+})
 
 // --- Site breakdown ---
 const siteBreakdown = computed(() => {
