@@ -6,7 +6,8 @@ Structure:
 {
   "date": "YYYY-MM-DD",
   "fasting": true,
-  "markers": {}
+  "markers": {},
+  "qualitative": [{ "name": "Factor V Leiden Mutation Analysis", "result": "Negative" }]
 }
 
 Rules:
@@ -15,6 +16,8 @@ Rules:
 - For values like "<10", use the number 10
 - For values like ">X", use X
 - Only include markers actually present in the report
+- markers is ONLY for numeric results matching one of the exact key names below
+- qualitative is for any test result that is NOT a plain number — genetic/mutation analyses, antibody positive/negative, presence/absence findings, or any other categorical result. Use the report's own test name for "name" and its exact reported result (e.g. "Negative", "Heterozygous", "Detected") for "result". Omit qualitative entirely if there are no such results.
 
 Use EXACTLY these key names (lab name → key):
 GLUCOSE → glucose

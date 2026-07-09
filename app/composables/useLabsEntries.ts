@@ -1,8 +1,14 @@
+export interface QualitativeResult {
+  name: string
+  result: string
+}
+
 export interface LabsEntry {
   date: string
   fasting: boolean
   sources: string[]
   markers: Record<string, number | null>
+  qualitative: QualitativeResult[]
 }
 
 export function useLabsEntries() {
