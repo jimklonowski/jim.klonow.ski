@@ -56,7 +56,7 @@
         @drop.prevent="onDrop"
       >
         <UIcon name="i-lucide-upload-cloud" class="w-14 h-14 text-muted mb-4" />
-        <p class="text-lg font-medium">Drop your {{ reportType === 'dexa' ? 'DEXA scan' : 'lab' }} PDF here</p>
+        <p class="text-lg font-medium">Drop your {{ dropZoneLabel }} PDF here</p>
         <p class="text-sm text-muted mt-1">or click to browse</p>
         <input ref="fileInput" type="file" accept=".pdf,application/pdf" class="hidden" @change="onFileSelect" />
       </div>
@@ -205,10 +205,18 @@ async function submitPin() {
 // Report type
 const REPORT_TYPES = [
   { value: 'bloodwork', label: 'Bloodwork', icon: 'i-lucide-test-tube' },
-  { value: 'dexa', label: 'DEXA Scan', icon: 'i-lucide-scan' }
+  { value: 'dexa', label: 'DEXA Scan', icon: 'i-lucide-scan' },
+  { value: 'echo', label: 'Echocardiogram', icon: 'i-lucide-heart-pulse' }
 ] as const
-type ReportType = 'bloodwork' | 'dexa'
+type ReportType = 'bloodwork' | 'dexa' | 'echo'
 const reportType = ref<ReportType>('bloodwork')
+
+const DROP_ZONE_LABELS: Record<ReportType, string> = {
+  bloodwork: 'lab',
+  dexa: 'DEXA scan',
+  echo: 'echocardiogram'
+}
+const dropZoneLabel = computed(() => DROP_ZONE_LABELS[reportType.value])
 
 // Upload state
 const fileInput = ref<HTMLInputElement | null>(null)

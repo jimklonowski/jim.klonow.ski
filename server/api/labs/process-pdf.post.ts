@@ -127,6 +127,27 @@ Rules:
 - Omit any section not present in the report (vat, bone_density, symmetry are optional)
 - Return ONLY valid JSON`
 
+const ECHO_EXTRACTION_PROMPT = `Extract data from this transthoracic echocardiogram report and return ONLY valid JSON — no markdown, no explanation.
+
+Structure:
+{
+  "date": "YYYY-MM-DD",
+  "markers": {},
+  "qualitative": [{ "name": "...", "result": "..." }]
+}
+
+Rules:
+- date: the study date in YYYY-MM-DD format
+- markers keys and where to find each value in the "Measurements" table — use EXACTLY these names:
+  - la_volume_index: the "Vol/bsa, S" row under the "Left atrium" section (ml/m²)
+  - lv_mass_index: the "Mass/bsa" row under the "Left ventricle" section (g/m²)
+  - e_e_prime_ratio: the "E/e', avg, TDI" row under the "Left ventricle" section (unitless)
+  - ivs_thickness: the "IVS, ED" row under the "Ventricular septum" section specifically (cm) — do NOT use the "PW, ED" row under "Left ventricle", which is a different measurement (posterior wall, not septum)
+  - ejection_fraction: the estimated ejection fraction stated in the Conclusions/Observations narrative text (not the measurements table). It is usually given as a range like "55-60%" — use the midpoint (e.g. 57.5 for "55-60%")
+- Only include a marker if its value is actually present in the report
+- qualitative: any notable narrative findings from the Conclusions/Observations/Summary sections that are not plain numbers — valve regurgitation/stenosis grades, wall motion abnormalities, chamber size/function descriptions, pericardial findings, overall impression, etc. Use a short descriptive "name" (e.g. "Mitral Valve", "Overall Impression") and the finding as "result" (e.g. "Mild regurgitation", "Normal LV systolic and diastolic function"). Omit qualitative entirely if there's nothing notable.
+- Return ONLY valid JSON`
+
 export default defineEventHandler(async (event) => {
   const authCookie = getCookie(event, 'labs-auth')
   const secret = process.env.LABS_SECRET
@@ -158,7 +179,11 @@ export default defineEventHandler(async (event) => {
   const reportTypePart = formData.find(p => p.name === 'type')
   const reportType = reportTypePart?.data?.toString() ?? 'bloodwork'
 
-  const prompt = reportType === 'dexa' ? DEXA_EXTRACTION_PROMPT : EXTRACTION_PROMPT
+  const prompt = reportType === 'dexa'
+    ? DEXA_EXTRACTION_PROMPT
+    : reportType === 'echo'
+      ? ECHO_EXTRACTION_PROMPT
+      : EXTRACTION_PROMPT
 
   const base64Data = Buffer.from(pdf.data).toString('base64')
 
