@@ -243,14 +243,8 @@ import { getCompoundColor } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
 
-const route = useRoute()
-const { data, refresh } = await useAsyncData(route.path, () =>
-  queryCollection('journal').order('date', 'ASC').all(),
-  { getCachedData: (key, app) => { const d = app.payload.data[key]; return d?.length ? d : undefined } }
-)
-const { data: labsData } = await useAsyncData('labs-draws', () =>
-  queryCollection('labs').order('date', 'ASC').all()
-)
+const { data, refresh } = await useJournalEntries()
+const { data: labsData } = await useLabsEntries()
 
 onMounted(refresh)
 

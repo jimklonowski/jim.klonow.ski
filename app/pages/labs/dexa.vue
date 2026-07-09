@@ -194,9 +194,7 @@ import { DEXA_TOTAL_METRICS, REGION_LABELS } from '~/data/dexa'
 
 definePageMeta({ middleware: 'labs-auth' })
 
-const { data, refresh } = await useAsyncData('dexa', () =>
-  queryCollection('dexa').order('date', 'ASC').all()
-)
+const { data, refresh } = await useDexaEntries()
 
 if (import.meta.client) {
   onMounted(refresh)

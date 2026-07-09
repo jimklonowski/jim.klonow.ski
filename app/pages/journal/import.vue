@@ -219,14 +219,6 @@
               </div>
             </li>
           </ol>
-
-          <UAlert
-            icon="i-lucide-info"
-            color="neutral"
-            variant="subtle"
-            title="Dev-only note"
-            description="Like the journal save button, the webhook only writes files in dev mode (npm run dev). In production the endpoint will return 403 until file-based writes are replaced with a database."
-          />
         </UCard>
       </section>
 
@@ -249,10 +241,7 @@ const RECORD_TYPES: Record<string, string> = {
   HKQuantityTypeIdentifierBloodPressureDiastolic: 'bp_diastolic',
 }
 
-const { data: allEntries } = await useAsyncData('/journal', () =>
-  queryCollection('journal').order('date', 'ASC').all(),
-  { getCachedData: (key, app) => { const d = app.payload.data[key]; return d?.length ? d : undefined } }
-)
+const { data: allEntries } = await useJournalEntries()
 
 const entryMap = computed(() => {
   const map: Record<string, typeof allEntries.value extends Array<infer T> ? T : never> = {}

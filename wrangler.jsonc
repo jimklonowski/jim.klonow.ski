@@ -13,5 +13,18 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jim-klonow-ski-db",
+      "database_id": "03e6065f-e6e1-4a3d-ad03-d70d675a0bf3"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "LABS_BUCKET",
+      "bucket_name": "jim-klonow-ski-labs"
+    }
   ]
 }
