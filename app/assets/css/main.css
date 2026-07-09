@@ -17,4 +17,12 @@
   --color-green-800: #016538;
   --color-green-900: #0A5331;
   --color-green-950: #052E16;
+
+  --container-10xl: 100rem;
+  --container-11xl: 110rem;
+  --container-12xl: 120rem;
+}
+
+:root {
+  --ui-container: var(--container-10xl);
 }

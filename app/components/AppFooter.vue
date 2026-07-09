@@ -1,10 +1,10 @@
 <template>
   <UFooter>
-    <ULocaleSelect
+    <!-- <ULocaleSelect
       :model-value="locale"
       :locales="[en, es, fr]"
       @update:model-value="setLocale($event as typeof locale)"
-    />
+    /> -->
     <UColorModeButton />
   </UFooter>
 </template>
