@@ -114,6 +114,11 @@
               <LabsMarkerCard v-for="key in byCategory('inflammation')" :key="key" :biomarker-key="key" :entries="entries" />
             </div>
           </template>
+          <template #cardiac>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
+              <LabsMarkerCard v-for="key in byCategory('cardiac')" :key="key" :biomarker-key="key" :entries="entries" />
+            </div>
+          </template>
         </UTabs>
       </section>
     </div>
@@ -151,7 +156,7 @@ function qualitativeColor(result: string) {
   return /^(negative|not detected|normal|absent)$/i.test(result.trim()) ? 'success' : 'warning'
 }
 
-const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin']
+const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin', 'la_volume_index']
 
 const breakpoints = useBreakpoints(breakpointsTailwind)
 const isMobile = breakpoints.smaller('sm')
@@ -161,7 +166,8 @@ const tabItems = computed(() => [
   { label: isMobile.value ? undefined : 'Metabolic', icon: 'i-lucide-flask-conical', slot: 'metabolic' as const },
   { label: isMobile.value ? undefined : 'Lipids', icon: 'i-lucide-heart', slot: 'lipids' as const },
   { label: isMobile.value ? undefined : 'CBC', icon: 'i-lucide-test-tube', slot: 'cbc' as const },
-  { label: isMobile.value ? undefined : CATEGORY_LABELS.inflammation, icon: 'i-lucide-leaf', slot: 'inflammation' as const }
+  { label: isMobile.value ? undefined : CATEGORY_LABELS.inflammation, icon: 'i-lucide-leaf', slot: 'inflammation' as const },
+  { label: isMobile.value ? undefined : CATEGORY_LABELS.cardiac, icon: 'i-lucide-heart-pulse', slot: 'cardiac' as const }
 ])
 
 function byCategory(cat: Category) {

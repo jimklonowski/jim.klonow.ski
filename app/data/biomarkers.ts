@@ -3,7 +3,8 @@ export const CATEGORY_LABELS = {
   metabolic: 'Metabolic',
   lipids: 'Lipids',
   cbc: 'CBC',
-  inflammation: 'Inflammation & Nutrients'
+  inflammation: 'Inflammation & Nutrients',
+  cardiac: 'Cardiac'
 } as const
 
 export type Category = keyof typeof CATEGORY_LABELS
@@ -92,7 +93,14 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   iron: { label: 'Iron', unit: 'mcg/dL', category: 'inflammation', refMin: 50, refMax: 180, description: 'Serum iron — the amount of iron circulating in the blood. A single snapshot; interpret alongside ferritin and TIBC for a complete picture of iron status.' },
   tibc: { label: 'Iron Binding Capacity', unit: 'mcg/dL', category: 'inflammation', refMin: 250, refMax: 425, description: 'Total Iron Binding Capacity — measures how much iron the blood could carry. High TIBC with low ferritin strongly indicates iron deficiency.' },
   iron_saturation: { label: 'Iron Saturation', unit: '%', category: 'inflammation', refMin: 20, refMax: 48, description: 'Percentage of iron-binding capacity that is currently filled with iron. Below 20% with low ferritin confirms iron deficiency; above 50% may suggest iron overload.' },
-  ferritin: { label: 'Ferritin', unit: 'ng/mL', category: 'inflammation', refMin: 38, refMax: 380, pinned: true, description: 'Protein that stores iron in cells — the best single test for body iron stores. Low ferritin confirms iron deficiency before anemia develops. Also an acute-phase reactant, so can be falsely elevated during inflammation.' }
+  ferritin: { label: 'Ferritin', unit: 'ng/mL', category: 'inflammation', refMin: 38, refMax: 380, pinned: true, description: 'Protein that stores iron in cells — the best single test for body iron stores. Low ferritin confirms iron deficiency before anemia develops. Also an acute-phase reactant, so can be falsely elevated during inflammation.' },
+
+  // Cardiac (from echocardiogram)
+  la_volume_index: { label: 'LA Volume Index', unit: 'ml/m²', category: 'cardiac', refMin: 16, refMax: 34, pinned: true, description: 'Left atrial volume indexed to body surface area. The strongest echocardiographic predictor of future atrial fibrillation — an enlarged left atrium reflects chronic pressure/volume overload and remodeling that predisposes to AFib.' },
+  ejection_fraction: { label: 'Ejection Fraction', unit: '%', category: 'cardiac', refMin: 55, refMax: 70, description: 'Percentage of blood pumped out of the left ventricle with each contraction. The primary measure of LV systolic (pumping) function. Often reported as a range on echo; the midpoint is used here for trending.' },
+  e_e_prime_ratio: { label: "E/e' Ratio", unit: '', category: 'cardiac', refMax: 14, description: 'Ratio comparing mitral inflow velocity (E) to tissue Doppler annular velocity (e\'). A key non-invasive marker of left ventricular diastolic function and filling pressures — elevated values suggest diastolic dysfunction.' },
+  lv_mass_index: { label: 'LV Mass Index', unit: 'g/m²', category: 'cardiac', refMin: 50, refMax: 102, description: 'Left ventricular mass indexed to body surface area. Elevated values indicate left ventricular hypertrophy, often driven by chronic high blood pressure, and is itself an independent risk factor for atrial fibrillation.' },
+  ivs_thickness: { label: 'Septal Wall Thickness', unit: 'cm', category: 'cardiac', refMin: 0.6, refMax: 1.0, description: 'Interventricular septum thickness at end-diastole. Thickening (beyond the normal range) is an early sign of left ventricular hypertrophy, frequently from chronic hypertension.' }
 }
 
 export const PINNED_MARKERS = Object.entries(BIOMARKERS)
