@@ -33,7 +33,7 @@
             </div>
           </template>
         </UPopover>
-        <UButton to="/labs/upload" variant="outline" size="xs" icon="i-lucide-upload">
+        <UButton to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
           Upload Scan
         </UButton>
       </div>
