@@ -1,3 +1,13 @@
+interface Vitals {
+  weight_lbs?: number
+  rhr?: number
+  hrv?: number
+  bp_systolic?: number
+  bp_diastolic?: number
+}
+
+const VITAL_FIELDS = ['weight_lbs', 'rhr', 'hrv', 'bp_systolic', 'bp_diastolic'] as const
+
 export default defineEventHandler(async (event) => {
   const auth = getHeader(event, 'authorization')
   const secret = process.env.LABS_SECRET
@@ -5,21 +15,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 
-  if (!import.meta.dev) {
-    throw createError({ statusCode: 403, message: 'File saving is only available in development mode.' })
-  }
-
   const body = await readBody(event)
-  const metrics: Array<{ name: string; units?: string; data: Array<Record<string, unknown>> }> =
+  const metrics: Array<{ name: string, units?: string, data: Array<Record<string, unknown>> }> =
     body?.data?.metrics ?? []
 
-  const byDate: Record<string, {
-    weight_lbs?: number
-    rhr?: number
-    hrv?: number
-    bp_systolic?: number
-    bp_diastolic?: number
-  }> = {}
+  const byDate: Record<string, Vitals> = {}
 
   for (const metric of metrics) {
     const { name, units, data } = metric
@@ -55,42 +55,42 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const [{ readFile, writeFile, mkdir }, { join }] = await Promise.all([
-    import('node:fs/promises'),
-    import('node:path')
-  ])
-
-  const dir = join(process.cwd(), 'content', 'journal')
-  await mkdir(dir, { recursive: true })
-
-  const updated: string[] = []
+  const db = getDb(event)
   const created: string[] = []
+  const updated: string[] = []
 
   for (const [date, vitals] of Object.entries(byDate)) {
-    const filePath = join(dir, `${date}.json`)
-    let entry: Record<string, unknown>
-    let existed = false
+    const existing = await db.prepare('SELECT weight_lbs, rhr, hrv, bp_systolic, bp_diastolic FROM journal_entries WHERE date = ?1')
+      .bind(date).first<Record<string, number | null>>()
 
-    try {
-      entry = JSON.parse(await readFile(filePath, 'utf-8'))
-      existed = true
-    }
-    catch {
-      entry = { date, peptides: [], reconstitutions: [], food: {}, workout: '', notes: '' }
+    if (!existing) {
+      await db.prepare(`
+        INSERT INTO journal_entries (date, peptides, reconstitutions, food, workout, notes, weight_lbs, rhr, hrv, bp_systolic, bp_diastolic)
+        VALUES (?1, '[]', '[]', '{}', '', '', ?2, ?3, ?4, ?5, ?6)
+      `).bind(
+        date,
+        vitals.weight_lbs ?? null,
+        vitals.rhr ?? null,
+        vitals.hrv ?? null,
+        vitals.bp_systolic ?? null,
+        vitals.bp_diastolic ?? null
+      ).run()
+      created.push(date)
+      continue
     }
 
-    let changed = false
-    for (const [field, value] of Object.entries(vitals)) {
-      if (entry[field] == null && value != null) {
-        entry[field] = value
-        changed = true
-      }
+    const patch: Partial<Vitals> = {}
+    for (const field of VITAL_FIELDS) {
+      if (existing[field] == null && vitals[field] != null) patch[field] = vitals[field]
     }
+    if (Object.keys(patch).length === 0) continue
 
-    if (changed) {
-      await writeFile(filePath, JSON.stringify(entry, null, 2))
-      existed ? updated.push(date) : created.push(date)
-    }
+    const fields = Object.keys(patch) as Array<keyof Vitals>
+    const setClause = fields.map((f, i) => `${f} = ?${i + 2}`).join(', ')
+    await db.prepare(`UPDATE journal_entries SET ${setClause} WHERE date = ?1`)
+      .bind(date, ...fields.map(f => patch[f]))
+      .run()
+    updated.push(date)
   }
 
   return { ok: true, created: created.length, updated: updated.length, dates: [...created, ...updated].sort() }

@@ -7,7 +7,6 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxt/ui',
     '@nuxtjs/seo',
-    '@nuxt/content',
     '@vueuse/nuxt',
     '@nuxt/scripts',
     '@nuxtjs/i18n',
@@ -17,17 +16,6 @@ export default defineNuxtConfig({
   ],
 
   compatibilityDate: '2026-05-01',
-
-  content: {
-    build: {
-      markdown: {
-        remarkPlugins: {
-          'remark-reading-time': {}
-        }
-      }
-    },
-    watch: { enabled: true }
-  },
 
   css: ['~/assets/css/main.css'],
 
@@ -132,8 +120,6 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: [
         '@unhead/schema-org/vue',
-        '@vue/devtools-core',
-        '@vue/devtools-kit',
         'shaders/vue'
       ]
     },

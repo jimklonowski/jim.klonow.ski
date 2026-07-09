@@ -1,28 +1,41 @@
 export default defineEventHandler(async (event) => {
-  const authCookie = getCookie(event, 'labs-auth')
-  const secret = process.env.LABS_SECRET
-  if (!secret || !authCookie || authCookie !== secret) {
-    throw createError({ statusCode: 401, message: 'Unauthorized' })
-  }
+  requireLabsAuth(event)
 
-  if (!import.meta.dev) {
-    throw createError({ statusCode: 403, message: 'File saving is only available in development mode. Download the JSON and add it to content/journal/ manually.' })
-  }
-
-  const body = await readBody<{ date: string }>(event)
-  if (!body?.date) {
+  const body = await readBody<Record<string, unknown>>(event)
+  if (!body?.date || typeof body.date !== 'string') {
     throw createError({ statusCode: 400, message: 'Missing date field' })
   }
 
-  const [{ writeFile, mkdir }, { join }] = await Promise.all([
-    import('node:fs/promises'),
-    import('node:path')
-  ])
+  const db = getDb(event)
+  await db.prepare(`
+    INSERT INTO journal_entries (date, day, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions, food, workout, notes)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+    ON CONFLICT(date) DO UPDATE SET
+      day = excluded.day,
+      weight_lbs = excluded.weight_lbs,
+      bp_systolic = excluded.bp_systolic,
+      bp_diastolic = excluded.bp_diastolic,
+      rhr = excluded.rhr,
+      hrv = excluded.hrv,
+      peptides = excluded.peptides,
+      reconstitutions = excluded.reconstitutions,
+      food = excluded.food,
+      workout = excluded.workout,
+      notes = excluded.notes
+  `).bind(
+    body.date,
+    body.day ?? null,
+    body.weight_lbs ?? null,
+    body.bp_systolic ?? null,
+    body.bp_diastolic ?? null,
+    body.rhr ?? null,
+    body.hrv ?? null,
+    JSON.stringify(body.peptides ?? []),
+    JSON.stringify(body.reconstitutions ?? []),
+    JSON.stringify(body.food ?? {}),
+    body.workout ?? '',
+    body.notes ?? ''
+  ).run()
 
-  const filename = `${body.date}.json`
-  const dir = join(process.cwd(), 'content', 'journal')
-  await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, filename), JSON.stringify(body, null, 2))
-
-  return { ok: true, file: `content/journal/${filename}` }
+  return { ok: true, date: body.date }
 })
