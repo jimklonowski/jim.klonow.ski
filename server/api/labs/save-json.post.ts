@@ -44,6 +44,24 @@ export default defineEventHandler(async (event) => {
     return { ok: true, table: 'dexa_entries', date: data.date }
   }
 
+  // Merge with any existing row for this date rather than replacing it outright —
+  // lets multiple one-off single-result uploads for the same date add up instead of clobbering each other.
+  const existing = await db.prepare('SELECT sources, markers, qualitative FROM labs_entries WHERE date = ?1')
+    .bind(data.date).first<{ sources: string, markers: string, qualitative: string }>()
+
+  const existingSources = existing ? JSON.parse(existing.sources || '[]') as string[] : []
+  const existingMarkers = existing ? JSON.parse(existing.markers || '{}') as Record<string, number> : {}
+  const existingQualitative = existing ? JSON.parse(existing.qualitative || '[]') as { name: string, result: string }[] : []
+
+  const newSources = (data.sources ?? []) as string[]
+  const mergedSources = [...new Set([...existingSources, ...newSources])]
+  const mergedMarkers = { ...existingMarkers, ...(data.markers as Record<string, number> ?? {}) }
+  const newQualitative = (data.qualitative ?? []) as { name: string, result: string }[]
+  const mergedQualitative = [
+    ...existingQualitative.filter(q => !newQualitative.some(n => n.name === q.name)),
+    ...newQualitative
+  ]
+
   await db.prepare(`
     INSERT INTO labs_entries (date, fasting, sources, markers, qualitative)
     VALUES (?1, ?2, ?3, ?4, ?5)
@@ -55,9 +73,9 @@ export default defineEventHandler(async (event) => {
   `).bind(
     data.date,
     data.fasting ? 1 : 0,
-    JSON.stringify(data.sources ?? []),
-    JSON.stringify(data.markers ?? {}),
-    JSON.stringify(data.qualitative ?? [])
+    JSON.stringify(mergedSources),
+    JSON.stringify(mergedMarkers),
+    JSON.stringify(mergedQualitative)
   ).run()
 
   return { ok: true, table: 'labs_entries', date: data.date }
