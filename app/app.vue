@@ -5,10 +5,6 @@
       <NuxtPage />
     </NuxtLayout>
 
-    <ClientOnly>
-      <LazyUContentSearch />
-    </ClientOnly>
-
   </UApp>
 </template>
 
