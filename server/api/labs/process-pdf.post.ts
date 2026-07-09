@@ -1,5 +1,17 @@
 import Anthropic from '@anthropic-ai/sdk'
 
+// Builds "[Description]-[YYYY-MM-DD].pdf" from an arbitrary uploaded filename, stripping any
+// date-like text already in it first so re-running extraction never doubles up the date.
+function buildPdfFilename(originalName: string, date: string): string {
+  const base = originalName
+    .replace(/\.pdf$/i, '')
+    .replace(/[-_ ]*\d{4}-\d{2}-\d{2}$/, '')
+    .replace(/\d{4}$/, '')
+    .replace(/[-_ ]+$/, '')
+    .trim() || 'LabResult'
+  return `${base}-${date}.pdf`
+}
+
 const EXTRACTION_PROMPT = `Extract all biomarker values from this lab report PDF and return ONLY a valid JSON object — no markdown, no explanation, just JSON.
 
 Structure:
@@ -216,7 +228,14 @@ export default defineEventHandler(async (event) => {
   }
 
   // Store the PDF in R2 — sources hold bare object keys; list endpoints turn them into proxy URLs.
-  const pdfFilename = pdf.filename ?? 'lab.pdf'
+  // Filename is derived from the extracted (authoritative) date, not whatever the file was named on
+  // upload, so every stored PDF follows "[Description]-[YYYY-MM-DD].pdf" regardless of source filename.
+  const extractedDate = typeof extracted.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(extracted.date)
+    ? extracted.date
+    : null
+  const pdfFilename = extractedDate
+    ? buildPdfFilename(pdf.filename ?? 'LabResult.pdf', extractedDate)
+    : (pdf.filename ?? 'lab.pdf')
   const bucket = getLabsBucket(event)
   await bucket.put(pdfFilename, pdf.data, {
     httpMetadata: { contentType: 'application/pdf' }
