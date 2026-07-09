@@ -96,11 +96,9 @@ const sorted = computed(() =>
   [...props.entries].sort((a, b) => a.date.localeCompare(b.date))
 )
 
-const current = computed(() => sorted.value.at(-1)?.markers[props.biomarkerKey] ?? null)
-const prev = computed(() => {
-  const withValue = sorted.value.filter(e => e.markers[props.biomarkerKey] != null)
-  return withValue.length >= 2 ? (withValue.at(-2)?.markers[props.biomarkerKey] ?? null) : null
-})
+const withValue = computed(() => sorted.value.filter(e => e.markers[props.biomarkerKey] != null))
+const current = computed(() => withValue.value.at(-1)?.markers[props.biomarkerKey] ?? null)
+const prev = computed(() => withValue.value.length >= 2 ? (withValue.value.at(-2)?.markers[props.biomarkerKey] ?? null) : null)
 
 const displayValue = computed(() => {
   if (current.value === null || current.value === undefined) return '—'

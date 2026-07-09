@@ -258,7 +258,8 @@ function labSlotLabel(slot: string): string {
 }
 
 function pdfLabel(src: string): string {
-  return src.replace(/^\/labs\//, '').replace(/\.pdf$/i, '')
+  const filename = src.split('/').pop() ?? src
+  return decodeURIComponent(filename).replace(/\.pdf$/i, '')
 }
 
 const weekSlots = computed((): string[] => {
