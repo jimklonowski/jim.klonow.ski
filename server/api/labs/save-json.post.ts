@@ -45,17 +45,19 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.prepare(`
-    INSERT INTO labs_entries (date, fasting, sources, markers)
-    VALUES (?1, ?2, ?3, ?4)
+    INSERT INTO labs_entries (date, fasting, sources, markers, qualitative)
+    VALUES (?1, ?2, ?3, ?4, ?5)
     ON CONFLICT(date) DO UPDATE SET
       fasting = excluded.fasting,
       sources = excluded.sources,
-      markers = excluded.markers
+      markers = excluded.markers,
+      qualitative = excluded.qualitative
   `).bind(
     data.date,
     data.fasting ? 1 : 0,
     JSON.stringify(data.sources ?? []),
-    JSON.stringify(data.markers ?? {})
+    JSON.stringify(data.markers ?? {}),
+    JSON.stringify(data.qualitative ?? [])
   ).run()
 
   return { ok: true, table: 'labs_entries', date: data.date }

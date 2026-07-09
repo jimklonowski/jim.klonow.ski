@@ -116,6 +116,18 @@
         </UCard>
       </div>
 
+      <div v-if="result.qualitative?.length" class="space-y-2">
+        <p class="text-xs font-semibold text-muted uppercase tracking-wider">Genetic &amp; Qualitative Results</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <UCard v-for="item in result.qualitative" :key="item.name">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium">{{ item.name }}</p>
+              <UBadge :color="qualitativeColor(item.result)" variant="subtle">{{ item.result }}</UBadge>
+            </div>
+          </UCard>
+        </div>
+      </div>
+
       <div class="flex flex-wrap gap-3">
         <UButton icon="i-lucide-download" @click="downloadJson">Download JSON</UButton>
         <UButton variant="outline" icon="i-lucide-save" :loading="saving" @click="saveToSite">
@@ -141,10 +153,20 @@ import { BIOMARKERS } from '~/data/biomarkers'
 
 definePageMeta({ middleware: 'labs-auth' })
 
+interface QualitativeResult {
+  name: string
+  result: string
+}
+
 interface LabResult {
   date: string
   fasting: boolean
   markers: Record<string, number>
+  qualitative?: QualitativeResult[]
+}
+
+function qualitativeColor(result: string) {
+  return /^(negative|not detected|normal|absent)$/i.test(result.trim()) ? 'success' : 'warning'
 }
 
 // PIN gate — validated server-side (httpOnly cookie, not readable by JS)

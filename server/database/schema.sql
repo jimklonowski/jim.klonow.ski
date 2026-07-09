@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS labs_entries (
   date TEXT PRIMARY KEY,
   fasting INTEGER NOT NULL DEFAULT 0,
   sources TEXT NOT NULL DEFAULT '[]',
-  markers TEXT NOT NULL DEFAULT '{}'
+  markers TEXT NOT NULL DEFAULT '{}',
+  qualitative TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS dexa_entries (

@@ -38,7 +38,8 @@ export function parseLabsRow(row: Record<string, unknown>) {
     date: row.date as string,
     fasting: !!row.fasting,
     sources: (JSON.parse((row.sources as string) || '[]') as string[]).map(toPdfUrl),
-    markers: JSON.parse((row.markers as string) || '{}')
+    markers: JSON.parse((row.markers as string) || '{}'),
+    qualitative: JSON.parse((row.qualitative as string) || '[]')
   }
 }
 
