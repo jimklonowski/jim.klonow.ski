@@ -14,18 +14,25 @@
         </p>
       </div>
       <div class="flex gap-2 flex-wrap items-center">
-        <UButton
-          v-for="src in allSources"
-          :key="src"
-          :to="src"
-          target="_blank"
-          variant="ghost"
-          size="xs"
-          icon="i-lucide-file-text"
-          trailing
-        >
-          {{ pdfLabel(src) }}
-        </UButton>
+        <UPopover v-if="allSources.length" :content="{ side: 'bottom', align: 'end' }">
+          <UButton variant="outline" size="xs" icon="i-lucide-file-text" trailing-icon="i-lucide-chevron-down">
+            Source PDFs ({{ allSources.length }})
+          </UButton>
+          <template #content>
+            <div class="p-2 max-h-80 overflow-y-auto min-w-56 space-y-0.5">
+              <a
+                v-for="src in sortedSources"
+                :key="src"
+                :href="src"
+                target="_blank"
+                class="flex items-center gap-2 text-sm px-2 py-1.5 rounded-md hover:bg-elevated hover:text-primary transition-colors"
+              >
+                <UIcon name="i-lucide-file-text" class="w-3.5 h-3.5 shrink-0 text-muted" />
+                <span class="truncate">{{ pdfLabel(src) }}</span>
+              </a>
+            </div>
+          </template>
+        </UPopover>
         <UButton to="/labs/upload" variant="outline" size="xs" icon="i-lucide-upload">
           Upload Scan
         </UButton>
@@ -207,6 +214,7 @@ const prevLatest = computed(() => entries.value.length >= 2 ? entries.value.at(-
 const allSources = computed(() =>
   entries.value.flatMap(e => (e.sources ?? []).map((s: string) => s)).filter(Boolean)
 )
+const sortedSources = computed(() => [...allSources.value].reverse())
 
 const totalMetricEntries = computed(() => Object.entries(DEXA_TOTAL_METRICS))
 
@@ -285,7 +293,8 @@ function getModalValue(entry: typeof latest.value) {
 }
 
 function pdfLabel(src: string) {
-  return src.split('/').pop()?.replace(/\.pdf$/i, '') ?? src
+  const filename = src.split('/').pop() ?? src
+  return decodeURIComponent(filename).replace(/\.pdf$/i, '')
 }
 
 function formatDate(d: string) {
