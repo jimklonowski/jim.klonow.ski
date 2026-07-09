@@ -47,6 +47,23 @@
         </div>
       </section>
 
+      <!-- Genetic & qualitative results -->
+      <section v-if="qualitativeResults.length">
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-1">Genetic &amp; Qualitative Results</h2>
+        <p class="text-xs text-muted mb-4">One-time results — not tracked as trends.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <UCard v-for="item in qualitativeResults" :key="`${item.date}-${item.name}`">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-sm font-medium">{{ item.name }}</p>
+                <p class="text-xs text-muted mt-0.5">{{ formatDate(item.date) }}</p>
+              </div>
+              <UBadge :color="qualitativeColor(item.result)" variant="subtle">{{ item.result }}</UBadge>
+            </div>
+          </UCard>
+        </div>
+      </section>
+
       <!-- Trend charts for key markers -->
       <section v-if="entries.length >= 2">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Trends</h2>
@@ -123,6 +140,16 @@ const latest = computed(() => entries.value.at(-1) ?? null)
 const allSources = computed(() =>
   entries.value.flatMap(e => (e.sources ?? []).map((src: string) => src)).filter(Boolean)
 )
+
+const qualitativeResults = computed(() =>
+  [...entries.value]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .flatMap(e => (e.qualitative ?? []).map((q: { name: string, result: string }) => ({ ...q, date: e.date })))
+)
+
+function qualitativeColor(result: string) {
+  return /^(negative|not detected|normal|absent)$/i.test(result.trim()) ? 'success' : 'warning'
+}
 
 const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin']
 
