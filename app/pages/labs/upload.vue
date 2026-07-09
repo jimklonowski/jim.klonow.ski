@@ -129,7 +129,7 @@
         :color="saveResult.ok ? 'success' : 'error'"
         :title="saveResult.ok ? 'Saved!' : 'Could not save'"
         :description="saveResult.ok
-          ? `Saved to ${saveResult.file} — the dashboard will update automatically.`
+          ? `Saved ${formatDate(saveResult.date!)} — the dashboard will update automatically.`
           : saveResult.message"
       />
     </template>
@@ -196,7 +196,7 @@ const error = ref('')
 const filename = ref('')
 const result = ref<LabResult | null>(null)
 const saving = ref(false)
-const saveResult = ref<{ ok: boolean, file?: string, message?: string } | null>(null)
+const saveResult = ref<{ ok: boolean, date?: string, message?: string } | null>(null)
 
 const markerEntries = computed(() =>
   Object.entries(result.value?.markers ?? {}).sort(([a], [b]) => {
@@ -270,14 +270,14 @@ async function saveToSite() {
   saving.value = true
   saveResult.value = null
   try {
-    const res = await $fetch<{ ok: boolean, file: string }>('/api/labs/save-json', {
+    const res = await $fetch<{ ok: boolean, table: string, date: string }>('/api/labs/save-json', {
       method: 'POST',
       body: { ...result.value, _type: reportType.value }
     })
-    saveResult.value = { ok: true, file: res.file }
+    saveResult.value = { ok: true, date: res.date }
   }
   catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Failed to save. Download the JSON and add it to content/labs/ manually.'
+    const msg = e instanceof Error ? e.message : 'Failed to save. Please try again.'
     saveResult.value = { ok: false, message: msg }
   }
   finally {

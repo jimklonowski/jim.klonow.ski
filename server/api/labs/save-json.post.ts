@@ -1,36 +1,62 @@
+interface SavePayload {
+  date: string
+  _type?: string
+  [key: string]: unknown
+}
+
 export default defineEventHandler(async (event) => {
-  const authCookie = getCookie(event, 'labs-auth')
-  const secret = process.env.LABS_SECRET
-  if (!secret || !authCookie || authCookie !== secret) {
-    throw createError({ statusCode: 401, message: 'Unauthorized' })
-  }
+  requireLabsAuth(event)
+  requireUploadPin(event)
 
-  const uploadPin = getCookie(event, 'labs-upload-auth')
-  const correctPin = process.env.LABS_UPLOAD_PIN
-  if (!correctPin || !uploadPin || uploadPin !== correctPin) {
-    throw createError({ statusCode: 403, message: 'Upload PIN required' })
-  }
-
-  if (!import.meta.dev) {
-    throw createError({ statusCode: 403, message: 'File saving is only available in development mode. Download the JSON and add it to content/labs/ manually.' })
-  }
-
-  const body = await readBody<{ date: string, _type?: string }>(event)
+  const body = await readBody<SavePayload>(event)
   if (!body?.date) {
     throw createError({ statusCode: 400, message: 'Missing date field' })
   }
 
-  const [{ writeFile, mkdir }, { join }] = await Promise.all([
-    import('node:fs/promises'),
-    import('node:path')
-  ])
+  const db = getDb(event)
+  const { _type, ...data } = body
 
-  const folder = body._type === 'dexa' ? 'dexa' : 'labs'
-  const { _type: _, ...data } = body
-  const filename = `${data.date}.json`
-  const dir = join(process.cwd(), 'content', folder)
-  await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, filename), JSON.stringify(data, null, 2))
+  if (_type === 'dexa') {
+    await db.prepare(`
+      INSERT INTO dexa_entries (date, weight_lbs, sources, total, regions, vat, ag_ratio, bone_density, symmetry)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+      ON CONFLICT(date) DO UPDATE SET
+        weight_lbs = excluded.weight_lbs,
+        sources = excluded.sources,
+        total = excluded.total,
+        regions = excluded.regions,
+        vat = excluded.vat,
+        ag_ratio = excluded.ag_ratio,
+        bone_density = excluded.bone_density,
+        symmetry = excluded.symmetry
+    `).bind(
+      data.date,
+      data.weight_lbs ?? null,
+      JSON.stringify(data.sources ?? []),
+      JSON.stringify(data.total ?? {}),
+      JSON.stringify(data.regions ?? {}),
+      data.vat ? JSON.stringify(data.vat) : null,
+      data.ag_ratio ?? null,
+      data.bone_density ? JSON.stringify(data.bone_density) : null,
+      data.symmetry ? JSON.stringify(data.symmetry) : null
+    ).run()
 
-  return { ok: true, file: `content/${folder}/${filename}` }
+    return { ok: true, table: 'dexa_entries', date: data.date }
+  }
+
+  await db.prepare(`
+    INSERT INTO labs_entries (date, fasting, sources, markers)
+    VALUES (?1, ?2, ?3, ?4)
+    ON CONFLICT(date) DO UPDATE SET
+      fasting = excluded.fasting,
+      sources = excluded.sources,
+      markers = excluded.markers
+  `).bind(
+    data.date,
+    data.fasting ? 1 : 0,
+    JSON.stringify(data.sources ?? []),
+    JSON.stringify(data.markers ?? {})
+  ).run()
+
+  return { ok: true, table: 'labs_entries', date: data.date }
 })
