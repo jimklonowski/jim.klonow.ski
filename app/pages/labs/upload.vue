@@ -165,8 +165,20 @@ interface LabResult {
   qualitative?: QualitativeResult[]
 }
 
+// Free-text narrative findings can't be reliably graded word-for-word, so this only flags
+// results that name an actual severity/finding — everything else (including full descriptive
+// sentences that merely mention "normal"/"no stenosis"/etc.) reads as reassuring, not alarming.
 function qualitativeColor(result: string) {
-  return /^(negative|not detected|normal|absent)$/i.test(result.trim()) ? 'success' : 'warning'
+  const text = result.toLowerCase()
+  const concerning = /\b(mild|moderate|severe|abnormal|elevated|thicken|dilat|enlarg|reduced|decreased|positive|heterozygous|homozygous)\b/.test(text)
+    || /(?<!not )\bdetected\b/.test(text)
+  if (concerning) {
+    return 'warning'
+  }
+  if (/\b(normal|no evidence|no significant|no stenosis|no regurgitation|not detected|negative|absent|unremarkable)\b/.test(text)) {
+    return 'success'
+  }
+  return 'neutral'
 }
 
 // PIN gate — validated server-side (httpOnly cookie, not readable by JS)
