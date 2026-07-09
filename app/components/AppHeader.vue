@@ -2,6 +2,10 @@
   <UHeader title="jim.klonow.ski">
     <UNavigationMenu :items="items" variant="link" />
 
+    <template #right>
+      <UColorModeButton />
+    </template>
+
     <template #body>
       <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
     </template>
