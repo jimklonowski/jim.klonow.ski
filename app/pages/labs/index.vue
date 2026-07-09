@@ -9,34 +9,34 @@
             Latest draw: {{ formatDate(latest.date) }}
             <UBadge v-if="latest.fasting" variant="subtle" color="neutral" size="xs" class="ml-2">Fasting</UBadge>
           </p>
+          <UPopover v-if="allSources.length" :content="{ side: 'bottom', align: 'start' }" class="mt-2">
+            <UButton variant="outline" size="xs" icon="i-lucide-file-text" trailing-icon="i-lucide-chevron-down">
+              Source PDFs ({{ allSources.length }})
+            </UButton>
+            <template #content>
+              <div class="p-2 max-h-80 overflow-y-auto min-w-56 space-y-0.5">
+                <a
+                  v-for="src in sortedSources"
+                  :key="src"
+                  :href="src"
+                  target="_blank"
+                  class="flex items-center gap-2 text-sm px-2 py-1.5 rounded-md hover:bg-elevated hover:text-primary transition-colors"
+                >
+                  <UIcon name="i-lucide-file-text" class="w-3.5 h-3.5 shrink-0 text-muted" />
+                  <span class="truncate">{{ pdfLabel(src) }}</span>
+                </a>
+              </div>
+            </template>
+          </UPopover>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <UButton variant="outline" size="xs" icon="i-lucide-scan" @click="goToDexa">
             Body Composition
           </UButton>
-          <UButton to="/labs/upload" variant="outline" size="xs" icon="i-lucide-upload">
+          <UButton to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
             Upload Results
           </UButton>
         </div>
-        <UPopover v-if="allSources.length" :content="{ side: 'bottom', align: 'end' }">
-          <UButton variant="outline" size="xs" icon="i-lucide-file-text" trailing-icon="i-lucide-chevron-down">
-            Source PDFs ({{ allSources.length }})
-          </UButton>
-          <template #content>
-            <div class="p-2 max-h-80 overflow-y-auto min-w-56 space-y-0.5">
-              <a
-                v-for="src in sortedSources"
-                :key="src"
-                :href="src"
-                target="_blank"
-                class="flex items-center gap-2 text-sm px-2 py-1.5 rounded-md hover:bg-elevated hover:text-primary transition-colors"
-              >
-                <UIcon name="i-lucide-file-text" class="w-3.5 h-3.5 shrink-0 text-muted" />
-                <span class="truncate">{{ pdfLabel(src) }}</span>
-              </a>
-            </div>
-          </template>
-        </UPopover>
       </div>
 
       <!-- Pinned / key markers -->
