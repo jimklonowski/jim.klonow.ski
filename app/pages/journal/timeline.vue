@@ -191,13 +191,8 @@ const ZOOM_OPTS = [
 const zoom = ref<'week' | 'month'>('week')
 const cellWidth = computed(() => zoom.value === 'week' ? CELL_W_WEEK : CELL_W_MONTH)
 
-const { data, refresh } = await useAsyncData('/journal', () =>
-  queryCollection('journal').order('date', 'ASC').all(),
-  { getCachedData: (key, app) => { const d = app.payload.data[key]; return d?.length ? d : undefined } }
-)
-const { data: labsData } = await useAsyncData('labs-draws', () =>
-  queryCollection('labs').order('date', 'ASC').all()
-)
+const { data, refresh } = await useJournalEntries()
+const { data: labsData } = await useLabsEntries()
 onMounted(refresh)
 
 const entries = computed(() => data.value ?? [])

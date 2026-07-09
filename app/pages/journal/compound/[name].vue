@@ -255,10 +255,7 @@ const route = useRoute()
 const compoundName = computed(() => decodeURIComponent(route.params.name as string))
 const info = computed(() => getCompoundInfo(compoundName.value))
 
-const { data, refresh } = await useAsyncData('/journal', () =>
-  queryCollection('journal').order('date', 'ASC').all(),
-  { getCachedData: (key, app) => { const d = app.payload.data[key]; return d?.length ? d : undefined } }
-)
+const { data, refresh } = await useJournalEntries()
 onMounted(refresh)
 
 const entries = computed(() => data.value ?? [])
@@ -304,7 +301,7 @@ const daysAgo = computed(() => {
 // --- Vitals correlation ---
 function avgVital(list: typeof entries.value, field: string): number | null {
   const vals = list
-    .map(e => (e as Record<string, unknown>)[field] as number | null)
+    .map(e => (e as unknown as Record<string, unknown>)[field] as number | null)
     .filter((v): v is number => v != null && v > 0)
   if (vals.length < 5) return null
   return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10

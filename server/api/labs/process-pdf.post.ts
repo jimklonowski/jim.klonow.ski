@@ -187,20 +187,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, message: `Could not parse extraction result: ${text.slice(0, 200)}` })
   }
 
-  // Save PDF to /public/labs/ in dev so the source link works
+  // Store the PDF in R2 — sources hold bare object keys; list endpoints turn them into proxy URLs.
   const pdfFilename = pdf.filename ?? 'lab.pdf'
-  if (import.meta.dev) {
-    const [{ writeFile }, { join }] = await Promise.all([
-      import('node:fs/promises'),
-      import('node:path')
-    ])
-    await writeFile(join(process.cwd(), 'public', 'labs', pdfFilename), pdf.data)
-  }
+  const bucket = getLabsBucket(event)
+  await bucket.put(pdfFilename, pdf.data, {
+    httpMetadata: { contentType: 'application/pdf' }
+  })
 
-  // Populate sources with the public path so the dashboard can link to it
   const existingSources = Array.isArray(extracted.sources) ? extracted.sources as string[] : []
-  const pdfPath = `/labs/${pdfFilename}`
-  const sources = existingSources.includes(pdfPath) ? existingSources : [...existingSources, pdfPath]
+  const sources = existingSources.includes(pdfFilename) ? existingSources : [...existingSources, pdfFilename]
 
   return { ...extracted, sources }
 })

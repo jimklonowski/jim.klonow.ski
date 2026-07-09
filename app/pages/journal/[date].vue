@@ -231,10 +231,7 @@ const toast = useToast()
 
 const dateParam = computed(() => route.params.date as string)
 
-const { data: allEntries, refresh } = await useAsyncData('/journal', () =>
-  queryCollection('journal').order('date', 'ASC').all(),
-  { getCachedData: (key, app) => { const d = app.payload.data[key]; return d?.length ? d : undefined } }
-)
+const { data: allEntries, refresh } = await useJournalEntries()
 
 onMounted(refresh)
 

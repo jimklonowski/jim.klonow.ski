@@ -110,9 +110,7 @@ import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 definePageMeta({ middleware: 'labs-auth' })
 
-const { data, refresh } = await useAsyncData('labs', () =>
-  queryCollection('labs').order('date', 'ASC').all()
-)
+const { data, refresh } = await useLabsEntries()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data
 if (import.meta.client) {

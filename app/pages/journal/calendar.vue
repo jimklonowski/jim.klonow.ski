@@ -106,10 +106,7 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const { data, refresh } = await useAsyncData('/journal', () =>
-  queryCollection('journal').order('date', 'ASC').all(),
-  { getCachedData: (key, app) => { const d = app.payload.data[key]; return d?.length ? d : undefined } }
-)
+const { data, refresh } = await useJournalEntries()
 
 onMounted(refresh)
 
