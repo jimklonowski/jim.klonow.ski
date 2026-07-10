@@ -76,7 +76,7 @@ export const DOSE_UNITS = [
 
 export const KNOWN_COMPOUNDS = [
   // Peptides
-  'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500',
+  'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500', 'BPC-157 / TB-500',
   'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
   'Thymosin Alpha-1', 'Thymosin Beta-4',
   // TRT / Hormones
@@ -95,6 +95,7 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'KPV': '#10b981',
   'BPC-157': '#ef4444',
   'TB-500': '#ec4899',
+  'BPC-157 / TB-500': '#f43f5e',
   'Ipamorelin': '#06b6d4',
   'CJC-1295': '#84cc16',
   'CJC-1295 / Ipamorelin': '#65a30d',
