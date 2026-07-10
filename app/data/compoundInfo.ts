@@ -63,6 +63,24 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     halfLife: 'Longer than most healing peptides (~1–2 days), supporting less-frequent dosing.'
   },
 
+  'BPC-157 / TB-500': {
+    category: 'Healing Peptide Stack',
+    aka: 'BPC/TB4 Blend',
+    summary: 'A common stack combining BPC-157 and TB-500 (Thymosin Beta-4 fragment), two peptides studied for complementary roles in tissue repair — BPC-157 for gut/tendon/ligament healing and general anti-inflammatory effects, TB-500 for cell migration and systemic recovery.',
+    dosing: {
+      range: '500 mcg (blend, i.e. 250 mcg BPC-157 + 250 mcg TB-500 per injection)',
+      frequency: '1x daily, sometimes 2x during a loading phase',
+      timing: 'Subcutaneous injection; can be dosed near an injury site or systemically.'
+    },
+    reconstitution: {
+      instructions: '5 mg/5 mg blended vial + 2 mL bacteriostatic water → 5 mg/mL total (2.5 mg/mL each peptide)',
+      measuring: 'At 5 mg/mL total, 1 unit (0.01 mL) ≈ 50 mcg blend; a 500 mcg dose ≈ 10 units (0.1 mL).'
+    },
+    cycling: 'Often run in focused 4–8 week blocks tied to a specific injury, then reassessed rather than used indefinitely.',
+    storage: 'Lyophilized: freeze at −20°C. After mixing: refrigerate 2–8°C, use within ~4 weeks, avoid freeze–thaw cycles.',
+    halfLife: 'BPC-157 is short-acting (hours); TB-500 is longer-acting (~1–2 days) — the blend is typically dosed to the shorter half-life component.'
+  },
+
   'Ipamorelin': {
     category: 'Growth Hormone Secretagogue',
     summary: 'A selective growth hormone secretagogue (GHRP) that stimulates the pituitary to release GH with minimal effect on cortisol or appetite compared to older GHRPs like GHRP-6.',
