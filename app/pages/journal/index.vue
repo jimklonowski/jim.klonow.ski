@@ -173,6 +173,70 @@
         </div>
       </section>
 
+      <!-- Body composition & fitness (Apple Health) -->
+      <section v-if="latestHealth">
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Body Composition & Fitness</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <UCard
+            v-for="[key, meta] in healthMetricEntries"
+            :key="key"
+            class="cursor-pointer hover:ring-1 hover:ring-primary/50 transition-shadow"
+            @click="openHealthModal(key)"
+          >
+            <div class="space-y-2">
+              <p class="text-xs text-muted leading-tight">{{ meta.label }}</p>
+              <div class="flex items-end gap-1">
+                <span class="text-2xl font-bold tabular-nums">{{ formatHealthValue(key, latestHealth) }}</span>
+                <span v-if="key !== 'sleep_total_min'" class="text-xs text-muted mb-0.5">{{ meta.unit }}</span>
+              </div>
+              <div v-if="prevHealth && healthDeltaValue(key) !== null" class="flex items-center gap-1 text-xs text-muted">
+                <UIcon :name="healthDeltaIcon(key)" :class="healthDeltaColor(key)" class="w-3.5 h-3.5 shrink-0" />
+                <span :class="healthDeltaColor(key)">{{ healthDeltaText(key) }}</span>
+                <span>vs prev</span>
+              </div>
+            </div>
+          </UCard>
+        </div>
+
+        <div v-if="healthEntries.length >= 2" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
+          <UCard v-for="[key, meta] in healthTrendEntries" :key="key">
+            <template #header>
+              <p class="text-sm font-medium">{{ meta.label }}</p>
+              <p class="text-xs text-muted">{{ meta.unit }}</p>
+            </template>
+            <ClientOnly>
+              <AreaChart
+                :data="healthTrendData(key)"
+                :categories="{ value: { name: meta.label, color: '#06b6d4' } }"
+                :height="120"
+                :show-legend="false"
+              />
+            </ClientOnly>
+          </UCard>
+        </div>
+      </section>
+
+      <!-- History modal -->
+      <UModal v-model:open="healthModalOpen" :title="healthModalMeta?.label ?? ''">
+        <template #body>
+          <div class="space-y-4">
+            <p v-if="healthModalMeta?.description" class="text-sm text-muted leading-relaxed">
+              {{ healthModalMeta.description }}
+            </p>
+            <USeparator />
+            <p class="text-xs font-semibold text-muted uppercase tracking-wider">History</p>
+            <div
+              v-for="e in [...healthEntries].sort((a, b) => b.date.localeCompare(a.date))"
+              :key="e.date"
+              class="flex items-center justify-between py-2 border-b border-neutral-800 last:border-0"
+            >
+              <span class="text-sm text-muted">{{ formatDate(e.date) }}</span>
+              <span class="font-semibold tabular-nums">{{ formatHealthValue(healthModalKey, e) }}</span>
+            </div>
+          </div>
+        </template>
+      </UModal>
+
       <!-- Peptide usage summary -->
       <section v-if="peptideUsage.length">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Peptide Usage</h2>
@@ -187,6 +251,31 @@
             <span class="text-sm font-medium">{{ compound }}</span>
             <span class="text-xs text-muted">{{ count }}d</span>
           </NuxtLink>
+        </div>
+      </section>
+
+      <!-- Workouts (Apple Health) -->
+      <section v-if="recentWorkouts.length">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Workouts</h2>
+          <span class="text-xs text-muted">{{ workoutEntries.length }} total</span>
+        </div>
+        <div class="space-y-2">
+          <UCard v-for="w in recentWorkouts" :key="w.id">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+              <div class="flex items-center gap-3">
+                <UIcon :name="workoutIcon(w.workout_type)" class="w-4 h-4 shrink-0 text-muted" />
+                <div class="text-xs text-muted font-mono min-w-24">{{ formatDate(w.date) }}</div>
+                <div class="text-sm font-medium">{{ w.workout_type ?? 'Workout' }}</div>
+              </div>
+              <div class="flex items-center gap-4 text-xs font-mono text-muted">
+                <span v-if="w.duration_min != null">{{ w.duration_min }} min</span>
+                <span v-if="w.calories != null">{{ w.calories }} kcal</span>
+                <span v-if="w.avg_hr != null">♥ {{ w.avg_hr }}</span>
+                <span v-if="w.distance_mi != null">{{ w.distance_mi }} mi</span>
+              </div>
+            </div>
+          </UCard>
         </div>
       </section>
 
@@ -240,13 +329,18 @@
 
 <script setup lang="ts">
 import { getCompoundColor } from '~/data/journal'
+import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 
 definePageMeta({ middleware: 'journal-auth' })
 
 const { data, refresh } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
+const { data: healthData, refresh: refreshHealth } = await useHealthMetricsEntries()
+const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 
 onMounted(refresh)
+onMounted(refreshHealth)
+onMounted(refreshWorkouts)
 
 const entries = computed(() => data.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
@@ -394,4 +488,91 @@ function uniqueCompounds(entry: typeof latest.value) {
   if (!entry?.peptides) return []
   return [...new Set(entry.peptides.map((p: { compound: string }) => p.compound))]
 }
+
+// --- Body composition & fitness (health_metrics) ---
+const healthEntries = computed(() => healthData.value ?? [])
+const latestHealth = computed(() => healthEntries.value.at(-1) ?? null)
+const prevHealth = computed(() => healthEntries.value.length >= 2 ? (healthEntries.value.at(-2) ?? null) : null)
+
+const healthMetricEntries = computed(() => Object.entries(HEALTH_METRICS_META))
+const HEALTH_TREND_KEYS = ['vo2_max', 'body_fat_pct', 'sleep_total_min']
+const healthTrendEntries = computed(() =>
+  HEALTH_TREND_KEYS.map(k => [k, HEALTH_METRICS_META[k]] as const)
+    .filter((pair): pair is [string, NonNullable<(typeof HEALTH_METRICS_META)[string]>] => !!pair[1])
+)
+
+function getHealthValue(entry: typeof latestHealth.value, key: string): number | null {
+  if (!entry) return null
+  return (entry as unknown as Record<string, number | null>)[key] ?? null
+}
+
+function formatHealthValue(key: string, entry: typeof latestHealth.value) {
+  const v = getHealthValue(entry, key)
+  if (v === null) return '—'
+  if (key === 'sleep_total_min') return formatDuration(v)
+  return Number.isInteger(v) ? v.toString() : v.toFixed(1)
+}
+
+function healthDeltaValue(key: string) {
+  const cur = getHealthValue(latestHealth.value, key)
+  const prev = getHealthValue(prevHealth.value, key)
+  if (cur === null || prev === null) return null
+  return cur - prev
+}
+
+function healthDeltaText(key: string) {
+  const d = healthDeltaValue(key)
+  if (d === null) return ''
+  const sign = d >= 0 ? '+' : ''
+  if (key === 'sleep_total_min') return `${sign}${formatDuration(Math.abs(d))}`
+  return `${sign}${Math.abs(d) >= 10 ? Math.round(d) : d.toFixed(1)}`
+}
+
+function healthDeltaIcon(key: string) {
+  const d = healthDeltaValue(key)
+  if (!d || Math.abs(d) < 0.01) return 'i-lucide-minus'
+  return d > 0 ? 'i-lucide-trending-up' : 'i-lucide-trending-down'
+}
+
+function healthDeltaColor(key: string) {
+  const d = healthDeltaValue(key)
+  if (!d || Math.abs(d) < 0.01) return 'text-muted'
+  const lower = HEALTH_METRICS_META[key]?.lowerIsBetter
+  if (lower === undefined) return 'text-muted'
+  return (lower && d < 0) || (!lower && d > 0) ? 'text-success' : 'text-error'
+}
+
+function healthTrendData(key: string) {
+  return healthEntries.value
+    .filter(e => getHealthValue(e, key) !== null)
+    .map(e => ({ date: formatDate(e.date), value: getHealthValue(e, key) as number }))
+}
+
+const healthModalOpen = ref(false)
+const healthModalKey = ref('')
+const healthModalMeta = computed(() => healthModalKey.value ? HEALTH_METRICS_META[healthModalKey.value] : null)
+
+function openHealthModal(key: string) {
+  healthModalKey.value = key
+  healthModalOpen.value = true
+}
+
+// --- Workouts ---
+const WORKOUT_ICONS: Record<string, string> = {
+  Running: 'i-lucide-footprints',
+  Walking: 'i-lucide-footprints',
+  Cycling: 'i-lucide-bike',
+  Swimming: 'i-lucide-waves',
+  'Traditional Strength Training': 'i-lucide-dumbbell',
+  'Functional Strength Training': 'i-lucide-dumbbell'
+}
+
+function workoutIcon(type: string | null) {
+  return (type && WORKOUT_ICONS[type]) ?? 'i-lucide-dumbbell'
+}
+
+const workoutEntries = computed(() => workoutsData.value ?? [])
+const recentWorkouts = computed(() =>
+  [...workoutEntries.value].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15)
+)
 </script>
