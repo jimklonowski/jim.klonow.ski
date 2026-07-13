@@ -17,6 +17,16 @@
           </div>
         </div>
         <div class="flex gap-2">
+          <UButton
+            variant="outline"
+            size="xs"
+            :icon="whoopConnected ? 'i-lucide-check' : 'i-lucide-link'"
+            :to="whoopConnected ? undefined : '/api/whoop/authorize'"
+            :external="!whoopConnected"
+            :disabled="whoopConnected"
+          >
+            {{ whoopConnected ? 'Whoop Connected' : 'Connect Whoop' }}
+          </UButton>
           <UButton :to="`/journal/calendar`" variant="outline" size="xs" icon="i-lucide-calendar">
             Calendar
           </UButton>
@@ -173,9 +183,9 @@
         </div>
       </section>
 
-      <!-- Body composition & fitness (Apple Health) -->
+      <!-- Health metrics (Apple Health + Whoop) -->
       <section v-if="latestHealth">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Body Composition & Fitness</h2>
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Health Metrics</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <UCard
             v-for="[key, meta] in healthMetricEntries"
@@ -342,6 +352,17 @@ onMounted(refresh)
 onMounted(refreshHealth)
 onMounted(refreshWorkouts)
 
+const whoopConnected = ref(false)
+onMounted(async () => {
+  try {
+    const status = await $fetch<{ connected: boolean }>('/api/whoop/status')
+    whoopConnected.value = status.connected
+  }
+  catch {
+    whoopConnected.value = false
+  }
+})
+
 const entries = computed(() => data.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
 const previous = computed(() => entries.value.at(-2) ?? null)
@@ -495,7 +516,7 @@ const latestHealth = computed(() => healthEntries.value.at(-1) ?? null)
 const prevHealth = computed(() => healthEntries.value.length >= 2 ? (healthEntries.value.at(-2) ?? null) : null)
 
 const healthMetricEntries = computed(() => Object.entries(HEALTH_METRICS_META))
-const HEALTH_TREND_KEYS = ['vo2_max', 'body_fat_pct', 'sleep_total_min']
+const HEALTH_TREND_KEYS = ['vo2_max', 'body_fat_pct', 'sleep_total_min', 'recovery_score', 'strain', 'sleep_performance_pct']
 const healthTrendEntries = computed(() =>
   HEALTH_TREND_KEYS.map(k => [k, HEALTH_METRICS_META[k]] as const)
     .filter((pair): pair is [string, NonNullable<(typeof HEALTH_METRICS_META)[string]>] => !!pair[1])
@@ -559,10 +580,10 @@ function openHealthModal(key: string) {
 
 // --- Workouts ---
 const WORKOUT_ICONS: Record<string, string> = {
-  Running: 'i-lucide-footprints',
-  Walking: 'i-lucide-footprints',
-  Cycling: 'i-lucide-bike',
-  Swimming: 'i-lucide-waves',
+  'Running': 'i-lucide-footprints',
+  'Walking': 'i-lucide-footprints',
+  'Cycling': 'i-lucide-bike',
+  'Swimming': 'i-lucide-waves',
   'Traditional Strength Training': 'i-lucide-dumbbell',
   'Functional Strength Training': 'i-lucide-dumbbell'
 }
