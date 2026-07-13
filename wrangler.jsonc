@@ -26,5 +26,8 @@
       "binding": "LABS_BUCKET",
       "bucket_name": "jim-klonow-ski-labs"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["0 15 * * *"]
+  }
 }

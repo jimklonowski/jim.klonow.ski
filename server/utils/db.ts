@@ -53,8 +53,42 @@ export function parseHealthMetricsRow(row: Record<string, unknown>) {
     sleep_rem_min: (row.sleep_rem_min as number | null) ?? null,
     sleep_deep_min: (row.sleep_deep_min as number | null) ?? null,
     sleep_core_min: (row.sleep_core_min as number | null) ?? null,
-    sleep_awake_min: (row.sleep_awake_min as number | null) ?? null
+    sleep_awake_min: (row.sleep_awake_min as number | null) ?? null,
+    recovery_score: (row.recovery_score as number | null) ?? null,
+    strain: (row.strain as number | null) ?? null,
+    sleep_performance_pct: (row.sleep_performance_pct as number | null) ?? null
   }
+}
+
+export const HEALTH_METRIC_FIELDS = [
+  'vo2_max', 'body_fat_pct', 'lean_body_mass_lbs',
+  'sleep_total_min', 'sleep_rem_min', 'sleep_deep_min', 'sleep_core_min', 'sleep_awake_min',
+  'recovery_score', 'strain', 'sleep_performance_pct'
+] as const
+
+export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
+
+// Shared by the Apple Health webhook and the Whoop sync task - health_metrics has no manual-entry
+// UI, so whichever source has a value for a field just overwrites it (no null-only-patch needed).
+export async function upsertHealthMetrics(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): Promise<boolean> {
+  const cols = HEALTH_METRIC_FIELDS.filter(f => fields[f] != null)
+  if (cols.length === 0) return false
+
+  const existing = await db.prepare('SELECT date FROM health_metrics WHERE date = ?1').bind(date).first()
+  if (!existing) {
+    const allCols = ['date', ...cols]
+    const placeholders = allCols.map((_, i) => `?${i + 1}`).join(', ')
+    await db.prepare(`INSERT INTO health_metrics (${allCols.join(', ')}) VALUES (${placeholders})`)
+      .bind(date, ...cols.map(f => fields[f]))
+      .run()
+  }
+  else {
+    const setClause = cols.map((f, i) => `${f} = ?${i + 2}`).join(', ')
+    await db.prepare(`UPDATE health_metrics SET ${setClause} WHERE date = ?1`)
+      .bind(date, ...cols.map(f => fields[f]))
+      .run()
+  }
+  return true
 }
 
 export function parseWorkoutRow(row: Record<string, unknown>) {

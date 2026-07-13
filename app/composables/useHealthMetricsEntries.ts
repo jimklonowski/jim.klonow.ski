@@ -8,6 +8,9 @@ export interface HealthMetricsEntry {
   sleep_deep_min: number | null
   sleep_core_min: number | null
   sleep_awake_min: number | null
+  recovery_score: number | null
+  strain: number | null
+  sleep_performance_pct: number | null
 }
 
 export function useHealthMetricsEntries() {
