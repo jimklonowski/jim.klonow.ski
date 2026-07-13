@@ -58,3 +58,15 @@ CREATE TABLE IF NOT EXISTS workouts (
   distance_mi REAL
 );
 CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+
+CREATE TABLE IF NOT EXISTS whoop_tokens (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+-- One-time migration, do not re-run after it lands on an environment:
+-- ALTER TABLE health_metrics ADD COLUMN recovery_score REAL;
+-- ALTER TABLE health_metrics ADD COLUMN strain REAL;
+-- ALTER TABLE health_metrics ADD COLUMN sleep_performance_pct REAL;

@@ -30,10 +30,6 @@ interface Workout {
 }
 
 const VITAL_FIELDS = ['weight_lbs', 'rhr', 'hrv', 'bp_systolic', 'bp_diastolic'] as const
-const HEALTH_FIELDS = [
-  'vo2_max', 'body_fat_pct', 'lean_body_mass_lbs',
-  'sleep_total_min', 'sleep_rem_min', 'sleep_deep_min', 'sleep_core_min', 'sleep_awake_min'
-] as const
 
 function hoursToMin(qty: number) {
   return Math.round(qty * 60)
@@ -190,24 +186,7 @@ export default defineEventHandler(async (event) => {
 
   let healthMetricsTouched = 0
   for (const [date, metricsForDate] of Object.entries(healthByDate)) {
-    const fields = HEALTH_FIELDS.filter(f => metricsForDate[f] != null)
-    if (fields.length === 0) continue
-
-    const existingHealth = await db.prepare('SELECT date FROM health_metrics WHERE date = ?1').bind(date).first()
-    if (!existingHealth) {
-      const cols = ['date', ...fields]
-      const placeholders = cols.map((_, i) => `?${i + 1}`).join(', ')
-      await db.prepare(`INSERT INTO health_metrics (${cols.join(', ')}) VALUES (${placeholders})`)
-        .bind(date, ...fields.map(f => metricsForDate[f]))
-        .run()
-    }
-    else {
-      const setClause = fields.map((f, i) => `${f} = ?${i + 2}`).join(', ')
-      await db.prepare(`UPDATE health_metrics SET ${setClause} WHERE date = ?1`)
-        .bind(date, ...fields.map(f => metricsForDate[f]))
-        .run()
-    }
-    healthMetricsTouched++
+    if (await upsertHealthMetrics(db, date, metricsForDate)) healthMetricsTouched++
   }
 
   for (const w of workouts) {
