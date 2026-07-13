@@ -43,6 +43,35 @@ export function parseLabsRow(row: Record<string, unknown>) {
   }
 }
 
+export function parseHealthMetricsRow(row: Record<string, unknown>) {
+  return {
+    date: row.date as string,
+    vo2_max: (row.vo2_max as number | null) ?? null,
+    body_fat_pct: (row.body_fat_pct as number | null) ?? null,
+    lean_body_mass_lbs: (row.lean_body_mass_lbs as number | null) ?? null,
+    sleep_total_min: (row.sleep_total_min as number | null) ?? null,
+    sleep_rem_min: (row.sleep_rem_min as number | null) ?? null,
+    sleep_deep_min: (row.sleep_deep_min as number | null) ?? null,
+    sleep_core_min: (row.sleep_core_min as number | null) ?? null,
+    sleep_awake_min: (row.sleep_awake_min as number | null) ?? null
+  }
+}
+
+export function parseWorkoutRow(row: Record<string, unknown>) {
+  return {
+    id: row.id as number,
+    external_id: (row.external_id as string | null) ?? null,
+    date: row.date as string,
+    workout_type: (row.workout_type as string | null) ?? null,
+    start_time: (row.start_time as string | null) ?? null,
+    duration_min: (row.duration_min as number | null) ?? null,
+    calories: (row.calories as number | null) ?? null,
+    avg_hr: (row.avg_hr as number | null) ?? null,
+    max_hr: (row.max_hr as number | null) ?? null,
+    distance_mi: (row.distance_mi as number | null) ?? null
+  }
+}
+
 export function parseDexaRow(row: Record<string, unknown>) {
   return {
     date: row.date as string,
