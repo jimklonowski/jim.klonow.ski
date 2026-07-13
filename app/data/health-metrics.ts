@@ -21,6 +21,21 @@ export const HEALTH_METRICS_META: Record<string, DexaMetricMeta> = {
     label: 'Sleep Duration',
     unit: 'min',
     description: 'Total time asleep, from Apple Watch/Whoop sleep tracking synced via Apple Health.'
+  },
+  recovery_score: {
+    label: 'Recovery',
+    unit: '%',
+    description: 'Whoop\'s daily recovery score, based on HRV, resting heart rate, sleep, and other physiological markers. Higher means more prepared for strain.'
+  },
+  strain: {
+    label: 'Strain',
+    unit: '',
+    description: 'Whoop\'s cumulative cardiovascular load for the day, on a 0-21 scale.'
+  },
+  sleep_performance_pct: {
+    label: 'Sleep Performance',
+    unit: '%',
+    description: 'Whoop\'s sleep performance score - how much you slept relative to what your body needed.'
   }
 }
 
