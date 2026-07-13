@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.07.13f",
+  "version": "2026.07.13g",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -29,6 +29,7 @@
     "@takumi-rs/core": "^1.8.7",
     "@takumi-rs/wasm": "^1.8.7",
     "@unhead/vue": "^2.1.13",
+    "@vueuse/core": "^14.3.0",
     "@vueuse/nuxt": "14.3.0",
     "nuxt": "^4.4.8",
     "nuxt-charts": "^2.1.4",
