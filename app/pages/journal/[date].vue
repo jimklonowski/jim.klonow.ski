@@ -196,6 +196,29 @@
         </div>
       </UCard>
 
+      <!-- Synced workouts (Apple Health / Whoop) -->
+      <UCard v-if="dayWorkouts.length">
+        <template #header><p class="text-sm font-semibold">Workouts (synced)</p></template>
+        <div class="space-y-2">
+          <div
+            v-for="w in dayWorkouts"
+            :key="w.id"
+            class="flex items-center justify-between text-sm border-b border-neutral-800 last:border-0 pb-2 last:pb-0"
+          >
+            <div class="flex items-center gap-2">
+              <UIcon :name="workoutIcon(w.workout_type)" class="w-3.5 h-3.5 text-muted" />
+              <span class="font-medium">{{ w.workout_type ?? 'Workout' }}</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-mono text-muted">
+              <span v-if="w.duration_min != null">{{ w.duration_min }} min</span>
+              <span v-if="w.calories != null">{{ w.calories }} kcal</span>
+              <span v-if="w.avg_hr != null">♥ {{ w.avg_hr }}</span>
+              <span v-if="w.distance_mi != null">{{ w.distance_mi }} mi</span>
+            </div>
+          </div>
+        </div>
+      </UCard>
+
       <!-- Workout & Notes -->
       <UCard>
         <template #header><p class="text-sm font-semibold">Workout & Notes</p></template>
@@ -222,6 +245,7 @@
 <script setup lang="ts">
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, blankEntry } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry } from '~/data/journal'
+import { workoutIcon } from '~/data/workouts'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -232,8 +256,12 @@ const toast = useToast()
 const dateParam = computed(() => route.params.date as string)
 
 const { data: allEntries, refresh } = await useJournalEntries()
+const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 
 onMounted(refresh)
+onMounted(refreshWorkouts)
+
+const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
 
 const existingEntry = computed(() =>
   allEntries.value?.find(e => e.date === dateParam.value) ?? null
