@@ -102,7 +102,7 @@ export default defineNuxtConfig({
     compressPublicAssets: true,
     experimental: { websocket: true, tasks: true },
     scheduledTasks: {
-      '0 15 * * *': ['whoop:sync']
+      '0 11 * * *': ['whoop:sync']
     }
   },
 
