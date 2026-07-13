@@ -32,3 +32,29 @@ CREATE TABLE IF NOT EXISTS dexa_entries (
   bone_density TEXT,
   symmetry TEXT
 );
+
+CREATE TABLE IF NOT EXISTS health_metrics (
+  date TEXT PRIMARY KEY,
+  vo2_max REAL,
+  body_fat_pct REAL,
+  lean_body_mass_lbs REAL,
+  sleep_total_min INTEGER,
+  sleep_rem_min INTEGER,
+  sleep_deep_min INTEGER,
+  sleep_core_min INTEGER,
+  sleep_awake_min INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS workouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  external_id TEXT UNIQUE,
+  date TEXT NOT NULL,
+  workout_type TEXT,
+  start_time TEXT,
+  duration_min REAL,
+  calories REAL,
+  avg_hr INTEGER,
+  max_hr INTEGER,
+  distance_mi REAL
+);
+CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
