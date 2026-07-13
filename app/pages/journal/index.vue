@@ -264,14 +264,19 @@
         </div>
       </section>
 
-      <!-- Workouts (Apple Health) -->
-      <section v-if="recentWorkouts.length">
+      <!-- Workouts (Apple Health / Whoop) -->
+      <section v-if="workoutEntries.length">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Workouts</h2>
           <span class="text-xs text-muted">{{ workoutEntries.length }} total</span>
         </div>
         <div class="space-y-2">
-          <UCard v-for="w in recentWorkouts" :key="w.id">
+          <UCard
+            v-for="w in pageWorkouts"
+            :key="w.id"
+            class="cursor-pointer hover:ring-1 hover:ring-primary transition-all"
+            @click="navigateTo(`/journal/${w.date}`)"
+          >
             <div class="flex items-center justify-between flex-wrap gap-3">
               <div class="flex items-center gap-3">
                 <UIcon :name="workoutIcon(w.workout_type)" class="w-4 h-4 shrink-0 text-muted" />
@@ -286,6 +291,11 @@
               </div>
             </div>
           </UCard>
+        </div>
+        <div v-if="workoutTotalPages > 1" class="flex items-center justify-between mt-4">
+          <UButton size="xs" variant="ghost" icon="i-lucide-chevron-left" :disabled="workoutPage === 1" @click="workoutPage--">Prev</UButton>
+          <span class="text-xs text-muted">Page {{ workoutPage }} of {{ workoutTotalPages }}</span>
+          <UButton size="xs" variant="ghost" trailing-icon="i-lucide-chevron-right" :disabled="workoutPage === workoutTotalPages" @click="workoutPage++">Next</UButton>
         </div>
       </section>
 
@@ -340,6 +350,7 @@
 <script setup lang="ts">
 import { getCompoundColor } from '~/data/journal'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
+import { workoutIcon } from '~/data/workouts'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -579,21 +590,14 @@ function openHealthModal(key: string) {
 }
 
 // --- Workouts ---
-const WORKOUT_ICONS: Record<string, string> = {
-  'Running': 'i-lucide-footprints',
-  'Walking': 'i-lucide-footprints',
-  'Cycling': 'i-lucide-bike',
-  'Swimming': 'i-lucide-waves',
-  'Traditional Strength Training': 'i-lucide-dumbbell',
-  'Functional Strength Training': 'i-lucide-dumbbell'
-}
-
-function workoutIcon(type: string | null) {
-  return (type && WORKOUT_ICONS[type]) ?? 'i-lucide-dumbbell'
-}
-
 const workoutEntries = computed(() => workoutsData.value ?? [])
-const recentWorkouts = computed(() =>
-  [...workoutEntries.value].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15)
-)
+const sortedWorkouts = computed(() => [...workoutEntries.value].sort((a, b) => b.date.localeCompare(a.date)))
+
+const WORKOUT_PAGE_SIZE = 15
+const workoutPage = ref(1)
+const workoutTotalPages = computed(() => Math.max(1, Math.ceil(sortedWorkouts.value.length / WORKOUT_PAGE_SIZE)))
+const pageWorkouts = computed(() => {
+  const start = (workoutPage.value - 1) * WORKOUT_PAGE_SIZE
+  return sortedWorkouts.value.slice(start, start + WORKOUT_PAGE_SIZE)
+})
 </script>
