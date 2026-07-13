@@ -21,7 +21,7 @@ useHead({
   }
 })
 
-const title = 'JCK'
+const title = 'JCK - Health Dashboard'
 const description = 'James Christopher Klonowski'
 
 useSeoMeta({
@@ -30,4 +30,6 @@ useSeoMeta({
   ogTitle: title,
   ogDescription: description
 })
+
+defineOgImage('Default', { title, description, alt: description })
 </script>
