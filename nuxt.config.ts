@@ -100,7 +100,10 @@ export default defineNuxtConfig({
       nodeCompat: true
     },
     compressPublicAssets: true,
-    experimental: { websocket: true }
+    experimental: { websocket: true, tasks: true },
+    scheduledTasks: {
+      '0 15 * * *': ['whoop:sync']
+    }
   },
 
   routeRules: {
