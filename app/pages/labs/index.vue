@@ -58,12 +58,12 @@
         <p class="text-xs text-muted mb-4">One-time results — not tracked as trends.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <UCard v-for="item in qualitativeResults" :key="`${item.date}-${item.name}`">
-            <div class="flex items-center justify-between gap-3">
+            <div class="space-y-2">
               <div>
                 <p class="text-sm font-medium">{{ item.name }}</p>
                 <p class="text-xs text-muted mt-0.5">{{ formatDate(item.date) }}</p>
               </div>
-              <UBadge :color="qualitativeColor(item.result)" variant="subtle">{{ item.result }}</UBadge>
+              <UBadge :color="qualitativeColor(item.result)" variant="subtle" class="w-fit">{{ item.result }}</UBadge>
             </div>
           </UCard>
         </div>

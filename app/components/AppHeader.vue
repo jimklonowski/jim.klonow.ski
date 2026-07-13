@@ -15,6 +15,8 @@
 <script setup lang="ts">
 const items = [
   { label: 'Labs', to: '/labs', icon: 'i-lucide-activity' },
-  { label: 'Journal', to: '/journal', icon: 'i-lucide-book-open' }
+  { label: 'DEXA', to: '/labs/dexa', icon: 'i-lucide-scan' },
+  { label: 'Journal', to: '/journal', icon: 'i-lucide-book-open' },
+  { label: 'Calculator', to: '/journal/calculator', icon: 'i-lucide-calculator' }
 ]
 </script>
