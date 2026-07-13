@@ -111,11 +111,16 @@ export default defineEventHandler(async (event) => {
       }
       else if (name === 'sleep_analysis') {
         const h = healthByDate[dateStr]
-        if (typeof point.asleep === 'number') h.sleep_total_min = hoursToMin(point.asleep)
         if (typeof point.rem === 'number') h.sleep_rem_min = hoursToMin(point.rem)
         if (typeof point.deep === 'number') h.sleep_deep_min = hoursToMin(point.deep)
         if (typeof point.core === 'number') h.sleep_core_min = hoursToMin(point.core)
         if (typeof point.awake === 'number') h.sleep_awake_min = hoursToMin(point.awake)
+        // Health Auto Export's own `asleep` field on this metric has been unreliable (observed
+        // as 0 while rem/deep/core were correct), so derive total time asleep from the stages
+        // instead - this matches how HealthKit itself defines "asleep" (rem + core + deep).
+        if (h.sleep_rem_min != null || h.sleep_deep_min != null || h.sleep_core_min != null) {
+          h.sleep_total_min = (h.sleep_rem_min ?? 0) + (h.sleep_deep_min ?? 0) + (h.sleep_core_min ?? 0)
+        }
       }
     }
   }
