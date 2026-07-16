@@ -37,6 +37,16 @@
           >
             Sync Now
           </UButton>
+          <UButton
+            v-if="whoopConnected"
+            to="/api/whoop/authorize?reconnect=true"
+            external
+            variant="ghost"
+            size="xs"
+            icon="i-lucide-rotate-ccw"
+          >
+            Reconnect
+          </UButton>
           <UButton :to="`/journal/calendar`" variant="outline" size="xs" icon="i-lucide-calendar">
             Calendar
           </UButton>
