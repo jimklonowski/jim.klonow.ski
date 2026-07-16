@@ -28,7 +28,6 @@ export function parseJournalRow(row: Record<string, unknown>) {
     peptides: JSON.parse((row.peptides as string) || '[]'),
     reconstitutions: JSON.parse((row.reconstitutions as string) || '[]'),
     food: JSON.parse((row.food as string) || '{}'),
-    workout: (row.workout as string | null) ?? '',
     notes: (row.notes as string | null) ?? ''
   }
 }

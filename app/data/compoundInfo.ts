@@ -278,6 +278,46 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     storage: 'Lyophilized: freeze at −20°C. After mixing: refrigerate 2–8°C, use within ~4 weeks.'
   },
 
+  'PT-141': {
+    category: 'Libido Peptide',
+    aka: 'Bremelanotide',
+    summary: 'A melanocortin receptor agonist (primarily MC4R) that acts on central nervous system pathways involved in sexual arousal, rather than the vascular mechanism used by PDE5 inhibitors like sildenafil. Approved as Vyleesi for female hypoactive sexual desire disorder; also studied off-label for libido and erectile function in men.',
+    dosing: {
+      range: '0.5–2 mg',
+      frequency: 'As needed, not more than a few times per week',
+      timing: 'Subcutaneous injection roughly 45 min–2 hours before anticipated activity; effects can last several hours.',
+      notes: 'Start at the low end — nausea is common and dose-dependent.'
+    },
+    reconstitution: {
+      instructions: '10 mg vial + 2 mL bacteriostatic water → 5 mg/mL',
+      measuring: 'At 5 mg/mL, 1 unit (0.01 mL) = 50 mcg.'
+    },
+    cycling: 'Used situationally rather than on a fixed schedule; frequent use raises nausea/flushing risk and may blunt effect.',
+    storage: 'Lyophilized: refrigerate or freeze. After mixing: refrigerate 2–8°C, use within ~30 days.',
+    halfLife: 'A few hours.',
+    caution: 'Common side effects: nausea, flushing, headache, and a transient rise in blood pressure — use caution with existing cardiovascular conditions. Can cause temporary skin/gum darkening with frequent use.'
+  },
+
+  'Kisspeptin': {
+    category: 'Reproductive Hormone Peptide',
+    aka: 'Kisspeptin-10',
+    summary: 'A neuropeptide that acts upstream of the pituitary, stimulating GnRH release from the hypothalamus and thereby driving downstream LH/FSH and testosterone/estrogen production. Studied as a more "upstream" alternative to hCG for maintaining HPG axis function during TRT, and in fertility research.',
+    dosing: {
+      range: 'Highly variable across protocols — commonly in the low hundreds of mcg per dose',
+      frequency: '1–2x daily or per-protocol',
+      timing: 'Subcutaneous injection; some protocols pair timing with other HPG-axis-support compounds.',
+      notes: 'Human dosing data is sparse compared to hCG — treat published ranges as a starting reference, not an established standard.'
+    },
+    reconstitution: {
+      instructions: '5–10 mg vial + 2 mL bacteriostatic water, concentration depending on vial size',
+      measuring: 'Confirm mg/mL from the actual vial label before calculating units.'
+    },
+    cycling: 'Often used continuously alongside TRT, similar in intent to hCG, though with far less long-term human usage data.',
+    storage: 'Lyophilized: freeze at −20°C. After mixing: refrigerate 2–8°C, use promptly.',
+    halfLife: 'Very short (native kisspeptin-10 is on the order of minutes), which makes stable, sustained LH stimulation difficult to achieve with simple bolus dosing.',
+    caution: 'Much less human safety/efficacy data than hCG for this purpose; effects on LH can be transient given the short half-life.'
+  },
+
   'Testosterone Cypionate': {
     category: 'TRT / Hormone',
     summary: 'A long-acting testosterone ester delivered in oil, used in TRT protocols to restore physiological testosterone levels. Slower-releasing than propionate, giving more stable blood levels with less frequent dosing.',
@@ -381,6 +421,21 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Can raise LH/FSH and testosterone significantly — typically monitored with follow-up labs.'
   },
 
+  'Oxandrolone': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Anavar',
+    summary: 'An oral DHT-derived anabolic steroid, historically used medically for weight regain and (at very low doses) considered one of the milder AAS options in terms of androgenic side effects and hepatotoxicity relative to other C17-alpha-alkylated orals. Used off-label for lean mass and body recomposition.',
+    dosing: {
+      range: '10–20 mg/day (low/conservative end of typical ranges — many protocols run considerably higher)',
+      frequency: 'Once or twice daily, split doses given its short half-life',
+      timing: 'Oral, with or without food per product guidance.'
+    },
+    cycling: 'Typically run in defined 6–8 week blocks rather than continuously; suppresses natural testosterone production (reversible), so often timed alongside a TRT baseline or with a post-cycle recovery plan.',
+    storage: 'Room temperature, in original packaging, away from moisture and light.',
+    halfLife: '~8–12 hours.',
+    caution: 'Still C17-alpha-alkylated (hepatotoxic pathway) despite its "mild" reputation — periodic liver enzyme labs are advisable. Commonly lowers HDL cholesterol and can worsen lipid panels; suppresses endogenous testosterone. Physician oversight and lab monitoring recommended.'
+  },
+
   'Semaglutide': {
     category: 'GLP-1 Receptor Agonist',
     summary: 'A GLP-1 receptor agonist that slows gastric emptying, reduces appetite, and improves insulin sensitivity. Approved for type 2 diabetes and weight management (as Ozempic/Wegovy); also used in compounded form for weight-loss protocols.',
@@ -413,6 +468,31 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     storage: 'Refrigerate both before and after reconstitution; avoid freezing.',
     halfLife: '~5 days, supporting once-weekly dosing.',
     caution: 'Common GI side effects during titration; same class-wide thyroid C-cell tumor warning as other GLP-1/GIP agonists.'
+  },
+
+  '5-Amino-1MQ': {
+    category: 'Metabolic / NNMT Inhibitor',
+    summary: 'A small-molecule inhibitor of NNMT (nicotinamide N-methyltransferase), an enzyme that consumes both SAM and NAD+ precursors. By blocking NNMT, cells retain more NAD+/SAM for metabolic processes — studied in animal models for effects on fat cell metabolism, weight management, and mitochondrial/NAD+ support.',
+    dosing: {
+      range: '50–150 mg/day',
+      frequency: 'Once daily (oral)',
+      timing: 'Oral capsule, commonly taken with food per supplier guidance.'
+    },
+    cycling: 'Often used in multi-month blocks tied to a body-composition goal, then reassessed; human long-term data is limited.',
+    storage: 'Room temperature, in original packaging.',
+    caution: 'Human clinical trial data is very limited — most evidence is preclinical/animal. Sourcing quality varies widely since this is not an approved pharmaceutical.'
+  },
+
+  'SLU-PP-332': {
+    category: 'Exercise Mimetic (Research Compound)',
+    summary: 'A synthetic pan-agonist of the estrogen-related receptors (ERRα/β/γ), developed as a research tool to reproduce exercise-like effects on mitochondrial biogenesis and oxidative muscle fiber metabolism. Studied almost exclusively in rodent models for endurance capacity and fat oxidation ("exercise in a pill") — it is not an approved or clinically tested compound in humans.',
+    dosing: {
+      range: 'No established human dosing — any protocol in circulation is an extrapolation from animal mg/kg studies, not a validated human dose',
+      frequency: 'Reported protocols vary widely; treat all of these as unverified.',
+      notes: 'This is an early-stage research chemical, not a peptide/hormone with a track record of human self-administration.'
+    },
+    storage: 'Store per supplier guidance (typically room temperature, protected from light and moisture); purity varies significantly by source since it is not pharmaceutically manufactured.',
+    caution: 'Essentially no human safety or pharmacokinetic data exists. Effects, dosing, and risks are inferred from mouse studies only — treat this as the least-characterized compound on this list.'
   },
 
   'Modafinil': {

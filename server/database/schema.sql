@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   peptides TEXT NOT NULL DEFAULT '[]',
   reconstitutions TEXT NOT NULL DEFAULT '[]',
   food TEXT NOT NULL DEFAULT '{}',
-  workout TEXT,
   notes TEXT
 );
 
@@ -70,3 +69,14 @@ CREATE TABLE IF NOT EXISTS whoop_tokens (
 -- ALTER TABLE health_metrics ADD COLUMN recovery_score REAL;
 -- ALTER TABLE health_metrics ADD COLUMN strain REAL;
 -- ALTER TABLE health_metrics ADD COLUMN sleep_performance_pct REAL;
+
+-- One-time migration, do not re-run after it lands on an environment.
+-- Folds the retired freehand `workout` field into `notes` (structured workouts now come from
+-- the `workouts` table via Whoop sync) before dropping the column, so no historical text is lost:
+-- UPDATE journal_entries
+-- SET notes = CASE
+--   WHEN notes IS NOT NULL AND notes != '' THEN notes || char(10) || char(10) || 'Workout: ' || workout
+--   ELSE 'Workout: ' || workout
+-- END
+-- WHERE workout IS NOT NULL AND workout != '';
+-- ALTER TABLE journal_entries DROP COLUMN workout;
