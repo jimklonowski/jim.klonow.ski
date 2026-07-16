@@ -53,11 +53,28 @@
       </section>
 
       <!-- Genetic & qualitative results -->
-      <section v-if="qualitativeResults.length">
+      <section v-if="geneticResults.length">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-1">Genetic &amp; Qualitative Results</h2>
         <p class="text-xs text-muted mb-4">One-time results — not tracked as trends.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <UCard v-for="item in qualitativeResults" :key="`${item.date}-${item.name}`">
+          <UCard v-for="item in geneticResults" :key="`${item.date}-${item.name}`">
+            <div class="space-y-2">
+              <div>
+                <p class="text-sm font-medium">{{ item.name }}</p>
+                <p class="text-xs text-muted mt-0.5">{{ formatDate(item.date) }}</p>
+              </div>
+              <UBadge :color="qualitativeColor(item.result)" variant="subtle" class="w-fit">{{ item.result }}</UBadge>
+            </div>
+          </UCard>
+        </div>
+      </section>
+
+      <!-- Echocardiogram findings -->
+      <section v-if="echoResults.length">
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-1">Echocardiogram</h2>
+        <p class="text-xs text-muted mb-4">Findings from your most recent echo report.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <UCard v-for="item in echoResults" :key="`${item.date}-${item.name}`">
             <div class="space-y-2">
               <div>
                 <p class="text-sm font-medium">{{ item.name }}</p>
@@ -152,11 +169,25 @@ const allSources = computed(() =>
 )
 const sortedSources = computed(() => [...allSources.value].reverse())
 
-const qualitativeResults = computed(() =>
+// Echo reports were saved before results carried a `category` tag, so entries written
+// prior to that still need to be recognized by their known anatomical section names.
+const ECHO_SECTION_NAMES = new Set([
+  'Left Ventricle', 'Right Ventricle', 'Left Atrium', 'Right Atrium', 'Ventricular Septum',
+  'Mitral Valve', 'Aortic Valve', 'Tricuspid Valve', 'Pulmonic Valve', 'Aorta',
+  'Pericardium', 'Inferior Vena Cava', 'Overall Impression'
+])
+
+function isEcho(item: { name: string, category?: string }) {
+  return item.category === 'echo' || (!item.category && ECHO_SECTION_NAMES.has(item.name))
+}
+
+const allQualitativeResults = computed(() =>
   [...entries.value]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .flatMap(e => (e.qualitative ?? []).map((q: { name: string, result: string }) => ({ ...q, date: e.date })))
+    .flatMap(e => (e.qualitative ?? []).map((q: { name: string, result: string, category?: string }) => ({ ...q, date: e.date })))
 )
+const geneticResults = computed(() => allQualitativeResults.value.filter(item => !isEcho(item)))
+const echoResults = computed(() => allQualitativeResults.value.filter(isEcho))
 
 // Free-text narrative findings can't be reliably graded word-for-word, so this only flags
 // results that name an actual severity/finding — everything else (including full descriptive

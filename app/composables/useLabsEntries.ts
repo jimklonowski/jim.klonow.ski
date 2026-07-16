@@ -1,6 +1,7 @@
 export interface QualitativeResult {
   name: string
   result: string
+  category?: 'echo' | 'genetic'
 }
 
 export interface LabsEntry {

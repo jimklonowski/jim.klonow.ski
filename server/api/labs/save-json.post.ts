@@ -56,7 +56,10 @@ export default defineEventHandler(async (event) => {
   const newSources = (data.sources ?? []) as string[]
   const mergedSources = [...new Set([...existingSources, ...newSources])]
   const mergedMarkers = { ...existingMarkers, ...(data.markers as Record<string, number> ?? {}) }
-  const newQualitative = (data.qualitative ?? []) as { name: string, result: string }[]
+  // Tag each qualitative result with its report type so the dashboard can split echo
+  // findings from genetic/other qualitative results without guessing from the name.
+  const newQualitative = ((data.qualitative ?? []) as { name: string, result: string }[])
+    .map(q => ({ ...q, category: _type === 'echo' ? 'echo' : 'genetic' }))
   const mergedQualitative = [
     ...existingQualitative.filter(q => !newQualitative.some(n => n.name === q.name)),
     ...newQualitative
