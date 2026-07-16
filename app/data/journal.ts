@@ -30,7 +30,6 @@ export interface JournalEntry {
     lunch?: string
     dinner?: string
   }
-  workout?: string
   notes?: string
 }
 
@@ -78,12 +77,16 @@ export const KNOWN_COMPOUNDS = [
   // Peptides
   'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500', 'BPC-157 / TB-500',
   'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
-  'Thymosin Alpha-1', 'Thymosin Beta-4',
+  'Thymosin Alpha-1', 'Thymosin Beta-4', 'PT-141', 'Kisspeptin',
   // TRT / Hormones
   'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate',
   'HGH', 'hCG', 'Anastrozole', 'Enclomiphene',
+  // Anabolic Steroids
+  'Oxandrolone',
   // GLP-1
   'Semaglutide', 'Tirzepatide',
+  // Metabolic / Research Compounds
+  '5-Amino-1MQ', 'SLU-PP-332',
   // Nootropics
   'Modafinil', 'Semax', 'Selank', 'DSIP'
 ]
@@ -108,7 +111,12 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Anastrozole': '#6366f1',
   'Enclomiphene': '#7c3aed',
   'Semaglutide': '#0891b2',
-  'Tirzepatide': '#0e7490'
+  'Tirzepatide': '#0e7490',
+  'PT-141': '#db2777',
+  'Kisspeptin': '#4338ca',
+  'Oxandrolone': '#c026d3',
+  '5-Amino-1MQ': '#0d9488',
+  'SLU-PP-332': '#ca8a04'
 }
 
 export function getCompoundColor(compound: string): string {
@@ -131,7 +139,6 @@ export function blankEntry(date: string): JournalEntry {
     peptides: [],
     reconstitutions: [],
     food: { breakfast: '', snack: '', lunch: '', dinner: '' },
-    workout: '',
     notes: ''
   }
 }
