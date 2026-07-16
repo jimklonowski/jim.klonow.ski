@@ -27,11 +27,18 @@
           >
             {{ whoopConnected ? 'Whoop Connected' : 'Connect Whoop' }}
           </UButton>
+          <UButton
+            v-if="whoopConnected"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-refresh-cw"
+            :loading="syncingWhoop"
+            @click="syncWhoopNow"
+          >
+            Sync Now
+          </UButton>
           <UButton :to="`/journal/calendar`" variant="outline" size="xs" icon="i-lucide-calendar">
             Calendar
-          </UButton>
-          <UButton to="/journal/timeline" variant="outline" size="xs" icon="i-lucide-gantt-chart">
-            Timeline
           </UButton>
           <UButton to="/journal/import" variant="outline" size="xs" icon="i-lucide-upload">
             Import
@@ -224,6 +231,29 @@
             </ClientOnly>
           </UCard>
         </div>
+
+        <!-- Sleep stages -->
+        <UCard v-if="sleepStageChart.length" class="mt-4">
+          <template #header>
+            <p class="text-sm font-medium">Sleep Stages</p>
+            <p class="text-xs text-muted">minutes per night</p>
+          </template>
+          <ClientOnly>
+            <BarChart
+              :data="sleepStageChart"
+              :categories="{
+                rem: { name: 'REM', color: '#8b5cf6' },
+                deep: { name: 'Deep', color: '#3b82f6' },
+                core: { name: 'Core', color: '#06b6d4' },
+                awake: { name: 'Awake', color: '#f97316' }
+              }"
+              :y-axis="['rem', 'deep', 'core', 'awake']"
+              x-axis="date"
+              :stacked="true"
+              :height="200"
+            />
+          </ClientOnly>
+        </UCard>
       </section>
 
       <!-- History modal -->
@@ -354,6 +384,8 @@ import { workoutIcon } from '~/data/workouts'
 
 definePageMeta({ middleware: 'journal-auth' })
 
+const toast = useToast()
+
 const { data, refresh } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: healthData, refresh: refreshHealth } = await useHealthMetricsEntries()
@@ -373,6 +405,23 @@ onMounted(async () => {
     whoopConnected.value = false
   }
 })
+
+const syncingWhoop = ref(false)
+async function syncWhoopNow() {
+  syncingWhoop.value = true
+  try {
+    const { result } = await $fetch<{ result: { touched: number } }>('/api/whoop/sync', { method: 'POST' })
+    await Promise.all([refresh(), refreshHealth(), refreshWorkouts()])
+    toast.add({ title: 'Whoop synced', description: `${result.touched} day${result.touched === 1 ? '' : 's'} updated`, color: 'success', icon: 'i-lucide-check' })
+  }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    toast.add({ title: 'Sync failed', description: msg, color: 'error' })
+  }
+  finally {
+    syncingWhoop.value = false
+  }
+}
 
 const entries = computed(() => data.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
@@ -579,6 +628,18 @@ function healthTrendData(key: string) {
     .filter(e => getHealthValue(e, key) !== null)
     .map(e => ({ date: formatDate(e.date), value: getHealthValue(e, key) as number }))
 }
+
+const sleepStageChart = computed(() =>
+  healthEntries.value
+    .filter(e => e.sleep_rem_min != null || e.sleep_deep_min != null || e.sleep_core_min != null || e.sleep_awake_min != null)
+    .map(e => ({
+      date: formatDate(e.date),
+      rem: e.sleep_rem_min ?? 0,
+      deep: e.sleep_deep_min ?? 0,
+      core: e.sleep_core_min ?? 0,
+      awake: e.sleep_awake_min ?? 0
+    }))
+)
 
 const healthModalOpen = ref(false)
 const healthModalKey = ref('')
