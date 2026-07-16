@@ -144,6 +144,21 @@
           ? `Saved ${formatDate(saveResult.date!)} — the dashboard will update automatically.`
           : saveResult.message"
       />
+
+      <UCard v-if="summarizing || summary || summaryError">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
+            <p class="text-sm font-medium">AI Summary</p>
+          </div>
+        </template>
+        <div v-if="summarizing" class="flex items-center gap-3 text-sm text-muted py-2">
+          <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+          Comparing this draw against your history...
+        </div>
+        <p v-else-if="summary" class="text-sm leading-relaxed whitespace-pre-line">{{ summary }}</p>
+        <p v-else class="text-sm text-muted">{{ summaryError }}</p>
+      </UCard>
     </template>
   </div>
 </template>
@@ -239,6 +254,9 @@ const filename = ref('')
 const result = ref<LabResult | null>(null)
 const saving = ref(false)
 const saveResult = ref<{ ok: boolean, date?: string, message?: string } | null>(null)
+const summarizing = ref(false)
+const summary = ref('')
+const summaryError = ref('')
 
 const markerEntries = computed(() =>
   Object.entries(result.value?.markers ?? {}).sort(([a], [b]) => {
@@ -293,6 +311,9 @@ function reset() {
   error.value = ''
   filename.value = ''
   saveResult.value = null
+  summarizing.value = false
+  summary.value = ''
+  summaryError.value = ''
   if (fileInput.value) fileInput.value.value = ''
 }
 
@@ -317,6 +338,8 @@ async function saveToSite() {
       body: { ...result.value, _type: reportType.value }
     })
     saveResult.value = { ok: true, date: res.date }
+    // DEXA saves go to their own table and have no marker history to narrate.
+    if (res.table === 'labs_entries') generateSummary(res.date)
   }
   catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Failed to save. Please try again.'
@@ -324,6 +347,22 @@ async function saveToSite() {
   }
   finally {
     saving.value = false
+  }
+}
+
+async function generateSummary(date: string) {
+  summarizing.value = true
+  summary.value = ''
+  summaryError.value = ''
+  try {
+    const res = await $fetch<{ summary: string }>('/api/labs/generate-summary', { method: 'POST', body: { date } })
+    summary.value = res.summary
+  }
+  catch {
+    summaryError.value = 'Summary generation failed — your results were still saved.'
+  }
+  finally {
+    summarizing.value = false
   }
 }
 

@@ -10,6 +10,7 @@ export interface LabsEntry {
   sources: string[]
   markers: Record<string, number | null>
   qualitative: QualitativeResult[]
+  ai_summary?: string | null
 }
 
 export function useLabsEntries() {

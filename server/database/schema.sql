@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS labs_entries (
   fasting INTEGER NOT NULL DEFAULT 0,
   sources TEXT NOT NULL DEFAULT '[]',
   markers TEXT NOT NULL DEFAULT '{}',
-  qualitative TEXT NOT NULL DEFAULT '[]'
+  qualitative TEXT NOT NULL DEFAULT '[]',
+  ai_summary TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dexa_entries (
@@ -64,6 +65,9 @@ CREATE TABLE IF NOT EXISTS whoop_tokens (
   refresh_token TEXT NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+-- One-time migration, do not re-run after it lands on an environment:
+-- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
 
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE health_metrics ADD COLUMN recovery_score REAL;
