@@ -240,24 +240,28 @@
               :height="200"
             >
               <template #tooltip="{ values }">
-                <div v-if="values" class="bg-elevated border border-default rounded-lg shadow-lg p-3 text-xs min-w-44">
-                  <p class="font-semibold text-sm mb-2">{{ values.date }}</p>
+                <div
+                  v-if="values?.datum"
+                  class="rounded-lg p-3 text-xs min-w-44"
+                  style="background: #1e293b; border: 1px solid #334155; color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.4);"
+                >
+                  <p class="font-semibold text-sm mb-2" style="color: #f8fafc;">{{ values.datum.date }}</p>
                   <div class="space-y-1">
                     <div
                       v-for="key in (['rem', 'deep', 'core', 'awake'] as const)"
                       :key="key"
                       class="flex items-center justify-between gap-4"
                     >
-                      <span class="flex items-center gap-1.5 text-muted">
+                      <span class="flex items-center gap-1.5" style="color: #94a3b8;">
                         <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: SLEEP_STAGE_META[key].color }" />
                         {{ SLEEP_STAGE_META[key].name }}
                       </span>
-                      <span class="font-mono font-medium">{{ formatDuration(values[key] ?? 0) }}</span>
+                      <span class="font-mono font-medium" style="color: #f8fafc;">{{ formatDuration(values.datum[key] ?? 0) }}</span>
                     </div>
                   </div>
-                  <div class="flex items-center justify-between gap-4 pt-1.5 mt-1.5 border-t border-default">
-                    <span class="text-muted">Asleep</span>
-                    <span class="font-mono font-semibold">{{ formatDuration((values.rem ?? 0) + (values.deep ?? 0) + (values.core ?? 0)) }}</span>
+                  <div class="flex items-center justify-between gap-4 pt-1.5 mt-1.5" style="border-top: 1px solid #334155;">
+                    <span style="color: #94a3b8;">Asleep</span>
+                    <span class="font-mono font-semibold" style="color: #f8fafc;">{{ formatDuration((values.datum.rem ?? 0) + (values.datum.deep ?? 0) + (values.datum.core ?? 0)) }}</span>
                   </div>
                 </div>
               </template>
