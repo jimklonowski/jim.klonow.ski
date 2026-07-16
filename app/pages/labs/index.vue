@@ -39,6 +39,22 @@
         </div>
       </div>
 
+      <!-- AI trend summary -->
+      <section v-if="latestSummary">
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
+                <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">AI Summary</h2>
+              </div>
+              <p class="text-xs text-muted">{{ formatDate(latestSummary.date) }}</p>
+            </div>
+          </template>
+          <p class="text-sm leading-relaxed whitespace-pre-line">{{ latestSummary.text }}</p>
+        </UCard>
+      </section>
+
       <!-- Pinned / key markers -->
       <section>
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Key Markers</h2>
@@ -163,6 +179,12 @@ if (import.meta.client) {
 
 const entries = computed(() => data.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
+
+// Most recent draw that has a generated summary — older draws predate the feature.
+const latestSummary = computed(() => {
+  const entry = [...entries.value].reverse().find(e => e.ai_summary)
+  return entry ? { date: entry.date, text: entry.ai_summary as string } : null
+})
 
 const allSources = computed(() =>
   entries.value.flatMap(e => (e.sources ?? []).map((src: string) => src)).filter(Boolean)

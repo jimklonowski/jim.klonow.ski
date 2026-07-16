@@ -156,8 +156,8 @@ export default defineEventHandler(async (event) => {
 
     if (!existing) {
       await db.prepare(`
-        INSERT INTO journal_entries (date, peptides, reconstitutions, food, workout, notes, weight_lbs, rhr, hrv, bp_systolic, bp_diastolic)
-        VALUES (?1, '[]', '[]', '{}', '', '', ?2, ?3, ?4, ?5, ?6)
+        INSERT INTO journal_entries (date, peptides, reconstitutions, food, notes, weight_lbs, rhr, hrv, bp_systolic, bp_diastolic)
+        VALUES (?1, '[]', '[]', '{}', '', ?2, ?3, ?4, ?5, ?6)
       `).bind(
         date,
         vitals.weight_lbs ?? null,
