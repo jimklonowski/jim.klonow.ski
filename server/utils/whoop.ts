@@ -24,6 +24,23 @@ export async function saveWhoopTokens(db: D1Database, tokens: WhoopTokens) {
   `).bind(tokens.access_token, tokens.refresh_token, tokens.expires_at).run()
 }
 
+// sync.ts fires several whoopFetch() calls concurrently (Promise.all), and each independently
+// checks token expiry - without this guard, every one of them would see the same near-expiry
+// token and race to refresh it in parallel. Whoop invalidates a refresh_token as soon as the
+// first request consumes it, so the other concurrent calls would reuse an already-dead token and
+// fail (and, worse, permanently kill the connection until a manual reconnect). Sharing a single
+// in-flight refresh across concurrent callers on this isolate avoids that entirely.
+let refreshInFlight: Promise<WhoopTokens> | null = null
+
+function refreshWhoopTokenOnce(db: D1Database, refreshToken: string): Promise<WhoopTokens> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshWhoopToken(db, refreshToken).finally(() => {
+      refreshInFlight = null
+    })
+  }
+  return refreshInFlight
+}
+
 async function refreshWhoopToken(db: D1Database, refreshToken: string): Promise<WhoopTokens> {
   const clientId = process.env.WHOOP_CLIENT_ID
   const clientSecret = process.env.WHOOP_CLIENT_SECRET
@@ -64,7 +81,7 @@ export async function whoopFetch<T>(db: D1Database, path: string): Promise<T> {
   }
 
   if (tokens.expires_at - Date.now() < REFRESH_BUFFER_MS) {
-    tokens = await refreshWhoopToken(db, tokens.refresh_token)
+    tokens = await refreshWhoopTokenOnce(db, tokens.refresh_token)
   }
 
   const res = await fetch(`${WHOOP_API_BASE}${path}`, {
