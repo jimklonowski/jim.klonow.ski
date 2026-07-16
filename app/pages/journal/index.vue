@@ -18,43 +18,25 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <UButton
+            v-if="!whoopConnected"
             variant="outline"
             size="xs"
-            :icon="whoopConnected ? 'i-lucide-check' : 'i-lucide-link'"
-            :to="whoopConnected ? undefined : '/api/whoop/authorize'"
-            :external="!whoopConnected"
-            :disabled="whoopConnected"
-          >
-            {{ whoopConnected ? 'Whoop Connected' : 'Connect Whoop' }}
-          </UButton>
-          <UButton
-            v-if="whoopConnected"
-            variant="outline"
-            size="xs"
-            icon="i-lucide-refresh-cw"
-            :loading="syncingWhoop"
-            @click="syncWhoopNow"
-          >
-            Sync Now
-          </UButton>
-          <UButton
-            v-if="whoopConnected"
-            to="/api/whoop/authorize?reconnect=true"
+            icon="i-lucide-link"
+            to="/api/whoop/authorize"
             external
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-rotate-ccw"
           >
-            Reconnect
+            Connect Whoop
           </UButton>
+          <UDropdownMenu v-else :items="whoopMenuItems" :content="{ align: 'start' }" size="xs">
+            <UButton variant="outline" size="xs" icon="i-lucide-check" trailing-icon="i-lucide-chevron-down">
+              Whoop
+            </UButton>
+          </UDropdownMenu>
           <UButton :to="`/journal/calendar`" variant="outline" size="xs" icon="i-lucide-calendar">
             Calendar
           </UButton>
           <UButton to="/journal/import" variant="outline" size="xs" icon="i-lucide-upload">
             Import
-          </UButton>
-          <UButton to="/journal/calculator" variant="outline" size="xs" icon="i-lucide-calculator">
-            Calculator
           </UButton>
           <UButton :to="`/journal/${todayDate}`" size="xs" icon="i-lucide-plus">
             New Entry
@@ -251,17 +233,35 @@
           <ClientOnly>
             <BarChart
               :data="sleepStageChart"
-              :categories="{
-                rem: { name: 'REM', color: '#8b5cf6' },
-                deep: { name: 'Deep', color: '#3b82f6' },
-                core: { name: 'Core', color: '#06b6d4' },
-                awake: { name: 'Awake', color: '#f97316' }
-              }"
+              :categories="SLEEP_STAGE_META"
               :y-axis="['rem', 'deep', 'core', 'awake']"
               x-axis="date"
               :stacked="true"
               :height="200"
-            />
+            >
+              <template #tooltip="{ values }">
+                <div v-if="values" class="bg-elevated border border-default rounded-lg shadow-lg p-3 text-xs min-w-44">
+                  <p class="font-semibold text-sm mb-2">{{ values.date }}</p>
+                  <div class="space-y-1">
+                    <div
+                      v-for="key in (['rem', 'deep', 'core', 'awake'] as const)"
+                      :key="key"
+                      class="flex items-center justify-between gap-4"
+                    >
+                      <span class="flex items-center gap-1.5 text-muted">
+                        <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: SLEEP_STAGE_META[key].color }" />
+                        {{ SLEEP_STAGE_META[key].name }}
+                      </span>
+                      <span class="font-mono font-medium">{{ formatDuration(values[key] ?? 0) }}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between gap-4 pt-1.5 mt-1.5 border-t border-default">
+                    <span class="text-muted">Asleep</span>
+                    <span class="font-mono font-semibold">{{ formatDuration((values.rem ?? 0) + (values.deep ?? 0) + (values.core ?? 0)) }}</span>
+                  </div>
+                </div>
+              </template>
+            </BarChart>
           </ClientOnly>
         </UCard>
       </section>
@@ -432,6 +432,24 @@ async function syncWhoopNow() {
     syncingWhoop.value = false
   }
 }
+
+const whoopMenuItems = computed(() => [
+  {
+    label: 'Sync Now',
+    icon: 'i-lucide-refresh-cw',
+    loading: syncingWhoop.value,
+    onSelect: (e: Event) => {
+      e.preventDefault()
+      syncWhoopNow()
+    }
+  },
+  {
+    label: 'Reconnect',
+    icon: 'i-lucide-rotate-ccw',
+    to: '/api/whoop/authorize?reconnect=true',
+    external: true
+  }
+])
 
 const entries = computed(() => data.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
@@ -638,6 +656,13 @@ function healthTrendData(key: string) {
     .filter(e => getHealthValue(e, key) !== null)
     .map(e => ({ date: formatDate(e.date), value: getHealthValue(e, key) as number }))
 }
+
+const SLEEP_STAGE_META = {
+  rem: { name: 'REM', color: '#8b5cf6' },
+  deep: { name: 'Deep', color: '#3b82f6' },
+  core: { name: 'Core', color: '#06b6d4' },
+  awake: { name: 'Awake', color: '#f97316' }
+} as const
 
 const sleepStageChart = computed(() =>
   healthEntries.value
