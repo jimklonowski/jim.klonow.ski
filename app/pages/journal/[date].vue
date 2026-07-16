@@ -219,13 +219,10 @@
         </div>
       </UCard>
 
-      <!-- Workout & Notes -->
+      <!-- Notes -->
       <UCard>
-        <template #header><p class="text-sm font-semibold">Workout & Notes</p></template>
+        <template #header><p class="text-sm font-semibold">Notes</p></template>
         <div class="space-y-4">
-          <UFormField label="Workout">
-            <UInput v-model="form.workout" placeholder="Dumbbells – Chest, Biceps, Triceps" class="w-full" />
-          </UFormField>
           <UFormField label="Notes">
             <UTextarea v-model="form.notes" placeholder="Any observations, how you felt, etc." :rows="3" class="w-full" />
           </UFormField>
@@ -297,7 +294,6 @@ const form = reactive<{
   peptides: PeptideEntry[]
   reconstitutions: ReconstitutionEntry[]
   food: { breakfast: string, snack: string, lunch: string, dinner: string }
-  workout: string
   notes: string
 }>(buildForm())
 
@@ -320,7 +316,6 @@ function buildForm() {
       peptides: [] as PeptideEntry[],
       reconstitutions: [] as ReconstitutionEntry[],
       food: { breakfast: '', snack: '', lunch: '', dinner: '' },
-      workout: '',
       notes: ''
     }
   }
@@ -340,7 +335,6 @@ function buildForm() {
       lunch: entry.food?.lunch ?? '',
       dinner: entry.food?.dinner ?? ''
     },
-    workout: entry.workout ?? '',
     notes: entry.notes ?? ''
   }
 }
