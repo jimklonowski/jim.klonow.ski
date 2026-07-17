@@ -55,6 +55,13 @@
         </UCard>
       </section>
 
+      <!-- Protocol context: what was running when each draw happened -->
+      <LabsProtocolContext
+        v-if="entries.length && journalEntries.length"
+        :labs-entries="entries"
+        :journal-entries="journalEntries"
+      />
+
       <!-- Pinned / key markers -->
       <section>
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Key Markers</h2>
@@ -171,13 +178,16 @@ import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 definePageMeta({ middleware: 'labs-auth' })
 
 const { data, refresh } = await useLabsEntries()
+const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data
 if (import.meta.client) {
   onMounted(refresh)
+  onMounted(refreshJournal)
 }
 
 const entries = computed(() => data.value ?? [])
+const journalEntries = computed(() => journalData.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
 
 // Most recent draw that has a generated summary — older draws predate the feature.
