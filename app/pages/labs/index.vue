@@ -55,13 +55,6 @@
         </UCard>
       </section>
 
-      <!-- Protocol context: what was running when each draw happened -->
-      <LabsProtocolContext
-        v-if="entries.length && journalEntries.length"
-        :labs-entries="entries"
-        :journal-entries="journalEntries"
-      />
-
       <!-- Pinned / key markers -->
       <section>
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Key Markers</h2>
@@ -166,6 +159,13 @@
           </template>
         </UTabs>
       </section>
+
+      <!-- Protocol context: what was running when each draw happened -->
+      <LabsProtocolContext
+        v-if="entries.length && journalEntries.length"
+        :labs-entries="entries"
+        :journal-entries="journalEntries"
+      />
     </div>
   </UContainer>
 </template>
