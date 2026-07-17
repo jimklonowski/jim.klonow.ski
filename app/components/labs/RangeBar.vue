@@ -1,11 +1,17 @@
 <template>
   <div class="space-y-1">
     <div class="relative h-2 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-visible">
-      <!-- Reference range highlight -->
+      <!-- Lab reference range (broad, population) -->
       <div
         v-if="rangeStyle"
         class="absolute h-full rounded-full bg-green-200 dark:bg-green-900/50"
         :style="rangeStyle"
+      />
+      <!-- Optimal range (tighter target), nested inside the reference range -->
+      <div
+        v-if="optimalStyle"
+        class="absolute h-full rounded-full bg-green-500/70 dark:bg-green-500/60"
+        :style="optimalStyle"
       />
       <!-- Value marker -->
       <div
@@ -65,6 +71,16 @@ const rangeStyle = computed(() => {
 
   const left = refMin !== undefined ? toPercent(refMin) : 0
   const right = refMax !== undefined ? toPercent(refMax) : 100
+
+  return { left: `${left}%`, width: `${right - left}%` }
+})
+
+const optimalStyle = computed(() => {
+  const { optimalMin, optimalMax } = props.meta
+  if (optimalMin === undefined && optimalMax === undefined) return null
+
+  const left = optimalMin !== undefined ? toPercent(optimalMin) : 0
+  const right = optimalMax !== undefined ? toPercent(optimalMax) : 100
 
   return { left: `${left}%`, width: `${right - left}%` }
 })

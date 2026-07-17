@@ -32,6 +32,7 @@
     "@vueuse/nuxt": "14.3.0",
     "nuxt": "^4.4.8",
     "nuxt-charts": "^2.1.4",
+    "nuxt-security": "^2.6.0",
     "pinia": "^4.0.2",
     "shaders": "^3.0.438",
     "vue": "^3.5.39"
