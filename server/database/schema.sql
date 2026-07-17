@@ -66,6 +66,30 @@ CREATE TABLE IF NOT EXISTS whoop_tokens (
   expires_at INTEGER NOT NULL
 );
 
+-- Vial inventory: sealed fridge stock (lyophilized) and active reconstituted vials.
+-- A sealed batch has quantity = number of identical vials on hand; opening one decrements
+-- the batch and spawns an active row (quantity 1) with opened_date + bac_water_ml set.
+-- Active-vial remaining mg is derived at read time from journal_entries.peptides doses
+-- of the same compound logged on/after opened_date (see app/utils/vialInventory.ts).
+CREATE TABLE IF NOT EXISTS vials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  compound TEXT NOT NULL,
+  supplier TEXT,
+  vial_amount REAL NOT NULL,
+  vial_unit TEXT NOT NULL DEFAULT 'mg',
+  quantity INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'sealed', -- 'sealed' | 'active' | 'finished'
+  opened_date TEXT,
+  bac_water_ml REAL,
+  lot TEXT,
+  expiry TEXT,
+  cost REAL,
+  notes TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_vials_compound ON vials(compound);
+CREATE INDEX IF NOT EXISTS idx_vials_status ON vials(status);
+
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
 
