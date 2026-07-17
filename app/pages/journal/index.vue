@@ -198,14 +198,15 @@
             <div class="space-y-2">
               <p class="text-xs text-muted leading-tight">{{ meta.label }}</p>
               <div class="flex items-end gap-1">
-                <span class="text-2xl font-bold tabular-nums">{{ formatHealthValue(key, latestHealth) }}</span>
+                <span class="text-2xl font-bold tabular-nums">{{ readingValueText(key) }}</span>
                 <span v-if="key !== 'sleep_total_min'" class="text-xs text-muted mb-0.5">{{ meta.unit }}</span>
               </div>
-              <div v-if="prevHealth && healthDeltaValue(key) !== null" class="flex items-center gap-1 text-xs text-muted">
+              <div v-if="healthDeltaValue(key) !== null" class="flex items-center gap-1 text-xs text-muted">
                 <UIcon :name="healthDeltaIcon(key)" :class="healthDeltaColor(key)" class="w-3.5 h-3.5 shrink-0" />
                 <span :class="healthDeltaColor(key)">{{ healthDeltaText(key) }}</span>
                 <span>vs prev</span>
               </div>
+              <p v-if="readingStaleDate(key)" class="text-xs text-muted/70">as of {{ readingStaleDate(key) }}</p>
             </div>
           </UCard>
         </div>
@@ -610,7 +611,35 @@ function uniqueCompounds(entry: typeof latest.value) {
 // --- Body composition & fitness (health_metrics) ---
 const healthEntries = computed(() => healthData.value ?? [])
 const latestHealth = computed(() => healthEntries.value.at(-1) ?? null)
-const prevHealth = computed(() => healthEntries.value.length >= 2 ? (healthEntries.value.at(-2) ?? null) : null)
+const latestHealthDate = computed(() => latestHealth.value?.date ?? null)
+
+// These metrics land on different cadences and from different sources (Whoop daily; Apple Health
+// sleep each morning; VO2 max only on outdoor workouts; Withings body-comp only on weigh-in days),
+// so today's row is mostly null. Show each metric's most recent actual reading — plus the reading
+// before it for the delta — rather than whatever happens to be on the latest date.
+interface HealthReading { value: number | null, date: string | null, prev: number | null }
+const latestReadings = computed<Record<string, HealthReading>>(() => {
+  const out: Record<string, HealthReading> = {}
+  for (const key of Object.keys(HEALTH_METRICS_META)) {
+    let value: number | null = null
+    let date: string | null = null
+    let prev: number | null = null
+    for (let i = healthEntries.value.length - 1; i >= 0; i--) {
+      const v = getHealthValue(healthEntries.value[i] ?? null, key)
+      if (v === null) continue
+      if (value === null) {
+        value = v
+        date = healthEntries.value[i]?.date ?? null
+      }
+      else {
+        prev = v
+        break
+      }
+    }
+    out[key] = { value, date, prev }
+  }
+  return out
+})
 
 const healthMetricEntries = computed(() => Object.entries(HEALTH_METRICS_META))
 const HEALTH_TREND_KEYS = ['vo2_max', 'body_fat_pct', 'sleep_total_min', 'recovery_score', 'strain', 'sleep_performance_pct']
@@ -624,18 +653,33 @@ function getHealthValue(entry: typeof latestHealth.value, key: string): number |
   return (entry as unknown as Record<string, number | null>)[key] ?? null
 }
 
-function formatHealthValue(key: string, entry: typeof latestHealth.value) {
-  const v = getHealthValue(entry, key)
+function formatHealthNumber(key: string, v: number | null) {
   if (v === null) return '—'
   if (key === 'sleep_total_min') return formatDuration(v)
   return Number.isInteger(v) ? v.toString() : v.toFixed(1)
 }
 
+// Used by the history modal, which formats a specific entry's value.
+function formatHealthValue(key: string, entry: typeof latestHealth.value) {
+  return formatHealthNumber(key, getHealthValue(entry, key))
+}
+
+// Card value: the most recent actual reading for this metric.
+function readingValueText(key: string) {
+  return formatHealthNumber(key, latestReadings.value[key]?.value ?? null)
+}
+
+// "as of <date>" shown only when the reading isn't from the newest health-metrics day.
+function readingStaleDate(key: string): string | null {
+  const r = latestReadings.value[key]
+  if (!r?.date || r.date === latestHealthDate.value) return null
+  return formatDate(r.date)
+}
+
 function healthDeltaValue(key: string) {
-  const cur = getHealthValue(latestHealth.value, key)
-  const prev = getHealthValue(prevHealth.value, key)
-  if (cur === null || prev === null) return null
-  return cur - prev
+  const r = latestReadings.value[key]
+  if (!r || r.value === null || r.prev === null) return null
+  return r.value - r.prev
 }
 
 function healthDeltaText(key: string) {

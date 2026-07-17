@@ -103,7 +103,10 @@ export default defineNuxtConfig({
     compressPublicAssets: true,
     experimental: { websocket: true, tasks: true },
     scheduledTasks: {
-      '0 11 * * *': ['whoop:sync']
+      '0 11 * * *': ['whoop:sync'],
+      // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
+      '0 14 * * *': ['digest:daily'],
+      '0 15 * * 1': ['digest:weekly']
     }
   },
 
