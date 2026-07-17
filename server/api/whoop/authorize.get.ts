@@ -1,5 +1,5 @@
 const WHOOP_AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth'
-const SCOPES = 'offline read:recovery read:sleep read:cycles read:profile'
+const SCOPES = 'offline read:recovery read:sleep read:cycles read:profile read:workout'
 
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
