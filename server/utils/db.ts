@@ -125,6 +125,18 @@ export function parseVialRow(row: Record<string, unknown>) {
   }
 }
 
+export function parseDigestRow(row: Record<string, unknown>) {
+  return {
+    id: row.id as number,
+    type: row.type as string,
+    period_start: row.period_start as string,
+    period_end: row.period_end as string,
+    summary: row.summary as string,
+    stats: JSON.parse((row.stats as string) || '{}'),
+    created_at: (row.created_at as string | null) ?? null
+  }
+}
+
 export interface WorkoutUpsert {
   external_id: string | null
   date: string

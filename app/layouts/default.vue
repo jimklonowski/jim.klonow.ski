@@ -5,5 +5,7 @@
     <UMain>
       <slot />
     </UMain>
+
+    <DigestPanel />
   </div>
 </template>

@@ -90,6 +90,19 @@ CREATE TABLE IF NOT EXISTS vials (
 CREATE INDEX IF NOT EXISTS idx_vials_compound ON vials(compound);
 CREATE INDEX IF NOT EXISTS idx_vials_status ON vials(status);
 
+-- AI-written health digests (daily "yesterday" recap + weekly summary), generated on a schedule
+-- and stored for in-app viewing. Unique on (type, period_end) so re-generating a period upserts.
+CREATE TABLE IF NOT EXISTS digests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL, -- 'daily' | 'weekly'
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  stats TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, period_end);
+
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
 
