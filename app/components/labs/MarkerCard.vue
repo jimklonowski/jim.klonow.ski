@@ -2,7 +2,10 @@
   <UCard class="h-full cursor-pointer hover:ring-1 hover:ring-primary/50 transition-shadow" @click="open = true">
     <div class="space-y-3">
       <div class="flex items-start justify-between gap-2">
-        <p class="text-xs font-medium text-muted leading-tight">{{ meta.label }}</p>
+        <p class="text-xs font-medium text-muted leading-tight flex items-center gap-1">
+          <UIcon v-if="meta.computed" name="i-lucide-calculator" class="w-3 h-3 shrink-0 text-muted" title="Computed from other markers" />
+          {{ meta.label }}
+        </p>
         <UBadge :color="statusColor" variant="subtle" size="xs" class="shrink-0">
           {{ statusLabel }}
         </UBadge>
@@ -32,15 +35,32 @@
           {{ meta.description }}
         </p>
 
-        <!-- Reference range -->
-        <div v-if="meta.refMin !== undefined || meta.refMax !== undefined" class="flex items-center gap-2 text-sm">
-          <span class="text-muted">Reference range:</span>
-          <span class="font-medium">
-            <template v-if="meta.refMin !== undefined && meta.refMax !== undefined">{{ meta.refMin }} – {{ meta.refMax }}</template>
-            <template v-else-if="meta.refMin !== undefined">≥ {{ meta.refMin }}</template>
-            <template v-else-if="meta.refMax !== undefined">≤ {{ meta.refMax }}</template>
-            {{ meta.unit }}
-          </span>
+        <UBadge v-if="meta.computed" color="neutral" variant="subtle" size="xs" icon="i-lucide-calculator" class="w-fit">
+          Computed from other markers
+        </UBadge>
+
+        <!-- Reference & optimal ranges -->
+        <div class="space-y-1.5">
+          <div v-if="meta.refMin !== undefined || meta.refMax !== undefined" class="flex items-center gap-2 text-sm">
+            <span class="inline-block w-3 h-3 rounded-full bg-green-200 dark:bg-green-900/50 shrink-0" />
+            <span class="text-muted">Reference range:</span>
+            <span class="font-medium">
+              <template v-if="meta.refMin !== undefined && meta.refMax !== undefined">{{ meta.refMin }} – {{ meta.refMax }}</template>
+              <template v-else-if="meta.refMin !== undefined">≥ {{ meta.refMin }}</template>
+              <template v-else-if="meta.refMax !== undefined">≤ {{ meta.refMax }}</template>
+              {{ meta.unit }}
+            </span>
+          </div>
+          <div v-if="meta.optimalMin !== undefined || meta.optimalMax !== undefined" class="flex items-center gap-2 text-sm">
+            <span class="inline-block w-3 h-3 rounded-full bg-green-500/70 shrink-0" />
+            <span class="text-muted">Optimal target:</span>
+            <span class="font-medium">
+              <template v-if="meta.optimalMin !== undefined && meta.optimalMax !== undefined">{{ meta.optimalMin }} – {{ meta.optimalMax }}</template>
+              <template v-else-if="meta.optimalMin !== undefined">≥ {{ meta.optimalMin }}</template>
+              <template v-else-if="meta.optimalMax !== undefined">≤ {{ meta.optimalMax }}</template>
+              {{ meta.unit }}
+            </span>
+          </div>
         </div>
 
         <!-- Trend chart -->

@@ -27,6 +27,12 @@
       "bucket_name": "jim-klonow-ski-labs"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "RATE_LIMIT",
+      "id": "96f29be3e5d34445af82db2b0bc21373"
+    }
+  ],
   "triggers": {
     "crons": ["0 11 * * *"]
   }
