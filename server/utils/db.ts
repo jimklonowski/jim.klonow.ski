@@ -106,6 +106,25 @@ export function parseWorkoutRow(row: Record<string, unknown>) {
   }
 }
 
+export function parseVialRow(row: Record<string, unknown>) {
+  return {
+    id: row.id as number,
+    compound: row.compound as string,
+    supplier: (row.supplier as string | null) ?? null,
+    vial_amount: row.vial_amount as number,
+    vial_unit: (row.vial_unit as string) || 'mg',
+    quantity: (row.quantity as number | null) ?? 1,
+    status: (row.status as string) || 'sealed',
+    opened_date: (row.opened_date as string | null) ?? null,
+    bac_water_ml: (row.bac_water_ml as number | null) ?? null,
+    lot: (row.lot as string | null) ?? null,
+    expiry: (row.expiry as string | null) ?? null,
+    cost: (row.cost as number | null) ?? null,
+    notes: (row.notes as string | null) ?? null,
+    created_at: (row.created_at as string | null) ?? null
+  }
+}
+
 export function parseDexaRow(row: Record<string, unknown>) {
   return {
     date: row.date as string,
