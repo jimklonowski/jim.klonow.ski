@@ -12,7 +12,8 @@ export default defineNuxtConfig({
     '@nuxtjs/i18n',
     '@pinia/nuxt',
     'nitro-cloudflare-dev',
-    'nuxt-charts'
+    'nuxt-charts',
+    'nuxt-security'
   ],
 
   compatibilityDate: '2026-05-01',
@@ -108,6 +109,50 @@ export default defineNuxtConfig({
 
   routeRules: {
     // '/': { prerender: true }
+    // Rate limiting is off everywhere except the two credential endpoints below.
+    // Counters live in the RATE_LIMIT KV namespace so they survive Worker isolate
+    // recycling; limits are per IP (cf-connecting-ip is set by Cloudflare and can't
+    // be spoofed by clients).
+    '/**': { security: { rateLimiter: false } },
+    '/api/labs/auth': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 5,
+          interval: 300000, // 5 attempts per 5 minutes
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    },
+    '/api/labs/upload-auth': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 5,
+          interval: 900000, // 5 attempts per 15 minutes — the PIN is the smaller keyspace
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    }
+  },
+
+  // Only the per-route rate limiter (see routeRules) is in use for now. Everything global
+  // is switched off so the module doesn't change existing behavior (CSP would need auditing
+  // against Nuxt UI/nuxt-charts inline usage, the size limiter against PDF uploads, etc.).
+  security: {
+    headers: false,
+    // Not global limiting (the '/**' rule above disables it) — the module only reads the
+    // storage driver from this global config, so it must be declared here for the
+    // per-route limiters to use KV instead of silently falling back to per-isolate memory.
+    rateLimiter: {
+      driver: { name: 'cloudflareKVBinding', options: { binding: 'RATE_LIMIT' } }
+    },
+    requestSizeLimiter: false,
+    xssValidator: false,
+    corsHandler: false,
+    allowedMethodsRestricter: false,
+    nonce: false,
+    sri: false,
+    removeLoggers: false,
+    hidePoweredBy: true
   },
 
   site: {
