@@ -14,6 +14,48 @@ export interface ReconstitutionEntry {
   bac_water_ml: number
 }
 
+export type VialStatus = 'sealed' | 'active' | 'finished'
+
+export interface Vial {
+  id?: number
+  compound: string
+  supplier?: string | null
+  vial_amount: number
+  vial_unit: 'mg' | 'mcg' | 'iu'
+  quantity: number
+  status: VialStatus
+  opened_date?: string | null
+  bac_water_ml?: number | null
+  lot?: string | null
+  expiry?: string | null
+  cost?: number | null
+  notes?: string | null
+  created_at?: string
+}
+
+export const VIAL_STATUS_LABELS: Record<VialStatus, string> = {
+  sealed: 'Sealed',
+  active: 'Active',
+  finished: 'Finished'
+}
+
+export function blankVial(compound = ''): Vial {
+  return {
+    compound,
+    supplier: '',
+    vial_amount: 10,
+    vial_unit: 'mg',
+    quantity: 1,
+    status: 'sealed',
+    opened_date: null,
+    bac_water_ml: null,
+    lot: '',
+    expiry: '',
+    cost: null,
+    notes: ''
+  }
+}
+
 export interface JournalEntry {
   date: string
   day?: number | null
