@@ -35,6 +35,9 @@
           <UButton :to="`/journal/calendar`" variant="outline" size="xs" icon="i-lucide-calendar">
             Calendar
           </UButton>
+          <UButton to="/journal/inventory" variant="outline" size="xs" icon="i-lucide-package">
+            Inventory
+          </UButton>
           <UButton to="/journal/import" variant="outline" size="xs" icon="i-lucide-upload">
             Import
           </UButton>

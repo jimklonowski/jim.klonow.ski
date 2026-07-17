@@ -15,6 +15,7 @@
             <p class="text-sm text-muted">{{ onDays.length }} days used</p>
           </div>
         </div>
+        <UButton to="/journal/inventory" variant="ghost" size="xs" icon="i-lucide-package">Inventory</UButton>
       </div>
 
       <div v-if="!onDays.length" class="text-muted text-sm">
