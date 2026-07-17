@@ -427,9 +427,11 @@ const syncingWhoop = ref(false)
 async function syncWhoopNow() {
   syncingWhoop.value = true
   try {
-    const { result } = await $fetch<{ result: { touched: number } }>('/api/whoop/sync', { method: 'POST' })
+    const { result } = await $fetch<{ result: { touched: number, workouts: number } }>('/api/whoop/sync', { method: 'POST' })
     await Promise.all([refresh(), refreshHealth(), refreshWorkouts()])
-    toast.add({ title: 'Whoop synced', description: `${result.touched} day${result.touched === 1 ? '' : 's'} updated`, color: 'success', icon: 'i-lucide-check' })
+    const parts = [`${result.touched} day${result.touched === 1 ? '' : 's'} updated`]
+    if (result.workouts) parts.push(`${result.workouts} workout${result.workouts === 1 ? '' : 's'}`)
+    toast.add({ title: 'Whoop synced', description: parts.join(' · '), color: 'success', icon: 'i-lucide-check' })
   }
   catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
