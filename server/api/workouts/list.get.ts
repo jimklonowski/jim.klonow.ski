@@ -4,5 +4,6 @@ export default defineEventHandler(async (event) => {
   const db = getDb(event)
   const { results } = await db.prepare('SELECT * FROM workouts ORDER BY date ASC').all()
 
-  return (results ?? []).map(parseWorkoutRow)
+  // Whoop + Apple Health + Peloton can each record the same session; merge them at read time.
+  return mergeWorkouts((results ?? []).map(parseWorkoutRow))
 })

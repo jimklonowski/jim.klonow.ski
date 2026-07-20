@@ -330,6 +330,7 @@
                 <UIcon :name="workoutIcon(w.workout_type)" class="w-4 h-4 shrink-0 text-muted" />
                 <div class="text-xs text-muted font-mono min-w-24">{{ formatDate(w.date) }}</div>
                 <div class="text-sm font-medium">{{ w.workout_type ?? 'Workout' }}</div>
+                <span v-if="w.sources.length > 1" class="text-xs text-muted">{{ w.sources.join(' + ') }}</span>
               </div>
               <div class="flex items-center gap-4 text-xs font-mono text-muted">
                 <span v-if="w.duration_min != null">{{ w.duration_min }} min</span>
