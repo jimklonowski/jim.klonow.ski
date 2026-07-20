@@ -93,15 +93,10 @@ async function healthInRange(db: D1Database, start: string, end: string): Promis
 
 async function workoutsInRange(db: D1Database, start: string, end: string): Promise<WorkoutRow[]> {
   const { results } = await db.prepare(
-    'SELECT date, workout_type, duration_min, calories, avg_hr FROM workouts WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC'
+    'SELECT * FROM workouts WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC'
   ).bind(start, end).all()
-  return (results ?? []).map(r => ({
-    date: r.date as string,
-    workout_type: (r.workout_type as string | null) ?? null,
-    duration_min: (r.duration_min as number | null) ?? null,
-    calories: (r.calories as number | null) ?? null,
-    avg_hr: (r.avg_hr as number | null) ?? null
-  }))
+  // Merge Whoop/Apple/Peloton recordings of the same session so counts and totals aren't inflated.
+  return mergeWorkouts((results ?? []).map(parseWorkoutRow))
 }
 
 // Most recent journal entry with a non-null weight/rhr/hrv strictly before `date`, for deltas.

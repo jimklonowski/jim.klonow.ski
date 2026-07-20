@@ -9,6 +9,8 @@ export interface WorkoutEntry {
   avg_hr: number | null
   max_hr: number | null
   distance_mi: number | null
+  /** Which trackers recorded this session (e.g. ['apple', 'whoop']) — merged server-side. */
+  sources: string[]
 }
 
 export function useWorkoutsEntries() {

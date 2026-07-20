@@ -208,6 +208,7 @@
             <div class="flex items-center gap-2">
               <UIcon :name="workoutIcon(w.workout_type)" class="w-3.5 h-3.5 text-muted" />
               <span class="font-medium">{{ w.workout_type ?? 'Workout' }}</span>
+              <span v-if="w.sources.length > 1" class="text-xs text-muted">{{ w.sources.join(' + ') }}</span>
             </div>
             <div class="flex items-center gap-3 text-xs font-mono text-muted">
               <span v-if="w.duration_min != null">{{ w.duration_min }} min</span>
