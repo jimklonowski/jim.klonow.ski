@@ -182,18 +182,60 @@
         <template #header><p class="text-sm font-semibold">Food</p></template>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <UFormField label="Breakfast">
-            <UInput v-model="form.food.breakfast" placeholder="Protein shake + creatine" class="w-full" />
+            <UInput v-model="form.food.breakfast" list="meal-history" placeholder="Protein shake + creatine" class="w-full" />
           </UFormField>
           <UFormField label="Snack">
-            <UInput v-model="form.food.snack" placeholder="Sourdough" class="w-full" />
+            <UInput v-model="form.food.snack" list="meal-history" placeholder="Sourdough" class="w-full" />
           </UFormField>
           <UFormField label="Lunch">
-            <UInput v-model="form.food.lunch" placeholder="Chipotle bowl" class="w-full" />
+            <UInput v-model="form.food.lunch" list="meal-history" placeholder="Chipotle bowl" class="w-full" />
           </UFormField>
           <UFormField label="Dinner">
-            <UInput v-model="form.food.dinner" placeholder="Steak + veggies" class="w-full" />
+            <UInput v-model="form.food.dinner" list="meal-history" placeholder="Steak + veggies" class="w-full" />
           </UFormField>
         </div>
+        <datalist id="meal-history">
+          <option v-for="m in mealHistory" :key="m" :value="m" />
+        </datalist>
+      </UCard>
+
+      <!-- Sodas -->
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold">Sodas</p>
+            <UButton size="xs" variant="outline" icon="i-lucide-plus" @click="addSoda">Add</UButton>
+          </div>
+        </template>
+
+        <div v-if="form.sodas.length" class="space-y-3">
+          <div
+            v-for="(soda, i) in form.sodas"
+            :key="i"
+            class="grid grid-cols-12 gap-2 items-end"
+          >
+            <UFormField label="Time" class="col-span-3">
+              <UInput v-model="soda.time" type="time" class="w-full font-mono text-sm" />
+            </UFormField>
+            <UFormField label="Drink" class="col-span-5">
+              <UInput v-model="soda.drink" list="soda-drinks" placeholder="Dr Pepper" class="w-full text-sm" />
+            </UFormField>
+            <UFormField label="Size" class="col-span-3">
+              <UInput v-model="soda.size" list="soda-sizes" placeholder="12oz can" class="w-full text-sm" />
+            </UFormField>
+            <div class="col-span-1 flex items-end pb-0.5">
+              <UButton variant="ghost" color="error" size="xs" icon="i-lucide-x" @click="removeSoda(i)" />
+            </div>
+          </div>
+        </div>
+        <p v-else class="text-sm text-muted">No sodas logged.</p>
+
+        <datalist id="soda-drinks">
+          <option v-for="d in SODA_DRINKS" :key="d" :value="d" />
+        </datalist>
+        <datalist id="soda-sizes">
+          <option v-for="s in SODA_SIZES" :key="s" :value="s" />
+        </datalist>
       </UCard>
 
       <!-- Synced workouts (Apple Health / Whoop) -->
@@ -241,8 +283,8 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, blankEntry } from '~/data/journal'
-import type { PeptideEntry, ReconstitutionEntry } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda } from '~/data/journal'
+import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
 import { workoutIcon } from '~/data/workouts'
 
 definePageMeta({ middleware: 'journal-auth' })
@@ -284,6 +326,21 @@ function copyFromPrevious() {
   form.peptides = prevEntry.value.peptides.map((p: PeptideEntry) => ({ ...p }))
 }
 
+// Pooled across all four meal slots (and all days) so an order typed for lunch once
+// autocompletes for dinner too - powers the datalist on each Food input.
+const mealHistory = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const e of allEntries.value ?? []) {
+    for (const slot of ['breakfast', 'snack', 'lunch', 'dinner'] as const) {
+      const v = e.food?.[slot]?.trim()
+      if (v) counts[v] = (counts[v] ?? 0) + 1
+    }
+  }
+  return Object.entries(counts)
+    .sort(([va, a], [vb, b]) => b - a || va.localeCompare(vb))
+    .map(([v]) => v)
+})
+
 const form = reactive<{
   date: string
   day: number | null
@@ -295,6 +352,7 @@ const form = reactive<{
   peptides: PeptideEntry[]
   reconstitutions: ReconstitutionEntry[]
   food: { breakfast: string, snack: string, lunch: string, dinner: string }
+  sodas: SodaEntry[]
   notes: string
 }>(buildForm())
 
@@ -317,6 +375,7 @@ function buildForm() {
       peptides: [] as PeptideEntry[],
       reconstitutions: [] as ReconstitutionEntry[],
       food: { breakfast: '', snack: '', lunch: '', dinner: '' },
+      sodas: [] as SodaEntry[],
       notes: ''
     }
   }
@@ -336,6 +395,7 @@ function buildForm() {
       lunch: entry.food?.lunch ?? '',
       dinner: entry.food?.dinner ?? ''
     },
+    sodas: (entry.sodas ?? []).map((s: SodaEntry) => ({ ...s })),
     notes: entry.notes ?? ''
   }
 }
@@ -354,6 +414,14 @@ function addReconstitution() {
 
 function removeReconstitution(i: number) {
   form.reconstitutions.splice(i, 1)
+}
+
+function addSoda() {
+  form.sodas.push(blankSoda(new Date().toTimeString().slice(0, 5)))
+}
+
+function removeSoda(i: number) {
+  form.sodas.splice(i, 1)
 }
 
 const saving = ref(false)

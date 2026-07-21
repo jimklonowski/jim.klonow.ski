@@ -47,6 +47,69 @@
         </div>
       </div>
 
+      <!-- Soda tracker -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Soda</h2>
+          <UButton size="xs" variant="ghost" icon="i-lucide-sliders-horizontal" @click="sodaCustomOpen = !sodaCustomOpen">
+            Customize
+          </UButton>
+        </div>
+        <UCard>
+          <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p class="text-3xl font-bold font-mono">{{ todaySodas.length }}</p>
+              <p class="text-xs text-muted">today{{ todaySodas.length ? ` · last ${todaySodas.at(-1)?.time}` : '' }}</p>
+            </div>
+            <UButton size="lg" icon="i-lucide-plus" :loading="addingSoda" @click="quickAddSoda()">
+              {{ lastDrink || 'Soda' }}<span v-if="lastSize"> · {{ lastSize }}</span>
+            </UButton>
+          </div>
+
+          <div v-if="sodaCustomOpen" class="mt-4 pt-4 border-t border-neutral-800 grid grid-cols-2 gap-3">
+            <UFormField label="Drink">
+              <UInput v-model="customDrink" list="soda-drinks" placeholder="Dr Pepper" class="w-full" />
+              <datalist id="soda-drinks">
+                <option v-for="d in SODA_DRINKS" :key="d" :value="d" />
+              </datalist>
+            </UFormField>
+            <UFormField label="Size">
+              <UInput v-model="customSize" list="soda-sizes" placeholder="12oz can" class="w-full" />
+              <datalist id="soda-sizes">
+                <option v-for="s in SODA_SIZES" :key="s" :value="s" />
+              </datalist>
+            </UFormField>
+            <div class="col-span-2">
+              <UButton size="sm" icon="i-lucide-plus" :loading="addingSoda" @click="quickAddSoda(true)">Log this</UButton>
+            </div>
+          </div>
+
+          <div v-if="todaySodas.length" class="mt-4 pt-4 border-t border-neutral-800 space-y-1.5">
+            <div v-for="(s, i) in todaySodas" :key="i" class="flex items-center justify-between text-sm">
+              <span class="font-mono text-muted">{{ s.time }}</span>
+              <span>{{ s.drink || 'Soda' }}<span v-if="s.size" class="text-muted"> · {{ s.size }}</span></span>
+              <UButton variant="ghost" color="error" size="xs" icon="i-lucide-x" @click="removeSoda(i)" />
+            </div>
+          </div>
+        </UCard>
+
+        <UCard v-if="sodaTrend.length >= 2" class="mt-4">
+          <template #header>
+            <p class="text-sm font-medium">Daily Sodas</p>
+            <p class="text-xs text-muted">last 30 days</p>
+          </template>
+          <ClientOnly>
+            <BarChart
+              :data="sodaTrend"
+              :categories="{ count: { name: 'Sodas', color: '#f43f5e' } }"
+              x-axis="date"
+              :height="128"
+              :show-legend="false"
+            />
+          </ClientOnly>
+        </UCard>
+      </section>
+
       <!-- Latest vitals -->
       <section v-if="latest">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Latest Vitals</h2>
@@ -397,7 +460,8 @@
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor } from '~/data/journal'
+import { getCompoundColor, SODA_DRINKS, SODA_SIZES } from '~/data/journal'
+import type { SodaEntry } from '~/data/journal'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { workoutIcon } from '~/data/workouts'
 
@@ -608,6 +672,95 @@ function uniqueCompounds(entry: typeof latest.value) {
   if (!entry?.peptides) return []
   return [...new Set(entry.peptides.map((p: { compound: string }) => p.compound))]
 }
+
+// --- Soda tracker ---
+// Uses local date/time (not toISOString, which shifts to UTC) so a late-night tap logs
+// against the correct calendar day and displays the actual clock time it happened.
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function localTimeStr(d = new Date()) {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const todaySodas = computed<SodaEntry[]>(() => {
+  const today = localDateStr()
+  return entries.value.find(e => e.date === today)?.sodas ?? []
+})
+
+const lastSoda = computed<SodaEntry | null>(() => {
+  const all = entries.value.flatMap(e => (e.sodas ?? []).map(s => ({ ...s, date: e.date })))
+  all.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+  return all.at(-1) ?? null
+})
+const lastDrink = computed(() => lastSoda.value?.drink ?? '')
+const lastSize = computed(() => lastSoda.value?.size ?? '')
+
+const sodaCustomOpen = ref(false)
+const customDrink = ref('')
+const customSize = ref('')
+const addingSoda = ref(false)
+
+function applySodasLocally(date: string, sodas: SodaEntry[]) {
+  const idx = entries.value.findIndex(e => e.date === date)
+  if (idx >= 0) {
+    entries.value[idx]!.sodas = sodas
+  }
+  else if (data.value) {
+    data.value.push({ date, sodas })
+    data.value.sort((a, b) => a.date.localeCompare(b.date))
+  }
+}
+
+async function quickAddSoda(useCustom = false) {
+  addingSoda.value = true
+  const date = localDateStr()
+  const drink = (useCustom ? customDrink.value : lastDrink.value) || undefined
+  const size = (useCustom ? customSize.value : lastSize.value) || undefined
+  try {
+    const { sodas } = await $fetch<{ sodas: SodaEntry[] }>('/api/journal/soda', {
+      method: 'POST',
+      body: { date, time: localTimeStr(), drink, size }
+    })
+    applySodasLocally(date, sodas)
+    if (useCustom) {
+      customDrink.value = ''
+      customSize.value = ''
+      sodaCustomOpen.value = false
+    }
+  }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    toast.add({ title: 'Failed to log soda', description: msg, color: 'error' })
+  }
+  finally {
+    addingSoda.value = false
+  }
+}
+
+async function removeSoda(index: number) {
+  const date = localDateStr()
+  try {
+    const { sodas } = await $fetch<{ sodas: SodaEntry[] }>('/api/journal/soda', {
+      method: 'DELETE',
+      body: { date, index }
+    })
+    applySodasLocally(date, sodas)
+  }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    toast.add({ title: 'Failed to remove', description: msg, color: 'error' })
+  }
+}
+
+const sodaTrend = computed(() => {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 30)
+  const cutoffStr = localDateStr(cutoff)
+  return entries.value
+    .filter(e => e.date >= cutoffStr && (e.sodas ?? []).length)
+    .map(e => ({ date: formatDate(e.date), count: (e.sodas ?? []).length }))
+})
 
 // --- Body composition & fitness (health_metrics) ---
 const healthEntries = computed(() => healthData.value ?? [])

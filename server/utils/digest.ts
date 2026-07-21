@@ -241,7 +241,7 @@ function dailyPrompt(date: string, facts: string): string {
 Recap for ${fmtDate(date)}:
 ${facts}
 
-Write 1-2 short paragraphs highlighting what stands out about the day — notable vitals, recovery/sleep quality, whether they trained, and their protocol adherence. Be factual, specific, and warm but concise. If it was an unremarkable day, say so briefly. No greeting, no closing, no medical-advice disclaimers. Plain text only — no markdown, no headers, no bullet characters.`
+Write 1-2 short paragraphs highlighting what stands out about the day — notable vitals, recovery/sleep quality, whether they trained, and their protocol adherence. If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "your resting HR has averaged X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Be factual, specific, and warm but concise. If it was an unremarkable day, say so briefly. No greeting, no closing, no medical-advice disclaimers. Plain text only — no markdown, no headers, no bullet characters.`
 }
 
 function weeklyPrompt(start: string, end: string, facts: string): string {
@@ -250,11 +250,14 @@ function weeklyPrompt(start: string, end: string, facts: string): string {
 Week of ${fmtDate(start)} – ${fmtDate(end)}:
 ${facts}
 
-Write 2-3 short paragraphs, in order of importance: overall trends this week (weight, recovery, sleep, HRV/RHR), training volume, and protocol adherence (which compounds, how consistently). Call out anything notably better or worse than a typical week. Be factual, specific, and concise. No greeting, no closing, no medical-advice disclaimers. Plain text only — no markdown, no headers, no bullet characters.`
+Write 2-3 short paragraphs, in order of importance: overall trends this week (weight, recovery, sleep, HRV/RHR), training volume, and protocol adherence (which compounds, how consistently). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "your resting HR has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Call out anything notably better or worse than a typical week. Be factual, specific, and concise. No greeting, no closing, no medical-advice disclaimers. Plain text only — no markdown, no headers, no bullet characters.`
 }
 
 async function callClaude(apiKey: string, prompt: string): Promise<string> {
-  const anthropic = new Anthropic({ apiKey })
+  // The scheduled tasks get exactly one shot per day at this call, so lean on the SDK's
+  // backoff-retry (default 2 attempts) a bit harder and cap the request so a hung connection
+  // can't run the task into the Workers time limit.
+  const anthropic = new Anthropic({ apiKey, maxRetries: 4, timeout: 60_000 })
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 1024,
@@ -307,6 +310,28 @@ export async function generateDigest(
   const built = kind === 'weekly' ? await buildWeekly(db, start, end) : await buildDaily(db, end)
   if (!built.hasData) {
     return { ok: true, skipped: true, type: kind, period_start: start, period_end: end }
+  }
+
+  // Long-horizon context: protocol change-points and sustained metric shifts over the last
+  // ~4 months, so the recap can connect a month of elevated RHR to the TRT start instead of
+  // only seeing the period's own numbers.
+  const trendWindowStart = addDays(end, -119)
+  const [trendJournal, trendHealth] = await Promise.all([
+    journalInRange(db, trendWindowStart, end),
+    healthInRange(db, trendWindowStart, end)
+  ])
+  const trends = computeTrends(trendJournal, trendHealth, end)
+  const trendLines = formatTrendLines(trends)
+  if (trendLines.length) {
+    built.lines.push('', 'Sustained trends (multi-week context, precomputed):', ...trendLines)
+  }
+  if (trends.findings.length) {
+    (built.stats as Record<string, unknown>).trends = trends.findings.map(f => ({
+      metric: f.key,
+      delta: f.delta,
+      unit: f.unit,
+      since: f.since?.date ?? null
+    }))
   }
 
   const facts = built.lines.join('\n')

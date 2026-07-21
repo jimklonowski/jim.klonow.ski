@@ -190,27 +190,7 @@ export default defineEventHandler(async (event) => {
   }
 
   for (const w of workouts) {
-    if (w.external_id) {
-      await db.prepare(`
-        INSERT INTO workouts (external_id, date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-        ON CONFLICT(external_id) DO UPDATE SET
-          date = excluded.date,
-          workout_type = excluded.workout_type,
-          start_time = excluded.start_time,
-          duration_min = excluded.duration_min,
-          calories = excluded.calories,
-          avg_hr = excluded.avg_hr,
-          max_hr = excluded.max_hr,
-          distance_mi = excluded.distance_mi
-      `).bind(w.external_id, w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
-    }
-    else {
-      await db.prepare(`
-        INSERT INTO workouts (date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-      `).bind(w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
-    }
+    await upsertWorkout(db, w)
   }
 
   return {

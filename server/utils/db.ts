@@ -28,6 +28,7 @@ export function parseJournalRow(row: Record<string, unknown>) {
     peptides: JSON.parse((row.peptides as string) || '[]'),
     reconstitutions: JSON.parse((row.reconstitutions as string) || '[]'),
     food: JSON.parse((row.food as string) || '{}'),
+    sodas: JSON.parse((row.sodas as string) || '[]'),
     notes: (row.notes as string | null) ?? ''
   }
 }
@@ -150,7 +151,10 @@ export interface WorkoutUpsert {
 }
 
 // Shared by the Apple Health webhook and the Whoop sync task. When external_id is present the
-// row is upserted on it (idempotent re-sync); otherwise a new row is inserted unconditionally.
+// row is upserted on it (idempotent re-sync). Without one, the UNIQUE(external_id) constraint
+// offers no protection (SQLite treats NULLs as distinct) and Health Auto Export re-sends
+// overlapping windows on a schedule — so id-less rows are deduped on their natural key
+// (date + start_time + workout_type) instead of inserted unconditionally.
 export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<void> {
   if (w.external_id) {
     await db.prepare(`
@@ -168,10 +172,24 @@ export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<v
     `).bind(w.external_id, w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
   }
   else {
-    await db.prepare(`
-      INSERT INTO workouts (date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-    `).bind(w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+    // `IS` instead of `=` so NULL start_time/workout_type still match their own kind.
+    const existing = await db.prepare(`
+      SELECT id FROM workouts
+      WHERE external_id IS NULL AND date = ?1 AND start_time IS ?2 AND workout_type IS ?3
+    `).bind(w.date, w.start_time, w.workout_type).first<{ id: number }>()
+
+    if (existing) {
+      await db.prepare(`
+        UPDATE workouts SET duration_min = ?2, calories = ?3, avg_hr = ?4, max_hr = ?5, distance_mi = ?6
+        WHERE id = ?1
+      `).bind(existing.id, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+    }
+    else {
+      await db.prepare(`
+        INSERT INTO workouts (date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+      `).bind(w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+    }
   }
 }
 
