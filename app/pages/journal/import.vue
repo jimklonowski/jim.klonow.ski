@@ -140,7 +140,10 @@
               </UButton>
               <div v-if="importing || importDone" class="text-sm text-muted">
                 {{ done }} / {{ selectedCount }} saved
-                <span v-if="importDone" class="text-success ml-2">Done!</span>
+                <span v-if="importDone && !failedDates.length" class="text-success ml-2">Done!</span>
+                <span v-if="failedDates.length" class="text-error ml-2">
+                  {{ failedDates.length }} failed ({{ failedDates.join(', ') }}) — re-run import to retry
+                </span>
               </div>
             </div>
           </div>
@@ -408,38 +411,50 @@ function toggleAll(val: boolean) {
 const importing = ref(false)
 const importDone = ref(false)
 const done = ref(0)
+const failedDates = ref<string[]>([])
 
 async function importRows() {
   importing.value = true
   importDone.value = false
   done.value = 0
+  failedDates.value = []
 
   const selected = rows.value.filter(r => r.selected)
 
-  for (const row of selected) {
-    const existing = (entryMap.value as Record<string, Record<string, unknown>>)[row.date]
-    let payload: Record<string, unknown>
+  try {
+    for (const row of selected) {
+      const existing = (entryMap.value as Record<string, Record<string, unknown>>)[row.date]
+      let payload: Record<string, unknown>
 
-    if (existing) {
-      payload = { ...existing, ...row.updates }
-    }
-    else {
-      const blank = blankEntry(row.date)
-      payload = {
-        ...blank,
-        weight_lbs: row.weight_lbs ?? null,
-        rhr: row.rhr ?? null,
-        hrv: row.hrv ?? null,
-        bp_systolic: row.bp_systolic ?? null,
-        bp_diastolic: row.bp_diastolic ?? null,
+      if (existing) {
+        payload = { ...existing, ...row.updates }
+      }
+      else {
+        const blank = blankEntry(row.date)
+        payload = {
+          ...blank,
+          weight_lbs: row.weight_lbs ?? null,
+          rhr: row.rhr ?? null,
+          hrv: row.hrv ?? null,
+          bp_systolic: row.bp_systolic ?? null,
+          bp_diastolic: row.bp_diastolic ?? null,
+        }
+      }
+
+      // One bad row shouldn't abandon the rest of the batch (or strand the button in its
+      // loading state) — record it and keep going.
+      try {
+        await $fetch('/api/journal/save', { method: 'POST', body: payload })
+        done.value++
+      }
+      catch {
+        failedDates.value.push(row.date)
       }
     }
-
-    await $fetch('/api/journal/save', { method: 'POST', body: payload })
-    done.value++
   }
-
-  importDone.value = true
-  importing.value = false
+  finally {
+    importDone.value = true
+    importing.value = false
+  }
 }
 </script>

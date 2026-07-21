@@ -10,7 +10,16 @@ export default defineTask({
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return { result: { error: 'ANTHROPIC_API_KEY not configured' } }
 
-    const result = await generateDigest(db, apiKey, 'daily')
-    return { result }
+    try {
+      const result = await generateDigest(db, apiKey, 'daily')
+      return { result }
+    }
+    catch (err) {
+      // Swallow so the failure is visible in task logs rather than an unhandled cron error;
+      // the digest can always be regenerated on demand from the panel.
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('digest:daily failed:', message)
+      return { result: { error: message } }
+    }
   }
 })
