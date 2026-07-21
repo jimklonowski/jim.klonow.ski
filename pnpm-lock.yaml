@@ -78,8 +78,8 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2(@vue/devtools-api@8.1.5)(typescript@7.0.2)(vue@3.5.40(typescript@7.0.2))
       shaders:
-        specifier: ^3.0.441
-        version: 3.0.441(vue@3.5.40(typescript@7.0.2))
+        specifier: ^3.0.442
+        version: 3.0.442(vue@3.5.40(typescript@7.0.2))
       vue:
         specifier: 3.5.40
         version: 3.5.40(typescript@7.0.2)
@@ -7569,8 +7569,8 @@ packages:
     engines: {node: '>= 0.10'}
     hasBin: true
 
-  shaders@3.0.441:
-    resolution: {integrity: sha512-XSpBcNxUI2MkHMrssNEKgZK9dJVhWUomLAH/YlovwdfAOXNpCtqOUdTgxpeBVv4i8uIAkm2FByPmrEAbOxAeOg==}
+  shaders@3.0.442:
+    resolution: {integrity: sha512-bDlS4slkZqpRPZP91VPgZASJImOsN2y3YTTNiqSJAxxscHxvZcMczId/EdpwKUwv0PZShv7H/5UCEREHNpRumw==}
     hasBin: true
     peerDependencies:
       pixi.js: ^8.0.0
@@ -17730,7 +17730,7 @@ snapshots:
       to-buffer: 1.2.2
     optional: true
 
-  shaders@3.0.441(vue@3.5.40(typescript@7.0.2)):
+  shaders@3.0.442(vue@3.5.40(typescript@7.0.2)):
     dependencies:
       typegpu: 0.11.9
     optionalDependencies:
