@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   peptides TEXT NOT NULL DEFAULT '[]',
   reconstitutions TEXT NOT NULL DEFAULT '[]',
   food TEXT NOT NULL DEFAULT '{}',
+  sodas TEXT NOT NULL DEFAULT '[]',
   notes TEXT
 );
 
@@ -110,6 +111,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, perio
 -- ALTER TABLE health_metrics ADD COLUMN recovery_score REAL;
 -- ALTER TABLE health_metrics ADD COLUMN strain REAL;
 -- ALTER TABLE health_metrics ADD COLUMN sleep_performance_pct REAL;
+
+-- One-time migration, do not re-run after it lands on an environment:
+-- ALTER TABLE journal_entries ADD COLUMN sodas TEXT NOT NULL DEFAULT '[]';
 
 -- One-time migration, do not re-run after it lands on an environment.
 -- Folds the retired freehand `workout` field into `notes` (structured workouts now come from

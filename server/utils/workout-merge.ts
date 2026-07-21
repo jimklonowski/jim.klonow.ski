@@ -2,12 +2,13 @@
 // `whoop:*`), the Apple Watch workout arrives via the Health Auto Export webhook, and the Peloton
 // app writes its own copy to HealthKit (the one that carries distance). Rather than destructively
 // deduping the table (each source keeps upserting on its own external_id), rows are merged at read
-// time: same-day workouts whose start times fall within a small window are treated as one session,
-// keeping the richest record and filling its gaps from the others.
+// time: workouts that start near-simultaneously or substantially overlap in time are treated as
+// one session, keeping the richest record and filling its gaps from the others.
 
-// Cross-source recordings of the same session start within a couple of minutes of each other,
-// while back-to-back Peloton classes are at least a class-length (~20 min) apart, so 10 minutes
-// separates the two cases cleanly.
+// Cross-source copies usually start within a couple of minutes of each other, but Whoop's
+// auto-detection can lead/lag the Peloton class by 10+ minutes (observed: 11.7 min). The start
+// window catches the common case; the overlap rule (below) catches the stragglers without
+// merging back-to-back classes, which barely overlap.
 const START_WINDOW_MS = 10 * 60 * 1000
 
 const METRIC_FIELDS = ['duration_min', 'calories', 'avg_hr', 'max_hr', 'distance_mi'] as const
@@ -31,8 +32,9 @@ export function workoutSource(externalId: string | null): string {
   return externalId.startsWith('whoop:') ? 'whoop' : 'apple'
 }
 
-// Whoop start times are ISO ("2026-07-19T10:10:00.000Z"); Health Auto Export uses
-// "2026-07-19 06:10:00 -0500". Both parse via Date; anything else opts out of clustering.
+// Whoop start times are ISO UTC ("2026-07-19T10:10:00.000Z"); Health Auto Export uses local time
+// with offset ("2026-07-19 06:10:00 -0500"). Both parse via Date to the same epoch; anything
+// else opts out of clustering.
 function startMs(w: MergeableWorkout): number | null {
   if (!w.start_time) return null
   const t = new Date(w.start_time).getTime()
@@ -55,53 +57,66 @@ function mergeCluster<T extends MergeableWorkout>(cluster: T[]): MergedWorkout<T
       if (merged[f] == null && w[f] != null) (merged as MergeableWorkout)[f] = w[f]
     }
   }
-  // Prefer Apple's canonical HealthKit name ("Indoor Cycling") over Whoop's sport name ("spin")
-  // so the same activity is labeled consistently regardless of which record was richest.
-  merged.workout_type = ranked.find(w => workoutSource(w.external_id) === 'apple')?.workout_type
+  // Prefer Apple's record for the label ("Indoor Cycling" over Whoop's "spin") and for the date:
+  // Apple timestamps are local so their date is the day the workout actually happened, while
+  // Whoop rows synced before the timezone fix carry the UTC date (a day late for evening rides).
+  const apple = ranked.find(w => workoutSource(w.external_id) === 'apple')
+  merged.workout_type = apple?.workout_type
     ?? ranked.find(w => w.workout_type != null)?.workout_type
     ?? null
+  if (apple) merged.date = apple.date
   merged.sources = [...new Set(ranked.map(w => workoutSource(w.external_id)))]
   return merged
 }
 
 export function mergeWorkouts<T extends MergeableWorkout>(rows: T[]): Array<MergedWorkout<T>> {
-  const byDate = new Map<string, T[]>()
-  for (const row of rows) {
-    if (!byDate.has(row.date)) byDate.set(row.date, [])
-    byDate.get(row.date)!.push(row)
+  // Clustering is by time only, deliberately ignoring the stored `date`: the same session can be
+  // bucketed on different days by different sources (Whoop dates were UTC-derived), and epoch
+  // timestamps don't care.
+  const timed: Array<{ w: T, start: number, end: number }> = []
+  const untimed: T[] = []
+  for (const w of rows) {
+    const start = startMs(w)
+    if (start == null) untimed.push(w)
+    else timed.push({ w, start, end: start + (w.duration_min ?? 0) * 60_000 })
   }
+  timed.sort((a, b) => a.start - b.start)
 
-  const out: Array<MergedWorkout<T>> = []
-  for (const dayRows of byDate.values()) {
-    const timed = dayRows
-      .map(w => ({ w, start: startMs(w) }))
-      .filter((x): x is { w: T, start: number } => x.start != null)
-      .sort((a, b) => a.start - b.start)
-
-    // Greedy time clustering: a workout joins the current cluster if it starts within the
-    // window of the cluster's latest start.
-    const clusters: T[][] = []
-    let current: T[] = []
-    let lastStart = -Infinity
-    for (const { w, start } of timed) {
-      if (current.length && start - lastStart > START_WINDOW_MS) {
+  // Greedy time clustering: a workout joins the current cluster if it starts within the window
+  // of the cluster's latest start, or if it overlaps the cluster's span by at least half of the
+  // shorter of the two. Back-to-back classes overlap (near) zero, so they stay separate.
+  const clusters: T[][] = []
+  let current: T[] = []
+  let clusterStart = 0
+  let clusterEnd = 0
+  let lastStart = 0
+  for (const { w, start, end } of timed) {
+    if (current.length) {
+      const overlap = Math.min(clusterEnd, end) - Math.max(clusterStart, start)
+      const shorter = Math.min(end - start, clusterEnd - clusterStart)
+      const sameSession = start - lastStart <= START_WINDOW_MS
+        || (overlap > 0 && overlap >= shorter * 0.5)
+      if (!sameSession) {
         clusters.push(current)
         current = []
       }
-      current.push(w)
-      lastStart = start
     }
-    if (current.length) clusters.push(current)
-
-    // Rows without a parseable start time can't be matched to a session; pass them through.
-    for (const w of dayRows) {
-      if (startMs(w) == null) clusters.push([w])
+    if (!current.length) {
+      clusterStart = start
+      clusterEnd = end
     }
-
-    out.push(...clusters.map(mergeCluster))
+    else {
+      clusterEnd = Math.max(clusterEnd, end)
+    }
+    current.push(w)
+    lastStart = start
   }
+  if (current.length) clusters.push(current)
 
-  return out.sort((a, b) =>
+  // Rows without a parseable start time can't be matched to a session; pass them through.
+  for (const w of untimed) clusters.push([w])
+
+  return clusters.map(mergeCluster).sort((a, b) =>
     a.date.localeCompare(b.date) || (startMs(a) ?? Infinity) - (startMs(b) ?? Infinity)
   )
 }
