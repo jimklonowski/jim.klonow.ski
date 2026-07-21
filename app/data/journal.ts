@@ -6,6 +6,12 @@ export interface PeptideEntry {
   site: string
 }
 
+export interface SodaEntry {
+  time: string
+  drink?: string
+  size?: string
+}
+
 export interface ReconstitutionEntry {
   compound: string
   vial_amount: number
@@ -72,7 +78,20 @@ export interface JournalEntry {
     lunch?: string
     dinner?: string
   }
+  sodas?: SodaEntry[]
   notes?: string
+}
+
+export const SODA_DRINKS = [
+  'Dr Pepper', 'Coke', 'Diet Coke', 'Coke Zero', 'Sprite', 'Mountain Dew', 'Root Beer'
+]
+
+export const SODA_SIZES = [
+  'Mini can', '12oz can', '20oz bottle', 'Fountain - small', 'Fountain - medium', 'Fountain - large'
+]
+
+export function blankSoda(time: string): SodaEntry {
+  return { time, drink: '', size: '' }
 }
 
 export const INJECTION_SITES = [
@@ -181,6 +200,7 @@ export function blankEntry(date: string): JournalEntry {
     peptides: [],
     reconstitutions: [],
     food: { breakfast: '', snack: '', lunch: '', dinner: '' },
+    sodas: [],
     notes: ''
   }
 }

@@ -35,10 +35,20 @@ interface WhoopCycleRecord {
   score?: { strain?: number }
 }
 
+// Whoop timestamps are UTC; bucketing by their date string put any evening workout (7pm+ local)
+// on the next day, where it could no longer line up with the Apple Health copy of the same
+// session. Convert to home timezone before taking the date. The en-CA locale is used purely
+// because it formats dates as ISO YYYY-MM-DD (en-US would give 07/20/2026); the timeZone
+// option does the actual conversion.
+const HOME_TZ = 'America/Chicago'
+const localDateFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: HOME_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
+})
+
 function dateFromTimestamp(ts?: string | null): string | null {
   if (!ts) return null
-  const date = ts.substring(0, 10)
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null
+  const parsed = new Date(ts)
+  return Number.isNaN(parsed.getTime()) ? null : localDateFmt.format(parsed)
 }
 
 const KJ_PER_KCAL = 4.184
@@ -79,12 +89,27 @@ export default defineTask({
     const db = ((event.context as unknown as { cloudflare: { env: Env } }).cloudflare.env).DB
 
     // Whoop's collections are sorted descending by start time, so the default first page is
-    // already "most recent" - no pagination needed for a daily incremental sync.
-    const [recovery, sleep, cycles] = await Promise.all([
+    // already "most recent" - no pagination needed for a daily incremental sync. Each collection
+    // is fetched independently: a Whoop 5xx on one endpoint shouldn't cost the day's data from
+    // the others (there's no retry until tomorrow's cron).
+    const [recoveryRes, sleepRes, cyclesRes] = await Promise.allSettled([
       whoopFetch<WhoopCollectionResponse<WhoopRecoveryRecord>>(db, '/v2/recovery'),
       whoopFetch<WhoopCollectionResponse<WhoopSleepRecord>>(db, '/v2/activity/sleep'),
       whoopFetch<WhoopCollectionResponse<WhoopCycleRecord>>(db, '/v2/cycle')
     ])
+
+    const errors: string[] = []
+    function settled<T>(res: PromiseSettledResult<T>, label: string): T | null {
+      if (res.status === 'fulfilled') return res.value
+      const message = res.reason instanceof Error ? res.reason.message : String(res.reason)
+      errors.push(`${label}: ${message}`)
+      console.error(`Whoop ${label} sync skipped:`, message)
+      return null
+    }
+
+    const recovery = settled(recoveryRes, 'recovery') ?? { records: [] }
+    const sleep = settled(sleepRes, 'sleep') ?? { records: [] }
+    const cycles = settled(cyclesRes, 'cycle') ?? { records: [] }
 
     const byDate: Record<string, Partial<Record<HealthMetricField, number>>> = {}
 
@@ -128,9 +153,11 @@ export default defineTask({
       }
     }
     catch (err) {
-      console.error('Whoop workout sync skipped:', err instanceof Error ? err.message : err)
+      const message = err instanceof Error ? err.message : String(err)
+      errors.push(`workout: ${message}`)
+      console.error('Whoop workout sync skipped:', message)
     }
 
-    return { result: { touched, workouts, dates: Object.keys(byDate).sort() } }
+    return { result: { touched, workouts, dates: Object.keys(byDate).sort(), ...(errors.length ? { errors } : {}) } }
   }
 })

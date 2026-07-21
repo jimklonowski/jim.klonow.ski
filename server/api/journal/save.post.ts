@@ -8,8 +8,8 @@ export default defineEventHandler(async (event) => {
 
   const db = getDb(event)
   await db.prepare(`
-    INSERT INTO journal_entries (date, day, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions, food, notes)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+    INSERT INTO journal_entries (date, day, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions, food, sodas, notes)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
     ON CONFLICT(date) DO UPDATE SET
       day = excluded.day,
       weight_lbs = excluded.weight_lbs,
@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
       peptides = excluded.peptides,
       reconstitutions = excluded.reconstitutions,
       food = excluded.food,
+      sodas = excluded.sodas,
       notes = excluded.notes
   `).bind(
     body.date,
@@ -32,6 +33,7 @@ export default defineEventHandler(async (event) => {
     JSON.stringify(body.peptides ?? []),
     JSON.stringify(body.reconstitutions ?? []),
     JSON.stringify(body.food ?? {}),
+    JSON.stringify(body.sodas ?? []),
     body.notes ?? ''
   ).run()
 

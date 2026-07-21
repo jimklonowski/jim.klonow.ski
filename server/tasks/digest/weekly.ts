@@ -10,7 +10,14 @@ export default defineTask({
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return { result: { error: 'ANTHROPIC_API_KEY not configured' } }
 
-    const result = await generateDigest(db, apiKey, 'weekly')
-    return { result }
+    try {
+      const result = await generateDigest(db, apiKey, 'weekly')
+      return { result }
+    }
+    catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('digest:weekly failed:', message)
+      return { result: { error: message } }
+    }
   }
 })
