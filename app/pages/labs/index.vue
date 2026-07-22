@@ -111,14 +111,11 @@
               <p class="text-sm font-medium">{{ BIOMARKERS[key]?.label }}</p>
               <p class="text-xs text-muted">{{ BIOMARKERS[key]?.unit }}</p>
             </template>
-            <ClientOnly>
-              <AreaChart
-                :data="chartData(key)"
-                :categories="{ value: { name: BIOMARKERS[key]?.label ?? key, color: '#22c55e' } }"
-                :height="128"
-                :show-legend="false"
-              />
-            </ClientOnly>
+            <AreaChart
+              :data="chartData(key)"
+              :categories="{ value: { name: BIOMARKERS[key]?.label ?? key, color: '#22c55e' } }"
+              :height="128"
+            />
           </UCard>
         </div>
       </section>

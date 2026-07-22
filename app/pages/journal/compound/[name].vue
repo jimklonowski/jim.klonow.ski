@@ -111,17 +111,14 @@
                 ≈ {{ concentrationPerMl }} {{ currentMix.vial_unit }}/mL · 1 unit (0.01 mL) ≈ {{ mcgPerUnit }} {{ unit }}
               </p>
             </template>
-            <ClientOnly>
-              <BarChart
-                :data="syringeChart"
-                :categories="{ units: { name: 'Units', color: getCompoundColor(compoundName) } }"
-                :y-axis="['units']"
-                x-axis="dose"
-                :height="180"
-                :hide-legend="true"
-                :radius="4"
-              />
-            </ClientOnly>
+            <BarChart
+              :data="syringeChart"
+              :categories="{ units: { name: 'Units', color: getCompoundColor(compoundName) } }"
+              :y-axis-keys="['units']"
+              x-axis-key="dose"
+              :height="180"
+              :radius="4"
+            />
             <p class="text-xs text-muted mt-4">
               Based on your most recently logged mix ({{ formatDate(currentMix.date) }}). Units shown are for a U-100 insulin syringe (1 unit = 0.01 mL) — recalculate if you switch to a different vial size or dilution.
             </p>
@@ -184,14 +181,11 @@
               <p class="text-sm font-medium">Daily dose over time</p>
               <p class="text-xs text-muted">{{ unit }}</p>
             </template>
-            <ClientOnly>
-              <AreaChart
-                :data="doseChart"
-                :categories="{ dose: { name: 'Dose', color: getCompoundColor(compoundName) } }"
-                :height="160"
-                :show-legend="false"
-              />
-            </ClientOnly>
+            <AreaChart
+              :data="doseChart"
+              :categories="{ dose: { name: 'Dose', color: getCompoundColor(compoundName) } }"
+              :height="160"
+            />
           </UCard>
         </section>
 
