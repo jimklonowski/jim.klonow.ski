@@ -114,48 +114,56 @@
               <p class="text-sm font-medium">Weight</p>
               <p class="text-xs text-muted">lbs</p>
             </template>
-            <AreaChart
-              :data="weightChart"
-              :categories="{ value: { name: 'Weight', color: '#14b8a6' } }"
-              :height="128"
-            />
+            <ClientOnly>
+              <AreaChart
+                :data="weightChart"
+                :categories="{ value: { name: 'Weight', color: '#14b8a6' } }"
+                :height="128"
+              />
+            </ClientOnly>
           </UCard>
           <UCard>
             <template #header>
               <p class="text-sm font-medium">Blood Pressure</p>
               <p class="text-xs text-muted">mmHg</p>
             </template>
-            <AreaChart
-              :data="bpChart"
-              :categories="{
-                systolic: { name: 'Systolic', color: '#ef4444' },
-                diastolic: { name: 'Diastolic', color: '#3b82f6' }
-              }"
-              :height="128"
-              :show-legend="true"
-            />
+            <ClientOnly>
+              <AreaChart
+                :data="bpChart"
+                :categories="{
+                  systolic: { name: 'Systolic', color: '#ef4444' },
+                  diastolic: { name: 'Diastolic', color: '#3b82f6' }
+                }"
+                :height="128"
+                :show-legend="true"
+              />
+            </ClientOnly>
           </UCard>
           <UCard>
             <template #header>
               <p class="text-sm font-medium">Resting Heart Rate</p>
               <p class="text-xs text-muted">bpm</p>
             </template>
-            <AreaChart
-              :data="rhrChart"
-              :categories="{ value: { name: 'RHR', color: '#f97316' } }"
-              :height="128"
-            />
+            <ClientOnly>
+              <AreaChart
+                :data="rhrChart"
+                :categories="{ value: { name: 'RHR', color: '#f97316' } }"
+                :height="128"
+              />
+            </ClientOnly>
           </UCard>
           <UCard>
             <template #header>
               <p class="text-sm font-medium">HRV</p>
               <p class="text-xs text-muted">ms</p>
             </template>
-            <AreaChart
-              :data="hrvChart"
-              :categories="{ value: { name: 'HRV', color: '#8b5cf6' } }"
-              :height="128"
-            />
+            <ClientOnly>
+              <AreaChart
+                :data="hrvChart"
+                :categories="{ value: { name: 'HRV', color: '#8b5cf6' } }"
+                :height="128"
+              />
+            </ClientOnly>
           </UCard>
         </div>
 
@@ -206,11 +214,13 @@
               <p class="text-sm font-medium">{{ meta.label }}</p>
               <p class="text-xs text-muted">{{ meta.unit }}</p>
             </template>
-            <AreaChart
-              :data="healthTrendData(key)"
-              :categories="{ value: { name: meta.label, color: '#06b6d4' } }"
-              :height="120"
-            />
+            <ClientOnly>
+              <AreaChart
+                :data="healthTrendData(key)"
+                :categories="{ value: { name: meta.label, color: '#06b6d4' } }"
+                :height="120"
+              />
+            </ClientOnly>
           </UCard>
         </div>
 
@@ -220,40 +230,42 @@
             <p class="text-sm font-medium">Sleep Stages</p>
             <p class="text-xs text-muted">minutes per night</p>
           </template>
-          <BarChart
-            :data="sleepStageChart"
-            :categories="SLEEP_STAGE_META"
-            :y-axis-keys="['rem', 'deep', 'core', 'awake']"
-            x-axis-key="date"
-            :stacked="true"
-            :height="200"
-          >
-            <template #tooltip="{ params }">
-              <div
-                class="rounded-lg p-3 text-xs min-w-44"
-                style="background: #1e293b; border: 1px solid #334155; color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.4);"
-              >
-                <p class="font-semibold text-sm mb-2" style="color: #f8fafc;">{{ params[0]?.axisValue }}</p>
-                <div class="space-y-1">
-                  <div
-                    v-for="p in params"
-                    :key="p.seriesName"
-                    class="flex items-center justify-between gap-4"
-                  >
-                    <span class="flex items-center gap-1.5" style="color: #94a3b8;">
-                      <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: p.color }" />
-                      {{ p.seriesName }}
-                    </span>
-                    <span class="font-mono font-medium" style="color: #f8fafc;">{{ formatDuration(Number(p.value ?? 0)) }}</span>
+          <ClientOnly>
+            <BarChart
+              :data="sleepStageChart"
+              :categories="SLEEP_STAGE_META"
+              :y-axis-keys="['rem', 'deep', 'core', 'awake']"
+              x-axis-key="date"
+              :stacked="true"
+              :height="200"
+            >
+              <template #tooltip="{ params }">
+                <div
+                  class="rounded-lg p-3 text-xs min-w-44"
+                  style="background: #1e293b; border: 1px solid #334155; color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.4);"
+                >
+                  <p class="font-semibold text-sm mb-2" style="color: #f8fafc;">{{ params[0]?.axisValue }}</p>
+                  <div class="space-y-1">
+                    <div
+                      v-for="p in params"
+                      :key="p.seriesName"
+                      class="flex items-center justify-between gap-4"
+                    >
+                      <span class="flex items-center gap-1.5" style="color: #94a3b8;">
+                        <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: p.color }" />
+                        {{ p.seriesName }}
+                      </span>
+                      <span class="font-mono font-medium" style="color: #f8fafc;">{{ formatDuration(Number(p.value ?? 0)) }}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between gap-4 pt-1.5 mt-1.5" style="border-top: 1px solid #334155;">
+                    <span style="color: #94a3b8;">Asleep</span>
+                    <span class="font-mono font-semibold" style="color: #f8fafc;">{{ formatDuration(asleepMinutes(params)) }}</span>
                   </div>
                 </div>
-                <div class="flex items-center justify-between gap-4 pt-1.5 mt-1.5" style="border-top: 1px solid #334155;">
-                  <span style="color: #94a3b8;">Asleep</span>
-                  <span class="font-mono font-semibold" style="color: #f8fafc;">{{ formatDuration(asleepMinutes(params)) }}</span>
-                </div>
-              </div>
-            </template>
-          </BarChart>
+              </template>
+            </BarChart>
+          </ClientOnly>
         </UCard>
       </section>
 
@@ -308,13 +320,15 @@
             <p class="text-sm font-medium">Daily Sodas</p>
             <p class="text-xs text-muted">last 30 days</p>
           </template>
-          <BarChart
-            :data="sodaTrend"
-            :categories="{ count: { name: 'Sodas', color: '#f43f5e' } }"
-            :y-axis-keys="['count']"
-            x-axis-key="date"
-            :height="128"
-          />
+          <ClientOnly>
+            <BarChart
+              :data="sodaTrend"
+              :categories="{ count: { name: 'Sodas', color: '#f43f5e' } }"
+              :y-axis-keys="['count']"
+              x-axis-key="date"
+              :height="128"
+            />
+          </ClientOnly>
         </UCard>
       </section>
 
