@@ -750,7 +750,7 @@ async function removeSoda(index: number) {
   try {
     const { sodas } = await $fetch<{ sodas: SodaEntry[] }>('/api/journal/soda', {
       method: 'DELETE',
-      body: { date, index }
+      query: { date, index }
     })
     applySodasLocally(date, sodas)
   }
