@@ -74,11 +74,13 @@
             <p class="text-sm font-medium">{{ meta.label }}</p>
             <p class="text-xs text-muted">{{ meta.unit }}</p>
           </template>
-          <AreaChart
-            :data="trendData(key)"
-            :categories="{ value: { name: meta.label, color: '#22c55e' } }"
-            :height="120"
-          />
+          <ClientOnly>
+            <AreaChart
+              :data="trendData(key)"
+              :categories="{ value: { name: meta.label, color: '#22c55e' } }"
+              :height="120"
+            />
+          </ClientOnly>
         </UCard>
       </div>
     </section>
