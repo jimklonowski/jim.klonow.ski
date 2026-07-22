@@ -1,4 +1,7 @@
 // Removes one entry (by index) from a day's `sodas` array - lets the dashboard widget undo a mis-tap.
+//
+// Done as a single atomic UPDATE via SQLite's json_remove rather than SELECT-then-JS-splice-then-
+// UPDATE, for the same lost-update-under-concurrency reason as soda.post.ts.
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
 
@@ -8,11 +11,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb(event)
-  const existing = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(body.date).first<{ sodas: string }>()
-  const sodas = JSON.parse(existing?.sodas ?? '[]') as Array<{ time: string, drink?: string, size?: string }>
-  sodas.splice(body.index, 1)
+  const row = await db.prepare(`
+    UPDATE journal_entries SET sodas = json_remove(sodas, '$[' || CAST(?2 AS INTEGER) || ']') WHERE date = ?1
+    RETURNING sodas
+  `).bind(body.date, body.index).first<{ sodas: string }>()
 
-  await db.prepare('UPDATE journal_entries SET sodas = ?2 WHERE date = ?1').bind(body.date, JSON.stringify(sodas)).run()
-
+  const sodas = JSON.parse(row?.sodas ?? '[]') as Array<{ time: string, drink?: string, size?: string }>
   return { ok: true, date: body.date, sodas }
 })
