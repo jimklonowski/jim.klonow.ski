@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.07.22d",
+  "version": "2026.07.22e",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -30,7 +30,7 @@
     "@unhead/vue": "^3.2.1",
     "@vueuse/core": "^14.3.0",
     "@vueuse/nuxt": "14.3.0",
-    "nuxt": "^4.5.0",
+    "nuxt": "4.4.8",
     "nuxt-security": "^2.6.0",
     "pinia": "^4.0.2",
     "shaders": "^3.0.442",

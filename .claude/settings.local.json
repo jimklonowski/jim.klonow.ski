@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -NoProfile -Command 'Get-CimInstance Win32_Process -Filter \"Name='\\\\''node.exe'\\\\'' or Name='\\\\''workerd.exe'\\\\''\" | Where-Object { $_.CommandLine -like '\\\\''*wrangler*'\\\\'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }')"
+    ]
+  }
+}
