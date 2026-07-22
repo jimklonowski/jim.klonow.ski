@@ -329,6 +329,7 @@
             <BarChart
               :data="sodaTrend"
               :categories="{ count: { name: 'Sodas', color: '#f43f5e' } }"
+              :y-axis="['count']"
               x-axis="date"
               :height="128"
               :show-legend="false"
