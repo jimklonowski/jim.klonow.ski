@@ -65,11 +65,13 @@
 
         <!-- Trend chart -->
         <div v-if="chartPoints.length >= 2">
-          <AreaChart
-            :data="chartPoints"
-            :categories="{ value: { name: meta.label, color: '#22c55e' } }"
-            :height="120"
-          />
+          <ClientOnly>
+            <AreaChart
+              :data="chartPoints"
+              :categories="{ value: { name: meta.label, color: '#22c55e' } }"
+              :height="120"
+            />
+          </ClientOnly>
         </div>
 
         <USeparator />
