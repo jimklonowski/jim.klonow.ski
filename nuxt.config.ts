@@ -12,11 +12,18 @@ export default defineNuxtConfig({
     '@nuxtjs/i18n',
     '@pinia/nuxt',
     'nitro-cloudflare-dev',
-    'nuxt-charts',
+    'nuxt-echarts',
     'nuxt-security'
   ],
 
   compatibilityDate: '2026-05-01',
+
+  echarts: {
+    renderer: 'svg',
+    charts: ['LineChart', 'BarChart'],
+    components: ['GridComponent', 'TooltipComponent', 'LegendComponent'],
+    features: ['LabelLayout']
+  },
 
   css: ['~/assets/css/main.css'],
 
