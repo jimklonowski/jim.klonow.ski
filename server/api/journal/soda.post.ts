@@ -5,7 +5,8 @@
 // The append happens inside a single INSERT ... ON CONFLICT statement via SQLite's json_insert
 // (with the '$[#]' append path), rather than a SELECT-then-JS-modify-then-UPDATE - the latter
 // raced under rapid repeated taps (two requests could both read the array before either write
-// landed, so the second write would silently clobber the first's addition).
+// landed, so the second write would silently clobber the first's addition). The updated array is
+// fetched with a follow-up SELECT rather than `... RETURNING sodas` - see soda.delete.ts for why.
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
 
@@ -15,12 +16,12 @@ export default defineEventHandler(async (event) => {
   const entry = JSON.stringify({ time, drink: body?.drink || undefined, size: body?.size || undefined })
 
   const db = getDb(event)
-  const row = await db.prepare(`
+  await db.prepare(`
     INSERT INTO journal_entries (date, sodas) VALUES (?1, json_array(json(?2)))
     ON CONFLICT(date) DO UPDATE SET sodas = json_insert(sodas, '$[#]', json(?2))
-    RETURNING sodas
-  `).bind(date, entry).first<{ sodas: string }>()
+  `).bind(date, entry).run()
 
+  const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
   const sodas = JSON.parse(row!.sodas) as Array<{ time: string, drink?: string, size?: string }>
   return { ok: true, date, sodas }
 })
