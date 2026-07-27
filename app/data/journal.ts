@@ -143,7 +143,7 @@ export const KNOWN_COMPOUNDS = [
   'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate',
   'HGH', 'hCG', 'Anastrozole', 'Enclomiphene',
   // Anabolic Steroids
-  'Oxandrolone',
+  'Oxandrolone', 'Methenolone Acetate', 'Methenolone Enanthate',
   // GLP-1
   'Semaglutide', 'Tirzepatide',
   // Metabolic / Research Compounds
@@ -176,6 +176,8 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'PT-141': '#db2777',
   'Kisspeptin': '#4338ca',
   'Oxandrolone': '#c026d3',
+  'Methenolone Acetate': '#9333ea',
+  'Methenolone Enanthate': '#7e22ce',
   '5-Amino-1MQ': '#0d9488',
   'SLU-PP-332': '#ca8a04'
 }
