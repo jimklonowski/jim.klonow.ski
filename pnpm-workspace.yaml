@@ -8,6 +8,13 @@ allowBuilds:
   vue-demi: true
   workerd: true
 
+minimumReleaseAgeExclude:
+  - '@nuxt/kit@4.5.1'
+  - '@nuxt/nitro-server@4.5.1'
+  - '@nuxt/schema@4.5.1'
+  - '@nuxt/vite-builder@4.5.1'
+  - nuxt@4.5.1
+
 # Force a single Vue version across the tree. Without this, transitive deps resolved
 # multiple Vue patch releases (3.5.38/39/40) side by side, which made Nuxt UI's ULink /
 # vue-router `custom` slot receive undefined props during production SSR — crashing every
