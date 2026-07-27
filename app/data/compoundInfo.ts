@@ -436,6 +436,36 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Still C17-alpha-alkylated (hepatotoxic pathway) despite its "mild" reputation — periodic liver enzyme labs are advisable. Commonly lowers HDL cholesterol and can worsen lipid panels; suppresses endogenous testosterone. Physician oversight and lab monitoring recommended.'
   },
 
+  'Methenolone Acetate': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Primobolan / Primo',
+    summary: 'The oral (acetate ester) form of methenolone, a DHT-derived anabolic steroid valued for a mild side-effect profile relative to its anabolic activity. Not C17-alpha-alkylated like most orals, which is generally associated with lower hepatotoxicity than compounds like anavar or dianabol, though oral bioavailability is lower and it is considered only mildly anabolic/weakly androgenic — often run at higher total doses or stacked with a base compound.',
+    dosing: {
+      range: '50–100 mg/day (oral acetate; requires higher doses than the injectable enanthate version due to lower bioavailability and short half-life)',
+      frequency: 'Split into 2 daily doses given its short half-life',
+      timing: 'Oral, with or without food per product guidance.'
+    },
+    cycling: 'Typically run 12–16 weeks given its mild nature and slow-building effects; suppresses natural testosterone production (reversible), so commonly run alongside a TRT-dose testosterone base rather than alone.',
+    storage: 'Room temperature, in original packaging, away from moisture and light.',
+    halfLife: '~4–6 hours (acetate ester, oral) — considerably shorter than the injectable enanthate version (~10.5 days).',
+    caution: 'Widely counterfeited/underdosed on the gray market since genuine methenolone is expensive to produce — sourcing matters more than with many other compounds. Can still modestly suppress HDL and endogenous testosterone despite its "mild" reputation. Physician oversight and periodic lipid/liver labs recommended.'
+  },
+
+  'Methenolone Enanthate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Primobolan Depot / Primo',
+    summary: 'The injectable (enanthate ester) form of methenolone, a DHT-derived anabolic steroid. Not aromatizable to estrogen and considered only mildly anabolic/weakly androgenic, which is why it is valued for a favorable side-effect profile but often stacked with a stronger base compound to notice meaningful gains. The long enanthate ester allows less-frequent injections than the oral acetate version.',
+    dosing: {
+      range: '300–600 mg weekly (higher end of typical educational ranges since it is comparatively weak per mg)',
+      frequency: '1–2x weekly given the long ester',
+      timing: 'Intramuscular injection; time of day is not important, consistency between doses is.'
+    },
+    cycling: 'Typically run 12–16 weeks; suppresses natural testosterone production (reversible), so commonly run alongside a TRT-dose testosterone base rather than alone.',
+    storage: 'Room temperature, away from light and heat; no refrigeration needed for oil-based esters.',
+    halfLife: '~10.5 days — considerably longer than the oral acetate version (~4–6 hours), supporting less-frequent dosing.',
+    caution: 'Widely counterfeited/underdosed on the gray market since genuine methenolone is expensive to produce — sourcing matters more than with many other compounds. Can still modestly suppress HDL and endogenous testosterone despite its "mild" reputation. Physician oversight and periodic lipid/liver labs recommended.'
+  },
+
   'Semaglutide': {
     category: 'GLP-1 Receptor Agonist',
     summary: 'A GLP-1 receptor agonist that slows gastric emptying, reduces appetite, and improves insulin sensitivity. Approved for type 2 diabetes and weight management (as Ozempic/Wegovy); also used in compounded form for weight-loss protocols.',
