@@ -16,6 +16,8 @@
           v-model="files"
           multiple
           accept="image/*"
+          layout="list"
+          position="inside"
           icon="i-lucide-upload-cloud"
           label="Drop photos here — old or new, one at a time or a whole batch"
           description="Date is detected automatically from each photo's EXIF data"

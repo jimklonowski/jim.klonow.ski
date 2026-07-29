@@ -257,6 +257,7 @@
         <UFileUpload
           v-model="pendingFile"
           accept="image/*"
+          layout="list"
           position="inside"
           icon="i-lucide-camera"
           :label="`Drop a ${photoCategoryLabel(uploadCategory)} photo here`"
