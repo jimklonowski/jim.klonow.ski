@@ -24,37 +24,39 @@
           class="w-full"
         >
           <template #file="{ file, index, removeFile }">
-            <div class="flex items-center gap-3 w-full">
-              <img :src="previewUrlFor(file)" class="w-14 h-14 object-cover rounded-md shrink-0" />
-              <div class="flex-1 grid grid-cols-2 gap-2">
-                <UInput
-                  v-model="metaFor(file).date"
-                  type="date"
+            <div class="flex flex-col w-full">
+              <div class="flex items-center gap-3 w-full">
+                <img :src="previewUrlFor(file)" class="w-14 h-14 object-cover rounded-md shrink-0" />
+                <div class="flex-1 grid grid-cols-2 gap-2">
+                  <UInput
+                    v-model="metaFor(file).date"
+                    type="date"
+                    size="xs"
+                    class="font-mono"
+                    :disabled="metaFor(file).status !== 'pending'"
+                  />
+                  <USelect
+                    v-model="metaFor(file).category"
+                    :items="[...PHOTO_CATEGORIES]"
+                    value-key="value"
+                    label-key="label"
+                    size="xs"
+                    :disabled="metaFor(file).status !== 'pending'"
+                  />
+                </div>
+                <UIcon v-if="metaFor(file).status === 'uploading'" name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-muted shrink-0" />
+                <UIcon v-else-if="metaFor(file).status === 'done'" name="i-lucide-check" class="w-4 h-4 text-success shrink-0" />
+                <UButton
+                  v-else
+                  variant="ghost"
+                  color="error"
                   size="xs"
-                  class="font-mono"
-                  :disabled="metaFor(file).status !== 'pending'"
-                />
-                <USelect
-                  v-model="metaFor(file).category"
-                  :items="[...PHOTO_CATEGORIES]"
-                  value-key="value"
-                  label-key="label"
-                  size="xs"
-                  :disabled="metaFor(file).status !== 'pending'"
+                  icon="i-lucide-x"
+                  @click="removeFile(index)"
                 />
               </div>
-              <UIcon v-if="metaFor(file).status === 'uploading'" name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-muted shrink-0" />
-              <UIcon v-else-if="metaFor(file).status === 'done'" name="i-lucide-check" class="w-4 h-4 text-success shrink-0" />
-              <UButton
-                v-else
-                variant="ghost"
-                color="error"
-                size="xs"
-                icon="i-lucide-x"
-                @click="removeFile(index)"
-              />
+              <p v-if="metaFor(file).status === 'error'" class="text-xs text-error mt-1.5 w-full">{{ metaFor(file).error }}</p>
             </div>
-            <p v-if="metaFor(file).status === 'error'" class="text-xs text-error mt-1.5 w-full">{{ metaFor(file).error }}</p>
           </template>
         </UFileUpload>
 
@@ -109,7 +111,8 @@
             <img
               v-if="beforePhoto"
               :src="beforePhoto.url"
-              class="w-full aspect-square object-cover rounded-lg border border-default"
+              class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
+              @click="lightboxPhoto = beforePhoto"
             />
             <div v-else class="w-full aspect-square rounded-lg border border-dashed border-default flex items-center justify-center text-sm text-muted">
               No photo
@@ -120,7 +123,8 @@
             <img
               v-if="afterPhoto"
               :src="afterPhoto.url"
-              class="w-full aspect-square object-cover rounded-lg border border-default"
+              class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
+              @click="lightboxPhoto = afterPhoto"
             />
             <div v-else class="w-full aspect-square rounded-lg border border-dashed border-default flex items-center justify-center text-sm text-muted">
               No photo
@@ -133,22 +137,28 @@
         <div class="pt-4 border-t border-default">
           <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">All {{ photoCategoryLabel(category) }} photos</p>
           <div class="flex flex-wrap gap-2">
-            <button
-              v-for="opt in photoOptions"
-              :key="opt.value"
-              class="relative rounded-lg overflow-hidden border transition-all"
-              :class="[
-                opt.value === beforeId || opt.value === afterId ? 'ring-2 ring-primary' : 'border-default',
-              ]"
-              :title="opt.label"
-              @click="pickPhoto(opt.value)"
-            >
-              <img :src="opt.photo.url" class="w-16 h-16 object-cover" />
-            </button>
+            <UContextMenu v-for="opt in photoOptions" :key="opt.value" :items="menuItemsFor(opt.photo)">
+              <button
+                class="relative rounded-lg overflow-hidden border transition-all"
+                :class="[
+                  opt.value === beforeId || opt.value === afterId ? 'ring-2 ring-primary' : 'border-default',
+                ]"
+                :title="opt.label"
+                @click="pickPhoto(opt.value)"
+              >
+                <img :src="opt.photo.url" class="w-16 h-16 object-cover" />
+              </button>
+            </UContextMenu>
           </div>
-          <p class="text-xs text-muted mt-2">Click a thumbnail to fill Before, then again to fill After.</p>
+          <p class="text-xs text-muted mt-2">Tap a thumbnail to fill Before, then again to fill After. Long-press for options.</p>
         </div>
       </template>
+
+      <UModal v-model:open="lightboxOpen" :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''">
+        <template #body>
+          <img v-if="lightboxPhoto" :src="lightboxPhoto.url" class="w-full h-auto rounded-lg" />
+        </template>
+      </UModal>
 
     </div>
   </UContainer>
@@ -156,6 +166,7 @@
 
 <script setup lang="ts">
 import exifr from 'exifr'
+import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -282,11 +293,8 @@ async function uploadAllPending() {
     meta.status = 'uploading'
     meta.error = undefined
     try {
-      const body = new FormData()
-      body.append('photo', f)
-      body.append('category', meta.category)
-      body.append('date', meta.date)
-      await $fetch('/api/journal/photos/upload', { method: 'POST', body })
+      const params = new URLSearchParams({ category: meta.category, date: meta.date })
+      await $fetch(`/api/journal/photos/upload?${params}`, { method: 'POST', body: f })
       meta.status = 'done'
     }
     catch (err: unknown) {
@@ -332,5 +340,30 @@ function pickPhoto(id: number) {
 
 function formatDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// --- Lightbox + per-photo context menu ---
+
+const lightboxPhoto = ref<ProgressPhoto | null>(null)
+const lightboxOpen = computed({
+  get: () => !!lightboxPhoto.value,
+  set: (v: boolean) => { if (!v) lightboxPhoto.value = null }
+})
+
+async function deletePhoto(id: number) {
+  await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })
+  if (beforeId.value === id) beforeId.value = null
+  if (afterId.value === id) afterId.value = null
+  if (lightboxPhoto.value?.id === id) lightboxPhoto.value = null
+  await refresh()
+}
+
+function menuItemsFor(photo: ProgressPhoto) {
+  return [[{
+    label: 'Delete',
+    icon: 'i-lucide-trash-2',
+    color: 'error' as const,
+    onSelect: () => deletePhoto(photo.id)
+  }]]
 }
 </script>
