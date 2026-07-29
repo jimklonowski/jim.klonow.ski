@@ -91,6 +91,16 @@
                 <span v-if="cell.workoutCount > 1" class="text-xs text-muted leading-none">×{{ cell.workoutCount }}</span>
               </div>
 
+              <!-- Progress photo indicator -->
+              <div
+                v-if="cell.photoCount"
+                class="flex items-center gap-0.5 mt-1"
+                :title="`${cell.photoCount} progress photo${cell.photoCount > 1 ? 's' : ''}`"
+              >
+                <UIcon name="i-lucide-camera" class="w-3 h-3 text-fuchsia-500" />
+                <span v-if="cell.photoCount > 1" class="text-xs text-muted leading-none">×{{ cell.photoCount }}</span>
+              </div>
+
               <!-- Weight if available -->
               <div v-if="cell.weight" class="mt-1">
                 <span class="text-xs font-mono text-muted">{{ cell.weight }}</span>
@@ -285,15 +295,24 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const { data, refresh } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
+const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 
 onMounted(refresh)
 onMounted(refreshWorkouts)
+onMounted(refreshPhotos)
 
 const entries = computed(() => data.value ?? [])
 const workoutCountByDate = computed(() => {
   const map: Record<string, number> = {}
   for (const w of (workoutsData.value ?? [])) {
     map[w.date] = (map[w.date] ?? 0) + 1
+  }
+  return map
+})
+const photoCountByDate = computed(() => {
+  const map: Record<string, number> = {}
+  for (const p of (photosData.value ?? [])) {
+    map[p.date] = (map[p.date] ?? 0) + 1
   }
   return map
 })
@@ -351,6 +370,7 @@ interface CalendarCell {
   weight: string | null
   hasRecon: boolean
   workoutCount: number
+  photoCount: number
 }
 
 const calendarCells = computed((): CalendarCell[] => {
@@ -363,7 +383,7 @@ const calendarCells = computed((): CalendarCell[] => {
   const cells: CalendarCell[] = []
 
   for (let i = 0; i < firstDay; i++) {
-    cells.push({ date: null, day: null, isToday: false, isFuture: false, hasEntry: false, compounds: [], weight: null, hasRecon: false, workoutCount: 0 })
+    cells.push({ date: null, day: null, isToday: false, isFuture: false, hasEntry: false, compounds: [], weight: null, hasRecon: false, workoutCount: 0, photoCount: 0 })
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
@@ -378,14 +398,15 @@ const calendarCells = computed((): CalendarCell[] => {
       compounds: entry?.compounds ?? [],
       weight: entry?.weight != null ? `${entry.weight}` : null,
       hasRecon: entry?.hasRecon ?? false,
-      workoutCount: workoutCountByDate.value[dateStr] ?? 0
+      workoutCount: workoutCountByDate.value[dateStr] ?? 0,
+      photoCount: photoCountByDate.value[dateStr] ?? 0
     })
   }
 
   const remainder = cells.length % 7
   if (remainder !== 0) {
     for (let i = 0; i < 7 - remainder; i++) {
-      cells.push({ date: null, day: null, isToday: false, isFuture: false, hasEntry: false, compounds: [], weight: null, hasRecon: false, workoutCount: 0 })
+      cells.push({ date: null, day: null, isToday: false, isFuture: false, hasEntry: false, compounds: [], weight: null, hasRecon: false, workoutCount: 0, photoCount: 0 })
     }
   }
 
