@@ -238,6 +238,84 @@
         </datalist>
       </UCard>
 
+      <!-- Progress Photos -->
+      <UCard>
+        <template #header><p class="text-sm font-semibold">Progress Photos</p></template>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+          <UButton
+            v-for="c in PHOTO_CATEGORIES"
+            :key="c.value"
+            size="xs"
+            :variant="uploadCategory === c.value ? 'solid' : 'outline'"
+            @click="uploadCategory = c.value"
+          >
+            {{ c.label }}
+          </UButton>
+        </div>
+
+        <div
+          v-if="!pendingFile"
+          class="flex flex-col items-center justify-center py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
+          :class="photoDragging ? 'border-primary bg-primary/5' : 'border-neutral-700 hover:border-neutral-500'"
+          @click="photoFileInput?.click()"
+          @dragover.prevent="photoDragging = true"
+          @dragleave="photoDragging = false"
+          @drop.prevent="onPhotoDrop"
+        >
+          <UIcon name="i-lucide-camera" class="w-10 h-10 text-muted mb-3" />
+          <p class="text-sm font-medium">Drop a {{ photoCategoryLabel(uploadCategory) }} photo here</p>
+          <p class="text-xs text-muted mt-1">or click to browse</p>
+          <input ref="photoFileInput" type="file" accept="image/*" class="hidden" @change="onPhotoFileSelect" />
+        </div>
+
+        <div v-else class="flex items-center gap-4">
+          <img v-if="pendingPreviewUrl" :src="pendingPreviewUrl" class="w-24 h-24 object-cover rounded-lg border border-default" />
+          <div class="flex-1 space-y-2">
+            <UFormField label="Date" description="Detected from the photo's EXIF data — edit if it's wrong">
+              <UInput v-model="pendingDate" type="date" class="w-full font-mono" />
+            </UFormField>
+            <div class="flex gap-2">
+              <UButton size="xs" icon="i-lucide-upload" :loading="photoUploading" @click="confirmUploadPhoto">Upload</UButton>
+              <UButton size="xs" variant="ghost" @click="cancelPendingPhoto">Cancel</UButton>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="photoError" class="text-sm text-error mt-2">{{ photoError }}</p>
+
+        <template v-for="c in PHOTO_CATEGORIES" :key="c.value">
+          <div v-if="photosFor(c.value).length" class="mt-4">
+            <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">{{ c.label }}</p>
+            <div class="flex flex-wrap gap-2">
+              <div v-for="photo in photosFor(c.value)" :key="photo.id" class="relative group">
+                <img
+                  :src="photo.url"
+                  class="w-20 h-20 object-cover rounded-lg border border-default cursor-pointer"
+                  @click="lightboxPhoto = photo"
+                />
+                <UButton
+                  variant="solid"
+                  color="error"
+                  size="xs"
+                  icon="i-lucide-x"
+                  class="absolute -top-1.5 -right-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  @click="deletePhoto(photo.id)"
+                />
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <p v-if="!dayPhotos.length" class="text-sm text-muted mt-2">No progress photos for this day.</p>
+      </UCard>
+
+      <UModal v-model:open="lightboxOpen" :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''">
+        <template #body>
+          <img v-if="lightboxPhoto" :src="lightboxPhoto.url" class="w-full h-auto rounded-lg" />
+        </template>
+      </UModal>
+
       <!-- Synced workouts (Apple Health / Whoop) -->
       <UCard v-if="dayWorkouts.length">
         <template #header><p class="text-sm font-semibold">Workouts (synced)</p></template>
@@ -286,6 +364,8 @@
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
 import { workoutIcon } from '~/data/workouts'
+import type { ProgressPhoto } from '~/composables/usePhotoEntries'
+import exifr from 'exifr'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -297,11 +377,122 @@ const dateParam = computed(() => route.params.date as string)
 
 const { data: allEntries, refresh } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
+const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 
 onMounted(refresh)
 onMounted(refreshWorkouts)
+onMounted(refreshPhotos)
 
 const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
+
+// --- Progress Photos ---
+
+const PHOTO_CATEGORIES = [
+  { value: 'chest', label: 'Chest' },
+  { value: 'left_bicep', label: 'Left Bicep' },
+  { value: 'right_bicep', label: 'Right Bicep' },
+  { value: 'face_hairline', label: 'Face / Hairline' }
+] as const
+type PhotoCategory = typeof PHOTO_CATEGORIES[number]['value']
+
+function photoCategoryLabel(category: string) {
+  return PHOTO_CATEGORIES.find(c => c.value === category)?.label ?? category
+}
+
+const dayPhotos = computed(() => (photosData.value ?? []).filter(p => p.date === dateParam.value))
+function photosFor(category: PhotoCategory) {
+  return dayPhotos.value.filter(p => p.category === category)
+}
+
+const uploadCategory = ref<PhotoCategory>('chest')
+const photoFileInput = ref<HTMLInputElement | null>(null)
+const photoDragging = ref(false)
+const pendingFile = ref<File | null>(null)
+const pendingPreviewUrl = ref('')
+const pendingDate = ref(dateParam.value)
+const photoUploading = ref(false)
+const photoError = ref('')
+
+function toLocalDateStr(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+async function preparePhoto(file: File) {
+  if (!file.type.startsWith('image/')) {
+    photoError.value = 'Please upload an image file.'
+    return
+  }
+  photoError.value = ''
+  pendingFile.value = file
+  if (pendingPreviewUrl.value) URL.revokeObjectURL(pendingPreviewUrl.value)
+  pendingPreviewUrl.value = URL.createObjectURL(file)
+
+  let exifDate: unknown
+  try {
+    const tags = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])
+    exifDate = tags?.DateTimeOriginal ?? tags?.CreateDate
+  }
+  catch {
+    exifDate = null
+  }
+  pendingDate.value = exifDate instanceof Date ? toLocalDateStr(exifDate) : toLocalDateStr(new Date(file.lastModified))
+}
+
+function onPhotoFileSelect(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) preparePhoto(file)
+}
+
+function onPhotoDrop(e: DragEvent) {
+  photoDragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) preparePhoto(file)
+}
+
+function cancelPendingPhoto() {
+  if (pendingPreviewUrl.value) URL.revokeObjectURL(pendingPreviewUrl.value)
+  pendingPreviewUrl.value = ''
+  pendingFile.value = null
+  photoError.value = ''
+  if (photoFileInput.value) photoFileInput.value.value = ''
+}
+
+async function confirmUploadPhoto() {
+  if (!pendingFile.value) return
+  photoUploading.value = true
+  photoError.value = ''
+  try {
+    const body = new FormData()
+    body.append('photo', pendingFile.value)
+    body.append('category', uploadCategory.value)
+    body.append('date', pendingDate.value)
+    await $fetch('/api/journal/photos/upload', { method: 'POST', body })
+    cancelPendingPhoto()
+    await refreshPhotos()
+    toast.add({ title: 'Photo uploaded', color: 'success', icon: 'i-lucide-check' })
+  }
+  catch (err: unknown) {
+    photoError.value = err instanceof Error ? err.message : 'Upload failed'
+  }
+  finally {
+    photoUploading.value = false
+  }
+}
+
+async function deletePhoto(id: number) {
+  await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })
+  if (lightboxPhoto.value?.id === id) lightboxPhoto.value = null
+  await refreshPhotos()
+}
+
+const lightboxPhoto = ref<ProgressPhoto | null>(null)
+const lightboxOpen = computed({
+  get: () => !!lightboxPhoto.value,
+  set: (v: boolean) => { if (!v) lightboxPhoto.value = null }
+})
 
 const existingEntry = computed(() =>
   allEntries.value?.find(e => e.date === dateParam.value) ?? null

@@ -38,6 +38,9 @@
           <UButton to="/journal/inventory" variant="outline" size="xs" icon="i-lucide-package">
             Inventory
           </UButton>
+          <UButton to="/journal/photos" variant="outline" size="xs" icon="i-lucide-camera">
+            Photos
+          </UButton>
           <UButton to="/journal/import" variant="outline" size="xs" icon="i-lucide-upload">
             Import
           </UButton>
