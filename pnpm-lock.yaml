@@ -79,8 +79,8 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2(@vue/devtools-api@8.1.5)(typescript@7.0.2)(vue@3.5.40(typescript@7.0.2))
       shaders:
-        specifier: ^3.0.444
-        version: 3.0.444(vue@3.5.40(typescript@7.0.2))
+        specifier: ^3.0.445
+        version: 3.0.445(vue@3.5.40(typescript@7.0.2))
       vue:
         specifier: 3.5.40
         version: 3.5.40(typescript@7.0.2)
@@ -6997,8 +6997,8 @@ packages:
     engines: {node: '>= 0.10'}
     hasBin: true
 
-  shaders@3.0.444:
-    resolution: {integrity: sha512-i/Wg/Gnj3ulb1cqpCLXhrYvgRkn0ncWDH/b9U5sqKfzuz8ygq+AyLWhTv2WBzLi3F8tAU2+88u5zGBOlIiqLyQ==}
+  shaders@3.0.445:
+    resolution: {integrity: sha512-D2cyaHIBHnoXaHxfoTg3ftaJrd4uZt3BMoJq7u58mKwNE2963+btNSE8R67Upz0YrNGggWSpJkv0LKqFM5QuzA==}
     hasBin: true
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
@@ -16627,7 +16627,7 @@ snapshots:
       to-buffer: 1.2.2
     optional: true
 
-  shaders@3.0.444(vue@3.5.40(typescript@7.0.2)):
+  shaders@3.0.445(vue@3.5.40(typescript@7.0.2)):
     dependencies:
       typegpu: 0.11.9
     optionalDependencies:
