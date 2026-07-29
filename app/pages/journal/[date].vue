@@ -460,11 +460,8 @@ async function confirmUploadPhoto() {
   photoUploading.value = true
   photoError.value = ''
   try {
-    const body = new FormData()
-    body.append('photo', pendingFile.value)
-    body.append('category', uploadCategory.value)
-    body.append('date', pendingDate.value)
-    await $fetch('/api/journal/photos/upload', { method: 'POST', body })
+    const params = new URLSearchParams({ category: uploadCategory.value, date: pendingDate.value })
+    await $fetch(`/api/journal/photos/upload?${params}`, { method: 'POST', body: pendingFile.value })
     pendingFile.value = null
     await refreshPhotos()
     toast.add({ title: 'Photo uploaded', color: 'success', icon: 'i-lucide-check' })
