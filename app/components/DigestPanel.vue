@@ -5,7 +5,7 @@
       icon="i-lucide-newspaper"
       size="xl"
       color="primary"
-      class="fixed bottom-6 right-6 z-50 rounded-full shadow-lg shadow-primary/30 aspect-square"
+      class="fixed bottom-6 right-6 z-50 w-14 h-14 p-0 flex items-center justify-center rounded-full shadow-lg shadow-primary/30"
       :aria-label="'Open health digests'"
       @click="openPanel"
     />
