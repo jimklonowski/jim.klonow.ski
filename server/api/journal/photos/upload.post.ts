@@ -11,36 +11,37 @@ const EXT_BY_MIME: Record<string, string> = {
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
 
-  const formData = await readMultipartFormData(event)
-  if (!formData?.length) {
-    throw createError({ statusCode: 400, message: 'No file uploaded' })
-  }
-
-  const photo = formData.find(p => p.type?.startsWith('image/'))
-  if (!photo) {
-    throw createError({ statusCode: 400, message: 'No image file found in request' })
-  }
-
-  const category = formData.find(p => p.name === 'category')?.data?.toString() ?? ''
+  // Raw binary body + query-string metadata rather than multipart/form-data - h3's multipart
+  // parser has to scan the whole body for boundary markers, which is real CPU work on a
+  // multi-MB photo and was itself enough to trip Workers' tight per-request CPU time limit even
+  // after removing the redundant server-side EXIF parse below.
+  const query = getQuery(event)
+  const category = typeof query.category === 'string' ? query.category : ''
   if (!CATEGORIES.includes(category as typeof CATEGORIES[number])) {
     throw createError({ statusCode: 400, message: 'Invalid or missing category' })
+  }
+
+  const contentType = getHeader(event, 'content-type') ?? 'application/octet-stream'
+  const data = await readRawBody(event, false)
+  if (!data?.length) {
+    throw createError({ statusCode: 400, message: 'No file uploaded' })
   }
 
   // The client already parses EXIF and sends a resolved date on the common path - only pay for
   // a server-side EXIF parse (real CPU cost on a full-res photo, and Workers CPU time is tight)
   // when it didn't, e.g. a non-JS client or a request that raced ahead of the client-side parse.
-  const suppliedDate = formData.find(p => p.name === 'date')?.data?.toString()
+  const suppliedDate = typeof query.date === 'string' ? query.date : undefined
   const hasValidSuppliedDate = !!suppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
 
-  const taken_at = hasValidSuppliedDate ? suppliedDate! : await extractPhotoDate(photo.data)
+  const taken_at = hasValidSuppliedDate ? suppliedDate! : await extractPhotoDate(data)
   const date = taken_at ?? new Date().toISOString().slice(0, 10)
 
-  const ext = EXT_BY_MIME[photo.type ?? ''] ?? photo.filename?.split('.').pop() ?? 'jpg'
+  const ext = EXT_BY_MIME[contentType] ?? 'jpg'
   const r2Key = `${date}-${category}-${Date.now()}.${ext}`
 
   const bucket = getPhotosBucket(event)
-  await bucket.put(r2Key, photo.data, {
-    httpMetadata: { contentType: photo.type ?? 'application/octet-stream' }
+  await bucket.put(r2Key, data, {
+    httpMetadata: { contentType }
   })
 
   const created_at = new Date().toISOString()
