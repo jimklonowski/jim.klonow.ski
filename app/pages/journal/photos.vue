@@ -8,6 +8,17 @@
         <h1 class="text-2xl font-bold">Progress Photos</h1>
       </div>
 
+      <!-- One-time backfill for photos uploaded before thumbnails existed -->
+      <UAlert
+        v-if="missingThumbnails.length"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-image"
+        title="Some photos are missing thumbnails"
+        :description="`${missingThumbnails.length} photo${missingThumbnails.length === 1 ? '' : 's'} uploaded before thumbnails existed — generate them now to speed up loading, no re-upload needed.`"
+        :actions="backfillActions"
+      />
+
       <!-- Add Photos (bulk backfill - no need to visit a day's journal entry) -->
       <UCard>
         <template #header><p class="text-sm font-semibold">Add Photos</p></template>
@@ -110,7 +121,7 @@
           <div class="space-y-2">
             <img
               v-if="beforePhoto"
-              :src="beforePhoto.url"
+              :src="beforePhoto.thumbUrl ?? beforePhoto.url"
               class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
               @click="lightboxPhoto = beforePhoto"
             />
@@ -122,7 +133,7 @@
           <div class="space-y-2">
             <img
               v-if="afterPhoto"
-              :src="afterPhoto.url"
+              :src="afterPhoto.thumbUrl ?? afterPhoto.url"
               class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
               @click="lightboxPhoto = afterPhoto"
             />
@@ -146,7 +157,7 @@
                 :title="opt.label"
                 @click="pickPhoto(opt.value)"
               >
-                <img :src="opt.photo.url" class="w-16 h-16 object-cover" />
+                <img :src="opt.photo.thumbUrl ?? opt.photo.url" loading="lazy" class="w-16 h-16 object-cover" />
               </button>
             </UContextMenu>
           </div>
@@ -185,6 +196,42 @@ function photoCategoryLabel(value: string) {
 
 const { data: photosData, refresh } = await usePhotoEntries()
 onMounted(refresh)
+
+// --- One-time thumbnail backfill for photos uploaded before thumbnails existed ---
+// Re-fetches each already-uploaded original through the authenticated proxy, regenerates a
+// thumbnail from that in-browser (same path as a fresh upload), and pushes just the thumbnail up
+// - no need to re-select the original files.
+const missingThumbnails = computed(() => (photosData.value ?? []).filter(p => !p.thumbUrl))
+const backfilling = ref(false)
+const backfillDone = ref(0)
+const backfillTotal = ref(0)
+
+async function backfillThumbnails() {
+  const targets = [...missingThumbnails.value]
+  if (!targets.length) return
+  backfilling.value = true
+  backfillTotal.value = targets.length
+  backfillDone.value = 0
+  for (const photo of targets) {
+    try {
+      const blob = await (await fetch(photo.url)).blob()
+      const thumb = await createPhotoThumbnail(blob)
+      await $fetch(`/api/journal/photos/thumbnail?id=${photo.id}`, { method: 'POST', body: thumb })
+    }
+    catch {
+      // Skip this one - it'll just keep falling back to the full-size image.
+    }
+    backfillDone.value++
+  }
+  backfilling.value = false
+  await refresh()
+}
+
+const backfillActions = computed(() => [{
+  label: backfilling.value ? `Generating (${backfillDone.value}/${backfillTotal.value})…` : 'Generate thumbnails',
+  loading: backfilling.value,
+  onClick: backfillThumbnails
+}])
 
 const category = ref<PhotoCategory>('chest')
 
@@ -294,7 +341,14 @@ async function uploadAllPending() {
     meta.error = undefined
     try {
       const params = new URLSearchParams({ category: meta.category, date: meta.date })
-      await $fetch(`/api/journal/photos/upload?${params}`, { method: 'POST', body: f })
+      const created = await $fetch<{ id: number }>(`/api/journal/photos/upload?${params}`, { method: 'POST', body: f })
+      try {
+        const thumb = await createPhotoThumbnail(f)
+        await $fetch(`/api/journal/photos/thumbnail?id=${created.id}`, { method: 'POST', body: thumb })
+      }
+      catch {
+        // Best-effort - the grid just falls back to the full-size image for this photo.
+      }
       meta.status = 'done'
     }
     catch (err: unknown) {
