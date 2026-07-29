@@ -466,6 +466,21 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Widely counterfeited/underdosed on the gray market since genuine methenolone is expensive to produce — sourcing matters more than with many other compounds. Can still modestly suppress HDL and endogenous testosterone despite its "mild" reputation. Physician oversight and periodic lipid/liver labs recommended.'
   },
 
+  'Finasteride': {
+    category: 'DHT Blocker (5-alpha Reductase Inhibitor)',
+    aka: 'Propecia (1mg) / Proscar (5mg)',
+    summary: 'A selective inhibitor of the type II 5-alpha reductase enzyme, which converts testosterone into DHT. Reduces scalp DHT by roughly 60-70% at the standard 1mg dose, slowing/reversing androgenic hair loss for many users. Approved for male pattern hair loss (1mg) and BPH (5mg).',
+    dosing: {
+      range: '1 mg/day (hair loss dose; 5mg tablets are commonly split/quartered to reach this)',
+      frequency: 'Once daily',
+      timing: 'Oral, any time of day; consistency matters more than timing. Effects take 3-6+ months to become noticeable.'
+    },
+    cycling: 'Taken continuously — benefits reverse within ~6-12 months of stopping since it only suppresses ongoing conversion, it does not create a lasting change.',
+    storage: 'Room temperature, in original packaging.',
+    halfLife: '~5-6 hours, but tissue DHT suppression persists longer than plasma levels suggest with daily dosing.',
+    caution: 'Only blocks 5-alpha reductase conversion of testosterone → DHT — it does not lower DHT-derived compounds that are already DHT itself (e.g. methenolone, oxandrolone), so it won’t offset hair-loss risk from those. Associated with a small but real risk of sexual side effects (libido, erectile function) in a subset of users, sometimes persisting after discontinuation ("post-finasteride syndrome" — rare but reported). Can suppress PSA by ~50%, which must be accounted for when interpreting prostate labs. Pregnant women should not handle crushed/broken tablets (teratogenic).'
+  },
+
   'Semaglutide': {
     category: 'GLP-1 Receptor Agonist',
     summary: 'A GLP-1 receptor agonist that slows gastric emptying, reduces appetite, and improves insulin sensitivity. Approved for type 2 diabetes and weight management (as Ozempic/Wegovy); also used in compounded form for weight-loss protocols.',

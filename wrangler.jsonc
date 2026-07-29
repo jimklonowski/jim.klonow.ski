@@ -25,6 +25,10 @@
     {
       "binding": "LABS_BUCKET",
       "bucket_name": "jim-klonow-ski-labs"
+    },
+    {
+      "binding": "PHOTOS_BUCKET",
+      "bucket_name": "jim-klonow-ski-photos"
     }
   ],
   "kv_namespaces": [

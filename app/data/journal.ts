@@ -144,6 +144,8 @@ export const KNOWN_COMPOUNDS = [
   'HGH', 'hCG', 'Anastrozole', 'Enclomiphene',
   // Anabolic Steroids
   'Oxandrolone', 'Methenolone Acetate', 'Methenolone Enanthate',
+  // Hair/DHT
+  'Finasteride',
   // GLP-1
   'Semaglutide', 'Tirzepatide',
   // Metabolic / Research Compounds
@@ -171,6 +173,7 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'hCG': '#b45309',
   'Anastrozole': '#6366f1',
   'Enclomiphene': '#7c3aed',
+  'Finasteride': '#059669',
   'Semaglutide': '#0891b2',
   'Tirzepatide': '#0e7490',
   'PT-141': '#db2777',

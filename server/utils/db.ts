@@ -11,9 +11,28 @@ export function getLabsBucket(event: H3Event): R2Bucket {
   return (event.context.cloudflare.env as unknown as Env).LABS_BUCKET
 }
 
+export function getPhotosBucket(event: H3Event): R2Bucket {
+  return (event.context.cloudflare.env as unknown as Env).PHOTOS_BUCKET
+}
+
 // R2 objects are private; every source key is served through the authenticated proxy route.
 export function toPdfUrl(key: string): string {
   return `/api/labs/pdf/${encodeURIComponent(key)}`
+}
+
+export function toPhotoUrl(key: string): string {
+  return `/api/journal/photos/file/${encodeURIComponent(key)}`
+}
+
+export function parseProgressPhotoRow(row: Record<string, unknown>) {
+  return {
+    id: row.id as number,
+    date: row.date as string,
+    category: row.category as string,
+    url: toPhotoUrl(row.r2_key as string),
+    taken_at: (row.taken_at as string | null) ?? null,
+    created_at: row.created_at as string
+  }
 }
 
 export function parseJournalRow(row: Record<string, unknown>) {
