@@ -116,12 +116,38 @@
           </UFormField>
         </div>
 
-        <!-- Side by side -->
-        <div class="grid grid-cols-2 gap-4">
+        <!-- Drag-to-reveal before/after comparison, full quality (not the thumbnail) -->
+        <PhotoCompareSlider
+          v-if="beforePhoto && afterPhoto"
+          :before-url="beforePhoto.url"
+          :after-url="afterPhoto.url"
+          :before-label="formatDate(beforePhoto.date)"
+          :after-label="formatDate(afterPhoto.date)"
+        >
+          <UButton
+            icon="i-lucide-maximize-2"
+            size="xs"
+            variant="solid"
+            color="neutral"
+            class="absolute top-2 left-2 opacity-80"
+            @pointerdown.stop
+            @click="lightboxPhoto = beforePhoto"
+          />
+          <UButton
+            icon="i-lucide-maximize-2"
+            size="xs"
+            variant="solid"
+            color="neutral"
+            class="absolute top-2 right-2 opacity-80"
+            @pointerdown.stop
+            @click="lightboxPhoto = afterPhoto"
+          />
+        </PhotoCompareSlider>
+        <div v-else class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <img
               v-if="beforePhoto"
-              :src="beforePhoto.thumbUrl ?? beforePhoto.url"
+              :src="beforePhoto.url"
               class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
               @click="lightboxPhoto = beforePhoto"
             />
@@ -133,7 +159,7 @@
           <div class="space-y-2">
             <img
               v-if="afterPhoto"
-              :src="afterPhoto.thumbUrl ?? afterPhoto.url"
+              :src="afterPhoto.url"
               class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
               @click="lightboxPhoto = afterPhoto"
             />
