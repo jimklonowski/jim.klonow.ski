@@ -288,7 +288,8 @@
             <div class="flex flex-wrap gap-2">
               <div v-for="photo in photosFor(c.value)" :key="photo.id" class="relative group">
                 <img
-                  :src="photo.url"
+                  :src="photo.thumbUrl ?? photo.url"
+                  loading="lazy"
                   class="w-20 h-20 object-cover rounded-lg border border-default cursor-pointer"
                   @click="lightboxPhoto = photo"
                 />
@@ -461,7 +462,14 @@ async function confirmUploadPhoto() {
   photoError.value = ''
   try {
     const params = new URLSearchParams({ category: uploadCategory.value, date: pendingDate.value })
-    await $fetch(`/api/journal/photos/upload?${params}`, { method: 'POST', body: pendingFile.value })
+    const created = await $fetch<{ id: number }>(`/api/journal/photos/upload?${params}`, { method: 'POST', body: pendingFile.value })
+    try {
+      const thumb = await createPhotoThumbnail(pendingFile.value)
+      await $fetch(`/api/journal/photos/thumbnail?id=${created.id}`, { method: 'POST', body: thumb })
+    }
+    catch {
+      // Best-effort - the gallery just falls back to the full-size image for this photo.
+    }
     pendingFile.value = null
     await refreshPhotos()
     toast.add({ title: 'Photo uploaded', color: 'success', icon: 'i-lucide-check' })
