@@ -104,6 +104,20 @@ CREATE TABLE IF NOT EXISTS digests (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, period_end);
 
+-- Progress photos (chest/bicep/face selfies) tied to a date, stored in PHOTOS_BUCKET (R2).
+-- date is what drives calendar/comparison views and defaults from EXIF DateTimeOriginal on
+-- upload; taken_at keeps the full EXIF timestamp when present, purely for reference.
+CREATE TABLE IF NOT EXISTS progress_photos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,
+  category TEXT NOT NULL, -- 'chest' | 'left_bicep' | 'right_bicep' | 'face_hairline'
+  r2_key TEXT NOT NULL,
+  taken_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_progress_photos_date ON progress_photos(date);
+CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(category);
+
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
 
