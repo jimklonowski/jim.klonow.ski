@@ -1,4 +1,4 @@
-const CATEGORIES = ['chest', 'left_bicep', 'right_bicep', 'face_hairline'] as const
+const CATEGORIES = ['chest', 'left_bicep', 'right_bicep', 'face', 'hairline'] as const
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',

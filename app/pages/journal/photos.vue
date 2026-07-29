@@ -16,6 +16,8 @@
           v-model="files"
           multiple
           accept="image/*"
+          layout="list"
+          position="inside"
           icon="i-lucide-upload-cloud"
           label="Drop photos here — old or new, one at a time or a whole batch"
           description="Date is detected automatically from each photo's EXIF data"
@@ -161,7 +163,8 @@ const PHOTO_CATEGORIES = [
   { value: 'chest', label: 'Chest' },
   { value: 'left_bicep', label: 'Left Bicep' },
   { value: 'right_bicep', label: 'Right Bicep' },
-  { value: 'face_hairline', label: 'Face / Hairline' }
+  { value: 'face', label: 'Face' },
+  { value: 'hairline', label: 'Hairline' }
 ] as const
 type PhotoCategory = typeof PHOTO_CATEGORIES[number]['value']
 

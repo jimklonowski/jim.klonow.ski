@@ -257,6 +257,7 @@
         <UFileUpload
           v-model="pendingFile"
           accept="image/*"
+          layout="list"
           position="inside"
           icon="i-lucide-camera"
           :label="`Drop a ${photoCategoryLabel(uploadCategory)} photo here`"
@@ -394,7 +395,8 @@ const PHOTO_CATEGORIES = [
   { value: 'chest', label: 'Chest' },
   { value: 'left_bicep', label: 'Left Bicep' },
   { value: 'right_bicep', label: 'Right Bicep' },
-  { value: 'face_hairline', label: 'Face / Hairline' }
+  { value: 'face', label: 'Face' },
+  { value: 'hairline', label: 'Hairline' }
 ] as const
 type PhotoCategory = typeof PHOTO_CATEGORIES[number]['value']
 
