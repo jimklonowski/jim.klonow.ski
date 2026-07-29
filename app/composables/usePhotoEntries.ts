@@ -1,7 +1,7 @@
 export interface ProgressPhoto {
   id: number
   date: string
-  category: 'chest' | 'left_bicep' | 'right_bicep' | 'face_hairline'
+  category: 'chest' | 'left_bicep' | 'right_bicep' | 'face' | 'hairline'
   url: string
   taken_at: string | null
   created_at: string
