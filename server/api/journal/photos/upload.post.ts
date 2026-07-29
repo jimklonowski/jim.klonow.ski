@@ -26,12 +26,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid or missing category' })
   }
 
-  const taken_at = await extractPhotoDate(photo.data)
-
+  // The client already parses EXIF and sends a resolved date on the common path - only pay for
+  // a server-side EXIF parse (real CPU cost on a full-res photo, and Workers CPU time is tight)
+  // when it didn't, e.g. a non-JS client or a request that raced ahead of the client-side parse.
   const suppliedDate = formData.find(p => p.name === 'date')?.data?.toString()
-  const date = suppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
-    ? suppliedDate
-    : taken_at ?? new Date().toISOString().slice(0, 10)
+  const hasValidSuppliedDate = !!suppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
+
+  const taken_at = hasValidSuppliedDate ? suppliedDate! : await extractPhotoDate(photo.data)
+  const date = taken_at ?? new Date().toISOString().slice(0, 10)
 
   const ext = EXT_BY_MIME[photo.type ?? ''] ?? photo.filename?.split('.').pop() ?? 'jpg'
   const r2Key = `${date}-${category}-${Date.now()}.${ext}`
