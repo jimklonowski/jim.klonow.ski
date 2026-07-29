@@ -3,6 +3,7 @@ export interface ProgressPhoto {
   date: string
   category: 'chest' | 'left_bicep' | 'right_bicep' | 'face' | 'hairline'
   url: string
+  thumbUrl: string | null
   taken_at: string | null
   created_at: string
 }

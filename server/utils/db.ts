@@ -25,11 +25,13 @@ export function toPhotoUrl(key: string): string {
 }
 
 export function parseProgressPhotoRow(row: Record<string, unknown>) {
+  const thumbKey = row.thumb_r2_key as string | null
   return {
     id: row.id as number,
     date: row.date as string,
     category: row.category as string,
     url: toPhotoUrl(row.r2_key as string),
+    thumbUrl: thumbKey ? toPhotoUrl(thumbKey) : null,
     taken_at: (row.taken_at as string | null) ?? null,
     created_at: row.created_at as string
   }
