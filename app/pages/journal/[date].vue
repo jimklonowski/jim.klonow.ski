@@ -254,33 +254,30 @@
           </UButton>
         </div>
 
-        <div
-          v-if="!pendingFile"
-          class="flex flex-col items-center justify-center py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
-          :class="photoDragging ? 'border-primary bg-primary/5' : 'border-neutral-700 hover:border-neutral-500'"
-          @click="photoFileInput?.click()"
-          @dragover.prevent="photoDragging = true"
-          @dragleave="photoDragging = false"
-          @drop.prevent="onPhotoDrop"
+        <UFileUpload
+          v-model="pendingFile"
+          accept="image/*"
+          position="inside"
+          icon="i-lucide-camera"
+          :label="`Drop a ${photoCategoryLabel(uploadCategory)} photo here`"
+          description="or click to browse — date is detected automatically from EXIF"
+          class="w-full"
         >
-          <UIcon name="i-lucide-camera" class="w-10 h-10 text-muted mb-3" />
-          <p class="text-sm font-medium">Drop a {{ photoCategoryLabel(uploadCategory) }} photo here</p>
-          <p class="text-xs text-muted mt-1">or click to browse</p>
-          <input ref="photoFileInput" type="file" accept="image/*" class="hidden" @change="onPhotoFileSelect" />
-        </div>
-
-        <div v-else class="flex items-center gap-4">
-          <img v-if="pendingPreviewUrl" :src="pendingPreviewUrl" class="w-24 h-24 object-cover rounded-lg border border-default" />
-          <div class="flex-1 space-y-2">
-            <UFormField label="Date" description="Detected from the photo's EXIF data — edit if it's wrong">
-              <UInput v-model="pendingDate" type="date" class="w-full font-mono" />
-            </UFormField>
-            <div class="flex gap-2">
-              <UButton size="xs" icon="i-lucide-upload" :loading="photoUploading" @click="confirmUploadPhoto">Upload</UButton>
-              <UButton size="xs" variant="ghost" @click="cancelPendingPhoto">Cancel</UButton>
+          <template #file="{ removeFile }">
+            <div class="flex items-center gap-4 w-full">
+              <img v-if="pendingPreviewUrl" :src="pendingPreviewUrl" class="w-24 h-24 object-cover rounded-lg border border-default" />
+              <div class="flex-1 space-y-2">
+                <UFormField label="Date" description="Detected from the photo's EXIF data — edit if it's wrong">
+                  <UInput v-model="pendingDate" type="date" class="w-full font-mono" />
+                </UFormField>
+                <div class="flex gap-2">
+                  <UButton size="xs" icon="i-lucide-upload" :loading="photoUploading" @click="confirmUploadPhoto">Upload</UButton>
+                  <UButton size="xs" variant="ghost" @click="removeFile">Cancel</UButton>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </template>
+        </UFileUpload>
 
         <p v-if="photoError" class="text-sm text-error mt-2">{{ photoError }}</p>
 
@@ -307,7 +304,13 @@
           </div>
         </template>
 
-        <p v-if="!dayPhotos.length" class="text-sm text-muted mt-2">No progress photos for this day.</p>
+        <UEmpty
+          v-if="!dayPhotos.length"
+          icon="i-lucide-image-off"
+          title="No progress photos"
+          description="No progress photos for this day yet."
+          class="mt-2"
+        />
       </UCard>
 
       <UModal v-model:open="lightboxOpen" :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''">
@@ -405,8 +408,6 @@ function photosFor(category: PhotoCategory) {
 }
 
 const uploadCategory = ref<PhotoCategory>('chest')
-const photoFileInput = ref<HTMLInputElement | null>(null)
-const photoDragging = ref(false)
 const pendingFile = ref<File | null>(null)
 const pendingPreviewUrl = ref('')
 const pendingDate = ref(dateParam.value)
@@ -420,44 +421,36 @@ function toLocalDateStr(d: Date) {
   return `${y}-${m}-${day}`
 }
 
-async function preparePhoto(file: File) {
-  if (!file.type.startsWith('image/')) {
-    photoError.value = 'Please upload an image file.'
-    return
+// UFileUpload owns selection/drag-drop via its v-model - react to the file it hands us instead
+// of wiring up input/drop events ourselves.
+watch(pendingFile, async (file) => {
+  if (pendingPreviewUrl.value) {
+    URL.revokeObjectURL(pendingPreviewUrl.value)
+    pendingPreviewUrl.value = ''
   }
   photoError.value = ''
-  pendingFile.value = file
-  if (pendingPreviewUrl.value) URL.revokeObjectURL(pendingPreviewUrl.value)
+  if (!file) return
+
   pendingPreviewUrl.value = URL.createObjectURL(file)
 
-  let exifDate: unknown
+  let exifDate: unknown = null
   try {
     const tags = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])
-    exifDate = tags?.DateTimeOriginal ?? tags?.CreateDate
+    exifDate = tags?.DateTimeOriginal ?? tags?.CreateDate ?? null
   }
   catch {
     exifDate = null
   }
   pendingDate.value = exifDate instanceof Date ? toLocalDateStr(exifDate) : toLocalDateStr(new Date(file.lastModified))
-}
+})
 
-function onPhotoFileSelect(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) preparePhoto(file)
-}
-
-function onPhotoDrop(e: DragEvent) {
-  photoDragging.value = false
-  const file = e.dataTransfer?.files?.[0]
-  if (file) preparePhoto(file)
-}
-
-function cancelPendingPhoto() {
-  if (pendingPreviewUrl.value) URL.revokeObjectURL(pendingPreviewUrl.value)
-  pendingPreviewUrl.value = ''
-  pendingFile.value = null
-  photoError.value = ''
-  if (photoFileInput.value) photoFileInput.value.value = ''
+// ofetch wraps failures as "[POST] \"/api/...\": <status> <text>" with the server's actual
+// error (from h3's createError) tucked away in `.data.message` - surface that instead.
+function extractErrorMessage(err: unknown): string {
+  const e = err as { data?: { message?: string, statusMessage?: string }, statusCode?: number, message?: string }
+  const serverMsg = e?.data?.message ?? e?.data?.statusMessage
+  if (serverMsg) return e.statusCode ? `${serverMsg} (${e.statusCode})` : serverMsg
+  return e?.message ?? 'Upload failed'
 }
 
 async function confirmUploadPhoto() {
@@ -470,12 +463,12 @@ async function confirmUploadPhoto() {
     body.append('category', uploadCategory.value)
     body.append('date', pendingDate.value)
     await $fetch('/api/journal/photos/upload', { method: 'POST', body })
-    cancelPendingPhoto()
+    pendingFile.value = null
     await refreshPhotos()
     toast.add({ title: 'Photo uploaded', color: 'success', icon: 'i-lucide-check' })
   }
   catch (err: unknown) {
-    photoError.value = err instanceof Error ? err.message : 'Upload failed'
+    photoError.value = extractErrorMessage(err)
   }
   finally {
     photoUploading.value = false
