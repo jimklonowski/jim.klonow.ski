@@ -30,31 +30,33 @@
           <div
             v-for="p in pending"
             :key="p.id"
-            class="flex items-center gap-3 p-2 rounded-lg border border-default"
+            class="p-2 rounded-lg border border-default"
           >
-            <img :src="p.previewUrl" class="w-14 h-14 object-cover rounded-md shrink-0" />
-            <div class="flex-1 grid grid-cols-2 gap-2">
-              <UInput v-model="p.date" type="date" size="xs" class="font-mono" :disabled="p.status !== 'pending'" />
-              <USelect
-                v-model="p.category"
-                :items="PHOTO_CATEGORIES"
-                value-key="value"
-                label-key="label"
+            <div class="flex items-center gap-3">
+              <img :src="p.previewUrl" class="w-14 h-14 object-cover rounded-md shrink-0" />
+              <div class="flex-1 grid grid-cols-2 gap-2">
+                <UInput v-model="p.date" type="date" size="xs" class="font-mono" :disabled="p.status !== 'pending'" />
+                <USelect
+                  v-model="p.category"
+                  :items="PHOTO_CATEGORIES"
+                  value-key="value"
+                  label-key="label"
+                  size="xs"
+                  :disabled="p.status !== 'pending'"
+                />
+              </div>
+              <UIcon v-if="p.status === 'uploading'" name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-muted shrink-0" />
+              <UIcon v-else-if="p.status === 'done'" name="i-lucide-check" class="w-4 h-4 text-success shrink-0" />
+              <UButton
+                v-else
+                variant="ghost"
+                color="error"
                 size="xs"
-                :disabled="p.status !== 'pending'"
+                icon="i-lucide-x"
+                @click="removePending(p.id)"
               />
             </div>
-            <UIcon v-if="p.status === 'uploading'" name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-muted shrink-0" />
-            <UIcon v-else-if="p.status === 'done'" name="i-lucide-check" class="w-4 h-4 text-success shrink-0" />
-            <UButton
-              v-else
-              variant="ghost"
-              color="error"
-              size="xs"
-              icon="i-lucide-x"
-              @click="removePending(p.id)"
-            />
-            <p v-if="p.status === 'error'" class="text-xs text-error shrink-0 max-w-32 truncate" :title="p.error">{{ p.error }}</p>
+            <p v-if="p.status === 'error'" class="text-xs text-error mt-1.5">{{ p.error }}</p>
           </div>
 
           <div class="flex gap-2 pt-1">
@@ -259,6 +261,16 @@ function removePending(id: number) {
 const pendingCount = computed(() => pending.value.filter(p => p.status === 'pending' || p.status === 'error').length)
 const hasFinished = computed(() => pending.value.some(p => p.status === 'done'))
 
+// ofetch wraps failures as "[POST] \"/api/...\": <status> <text>" with the server's actual
+// error (from h3's createError) tucked away in `.data.message` - surface that instead so
+// upload failures are actually diagnosable from the UI.
+function extractErrorMessage(err: unknown): string {
+  const e = err as { data?: { message?: string, statusMessage?: string }, statusCode?: number, message?: string }
+  const serverMsg = e?.data?.message ?? e?.data?.statusMessage
+  if (serverMsg) return e.statusCode ? `${serverMsg} (${e.statusCode})` : serverMsg
+  return e?.message ?? 'Upload failed'
+}
+
 async function uploadAllPending() {
   uploadingAll.value = true
   const toUpload = pending.value.filter(p => p.status === 'pending' || p.status === 'error')
@@ -275,7 +287,7 @@ async function uploadAllPending() {
     }
     catch (err: unknown) {
       p.status = 'error'
-      p.error = err instanceof Error ? err.message : 'Upload failed'
+      p.error = extractErrorMessage(err)
     }
   }
   uploadingAll.value = false
