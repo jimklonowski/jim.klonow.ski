@@ -57,8 +57,9 @@ const option = computed<ECOption>(() => ({
     type: 'line',
     name: meta.name,
     data: props.data.map(d => d[key] as number),
-    smooth: true,
-    symbol: 'none',
+    smooth: false,
+    symbol: 'circle',
+    symbolSize: 6,
     lineStyle: { width: 2, color: meta.color },
     itemStyle: { color: meta.color },
     areaStyle: { color: meta.color, opacity: 0.15 }

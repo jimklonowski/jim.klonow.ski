@@ -515,6 +515,23 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Common GI side effects during titration; same class-wide thyroid C-cell tumor warning as other GLP-1/GIP agonists.'
   },
 
+  'Retatrutide': {
+    category: 'GLP-1/GIP/Glucagon Receptor Agonist',
+    summary: 'A triple agonist targeting GLP-1, GIP, and glucagon receptors — the addition of glucagon activity distinguishes it from semaglutide (GLP-1 only) and tirzepatide (GLP-1/GIP), and is associated with the largest weight-loss effect sizes seen in GLP-1-class trials to date. Still in late-stage clinical trials, not yet FDA approved; available in research/compounded form.',
+    dosing: {
+      range: '1 mg starting dose, titrated up to 4–12 mg over months per trial protocols',
+      frequency: 'Weekly',
+      timing: 'Same day each week; slow titration (every 4 weeks) minimizes GI side effects.'
+    },
+    reconstitution: {
+      instructions: 'Compounded lyophilized vials: reconstitute per supplier-specific concentration with bacteriostatic water — concentration varies by vial, always confirm before dosing.'
+    },
+    cycling: 'Generally used continuously while pursuing a weight/metabolic goal.',
+    storage: 'Refrigerate both before and after reconstitution; avoid freezing.',
+    halfLife: '~6 days, supporting once-weekly dosing.',
+    caution: 'Not yet FDA approved — no long-term post-market safety data exists outside trials. Common GI side effects during titration; glucagon agonism raises additional theoretical concerns (e.g. on heart rate) versus GLP-1-only agonists. Same class-wide thyroid C-cell tumor warning as other GLP-1-class agonists.'
+  },
+
   '5-Amino-1MQ': {
     category: 'Metabolic / NNMT Inhibitor',
     summary: 'A small-molecule inhibitor of NNMT (nicotinamide N-methyltransferase), an enzyme that consumes both SAM and NAD+ precursors. By blocking NNMT, cells retain more NAD+/SAM for metabolic processes — studied in animal models for effects on fat cell metabolism, weight management, and mitochondrial/NAD+ support.',

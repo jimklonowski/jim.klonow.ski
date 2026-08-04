@@ -7,11 +7,11 @@
     @pointerup="onPointerUp"
     @pointercancel="onPointerUp"
   >
-    <img :src="afterUrl" class="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable="false" />
+    <img :src="afterUrl" class="absolute inset-0 w-full h-full object-cover pointer-events-none" :style="afterStyle" draggable="false" />
     <img
       :src="beforeUrl"
       class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-      :style="{ clipPath: `inset(0 ${100 - pct}% 0 0)` }"
+      :style="{ clipPath: `inset(0 ${100 - pct}% 0 0)`, ...beforeStyle }"
       draggable="false"
     />
 
@@ -42,6 +42,8 @@ const props = defineProps<{
   afterUrl: string
   beforeLabel?: string
   afterLabel?: string
+  beforeStyle?: Record<string, string>
+  afterStyle?: Record<string, string>
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
