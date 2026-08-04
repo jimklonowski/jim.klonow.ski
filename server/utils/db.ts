@@ -33,7 +33,10 @@ export function parseProgressPhotoRow(row: Record<string, unknown>) {
     url: toPhotoUrl(row.r2_key as string),
     thumbUrl: thumbKey ? toPhotoUrl(thumbKey) : null,
     taken_at: (row.taken_at as string | null) ?? null,
-    created_at: row.created_at as string
+    created_at: row.created_at as string,
+    frameOffsetX: (row.frame_offset_x as number | null) ?? 0,
+    frameOffsetY: (row.frame_offset_y as number | null) ?? 0,
+    frameScale: (row.frame_scale as number | null) ?? 1
   }
 }
 

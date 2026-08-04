@@ -6,6 +6,9 @@ export interface ProgressPhoto {
   thumbUrl: string | null
   taken_at: string | null
   created_at: string
+  frameOffsetX: number
+  frameOffsetY: number
+  frameScale: number
 }
 
 export function usePhotoEntries() {

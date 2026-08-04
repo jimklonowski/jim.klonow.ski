@@ -147,7 +147,7 @@ export const KNOWN_COMPOUNDS = [
   // Hair/DHT
   'Finasteride',
   // GLP-1
-  'Semaglutide', 'Tirzepatide',
+  'Semaglutide', 'Tirzepatide', 'Retatrutide',
   // Metabolic / Research Compounds
   '5-Amino-1MQ', 'SLU-PP-332',
   // Nootropics
@@ -176,13 +176,17 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Finasteride': '#059669',
   'Semaglutide': '#0891b2',
   'Tirzepatide': '#0e7490',
+  'Retatrutide': '#0369a1',
   'PT-141': '#db2777',
   'Kisspeptin': '#4338ca',
   'Oxandrolone': '#c026d3',
   'Methenolone Acetate': '#9333ea',
   'Methenolone Enanthate': '#7e22ce',
   '5-Amino-1MQ': '#0d9488',
-  'SLU-PP-332': '#ca8a04'
+  'SLU-PP-332': '#ca8a04',
+  'Humanin': '#eab308',
+  'Thymosin Alpha-1': '#22c55e',
+  'Thymosin Beta-4': '#f472b6'
 }
 
 export function getCompoundColor(compound: string): string {
