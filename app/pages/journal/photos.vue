@@ -115,6 +115,17 @@
             <USelect v-model.nullable="afterId" :items="photoOptions" value-key="value" label-key="label" class="w-full" />
           </UFormField>
         </div>
+        <div class="flex justify-center -mt-2">
+          <UButton
+            icon="i-lucide-arrow-left-right"
+            size="xs"
+            variant="ghost"
+            :disabled="beforeId == null || afterId == null"
+            @click="swapBeforeAfter"
+          >
+            Swap
+          </UButton>
+        </div>
 
         <!-- Drag-to-reveal before/after comparison, full quality (not the thumbnail) -->
         <PhotoCompareSlider
@@ -123,6 +134,8 @@
           :after-url="afterPhoto.url"
           :before-label="formatDate(beforePhoto.date)"
           :after-label="formatDate(afterPhoto.date)"
+          :before-style="frameStyle(beforePhoto)"
+          :after-style="frameStyle(afterPhoto)"
         >
           <UButton
             icon="i-lucide-maximize-2"
@@ -145,24 +158,26 @@
         </PhotoCompareSlider>
         <div v-else class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
-            <img
+            <div
               v-if="beforePhoto"
-              :src="beforePhoto.url"
-              class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
+              class="w-full aspect-square rounded-lg border border-default overflow-hidden cursor-zoom-in"
               @click="lightboxPhoto = beforePhoto"
-            />
+            >
+              <img :src="beforePhoto.url" class="w-full h-full object-cover" :style="frameStyle(beforePhoto)" />
+            </div>
             <div v-else class="w-full aspect-square rounded-lg border border-dashed border-default flex items-center justify-center text-sm text-muted">
               No photo
             </div>
             <p class="text-xs text-muted text-center">{{ beforePhoto ? formatDate(beforePhoto.date) : '' }}</p>
           </div>
           <div class="space-y-2">
-            <img
+            <div
               v-if="afterPhoto"
-              :src="afterPhoto.url"
-              class="w-full aspect-square object-cover rounded-lg border border-default cursor-zoom-in"
+              class="w-full aspect-square rounded-lg border border-default overflow-hidden cursor-zoom-in"
               @click="lightboxPhoto = afterPhoto"
-            />
+            >
+              <img :src="afterPhoto.url" class="w-full h-full object-cover" :style="frameStyle(afterPhoto)" />
+            </div>
             <div v-else class="w-full aspect-square rounded-lg border border-dashed border-default flex items-center justify-center text-sm text-muted">
               No photo
             </div>
@@ -178,22 +193,85 @@
               <button
                 class="relative rounded-lg overflow-hidden border transition-all"
                 :class="[
-                  opt.value === beforeId || opt.value === afterId ? 'ring-2 ring-primary' : 'border-default',
+                  opt.value === beforeId ? 'ring-2 ring-primary'
+                  : opt.value === afterId ? 'ring-2 ring-success'
+                  : 'border-default',
                 ]"
                 :title="opt.label"
                 @click="pickPhoto(opt.value)"
               >
-                <img :src="opt.photo.thumbUrl ?? opt.photo.url" loading="lazy" class="w-16 h-16 object-cover" />
+                <img :src="opt.photo.thumbUrl ?? opt.photo.url" loading="lazy" class="w-16 h-16 object-cover" :style="frameStyle(opt.photo)" />
               </button>
             </UContextMenu>
           </div>
-          <p class="text-xs text-muted mt-2">Tap a thumbnail to fill Before, then again to fill After. Long-press for options.</p>
+          <p class="text-xs text-muted mt-2 flex items-center gap-3 flex-wrap">
+            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full ring-2 ring-primary" />Before</span>
+            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full ring-2 ring-success" />After</span>
+            <span>Tap a thumbnail to fill Before, then again to fill After. Long-press for options.</span>
+          </p>
         </div>
       </template>
 
       <UModal v-model:open="lightboxOpen" :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''">
         <template #body>
           <img v-if="lightboxPhoto" :src="lightboxPhoto.url" class="w-full h-auto rounded-lg" />
+        </template>
+      </UModal>
+
+      <UModal v-model:open="editOpen" title="Edit Photo">
+        <template #body>
+          <div class="space-y-4">
+            <UFormField label="Date">
+              <UInput v-model="editForm.date" type="date" class="w-full font-mono" />
+            </UFormField>
+            <UFormField label="Category">
+              <USelect v-model="editForm.category" :items="[...PHOTO_CATEGORIES]" value-key="value" label-key="label" class="w-full" />
+            </UFormField>
+            <div class="flex justify-end gap-2 pt-2">
+              <UButton variant="ghost" @click="editOpen = false">Cancel</UButton>
+              <UButton :loading="savingEdit" :disabled="!editForm.date" @click="saveEdit">Save</UButton>
+            </div>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal v-model:open="reframeOpen" title="Reframe Photo">
+        <template #body>
+          <div class="space-y-4">
+            <div
+              ref="reframeContainerRef"
+              class="relative w-full max-w-xs mx-auto aspect-square rounded-lg overflow-hidden border border-default select-none touch-none cursor-move"
+              @pointerdown="onReframePointerDown"
+              @pointermove="onReframePointerMove"
+              @pointerup="onReframePointerUp"
+              @pointercancel="onReframePointerUp"
+            >
+              <img
+                v-if="reframingPhoto"
+                :src="reframingPhoto.url"
+                class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                :style="{ transform: `translate(${reframeForm.offsetX}%, ${reframeForm.offsetY}%) scale(${reframeForm.scale})` }"
+                draggable="false"
+              />
+              <div class="absolute inset-0 pointer-events-none">
+                <div class="absolute left-1/2 top-0 bottom-0 w-px bg-white/50" />
+                <div class="absolute top-1/2 left-0 right-0 h-px bg-white/50" />
+              </div>
+            </div>
+            <p class="text-xs text-muted text-center">Drag the photo to reposition, use the slider to zoom.</p>
+
+            <UFormField label="Zoom">
+              <USlider v-model="reframeForm.scale" :min="1" :max="3" :step="0.05" />
+            </UFormField>
+
+            <div class="flex items-center justify-between gap-2 pt-2">
+              <UButton variant="ghost" size="sm" icon="i-lucide-rotate-ccw" @click="resetReframeForm">Reset</UButton>
+              <div class="flex gap-2">
+                <UButton variant="ghost" @click="reframeOpen = false">Cancel</UButton>
+                <UButton :loading="savingReframe" @click="saveReframe">Save</UButton>
+              </div>
+            </div>
+          </div>
         </template>
       </UModal>
 
@@ -411,11 +489,32 @@ const beforePhoto = computed(() => photosForCategory.value.find(p => p.id === be
 const afterPhoto = computed(() => photosForCategory.value.find(p => p.id === afterId.value) ?? null)
 
 // Clicking a thumbnail fills Before first, then After, then starts overwriting Before again.
+// Once both are filled, the earlier date always ends up on the left (Before) - use the swap
+// button below the pickers to override.
 function pickPhoto(id: number) {
   if (id === beforeId.value || id === afterId.value) return
   if (beforeId.value == null) beforeId.value = id
   else if (afterId.value == null) afterId.value = id
   else { beforeId.value = afterId.value; afterId.value = id }
+  sortBeforeAfterByDate()
+}
+
+function sortBeforeAfterByDate() {
+  const b = photosForCategory.value.find(p => p.id === beforeId.value)
+  const a = photosForCategory.value.find(p => p.id === afterId.value)
+  if (!b || !a) return
+  const beforeIsLater = b.date > a.date || (b.date === a.date && b.id > a.id)
+  if (beforeIsLater) {
+    const tmp = beforeId.value
+    beforeId.value = afterId.value
+    afterId.value = tmp
+  }
+}
+
+function swapBeforeAfter() {
+  const tmp = beforeId.value
+  beforeId.value = afterId.value
+  afterId.value = tmp
 }
 
 function formatDate(d: string) {
@@ -438,12 +537,151 @@ async function deletePhoto(id: number) {
   await refresh()
 }
 
+const editingPhoto = ref<ProgressPhoto | null>(null)
+const editForm = reactive<{ date: string, category: PhotoCategory }>({ date: '', category: 'chest' })
+const editOpen = computed({
+  get: () => !!editingPhoto.value,
+  set: (v: boolean) => { if (!v) editingPhoto.value = null }
+})
+const savingEdit = ref(false)
+
+function openEdit(photo: ProgressPhoto) {
+  editingPhoto.value = photo
+  editForm.date = photo.date
+  editForm.category = photo.category
+}
+
+async function saveEdit() {
+  const photo = editingPhoto.value
+  if (!photo) return
+  savingEdit.value = true
+  try {
+    await $fetch('/api/journal/photos/update', {
+      method: 'POST',
+      body: { id: photo.id, date: editForm.date, category: editForm.category }
+    })
+    editingPhoto.value = null
+    await refresh()
+  }
+  finally {
+    savingEdit.value = false
+  }
+}
+
+function isReframed(photo: ProgressPhoto) {
+  return photo.frameOffsetX !== 0 || photo.frameOffsetY !== 0 || photo.frameScale !== 1
+}
+
 function menuItemsFor(photo: ProgressPhoto) {
-  return [[{
+  const reframeGroup = [{
+    label: 'Reframe',
+    icon: 'i-lucide-move',
+    onSelect: () => openReframe(photo)
+  }]
+  if (isReframed(photo)) {
+    reframeGroup.push({
+      label: 'Reset Framing',
+      icon: 'i-lucide-rotate-ccw',
+      onSelect: () => resetFraming(photo)
+    })
+  }
+  return [reframeGroup, [{
+    label: 'Edit',
+    icon: 'i-lucide-pencil',
+    onSelect: () => openEdit(photo)
+  }], [{
     label: 'Delete',
     icon: 'i-lucide-trash-2',
     color: 'error' as const,
     onSelect: () => deletePhoto(photo.id)
   }]]
+}
+
+// --- Reframing (manual pan/zoom to line up consistent framing across photos) ---
+// Stored as a percent offset + scale on the photo row and applied as a CSS transform
+// wherever it renders - non-destructive, the original pixels are untouched.
+function frameStyle(photo: ProgressPhoto | null) {
+  if (!photo || !isReframed(photo)) return {}
+  return { transform: `translate(${photo.frameOffsetX}%, ${photo.frameOffsetY}%) scale(${photo.frameScale})` }
+}
+
+const reframingPhoto = ref<ProgressPhoto | null>(null)
+const reframeForm = reactive({ offsetX: 0, offsetY: 0, scale: 1 })
+const reframeOpen = computed({
+  get: () => !!reframingPhoto.value,
+  set: (v: boolean) => { if (!v) reframingPhoto.value = null }
+})
+const savingReframe = ref(false)
+const reframeContainerRef = ref<HTMLElement | null>(null)
+const reframeDragging = ref(false)
+let reframeLastPointer = { x: 0, y: 0 }
+
+function openReframe(photo: ProgressPhoto) {
+  reframingPhoto.value = photo
+  reframeForm.offsetX = photo.frameOffsetX
+  reframeForm.offsetY = photo.frameOffsetY
+  reframeForm.scale = photo.frameScale
+}
+
+function resetReframeForm() {
+  reframeForm.offsetX = 0
+  reframeForm.offsetY = 0
+  reframeForm.scale = 1
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, v))
+}
+
+function onReframePointerDown(e: PointerEvent) {
+  reframeDragging.value = true
+  reframeLastPointer = { x: e.clientX, y: e.clientY }
+  reframeContainerRef.value?.setPointerCapture(e.pointerId)
+}
+
+function onReframePointerMove(e: PointerEvent) {
+  if (!reframeDragging.value) return
+  const el = reframeContainerRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const dxPct = ((e.clientX - reframeLastPointer.x) / rect.width) * 100
+  const dyPct = ((e.clientY - reframeLastPointer.y) / rect.height) * 100
+  reframeLastPointer = { x: e.clientX, y: e.clientY }
+  reframeForm.offsetX = clamp(reframeForm.offsetX + dxPct, -75, 75)
+  reframeForm.offsetY = clamp(reframeForm.offsetY + dyPct, -75, 75)
+}
+
+function onReframePointerUp() {
+  reframeDragging.value = false
+}
+
+async function saveReframe() {
+  const photo = reframingPhoto.value
+  if (!photo) return
+  savingReframe.value = true
+  try {
+    await $fetch('/api/journal/photos/update', {
+      method: 'POST',
+      body: {
+        id: photo.id,
+        frameOffsetX: reframeForm.offsetX,
+        frameOffsetY: reframeForm.offsetY,
+        frameScale: reframeForm.scale
+      }
+    })
+    reframingPhoto.value = null
+    await refresh()
+  }
+  finally {
+    savingReframe.value = false
+  }
+}
+
+async function resetFraming(photo: ProgressPhoto) {
+  await $fetch('/api/journal/photos/update', {
+    method: 'POST',
+    body: { id: photo.id, frameOffsetX: 0, frameOffsetY: 0, frameScale: 1 }
+  })
+  await refresh()
 }
 </script>

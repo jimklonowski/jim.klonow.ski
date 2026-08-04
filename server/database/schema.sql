@@ -110,6 +110,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, perio
 -- thumb_r2_key is a small client-generated JPEG (Workers has no sharp/native image resizing)
 -- uploaded alongside the original; nullable since rows from before this existed have none -
 -- grids fall back to the full-size r2_key for those.
+-- frame_offset_x/y (percent of image size, e.g. -30) and frame_scale (1 = no zoom) let a photo be
+-- manually repositioned/zoomed for consistent framing across a comparison set without touching
+-- the original pixels - applied as a CSS transform wherever the photo renders. Defaults are a
+-- no-op so existing rows render unchanged.
 CREATE TABLE IF NOT EXISTS progress_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL,
@@ -117,7 +121,10 @@ CREATE TABLE IF NOT EXISTS progress_photos (
   r2_key TEXT NOT NULL,
   thumb_r2_key TEXT,
   taken_at TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  frame_offset_x REAL NOT NULL DEFAULT 0,
+  frame_offset_y REAL NOT NULL DEFAULT 0,
+  frame_scale REAL NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_progress_photos_date ON progress_photos(date);
 CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(category);
@@ -127,6 +134,11 @@ CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(categ
 
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE progress_photos ADD COLUMN thumb_r2_key TEXT;
+
+-- One-time migration, do not re-run after it lands on an environment:
+-- ALTER TABLE progress_photos ADD COLUMN frame_offset_x REAL NOT NULL DEFAULT 0;
+-- ALTER TABLE progress_photos ADD COLUMN frame_offset_y REAL NOT NULL DEFAULT 0;
+-- ALTER TABLE progress_photos ADD COLUMN frame_scale REAL NOT NULL DEFAULT 1;
 
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE health_metrics ADD COLUMN recovery_score REAL;
