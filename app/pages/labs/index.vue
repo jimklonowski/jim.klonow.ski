@@ -41,18 +41,21 @@
 
       <!-- AI trend summary -->
       <section v-if="latestSummary">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between gap-2">
+        <UCollapsible :default-open="isRecentDraw" class="rounded-lg overflow-hidden bg-default ring ring-default">
+          <template #default="{ open }">
+            <button type="button" class="w-full flex items-center justify-between gap-2 p-4 sm:px-6 sm:py-4 text-left">
               <div class="flex items-center gap-2">
                 <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
                 <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">AI Summary</h2>
+                <p class="text-xs text-muted">{{ formatDate(latestSummary.date) }}</p>
               </div>
-              <p class="text-xs text-muted">{{ formatDate(latestSummary.date) }}</p>
-            </div>
+              <UIcon name="i-lucide-chevron-down" class="w-4 h-4 text-muted transition-transform" :class="{ 'rotate-180': open }" />
+            </button>
           </template>
-          <p class="text-sm leading-relaxed whitespace-pre-line">{{ latestSummary.text }}</p>
-        </UCard>
+          <template #content>
+            <p class="text-sm leading-relaxed whitespace-pre-line px-4 pb-4 sm:px-6 sm:pb-6">{{ latestSummary.text }}</p>
+          </template>
+        </UCollapsible>
       </section>
 
       <!-- Pinned / key markers -->
@@ -193,6 +196,12 @@ const latest = computed(() => entries.value.at(-1) ?? null)
 const latestSummary = computed(() => {
   const entry = [...entries.value].reverse().find(e => e.ai_summary)
   return entry ? { date: entry.date, text: entry.ai_summary as string } : null
+})
+
+const isRecentDraw = computed(() => {
+  if (!latestSummary.value) return false
+  const days = (Date.now() - new Date(latestSummary.value.date + 'T00:00:00').getTime()) / 86400000
+  return days <= 7
 })
 
 const allSources = computed(() =>

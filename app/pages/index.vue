@@ -18,7 +18,7 @@
       <GradientGlow class="top-0 w-2/3 h-1/2" />
     </template>
 
-    <UPageGrid class="sm:grid-cols-2 lg:grid-cols-2 max-w-2xl mx-auto">
+    <UPageGrid class="grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 max-w-2xl mx-auto gap-3 sm:gap-4">
       <UPageCard
         v-for="card in cards"
         :key="card.title"
@@ -28,7 +28,16 @@
         :description="card.description"
         spotlight
         highlight
-        class="text-left"
+        class="text-center sm:text-left"
+        :ui="{
+          container: 'aspect-square sm:aspect-auto flex flex-col items-center justify-center sm:items-stretch sm:justify-start p-3 sm:p-6',
+          wrapper: 'flex-none items-center justify-center text-center sm:flex-1 sm:items-start sm:justify-start sm:text-left',
+          body: 'flex-none sm:flex-1',
+          leading: 'mx-auto mb-2 sm:mx-0 sm:mb-2.5',
+          leadingIcon: 'size-7 sm:size-5',
+          title: 'text-sm sm:text-base',
+          description: 'text-xs line-clamp-2 sm:text-[15px] sm:line-clamp-none'
+        }"
       />
     </UPageGrid>
   </UPageHero>
