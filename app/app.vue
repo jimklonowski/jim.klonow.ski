@@ -34,8 +34,11 @@ useSeoMeta({
   title,
   description,
   ogTitle: title,
-  ogDescription: description
+  ogDescription: description,
+  ogImage: 'https://jim.klonow.ski/og.png',
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageAlt: description,
+  twitterCard: 'summary_large_image'
 })
-
-defineOgImage('Default', { title, description, alt: description })
 </script>

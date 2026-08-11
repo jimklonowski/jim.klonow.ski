@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.08.11",
+  "version": "2026.08.11b",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -25,8 +25,6 @@
     "@nuxtjs/i18n": "10.6.0",
     "@nuxtjs/seo": "5.3.12",
     "@pinia/nuxt": "1.0.1",
-    "@takumi-rs/core": "^1.8.7",
-    "@takumi-rs/wasm": "^1.8.7",
     "@unhead/vue": "^3.2.3",
     "@vueuse/core": "^14.4.0",
     "@vueuse/nuxt": "14.4.0",
