@@ -10,7 +10,12 @@
       @click="openPanel"
     />
 
-    <USlideover v-model:open="open" title="Health Digests" description="AI recaps of your vitals, sleep, doses and training">
+    <USlideover
+      v-model:open="open"
+      title="Health Digests"
+      description="AI recaps of your vitals, sleep, doses and training"
+      :ui="{ content: 'max-w-2xl' }"
+    >
       <template #body>
         <div class="space-y-4">
           <!-- Generate + filter controls -->
@@ -54,7 +59,9 @@
                 </div>
               </template>
 
-              <p class="text-sm leading-relaxed whitespace-pre-line">{{ d.summary }}</p>
+              <div class="text-sm leading-relaxed [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_li+li]:mt-1 [&_strong]:font-semibold">
+                <Markdown :value="d.summary" />
+              </div>
 
               <div v-if="chips(d).length" class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-default">
                 <span
@@ -108,17 +115,22 @@ const filtered = computed(() =>
 
 // --- generation ---
 const generating = ref(false)
+// Local (not UTC) YYYY-MM-DD, so an evening "today" doesn't roll over to tomorrow.
+function localToday(): string {
+  return new Date().toLocaleDateString('en-CA')
+}
+
 const generateItems = [
   [
-    { label: "Yesterday's recap", icon: 'i-lucide-calendar-days', onSelect: () => generate('daily') },
+    { label: "Today's recap", icon: 'i-lucide-calendar-days', onSelect: () => generate('daily', localToday()) },
     { label: 'This past week', icon: 'i-lucide-calendar-range', onSelect: () => generate('weekly') }
   ]
 ]
 
-async function generate(kind: 'daily' | 'weekly') {
+async function generate(kind: 'daily' | 'weekly', endDate?: string) {
   generating.value = true
   try {
-    const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', { method: 'POST', body: { kind } })
+    const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', { method: 'POST', body: { kind, endDate } })
     if (res.skipped) {
       toast.add({ title: 'Nothing to summarize', description: `No data logged for that ${kind === 'weekly' ? 'week' : 'day'}.`, color: 'warning', icon: 'i-lucide-info' })
     }
@@ -167,13 +179,16 @@ function chips(d: Digest): string[] {
     push(s.weight_lbs, v => `${v} lbs`)
     push(s.doses, v => `${v} dose${v === 1 ? '' : 's'}`)
     push(s.workouts, v => v ? `${v} workout${v === 1 ? '' : 's'}` : '')
+    push(s.sodas, v => v ? `${v} soda${v === 1 ? '' : 's'}` : '')
   }
   else {
     push(s.avg_recovery, v => `Avg rec ${v}%`)
     push(s.avg_sleep_min, v => `Avg sleep ${fmtSleep(v)}`)
+    if (s.avg_bp_systolic != null && s.avg_bp_diastolic != null) out.push(`BP ${s.avg_bp_systolic}/${s.avg_bp_diastolic}`)
     push(s.weight_change, v => `${v >= 0 ? '+' : ''}${v} lbs`)
     push(s.compounds, v => `${v} compound${v === 1 ? '' : 's'}`)
     push(s.workouts, v => `${v} workout${v === 1 ? '' : 's'}`)
+    push(s.sodas, v => `${v} soda${v === 1 ? '' : 's'}`)
   }
   return out.filter(Boolean)
 }
