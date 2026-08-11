@@ -3,6 +3,7 @@ import { locales } from './i18n/locales'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
+    '@comark/nuxt',
     '@nuxt/eslint',
     '@nuxt/image',
     '@nuxt/ui',
