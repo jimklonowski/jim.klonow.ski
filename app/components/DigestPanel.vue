@@ -60,7 +60,7 @@
               </template>
 
               <div class="text-sm leading-relaxed [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_li+li]:mt-1 [&_strong]:font-semibold">
-                <Comark :markdown="d.summary" />
+                <Markdown :value="d.summary" />
               </div>
 
               <div v-if="chips(d).length" class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-default">
