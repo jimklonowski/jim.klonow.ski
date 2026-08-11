@@ -102,6 +102,12 @@ export default defineNuxtConfig({
     ]
   },
 
+  // Static og.png in /public instead of runtime generation — the takumi WASM renderer
+  // alone was 1.6 MiB gzipped, over half the free-plan Worker size limit.
+  ogImage: {
+    enabled: false
+  },
+
   nitro: {
     preset: "cloudflare_module",
     cloudflare: {
