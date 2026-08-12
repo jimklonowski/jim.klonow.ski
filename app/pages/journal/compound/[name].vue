@@ -44,9 +44,10 @@
             <p class="text-xs text-muted mt-1">{{ daysAgo }} days ago</p>
           </UCard>
         </div>
+      </template>
 
-        <!-- Compound info -->
-        <section v-if="info">
+      <!-- Compound info (always shown so unused compounds still have an info page) -->
+      <section v-if="info">
           <div class="flex items-baseline justify-between mb-4">
             <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">About {{ compoundName }}</h2>
             <UBadge variant="subtle" size="sm">{{ info.category }}</UBadge>
@@ -88,6 +89,8 @@
             </div>
           </UCard>
         </section>
+
+      <template v-if="onDays.length">
 
         <!-- Syringe units -->
         <section v-if="currentMix">

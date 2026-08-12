@@ -358,6 +358,21 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'More frequent injections can mean more injection-site irritation; requires physician oversight and lab monitoring.'
   },
 
+  'Sustanon 250': {
+    category: 'TRT / Hormone',
+    aka: 'Sustanon / Sust / Testosterone Blend',
+    summary: 'A blend of four testosterone esters in one oil (30 mg propionate, 60 mg phenylpropionate, 60 mg isocaproate, 100 mg decanoate per 250 mg). Designed for infrequent clinical injections — the short esters kick in fast while the decanoate provides a long tail. In practice, injecting it infrequently produces noticeable peaks and troughs.',
+    dosing: {
+      range: '125–250 mg every 7–14 days (clinical TRT); enhanced educational protocols run 250–750 mg weekly',
+      frequency: 'Despite the "long-acting blend" design, 2x weekly injections give far more stable levels than the labeled every-3-weeks schedule',
+      timing: 'Intramuscular injection; consistency between doses matters more than time of day.'
+    },
+    cycling: 'Same as any testosterone base — continuous for TRT with lab-guided adjustments, or defined blocks in enhanced protocols.',
+    storage: 'Room temperature, away from light and heat; no refrigeration needed for oil-based esters.',
+    halfLife: 'Composite — the propionate peaks within ~1–2 days while the decanoate tail extends ~2 weeks, so levels are inherently less predictable than a single ester.',
+    caution: 'Same monitoring as any testosterone (hematocrit, estradiol, lipids, PSA). The mixed esters make lab timing awkward — trough levels are harder to define than with a single ester, and estrogen management is bumpier due to the built-in peaks.'
+  },
+
   'HGH': {
     category: 'TRT / Hormone',
     aka: 'Human Growth Hormone / Somatropin',
@@ -421,6 +436,51 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Can raise LH/FSH and testosterone significantly — typically monitored with follow-up labs.'
   },
 
+  'Clomiphene': {
+    category: 'SERM',
+    aka: 'Clomid / Clomiphene Citrate',
+    summary: 'A selective estrogen receptor modulator that blocks estrogen feedback at the hypothalamus/pituitary, raising LH/FSH and endogenous testosterone. The classic PCT (post-cycle therapy) drug for restarting natural production after suppression. It is a mix of two isomers: enclomiphene (the active trans-isomer) and zuclomiphene (a long-lived, weakly estrogenic cis-isomer responsible for most of the side-effect baggage — which is why isolated enclomiphene exists as a cleaner alternative).',
+    dosing: {
+      range: '25–50 mg/day (PCT protocols commonly start at 50 mg for 2 weeks, then taper to 25 mg)',
+      frequency: 'Once daily for 4–6 weeks in PCT contexts',
+      timing: 'Oral, any time of day; consistency matters more than timing.'
+    },
+    cycling: 'Used as a defined 4–6 week PCT block starting once the suppressive compounds have cleared (timed off the longest ester’s half-life), or lower-dose continuously for fertility/hypogonadism protocols under physician guidance.',
+    storage: 'Room temperature, in original packaging.',
+    halfLife: '~5–7 days for the drug overall, but zuclomiphene persists for weeks after the last dose.',
+    caution: 'Visual disturbances (tracers, blurring) are a known side effect — rare but a signal to stop immediately, as persistent cases are documented. Mood changes/irritability are commonly reported at PCT doses. Verify recovery with labs (LH, FSH, total/free T) rather than assuming it worked.'
+  },
+
+  'Tamoxifen': {
+    category: 'SERM',
+    aka: 'Nolvadex / Tamoxifen Citrate',
+    summary: 'A selective estrogen receptor modulator that blocks estrogen receptors in breast tissue (its approved use is breast cancer) while acting as a weak estrogen agonist in liver and bone. The standard defense against gynecomastia from aromatizing compounds and a common PCT drug — often considered better tolerated than clomiphene. Note it blocks the receptor rather than lowering estrogen levels; serum estradiol can actually rise while on it.',
+    dosing: {
+      range: '20–40 mg/day for PCT; 10–20 mg/day for gyno management while on aromatizing compounds',
+      frequency: 'Once daily (long half-life makes split dosing unnecessary)',
+      timing: 'Oral, any time of day, with or without food.'
+    },
+    cycling: 'PCT: 4–6 weeks starting once suppressive compounds have cleared. For gyno symptoms (itchy/puffy nipples), often run at 10–20 mg until symptoms resolve. Less useful against prolactin-driven gyno from 19-nors (trenbolone, nandrolone), which is a different mechanism.',
+    storage: 'Room temperature, in original packaging.',
+    halfLife: '~5–7 days (active metabolite endoxifen even longer), so steady state takes weeks.',
+    caution: 'Modestly lowers IGF-1. Rare but serious risk of blood clots (avoid with clotting history). Liver-agonist activity actually improves some lipid markers, but liver enzymes are still worth watching. Vision changes are a stop signal, as with clomiphene.'
+  },
+
+  'Mesterolone': {
+    category: 'Androgen (Oral Ancillary)',
+    aka: 'Proviron',
+    summary: 'An oral DHT derivative that is not C17-alpha-alkylated (so minimal liver toxicity) and is rapidly deactivated in muscle tissue — making it nearly useless as a mass-builder but popular as an on-cycle ancillary. It binds SHBG strongly (raising free testosterone), has a reputation for mild anti-estrogenic activity, and is commonly used for libido, well-being, and cosmetic "hardening" effects.',
+    dosing: {
+      range: '25–75 mg/day',
+      frequency: 'Once daily or split into two doses',
+      timing: 'Oral, with or without food.'
+    },
+    cycling: 'Typically run alongside other compounds for the duration of a cycle rather than standalone; some TRT protocols add low doses continuously for libido/free-T effects.',
+    storage: 'Room temperature, in original packaging.',
+    halfLife: '~12 hours.',
+    caution: 'It is pure DHT activity — accelerates androgenic hair loss in those predisposed and can worsen lipids. Mildly suppressive on its own despite the "ancillary" label. Not hepatotoxic like 17-alkylated orals, but still warrants lab monitoring in context.'
+  },
+
   'Oxandrolone': {
     category: 'Anabolic Steroid (Oral)',
     aka: 'Anavar',
@@ -466,6 +526,246 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Widely counterfeited/underdosed on the gray market since genuine methenolone is expensive to produce — sourcing matters more than with many other compounds. Can still modestly suppress HDL and endogenous testosterone despite its "mild" reputation. Physician oversight and periodic lipid/liver labs recommended.'
   },
 
+  'Trenbolone Acetate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Tren A / Tren Ace / Finaplix',
+    summary: 'The short-ester form of trenbolone, a 19-nor compound with several times the androgen-receptor binding affinity of testosterone — widely regarded as the most powerful commonly used AAS for recomposition, and also one of the harshest. Does not aromatize to estrogen but has strong progestogenic activity. Originally a veterinary cattle implant (Finaplix); there is no approved human formulation. The acetate ester is often preferred over enanthate specifically because it clears in days if side effects become intolerable.',
+    dosing: {
+      range: '200–400 mg weekly (educational ranges; often started low to assess tolerance)',
+      frequency: 'Every day or every other day given the short ester',
+      timing: 'Intramuscular injection; consistency between doses matters.'
+    },
+    cycling: 'Run in defined 6–10 week blocks alongside a testosterone base, never standalone and never as a first cycle — universally considered an advanced compound. Strongly suppressive; requires a full recovery plan.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~1–2 days — the shortest tren ester, and the main reason it’s recommended over long esters for anyone’s first exposure.',
+    caution: 'Notorious side-effect profile: night sweats, insomnia, elevated heart rate and blood pressure, anxiety/aggression and mood changes, sharply worsened lipids, and reduced cardio capacity. Progestogenic gyno is possible (prolactin pathway — tamoxifen alone won’t address it). "Tren cough" — a brief coughing fit immediately after injection — is common and alarming but usually transient. Significant cardiovascular strain; regular BP monitoring and labs are the minimum.'
+  },
+
+  'Trenbolone Enanthate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Tren E',
+    summary: 'The long-ester form of trenbolone, identical in effect to the acetate but with less frequent injections. The trade-off: if side effects hit, the compound takes weeks to clear rather than days — which is why the acetate ester is usually suggested for first-time exposure.',
+    dosing: {
+      range: '200–400 mg weekly (educational ranges)',
+      frequency: '2x weekly',
+      timing: 'Intramuscular injection; consistency between doses matters.'
+    },
+    cycling: 'Run in defined 8–12 week blocks alongside a testosterone base; advanced-only compound. Strongly suppressive; requires a full recovery plan.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~5–7 days — sides linger for weeks after the last injection.',
+    caution: 'Same harsh profile as trenbolone acetate (sleep disruption, night sweats, BP/heart-rate elevation, mood effects, brutal lipid impact, progestogenic gyno risk) with the added problem that none of it can be shut off quickly. Regular BP monitoring and labs are the minimum.'
+  },
+
+  'Trenbolone Hexahydrobenzylcarbonate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Tren Hex / Parabolan',
+    summary: 'Trenbolone with the very long hexahydrobenzylcarbonate ester — the only trenbolone ever approved for human use (as Parabolan in France, discontinued in 1997, in 76.5 mg ampules). Pharmacologically identical to other tren esters; today it exists only through gray-market production and is mostly chosen for novelty or injection-frequency preference.',
+    dosing: {
+      range: '150–300 mg weekly (the historic human product was dosed at 76.5 mg every 1–2 weeks clinically)',
+      frequency: '1–2x weekly given the long ester',
+      timing: 'Intramuscular injection.'
+    },
+    cycling: 'Defined 8–12 week blocks alongside a testosterone base; advanced-only, strongly suppressive.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~8–10 days — the slowest tren ester to clear.',
+    caution: 'All the trenbolone cautions apply (sleep, BP, mood, lipids, progestogenic gyno), with the slowest exit if sides become intolerable. Gray-market-only production makes counterfeiting/underdosing common.'
+  },
+
+  'Boldenone Undecylenate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'EQ / Equipoise',
+    summary: 'A veterinary injectable (1-dehydrotestosterone) with a very long ester, known for slow, steady, relatively dry gains, a pronounced appetite increase, and roughly half the aromatization rate of testosterone. Its signature side effect is a strong stimulation of red blood cell production — hematocrit climbing out of range is the most common reason people stop it.',
+    dosing: {
+      range: '300–600 mg weekly (educational ranges)',
+      frequency: '1–2x weekly given the long ester',
+      timing: 'Intramuscular injection.'
+    },
+    cycling: 'Because onset is slow, typically run in long 14–20 week blocks alongside a testosterone base; suppressive, requires a recovery plan.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~14 days — takes over a month to reach steady state and similarly long to clear.',
+    caution: 'Monitor hematocrit/hemoglobin closely — erythrocytosis is near-universal on EQ and raises clot risk; some users end up donating blood to manage it. Some report anxiety/irritability. Lipid impact milder than orals but real. Long detection window and slow clearance.'
+  },
+
+  'Nandrolone Phenylpropionate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'NPP',
+    summary: 'The short-ester form of nandrolone, a 19-nor compound known for adding quality mass with notable joint/connective-tissue relief (increased collagen synthesis and synovial fluid). Aromatizes at only ~20% the rate of testosterone but is progestogenic, which drives its own set of side effects. The short ester makes it easier to bail out than deca if sides appear.',
+    dosing: {
+      range: '300–400 mg weekly (educational ranges)',
+      frequency: 'Every other day given the short ester',
+      timing: 'Intramuscular injection.'
+    },
+    cycling: 'Run 8–12 weeks alongside a testosterone base — nandrolone without a test base is strongly associated with libido/erectile problems ("deca dick"). Deeply suppressive; recovery takes longer than with testosterone-only protocols.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~2–3 days.',
+    caution: 'Progestogenic/prolactin-mediated sides: gyno (not fixed by tamoxifen alone), water retention, libido loss. Nandrolone metabolites are detectable in anti-doping tests for up to ~18 months. Mental-health effects (flat mood, anhedonia) are commonly reported with 19-nors. Monitor prolactin, lipids, and BP.'
+  },
+
+  'Nandrolone Decanoate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Deca / Deca-Durabolin',
+    summary: 'The classic long-ester nandrolone — one of the oldest and most-used AAS, prescribed historically for anemia and wasting. Same compound as NPP with a much longer ester: steady mass gains, famous joint relief, low aromatization but real progestogenic activity. Some protocols run low-dose deca (~100–150 mg/week) alongside TRT purely for joint comfort.',
+    dosing: {
+      range: '200–400 mg weekly (educational ranges); 100–150 mg weekly in "therapeutic" joint-support protocols',
+      frequency: '1x weekly',
+      timing: 'Intramuscular injection.'
+    },
+    cycling: 'Slow onset — typically 12–16 week blocks alongside a testosterone base (never solo; see "deca dick"). Deeply suppressive with a long recovery tail.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~7–12 days.',
+    caution: 'Same progestogenic/prolactin cautions as NPP (gyno, water retention, libido loss) but slow to clear if sides appear. Metabolites detectable up to ~18 months. Commonly reported flat/blunted mood on 19-nors. Monitor prolactin, lipids, BP, and hematocrit.'
+  },
+
+  'Drostanolone Propionate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Masteron / Mast P',
+    summary: 'A DHT-derived injectable originally developed for breast cancer treatment. Cannot aromatize and carries a mild anti-estrogenic reputation. Only modestly anabolic — it’s used almost entirely as a cosmetic "finishing" compound for muscle hardness and dryness, with effects really only visible at low body fat. Popular in contest-prep stacks.',
+    dosing: {
+      range: '300–400 mg weekly (educational ranges)',
+      frequency: 'Every other day given the short propionate ester',
+      timing: 'Intramuscular injection.'
+    },
+    cycling: 'Run 6–10 weeks alongside a testosterone base, typically during cutting phases; suppressive like all AAS.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~2 days.',
+    caution: 'Pure DHT-line androgenicity: among the worst common compounds for accelerating male pattern hair loss in the predisposed (and 5-AR inhibitors like finasteride/dutasteride do nothing for it, since it is already a DHT derivative). Lowers HDL notably. Little point at higher body fat percentages.'
+  },
+
+  'Drostanolone Enanthate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'Masteron Enanthate / Mast E',
+    summary: 'The long-ester version of drostanolone — identical cosmetic hardening/drying effects to the propionate with less frequent injections. A gray-market creation (the original pharmaceutical Masteron was propionate only).',
+    dosing: {
+      range: '400–600 mg weekly (educational ranges; slightly higher than prop is common since more of the weight is ester)',
+      frequency: '2x weekly',
+      timing: 'Intramuscular injection.'
+    },
+    cycling: 'Run 8–12 weeks alongside a testosterone base, typically while cutting; suppressive.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~10 days.',
+    caution: 'Same profile as drostanolone propionate: severe hair-loss acceleration in the predisposed (not preventable with finasteride/dutasteride), notable HDL suppression, and cosmetic effects that require low body fat to see.'
+  },
+
+  'Dihydroboldenone Cypionate': {
+    category: 'Anabolic Steroid (Injectable)',
+    aka: 'DHB / 1-Testosterone Cypionate',
+    summary: 'The 5-alpha-reduced form of boldenone (also called 1-testosterone), a gray-market injectable with essentially no human clinical data. Reputation: testosterone-like or better anabolic effect with zero aromatization — lean, dry gains without estrogen management. Its defining practical problem is severe post-injection pain (PIP) even at modest concentrations, which is why many people try it once and quit.',
+    dosing: {
+      range: '200–400 mg weekly (educational ranges)',
+      frequency: '2x weekly',
+      timing: 'Intramuscular injection; many users rotate larger muscle groups and dilute with other oils to manage PIP.'
+    },
+    cycling: 'Run 8–12 weeks alongside a testosterone base; suppressive.',
+    storage: 'Room temperature, away from light and heat.',
+    halfLife: '~8 days (cypionate ester).',
+    caution: 'Essentially no human research — all dosing and safety knowledge is anecdotal, and it exists only through underground labs, so quality varies wildly. Notorious PIP; injection-site abscesses from bad brews are a real risk. Expect DHT-line androgenic effects (hair, prostate) and lipid suppression. No aromatization means estrogen can run low if used without adequate test.'
+  },
+
+  'Methandrostenolone': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Dianabol / Dbol / Methandienone',
+    summary: 'The original and most famous oral AAS, developed in the 1950s and central to bodybuilding’s golden era. A C17-alpha-alkylated testosterone derivative that delivers rapid size and strength — a large share of it water — via strong glycogen retention and aromatization to a potent methylated estrogen. Classically used as a 4–6 week "kickstart" while long injectable esters build up.',
+    dosing: {
+      range: '20–30 mg/day (educational conservative range)',
+      frequency: 'Split into 2–3 doses across the day given the short half-life',
+      timing: 'Oral; some protocols concentrate dosing pre-workout.'
+    },
+    cycling: 'Short 4–6 week blocks only, almost always alongside an injectable base — the hepatotoxicity of 17-alkylated orals makes longer runs a bad trade. Suppressive.',
+    storage: 'Room temperature, away from moisture and light.',
+    halfLife: '~4–6 hours.',
+    caution: 'Aromatizes to methylestradiol, a more potent estrogen than estradiol — water retention, blood pressure elevation, and gyno risk are front-loaded and an AI is commonly needed. Hepatotoxic (17-alpha-alkylated): liver enzymes rise quickly; no alcohol, watch other oral meds, keep blocks short. Sharp HDL suppression. Most of the scale weight leaves when the water does.'
+  },
+
+  'Turinabol': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Tbol / Oral Turinabol / Chlorodehydromethyltestosterone (CDMT)',
+    summary: 'A chlorinated modification of dianabol that cannot aromatize — trading dbol’s rapid watery mass for slower, dry, keepable gains with no estrogenic side effects. Historically infamous as the compound at the center of the East German state doping program. Moderate anabolic effect with relatively mild androgenic activity.',
+    dosing: {
+      range: '20–40 mg/day (educational ranges)',
+      frequency: 'Once daily or split into 2 doses',
+      timing: 'Oral, with or without food.'
+    },
+    cycling: 'Short 6–8 week blocks, typically alongside an injectable base; suppressive. Liver limits duration like all 17-alkylated orals.',
+    storage: 'Room temperature, away from moisture and light.',
+    halfLife: '~16 hours — long for an oral, making once-daily dosing viable.',
+    caution: 'Hepatotoxic (17-alpha-alkylated) — keep blocks short and monitor liver enzymes. Strong HDL suppression despite the "mild" reputation. Long-term metabolite detection is excellent in modern anti-doping (it’s the compound behind many retroactive Olympic disqualifications). No pharmaceutical production exists — gray-market only.'
+  },
+
+  'Stanozolol': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Winstrol / Winny (oral tabs or aqueous injectable)',
+    summary: 'A DHT-derived compound available as tablets or an aqueous suspension injectable — unusually, both routes are C17-alpha-alkylated, so the injectable is just as liver-toxic. Cannot aromatize; produces a distinctive dry, hard, vascular look, which makes it a contest-prep and athletics staple (famously, Ben Johnson in 1988). Also strongly reduces SHBG, freeing up other compounds in a stack.',
+    dosing: {
+      range: '25–50 mg/day oral, or 50 mg every other day injectable (educational ranges)',
+      frequency: 'Oral split into 2 doses; injectable daily or every other day',
+      timing: 'Typically run the final 4–6 weeks before a physique peak.'
+    },
+    cycling: 'Short 4–6 week blocks alongside a testosterone base; suppressive. The dry-joint effect makes it a poor pairing with heavy low-rep training for some.',
+    storage: 'Room temperature; shake aqueous suspension before drawing.',
+    halfLife: '~9 hours (oral).',
+    caution: 'One of the harshest common compounds on lipids — HDL can crater within weeks. Hepatotoxic by either route (both are 17-alkylated). Notoriously drying to joints (it lowers synovial fluid), with tendon-brittleness concerns. DHT-line hair loss risk, not preventable with 5-AR inhibitors.'
+  },
+
+  'Oxymetholone': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Anadrol / Adrol / A-bombs',
+    summary: 'The most aggressive mass-building oral in common use, originally developed for anemia. Delivers dramatic size, fullness, and strength within weeks — much of it water. Bizarrely, despite being DHT-derived and unable to aromatize, it produces strong estrogenic-type side effects (thought to activate estrogen receptors directly), so gyno and water retention are real risks that an aromatase inhibitor cannot fix.',
+    dosing: {
+      range: '50–100 mg/day (educational ranges; 50 mg is plenty for most)',
+      frequency: 'Once daily or split',
+      timing: 'Oral; often used as a 4-week kickstart or a pre-contest fullness tool.'
+    },
+    cycling: 'Short 4–6 week blocks only, alongside an injectable base; suppressive. Diminishing returns above 100 mg are well-documented while toxicity keeps climbing.',
+    storage: 'Room temperature, away from moisture and light.',
+    halfLife: '~8–9 hours.',
+    caution: 'Among the most hepatotoxic common orals (17-alpha-alkylated) — liver enzymes and blood pressure both spike fast. Estrogenic sides respond to SERMs (receptor blockers) but not AIs, since no aromatization is involved. Appetite suppression, lethargy, and headaches are common. Sharp HDL suppression; significant water/BP load on the heart.'
+  },
+
+  'Methasterone': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Superdrol / Sdrol / Methyldrostanolone',
+    summary: 'Methylated drostanolone — sold openly as a "prohormone" supplement in the 2000s until banned in 2012, and responsible for a disproportionate share of documented AAS liver-injury case reports. Produces rapid, dry, full gains with no estrogen conversion, which built its cult following; its hepatotoxicity is in a different league from mainstream orals.',
+    dosing: {
+      range: '10–20 mg/day (educational ranges — this is a compound where more is emphatically not better)',
+      frequency: 'Once daily or split',
+      timing: 'Oral.'
+    },
+    cycling: 'Very short 3–4 week blocks maximum, alongside an injectable base; suppressive. Longer runs are where the published liver-injury cases cluster.',
+    storage: 'Room temperature, away from moisture and light.',
+    halfLife: '~8 hours.',
+    caution: 'Severely hepatotoxic — documented cases of cholestatic jaundice and drug-induced liver injury, some requiring hospitalization. Crushing lethargy, appetite loss, and back pumps are commonly reported. Brutal lipid suppression. If any oral warrants pre/mid/post liver labs and strict duration limits, it is this one; many harm-reduction sources simply say skip it.'
+  },
+
+  'Fluoxymesterone': {
+    category: 'Anabolic Steroid (Oral)',
+    aka: 'Halotestin / Halo',
+    summary: 'A 17-alkylated testosterone derivative that builds almost no mass but produces dramatic strength, aggression, and muscle density — the classic "meet day" drug for powerlifters and fighters, and a final-week hardener in bodybuilding. Pound-for-pound one of the most androgenic and least anabolic compounds available.',
+    dosing: {
+      range: '10–20 mg/day (educational ranges)',
+      frequency: 'Once daily or split; some strength athletes dose only on training/competition days',
+      timing: 'Oral, ~1–2 hours before training when used acutely.'
+    },
+    cycling: 'Very short 2–4 week blocks (or acute use), alongside a base; suppressive. Duration is limited by liver and lipid toxicity, not by diminishing gains.',
+    storage: 'Room temperature, away from moisture and light.',
+    halfLife: '~9 hours.',
+    caution: 'Among the harshest compounds on both liver and lipids — HDL suppression is severe and fast. The aggression/irritability it is famous for is a real behavioral side effect, not just gym folklore. High androgenicity: hair loss and acne in the predisposed. Strictly a short-duration specialty tool.'
+  },
+
+  'Clenbuterol': {
+    category: 'Beta-2 Agonist (Cutting)',
+    aka: 'Clen',
+    summary: 'Not a steroid — a long-acting beta-2 adrenergic agonist bronchodilator (asthma drug in some countries, never approved for humans in the US) used off-label as a thermogenic. Raises metabolic rate a few percent and has mild anti-catabolic properties. Its very long half-life means the stimulant effects run around the clock, unlike caffeine-type thermogenics.',
+    dosing: {
+      range: '20 mcg/day starting, titrated up by 20 mcg every few days as tolerated; common educational ceiling 80–120 mcg/day',
+      frequency: 'Once daily (long half-life) — morning dosing limits sleep disruption',
+      timing: 'Classic protocols run 2 weeks on / 2 weeks off to offset receptor downregulation; others taper up continuously and stop.'
+    },
+    cycling: 'Effectiveness fades as beta-2 receptors downregulate over 2–4 weeks; breaks restore sensitivity. Always titrate — never start at the target dose.',
+    storage: 'Room temperature, in original packaging.',
+    halfLife: '~26–36 hours — side effects persist all day and take days to fully clear after stopping.',
+    caution: 'Serious cardiac concerns: prolonged/high-dose use is associated with cardiac hypertrophy, arrhythmias, and documented myocardial injury cases — this is the compound’s real risk, not the shakes. Common sides: hand tremors, insomnia, sweating, and muscle cramps (it depletes taurine and potassium — supplementing both is standard). Avoid entirely with any cardiac history, and never combine with other stimulants casually.'
+  },
+
   'Finasteride': {
     category: 'DHT Blocker (5-alpha Reductase Inhibitor)',
     aka: 'Propecia (1mg) / Proscar (5mg)',
@@ -479,6 +779,21 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     storage: 'Room temperature, in original packaging.',
     halfLife: '~5-6 hours, but tissue DHT suppression persists longer than plasma levels suggest with daily dosing.',
     caution: 'Only blocks 5-alpha reductase conversion of testosterone → DHT — it does not lower DHT-derived compounds that are already DHT itself (e.g. methenolone, oxandrolone), so it won’t offset hair-loss risk from those. Associated with a small but real risk of sexual side effects (libido, erectile function) in a subset of users, sometimes persisting after discontinuation ("post-finasteride syndrome" — rare but reported). Can suppress PSA by ~50%, which must be accounted for when interpreting prostate labs. Pregnant women should not handle crushed/broken tablets (teratogenic).'
+  },
+
+  'Dutasteride': {
+    category: 'DHT Blocker (5-alpha Reductase Inhibitor)',
+    aka: 'Avodart',
+    summary: 'A dual inhibitor of both type I and type II 5-alpha reductase enzymes, which convert testosterone into DHT. Suppresses serum DHT by ~90%+ (vs ~70% for finasteride, which only blocks type II), making it the more potent option for androgenic hair loss. Approved for BPH (0.5mg); used off-label for hair loss.',
+    dosing: {
+      range: '0.5 mg/day (standard dose; some protocols use 0.5 mg every other day or a few times weekly given the very long half-life)',
+      frequency: 'Once daily',
+      timing: 'Oral, any time of day, with or without food; consistency matters more than timing. Effects take 3-6+ months to become noticeable. When switching from finasteride, no washout is needed — dutasteride covers everything finasteride does and more.'
+    },
+    cycling: 'Taken continuously — benefits reverse after stopping, though the very long half-life means DHT suppression persists for weeks to months after discontinuation.',
+    storage: 'Room temperature, in original packaging. Soft gelatin capsules — do not open or handle if damaged.',
+    halfLife: '~4-5 weeks at steady state — dramatically longer than finasteride (~5-6 hours), so missed doses matter little but it also takes months to fully clear.',
+    caution: 'Same class-wide risks as finasteride — sexual side effects in a subset of users (with the added caveat that the long half-life means any side effects take much longer to resolve after stopping), and PSA suppression (~50%) that must be accounted for when interpreting prostate labs. Like finasteride, it does not lower compounds that are already DHT-derived (methenolone, oxandrolone). Pregnant women should not handle leaking/damaged capsules (teratogenic). Blood donation deferral: 6 months after the last dose (vs 1 month for finasteride) due to teratogenicity risk.'
   },
 
   'Semaglutide': {

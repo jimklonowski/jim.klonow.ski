@@ -140,12 +140,22 @@ export const KNOWN_COMPOUNDS = [
   'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
   'Thymosin Alpha-1', 'Thymosin Beta-4', 'PT-141', 'Kisspeptin',
   // TRT / Hormones
-  'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate',
+  'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate', 'Sustanon 250',
   'HGH', 'hCG', 'Anastrozole', 'Enclomiphene',
-  // Anabolic Steroids
-  'Oxandrolone', 'Methenolone Acetate', 'Methenolone Enanthate',
+  // PCT / Ancillaries
+  'Clomiphene', 'Tamoxifen', 'Mesterolone',
+  // Anabolic Steroids (Injectable)
+  'Methenolone Acetate', 'Methenolone Enanthate',
+  'Trenbolone Acetate', 'Trenbolone Enanthate', 'Trenbolone Hexahydrobenzylcarbonate',
+  'Boldenone Undecylenate', 'Nandrolone Phenylpropionate', 'Nandrolone Decanoate',
+  'Drostanolone Propionate', 'Drostanolone Enanthate', 'Dihydroboldenone Cypionate',
+  // Anabolic Steroids (Oral)
+  'Oxandrolone', 'Methandrostenolone', 'Turinabol', 'Stanozolol',
+  'Oxymetholone', 'Methasterone', 'Fluoxymesterone',
+  // Cutting / Beta-agonists
+  'Clenbuterol',
   // Hair/DHT
-  'Finasteride',
+  'Finasteride', 'Dutasteride',
   // GLP-1
   'Semaglutide', 'Tirzepatide', 'Retatrutide',
   // Metabolic / Research Compounds
@@ -174,6 +184,7 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Anastrozole': '#6366f1',
   'Enclomiphene': '#7c3aed',
   'Finasteride': '#059669',
+  'Dutasteride': '#047857',
   'Semaglutide': '#0891b2',
   'Tirzepatide': '#0e7490',
   'Retatrutide': '#0369a1',
@@ -182,6 +193,26 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Oxandrolone': '#c026d3',
   'Methenolone Acetate': '#9333ea',
   'Methenolone Enanthate': '#7e22ce',
+  'Sustanon 250': '#e11d48',
+  'Clomiphene': '#4f46e5',
+  'Tamoxifen': '#0284c7',
+  'Mesterolone': '#065f46',
+  'Trenbolone Acetate': '#b91c1c',
+  'Trenbolone Enanthate': '#991b1b',
+  'Trenbolone Hexahydrobenzylcarbonate': '#7f1d1d',
+  'Boldenone Undecylenate': '#15803d',
+  'Nandrolone Phenylpropionate': '#be185d',
+  'Nandrolone Decanoate': '#9d174d',
+  'Drostanolone Propionate': '#6d28d9',
+  'Drostanolone Enanthate': '#5b21b6',
+  'Dihydroboldenone Cypionate': '#166534',
+  'Methandrostenolone': '#d97706',
+  'Turinabol': '#a16207',
+  'Stanozolol': '#0ea5e9',
+  'Oxymetholone': '#ea580c',
+  'Methasterone': '#86198f',
+  'Fluoxymesterone': '#78350f',
+  'Clenbuterol': '#14b8a6',
   '5-Amino-1MQ': '#0d9488',
   'SLU-PP-332': '#ca8a04',
   'Humanin': '#eab308',
