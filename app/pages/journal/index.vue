@@ -365,10 +365,11 @@
             :key="compound"
             :to="`/journal/compound/${encodeURIComponent(compound)}`"
             class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:ring-1 hover:ring-primary transition-all cursor-pointer no-underline"
+            :class="count ? '' : 'opacity-50 hover:opacity-100'"
           >
             <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: getCompoundColor(compound) }" />
             <span class="text-sm font-medium">{{ compound }}</span>
-            <span class="text-xs text-muted">{{ count }}d</span>
+            <span v-if="count" class="text-xs text-muted">{{ count }}d</span>
           </NuxtLink>
         </div>
       </section>
@@ -458,7 +459,7 @@
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor, SODA_DRINKS, SODA_SIZES } from '~/data/journal'
+import { getCompoundColor, KNOWN_COMPOUNDS, SODA_DRINKS, SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { workoutIcon } from '~/data/workouts'
@@ -597,7 +598,7 @@ const chartEntries = computed(() => {
   if (!chartDays.value) return entries.value
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - chartDays.value)
-  const cutoffStr = cutoff.toISOString().split('T')[0]
+  const cutoffStr = cutoff.toISOString().split('T')[0] ?? ''
   return entries.value.filter(e => e.date >= cutoffStr)
 })
 
@@ -663,7 +664,14 @@ const peptideUsage = computed(() => {
       counts[compound] = (counts[compound] ?? 0) + 1
     }
   }
-  return Object.entries(counts).sort(([, a], [, b]) => b - a)
+  // Used compounds first (by days used), then every other known compound so
+  // each info page stays reachable even before it's ever been logged.
+  const used = Object.entries(counts).sort(([, a], [, b]) => b - a)
+  const unused = KNOWN_COMPOUNDS
+    .filter(c => !(c in counts))
+    .sort((a, b) => a.localeCompare(b))
+    .map(c => [c, 0] as [string, number])
+  return [...used, ...unused]
 })
 
 function uniqueCompounds(entry: typeof latest.value) {
