@@ -70,8 +70,8 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2(@vue/devtools-api@8.1.5)(typescript@7.0.2)(vue@3.5.41(typescript@7.0.2))
       shaders:
-        specifier: ^3.0.449
-        version: 3.0.449(vue@3.5.41(typescript@7.0.2))
+        specifier: ^3.0.451
+        version: 3.0.451(vue@3.5.41(typescript@7.0.2))
     devDependencies:
       '@comark/nuxt':
         specifier: 0.6.2
@@ -7330,8 +7330,8 @@ packages:
     engines: {node: '>= 0.10'}
     hasBin: true
 
-  shaders@3.0.449:
-    resolution: {integrity: sha512-RZw9Erq6mrhXiRMnIaDWMFUW4cNZNlJwz7xrmbWIC9lx2IG09W4gjov3SNAsmF6V8Eo417CXrRHskggRInLYBw==}
+  shaders@3.0.451:
+    resolution: {integrity: sha512-QkymcJEFgfjyToQmSjsmWlnEEMZ1oF34pKeLfjvWpvW2kqWtWEKEse1QCIBxN8onvblJbQCt6dZyBTMfD8szwA==}
     hasBin: true
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
@@ -12893,13 +12893,13 @@ snapshots:
 
   ast-kit@2.2.0:
     dependencies:
-      '@babel/parser': 7.29.7
+      '@babel/parser': 7.29.8
       pathe: 2.0.3
 
   ast-walker-scope@0.9.0:
     dependencies:
-      '@babel/parser': 7.29.7
-      '@babel/types': 7.29.7
+      '@babel/parser': 7.29.8
+      '@babel/types': 7.29.8
       ast-kit: 2.2.0
 
   async-lock@1.4.1:
@@ -14904,8 +14904,8 @@ snapshots:
 
   magicast@0.5.4:
     dependencies:
-      '@babel/parser': 7.29.7
-      '@babel/types': 7.29.7
+      '@babel/parser': 7.29.8
+      '@babel/types': 7.29.8
       source-map-js: 1.2.1
 
   make-asynchronous@1.1.0:
@@ -17170,7 +17170,7 @@ snapshots:
       to-buffer: 1.2.2
     optional: true
 
-  shaders@3.0.449(vue@3.5.41(typescript@7.0.2)):
+  shaders@3.0.451(vue@3.5.41(typescript@7.0.2)):
     dependencies:
       typegpu: 0.11.9
     optionalDependencies:
