@@ -356,21 +356,30 @@
         </template>
       </UModal>
 
-      <!-- Peptide usage summary -->
-      <section v-if="peptideUsage.length">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Peptide Usage</h2>
-        <div class="flex flex-wrap gap-2">
-          <NuxtLink
-            v-for="[compound, count] in peptideUsage"
-            :key="compound"
-            :to="`/journal/compound/${encodeURIComponent(compound)}`"
-            class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:ring-1 hover:ring-primary transition-all cursor-pointer no-underline"
-            :class="count ? '' : 'opacity-50 hover:opacity-100'"
-          >
-            <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: getCompoundColor(compound) }" />
-            <span class="text-sm font-medium">{{ compound }}</span>
-            <span v-if="count" class="text-xs text-muted">{{ count }}d</span>
-          </NuxtLink>
+      <!-- Compound usage summary -->
+      <section>
+        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Compound Usage</h2>
+        <div class="space-y-5">
+          <div v-for="group in compoundUsage" :key="group.label">
+            <p class="text-xs font-medium text-muted uppercase tracking-wider mb-2">{{ group.label }}</p>
+            <div class="flex flex-wrap gap-2">
+              <NuxtLink
+                v-for="[compound, count] in group.compounds"
+                :key="compound"
+                :to="`/journal/compound/${encodeURIComponent(compound)}`"
+                class="flex items-center rounded-lg border hover:ring-1 hover:ring-primary transition-all cursor-pointer no-underline"
+                :class="count ? 'gap-2 px-3 py-2' : 'gap-1.5 px-2 py-1 opacity-50 hover:opacity-100'"
+              >
+                <span
+                  class="rounded-full shrink-0"
+                  :class="count ? 'w-2.5 h-2.5' : 'w-2 h-2'"
+                  :style="{ background: getCompoundColor(compound) }"
+                />
+                <span :class="count ? 'text-sm font-medium' : 'text-xs'">{{ compound }}</span>
+                <span v-if="count" class="text-xs text-muted">{{ count }}d</span>
+              </NuxtLink>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -459,7 +468,7 @@
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor, KNOWN_COMPOUNDS, SODA_DRINKS, SODA_SIZES } from '~/data/journal'
+import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS, SODA_DRINKS, SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { workoutIcon } from '~/data/workouts'
@@ -656,7 +665,7 @@ const labDrawsInRange = computed(() => {
   return (labsData.value as Array<{ date: string }>).filter(l => l.date >= minDate && l.date <= maxDate)
 })
 
-const peptideUsage = computed(() => {
+const compoundUsage = computed(() => {
   const counts: Record<string, number> = {}
   for (const entry of entries.value) {
     const compounds = new Set((entry.peptides ?? []).map((p: { compound: string }) => p.compound))
@@ -664,14 +673,26 @@ const peptideUsage = computed(() => {
       counts[compound] = (counts[compound] ?? 0) + 1
     }
   }
-  // Used compounds first (by days used), then every other known compound so
-  // each info page stays reachable even before it's ever been logged.
-  const used = Object.entries(counts).sort(([, a], [, b]) => b - a)
-  const unused = KNOWN_COMPOUNDS
-    .filter(c => !(c in counts))
-    .sort((a, b) => a.localeCompare(b))
-    .map(c => [c, 0] as [string, number])
-  return [...used, ...unused]
+  // Within each group: used compounds first (by days used), then the rest
+  // alphabetically so each info page stays reachable before it's ever logged.
+  const grouped = Object.entries(COMPOUND_GROUPS).map(([label, list]) => {
+    const used = list
+      .filter(c => counts[c])
+      .map(c => [c, counts[c]!] as [string, number])
+      .sort(([, a], [, b]) => b - a)
+    const unused = list
+      .filter(c => !counts[c])
+      .sort((a, b) => a.localeCompare(b))
+      .map(c => [c, 0] as [string, number])
+    return { label, compounds: [...used, ...unused] }
+  })
+  // Freeform compounds logged outside the known list land in Other
+  const known = new Set(KNOWN_COMPOUNDS)
+  const extras = Object.entries(counts)
+    .filter(([c]) => !known.has(c))
+    .sort(([, a], [, b]) => b - a)
+  if (extras.length) grouped.find(g => g.label === 'Other')?.compounds.push(...extras)
+  return grouped
 })
 
 function uniqueCompounds(entry: typeof latest.value) {

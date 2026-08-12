@@ -931,6 +931,35 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     },
     cycling: 'Commonly used nightly for a period, with periodic breaks to gauge whether ongoing use is still needed.',
     storage: 'Lyophilized: freeze at −20°C. After mixing: refrigerate 2–8°C, avoid freeze–thaw cycles.'
+  },
+
+  'Cerebrolysin': {
+    category: 'Nootropic Peptide',
+    summary: 'An injectable mixture of low-molecular-weight neuropeptides and amino acids derived from porcine brain tissue, manufactured pharmaceutically (Ever Pharma, Austria). Claimed to mimic the activity of endogenous neurotrophic factors (BDNF/NGF-like effects). Prescribed in parts of Europe and Asia for stroke recovery, traumatic brain injury, and dementia; not FDA approved, and used off-label in nootropic circles for cognition and neuro-recovery.',
+    dosing: {
+      range: '5–10 mL per injection (clinical protocols for neurological conditions run higher as IV infusions)',
+      frequency: 'Daily or 5x weekly during a course',
+      timing: 'Intramuscular injection (IM is the practical route for volumes up to ~5 mL per site); typically run as a defined course rather than continuously.'
+    },
+    cycling: 'Used in courses of ~2–4 weeks, repeated a few times per year in clinical practice, rather than continuous use.',
+    storage: 'Comes as ready-to-use ampules — no reconstitution. Store below 25°C, protected from light; use immediately after opening and discard any remainder.',
+    halfLife: 'The constituent peptides clear plasma within hours; claimed neurotrophic effects are attributed to downstream signaling rather than sustained blood levels.',
+    caution: 'An animal-derived biological injectable — sourcing authentic pharmaceutical product matters more than with synthetic peptides, and counterfeits exist. Evidence for cognitive benefit is mixed and much of it comes from lower-quality trials. Contraindicated in epilepsy/seizure disorders and severe renal impairment; allergic reactions to the protein content are possible. Injection volumes are large by peptide standards — rotate sites.'
+  },
+
+  'Bromantane': {
+    category: 'Nootropic (Actoprotector)',
+    aka: 'Ladasten',
+    summary: 'A Russian-developed "actoprotector" — a stimulant-adjacent compound that increases physical and mental work capacity without the classic stimulant profile. Rather than blocking dopamine reuptake, it upregulates dopamine synthesis (tyrosine hydroxylase and AADC expression), giving a gradual, non-jittery boost to motivation and stamina with an unusual combination of mild anxiolytic effects. Prescribed in Russia for asthenia (fatigue syndromes).',
+    dosing: {
+      range: '25–100 mg/day (Russian clinical dosing for asthenia was 50–100 mg/day)',
+      frequency: 'Once daily, typically in the morning',
+      timing: 'Oral; poorly water-soluble, so absorption improves with a fatty meal (some users dose sublingually in suspension). Effects build over several days of consistent use rather than hitting acutely.'
+    },
+    cycling: 'Often run for a few weeks at a time with breaks; the dopamine-synthesis mechanism is claimed to avoid tolerance/withdrawal, but long-term Western data doesn’t exist to confirm it.',
+    storage: 'Room temperature, away from moisture and light.',
+    halfLife: '~11 hours.',
+    caution: 'Virtually all clinical data is Russian-language literature; Western safety data is minimal. Banned by WADA (it has been on the prohibited list since Russian athletes tested positive at the 1996 Olympics) — relevant if you are ever drug-tested. Mild immunomodulatory effects are documented but poorly characterized. Gray-market only in the US.'
   }
 }
 
