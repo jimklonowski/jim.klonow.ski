@@ -134,35 +134,34 @@ export const DOSE_UNITS = [
   { label: 'IU', value: 'iu' }
 ]
 
-export const KNOWN_COMPOUNDS = [
-  // Peptides
-  'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500', 'BPC-157 / TB-500',
-  'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
-  'Thymosin Alpha-1', 'Thymosin Beta-4', 'PT-141', 'Kisspeptin',
-  // TRT / Hormones
-  'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate', 'Sustanon 250',
-  'HGH', 'hCG', 'Anastrozole', 'Enclomiphene',
-  // PCT / Ancillaries
-  'Clomiphene', 'Tamoxifen', 'Mesterolone',
-  // Anabolic Steroids (Injectable)
-  'Methenolone Acetate', 'Methenolone Enanthate',
-  'Trenbolone Acetate', 'Trenbolone Enanthate', 'Trenbolone Hexahydrobenzylcarbonate',
-  'Boldenone Undecylenate', 'Nandrolone Phenylpropionate', 'Nandrolone Decanoate',
-  'Drostanolone Propionate', 'Drostanolone Enanthate', 'Dihydroboldenone Cypionate',
-  // Anabolic Steroids (Oral)
-  'Oxandrolone', 'Methandrostenolone', 'Turinabol', 'Stanozolol',
-  'Oxymetholone', 'Methasterone', 'Fluoxymesterone',
-  // Cutting / Beta-agonists
-  'Clenbuterol',
-  // Hair/DHT
-  'Finasteride', 'Dutasteride',
-  // GLP-1
-  'Semaglutide', 'Tirzepatide', 'Retatrutide',
-  // Metabolic / Research Compounds
-  '5-Amino-1MQ', 'SLU-PP-332',
-  // Nootropics
-  'Modafinil', 'Semax', 'Selank', 'DSIP'
-]
+export const COMPOUND_GROUPS: Record<string, string[]> = {
+  'Peptides': [
+    'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500', 'BPC-157 / TB-500',
+    'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
+    'Thymosin Alpha-1', 'Thymosin Beta-4', 'PT-141', 'Kisspeptin',
+    'HGH', 'hCG',
+    'Semaglutide', 'Tirzepatide', 'Retatrutide',
+    'Semax', 'Selank', 'DSIP', 'Cerebrolysin'
+  ],
+  'Steroids': [
+    'Testosterone Cypionate', 'Testosterone Enanthate', 'Testosterone Propionate', 'Sustanon 250',
+    'Methenolone Acetate', 'Methenolone Enanthate',
+    'Trenbolone Acetate', 'Trenbolone Enanthate', 'Trenbolone Hexahydrobenzylcarbonate',
+    'Boldenone Undecylenate', 'Nandrolone Phenylpropionate', 'Nandrolone Decanoate',
+    'Drostanolone Propionate', 'Drostanolone Enanthate', 'Dihydroboldenone Cypionate',
+    'Oxandrolone', 'Methandrostenolone', 'Turinabol', 'Stanozolol',
+    'Oxymetholone', 'Methasterone', 'Fluoxymesterone', 'Mesterolone'
+  ],
+  'PCT / Ancillaries': [
+    'Clomiphene', 'Tamoxifen', 'Anastrozole', 'Enclomiphene'
+  ],
+  'Other': [
+    'Clenbuterol', 'Finasteride', 'Dutasteride',
+    '5-Amino-1MQ', 'SLU-PP-332', 'Modafinil', 'Bromantane'
+  ]
+}
+
+export const KNOWN_COMPOUNDS = Object.values(COMPOUND_GROUPS).flat()
 
 export const COMPOUND_COLORS: Record<string, string> = {
   'MOTS-C': '#3b82f6',
@@ -213,6 +212,8 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Methasterone': '#86198f',
   'Fluoxymesterone': '#78350f',
   'Clenbuterol': '#14b8a6',
+  'Cerebrolysin': '#818cf8',
+  'Bromantane': '#78716c',
   '5-Amino-1MQ': '#0d9488',
   'SLU-PP-332': '#ca8a04',
   'Humanin': '#eab308',
