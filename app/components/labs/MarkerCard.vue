@@ -2,7 +2,7 @@
   <UCard class="h-full cursor-pointer hover:ring-1 hover:ring-primary/50 transition-shadow" @click="open = true">
     <div class="space-y-3">
       <div class="flex items-start justify-between gap-2">
-        <p class="text-xs font-medium text-muted leading-tight flex items-center gap-1">
+        <p class="text-xs font-medium font-mono text-muted leading-tight flex items-center gap-1">
           <UIcon v-if="meta.computed" name="i-lucide-calculator" class="w-3 h-3 shrink-0 text-muted" title="Computed from other markers" />
           {{ meta.label }}
         </p>
@@ -12,8 +12,8 @@
       </div>
 
       <div class="flex items-end gap-1.5">
-        <span class="text-2xl font-bold tabular-nums">{{ displayValue }}</span>
-        <span v-if="meta.unit" class="text-xs text-muted mb-0.5">{{ meta.unit }}</span>
+        <span class="text-2xl font-bold tabular-nums font-mono">{{ displayValue }}</span>
+        <span v-if="meta.unit" class="font-mono text-xs text-muted mb-0.5">{{ meta.unit }}</span>
       </div>
 
       <LabsRangeBar v-if="meta.refMin !== undefined || meta.refMax !== undefined" :value="current" :meta="meta" />

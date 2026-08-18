@@ -2,7 +2,7 @@
 @import "@nuxt/ui";
 
 @theme static {
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-mono: 'Departure Mono', 'IBM Plex Mono', monospace;
   --font-sans: 'IBM Plex Sans', sans-serif;
   --font-serif: 'IBM Plex Serif', serif;
 
