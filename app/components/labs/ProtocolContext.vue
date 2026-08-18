@@ -41,7 +41,7 @@
         >
           <div class="flex items-center gap-2.5 min-w-0">
             <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: getCompoundColor(c.compound) }" />
-            <span class="text-sm font-medium truncate">{{ c.compound }}</span>
+            <span class="text-sm font-medium font-mono truncate">{{ c.compound }}</span>
           </div>
           <div class="flex items-center gap-4 text-xs font-mono text-muted shrink-0">
             <span :title="`${c.doseDays} dosing days in window`">{{ c.doseDays }}d used</span>

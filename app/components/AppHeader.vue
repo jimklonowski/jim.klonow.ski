@@ -3,7 +3,7 @@
     <template #left>
       <NuxtLink to="/" class="flex items-center gap-2">
         <NuxtImg src="/icon-maskable.svg" width="32" height="32" />
-        <span class="font-black">jim.klonow.ski</span>
+        <span class="font-black font-mono">jim.klonow.ski</span>
       </NuxtLink>
     </template>
     <UNavigationMenu :items="items" variant="link" />

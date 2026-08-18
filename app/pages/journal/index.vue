@@ -55,28 +55,28 @@
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Latest Vitals</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Weight</p>
+            <p class="text-xs text-muted uppercase tracking-wider mb-1 font-mono">Weight</p>
             <p class="text-2xl font-bold font-mono">{{ latest.weight_lbs ?? '—' }}<span class="text-sm font-normal text-muted ml-1">lbs</span></p>
             <p v-if="weightDelta !== null" class="text-xs mt-1" :class="weightDelta > 0 ? 'text-warning' : 'text-success'">
               {{ weightDelta > 0 ? '+' : '' }}{{ weightDelta.toFixed(1) }} from prev
             </p>
           </UCard>
           <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Blood Pressure</p>
+            <p class="text-xs text-muted uppercase tracking-wider mb-1 font-mono">Blood Pressure</p>
             <p class="text-2xl font-bold font-mono">
               {{ latest.bp_systolic ?? '—' }}<span class="text-sm font-normal text-muted">/</span>{{ latest.bp_diastolic ?? '—' }}
             </p>
             <p class="text-xs text-muted mt-1">mmHg</p>
           </UCard>
           <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">RHR</p>
+            <p class="text-xs text-muted uppercase tracking-wider mb-1 font-mono">RHR</p>
             <p class="text-2xl font-bold font-mono">{{ latest.rhr ?? '—' }}<span class="text-sm font-normal text-muted ml-1">bpm</span></p>
             <p v-if="rhrDelta !== null" class="text-xs mt-1" :class="rhrDelta > 0 ? 'text-warning' : 'text-success'">
               {{ rhrDelta > 0 ? '+' : '' }}{{ rhrDelta }} from prev
             </p>
           </UCard>
           <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">HRV</p>
+            <p class="text-xs text-muted uppercase tracking-wider mb-1 font-mono">HRV</p>
             <p class="text-2xl font-bold font-mono">{{ latest.hrv ?? '—' }}<span class="text-sm font-normal text-muted ml-1">ms</span></p>
             <p v-if="hrvDelta !== null" class="text-xs mt-1" :class="hrvDelta > 0 ? 'text-success' : 'text-warning'">
               {{ hrvDelta > 0 ? '+' : '' }}{{ hrvDelta }} from prev
@@ -111,7 +111,7 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono">
           <UCard>
             <template #header>
               <p class="text-sm font-medium">Weight</p>
