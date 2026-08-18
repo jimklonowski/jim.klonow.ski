@@ -49,7 +49,7 @@
           class="cursor-pointer hover:ring-1 hover:ring-primary/50 transition-shadow"
           @click="openModal(key)"
         >
-          <div class="space-y-2">
+          <div class="space-y-2 font-mono">
             <p class="text-xs text-muted leading-tight">{{ meta.label }}</p>
             <div class="flex items-end gap-1">
               <span class="text-2xl font-bold tabular-nums">{{ formatTotalValue(key) }}</span>
@@ -91,7 +91,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" v-if="latest">
         <UCard v-for="[region, rdata] in regionEntries" :key="region">
           <div class="space-y-3">
-            <p class="text-sm font-medium">{{ REGION_LABELS[region] }}</p>
+            <p class="text-sm font-medium font-mono">{{ REGION_LABELS[region] }}</p>
             <div class="flex justify-between text-sm">
               <span class="text-muted">Fat %</span>
               <span class="font-semibold">{{ rdata.fat_pct }}%</span>
@@ -120,8 +120,8 @@
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <UCard v-if="latest.vat">
           <div class="space-y-1">
-            <p class="text-xs text-muted">VAT Volume</p>
-            <div class="flex items-end gap-1">
+            <p class="text-xs text-muted font-mono">VAT Volume</p>
+            <div class="flex items-end gap-1 font-mono">
               <span class="text-2xl font-bold">{{ latest.vat.volume_in3 }}</span>
               <span class="text-xs text-muted mb-0.5">in³</span>
             </div>
@@ -133,8 +133,8 @@
 
         <UCard v-if="latest.ag_ratio !== undefined">
           <div class="space-y-1">
-            <p class="text-xs text-muted">A/G Ratio</p>
-            <div class="flex items-end gap-1">
+            <p class="text-xs text-muted font-mono">A/G Ratio</p>
+            <div class="flex items-end gap-1 font-mono">
               <span class="text-2xl font-bold">{{ latest.ag_ratio }}</span>
             </div>
             <UBadge :color="latest.ag_ratio < 1.0 ? 'success' : 'error'" variant="subtle" size="xs">
@@ -145,24 +145,24 @@
 
         <UCard v-if="latest.bone_density">
           <div class="space-y-1">
-            <p class="text-xs text-muted">Bone Density</p>
-            <div class="flex items-end gap-1">
+            <p class="text-xs text-muted font-mono">Bone Density</p>
+            <div class="flex items-end gap-1 font-mono">
               <span class="text-2xl font-bold">{{ latest.bone_density.total_bmd }}</span>
               <span class="text-xs text-muted mb-0.5">g/cm²</span>
             </div>
-            <p class="text-xs text-muted">T-score {{ latest.bone_density.t_score }}</p>
+            <p class="text-xs text-muted font-mono">T-score {{ latest.bone_density.t_score }}</p>
           </div>
         </UCard>
 
         <UCard v-if="latest.symmetry">
           <div class="space-y-2">
-            <p class="text-xs text-muted">Arm Lean Balance</p>
-            <div class="flex justify-between text-xs">
+            <p class="text-xs text-muted font-mono">Arm Lean Balance</p>
+            <div class="flex justify-between text-xs font-mono">
               <span>R: {{ latest.symmetry.right_arm_lean }} lbs</span>
               <span>L: {{ latest.symmetry.left_arm_lean }} lbs</span>
             </div>
-            <p class="text-xs text-muted">Leg Lean Balance</p>
-            <div class="flex justify-between text-xs">
+            <p class="text-xs text-muted font-mono">Leg Lean Balance</p>
+            <div class="flex justify-between text-xs font-mono">
               <span>R: {{ latest.symmetry.right_leg_lean }} lbs</span>
               <span>L: {{ latest.symmetry.left_leg_lean }} lbs</span>
             </div>

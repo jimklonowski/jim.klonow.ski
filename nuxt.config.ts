@@ -53,22 +53,33 @@ export default defineNuxtConfig({
   },
 
   fonts: {
-    provider: 'fontsource',
+    // NOTE: a global `provider` deletes all other providers (including `local`),
+    // which breaks per-family provider overrides — set provider per family instead
+    // provider: 'fontsource',
     families: [
       {
+        name: 'Departure Mono',
+        provider: 'local',
+        weights: [400],
+        styles: ['normal']
+      },
+      {
         name: 'IBM Plex Mono',
+        provider: 'fontsource',
         weights: [100, 200, 300, 400, 500, 600, 700],
         styles: ['normal', 'italic'],
         subsets: ['latin']
       },
       {
         name: 'IBM Plex Sans',
+        provider: 'fontsource',
         weights: [100, 200, 300, 400, 500, 600, 700],
         styles: ['normal', 'italic'],
         subsets: ['latin']
       },
       {
         name: 'IBM Plex Serif',
+        provider: 'fontsource',
         weights: [100, 200, 300, 400, 500, 600, 700],
         styles: ['normal', 'italic'],
         subsets: ['latin']
