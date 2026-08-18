@@ -111,8 +111,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <UCard v-for="key in CHART_MARKERS" :key="key">
             <template #header>
-              <p class="text-sm font-medium">{{ BIOMARKERS[key]?.label }}</p>
-              <p class="text-xs text-muted">{{ BIOMARKERS[key]?.unit }}</p>
+              <p class="text-sm font-medium font-mono">{{ BIOMARKERS[key]?.label }}</p>
+              <p class="text-xs text-muted font-mono">{{ BIOMARKERS[key]?.unit }}</p>
             </template>
             <ClientOnly>
               <AreaChart
