@@ -1,7 +1,7 @@
 <template>
   <UPageHero
-    title="Jim Klonowski"
-    description="Vibe coding for my health."
+    title="jim.klonow.ski"
+    description="vibe coding for my health."
     :links="[
       { label: 'GitHub', to: 'https://github.com/jimklonowski', target: '_blank', icon: 'i-simple-icons-github', color: 'neutral', variant: 'ghost' }
     ]"
@@ -9,7 +9,7 @@
       root: 'pb-24 sm:pb-32',
       container: 'relative z-10 lg:py-32',
       wrapper: 'flex flex-col items-center',
-      title: 'sm:text-6xl lg:text-7xl xl:text-[80px] tracking-tighter leading-[1.05]',
+      title: 'sm:text-6xl lg:text-7xl xl:text-[80px] tracking-tighter leading-[1.05] font-mono',
       description: 'mt-5 max-w-xl mx-auto text-base sm:text-lg leading-relaxed'
     }"
   >
