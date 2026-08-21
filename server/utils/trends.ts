@@ -374,16 +374,21 @@ function fmtDate(d: string): string {
   return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
-// Renders the trends as fact-sheet lines for the digest prompt.
-export function formatTrendLines(trends: TrendsResult): string[] {
+// Renders the trends as fact-sheet lines for the digest prompt. `endDate` lets each protocol
+// change carry its age, so the model can treat a weeks-old stop as background rather than news.
+export function formatTrendLines(trends: TrendsResult, endDate: string): string[] {
+  const ago = (d: string) => {
+    const n = dayDiff(endDate, d)
+    return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`
+  }
   const lines: string[] = []
   if (trends.changes.length) {
     lines.push(`Protocol changes (last ${CHANGE_LOOKBACK_DAYS} days): ${trends.changes
       .map(c => c.kind === 'stop'
-        ? `${c.compounds.join(' + ')} stopped around ${fmtDate(c.date)} (no doses logged since)`
+        ? `${c.compounds.join(' + ')} stopped around ${fmtDate(c.date)} (${ago(c.date)}; no doses logged since)`
         : c.kind === 'adjust'
-          ? `${c.compounds.join(' + ')} dosing changed ${fmtDate(c.date)}`
-          : `${c.compounds.join(' + ')} began ${fmtDate(c.date)}`)
+          ? `${c.compounds.join(' + ')} dosing changed ${fmtDate(c.date)} (${ago(c.date)})`
+          : `${c.compounds.join(' + ')} began ${fmtDate(c.date)} (${ago(c.date)})`)
       .join('; ')}`)
   }
   for (const f of trends.findings) {

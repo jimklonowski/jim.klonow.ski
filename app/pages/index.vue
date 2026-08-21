@@ -14,7 +14,6 @@
     }"
   >
     <template #top>
-      <!-- <HeroShaders class="absolute top-0 inset-x-0 opacity-15 h-full" /> -->
       <GradientGlow class="top-0 w-2/3 h-1/2" />
     </template>
 

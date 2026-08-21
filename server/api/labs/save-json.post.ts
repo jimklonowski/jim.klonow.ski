@@ -5,7 +5,7 @@ interface SavePayload {
 }
 
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
   requireUploadPin(event)
 
   const body = await readBody<SavePayload>(event)

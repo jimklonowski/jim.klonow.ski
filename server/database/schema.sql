@@ -129,6 +129,21 @@ CREATE TABLE IF NOT EXISTS progress_photos (
 CREATE INDEX IF NOT EXISTS idx_progress_photos_date ON progress_photos(date);
 CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(category);
 
+-- Share invites: owner-minted links (/share/<id>) that grant read-only role sessions.
+-- Redemption is gated by expires_at/max_uses; setting revoked=1 (or deleting the row) also
+-- invalidates every session cookie minted from the invite — the auth middleware re-checks
+-- invite liveness on each guest request.
+CREATE TABLE IF NOT EXISTS invites (
+  id TEXT PRIMARY KEY,               -- URL token (24 random bytes, base64url)
+  role TEXT NOT NULL,                -- 'friend' | 'doctor'
+  label TEXT,                        -- who this link is for, e.g. "Dr. Smith"
+  created_at TEXT NOT NULL,
+  expires_at TEXT,                   -- redemption deadline (NULL = no deadline)
+  max_uses INTEGER,                  -- NULL = unlimited redemptions
+  uses INTEGER NOT NULL DEFAULT 0,
+  revoked INTEGER NOT NULL DEFAULT 0
+);
+
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
 

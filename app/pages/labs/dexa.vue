@@ -14,26 +14,8 @@
         </p>
       </div>
       <div class="flex gap-2 flex-wrap items-center">
-        <UPopover v-if="allSources.length" :content="{ side: 'bottom', align: 'end' }">
-          <UButton variant="outline" size="xs" icon="i-lucide-file-text" trailing-icon="i-lucide-chevron-down">
-            Source PDFs ({{ allSources.length }})
-          </UButton>
-          <template #content>
-            <div class="p-2 max-h-80 overflow-y-auto min-w-56 space-y-0.5">
-              <a
-                v-for="src in sortedSources"
-                :key="src"
-                :href="src"
-                target="_blank"
-                class="flex items-center gap-2 text-sm px-2 py-1.5 rounded-md hover:bg-elevated hover:text-primary transition-colors"
-              >
-                <UIcon name="i-lucide-file-text" class="w-3.5 h-3.5 shrink-0 text-muted" />
-                <span class="truncate">{{ pdfLabel(src) }}</span>
-              </a>
-            </div>
-          </template>
-        </UPopover>
-        <UButton to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
+        <SourcePdfsPopover :sources="allSources" align="end" />
+        <UButton v-if="isOwner" to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
           Upload Scan
         </UButton>
       </div>
@@ -43,25 +25,17 @@
     <section>
       <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Key Metrics</h2>
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <UCard
+        <StatTile
           v-for="[key, meta] in totalMetricEntries"
           :key="key"
-          class="cursor-pointer hover:ring-1 hover:ring-primary/50 transition-shadow"
+          :label="meta.label"
+          :value="formatTotalValue(key)"
+          :unit="meta.unit"
+          :delta="deltaValue(key)"
+          :lower-is-better="meta.lowerIsBetter"
+          clickable
           @click="openModal(key)"
-        >
-          <div class="space-y-2 font-mono">
-            <p class="text-xs text-muted leading-tight">{{ meta.label }}</p>
-            <div class="flex items-end gap-1">
-              <span class="text-2xl font-bold tabular-nums">{{ formatTotalValue(key) }}</span>
-              <span class="text-xs text-muted mb-0.5">{{ meta.unit }}</span>
-            </div>
-            <div v-if="prevLatest" class="flex items-center gap-1 text-xs text-muted">
-              <UIcon :name="deltaIcon(key)" :class="deltaColor(key)" class="w-3.5 h-3.5 shrink-0" />
-              <span :class="deltaColor(key)">{{ deltaText(key) }}</span>
-              <span>vs prev</span>
-            </div>
-          </div>
-        </UCard>
+        />
       </div>
     </section>
 
@@ -69,19 +43,14 @@
     <section v-if="entries.length >= 2">
       <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Trends</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        <UCard v-for="[key, meta] in trendMetrics" :key="key">
-          <template #header>
-            <p class="text-sm font-medium">{{ meta.label }}</p>
-            <p class="text-xs text-muted">{{ meta.unit }}</p>
-          </template>
-          <ClientOnly>
-            <AreaChart
-              :data="trendData(key)"
-              :categories="{ value: { name: meta.label, color: '#22c55e' } }"
-              :height="120"
-            />
-          </ClientOnly>
-        </UCard>
+        <TrendCard
+          v-for="[key, meta] in trendMetrics"
+          :key="key"
+          :label="meta.label"
+          :unit="meta.unit"
+          :data="trendData(key)"
+          :height="120"
+        />
       </div>
     </section>
 
@@ -201,6 +170,7 @@ import { DEXA_TOTAL_METRICS, REGION_LABELS } from '~/data/dexa'
 definePageMeta({ middleware: 'labs-auth' })
 
 const { data, refresh } = await useDexaEntries()
+const { isOwner } = await useAuth()
 
 if (import.meta.client) {
   onMounted(refresh)
@@ -213,7 +183,6 @@ const prevLatest = computed(() => entries.value.length >= 2 ? entries.value.at(-
 const allSources = computed(() =>
   entries.value.flatMap(e => (e.sources ?? []).map((s: string) => s)).filter(Boolean)
 )
-const sortedSources = computed(() => [...allSources.value].reverse())
 
 const totalMetricEntries = computed(() => Object.entries(DEXA_TOTAL_METRICS))
 
@@ -222,7 +191,7 @@ const regionEntries = computed((): [string, RegionData][] =>
   Object.entries(latest.value?.regions ?? {}).filter((pair): pair is [string, RegionData] => !!pair[1])
 )
 
-function goToLabs() { window.location.href = '/labs' }
+function goToLabs() { navigateTo('/labs') }
 
 const TREND_KEYS = ['body_fat_pct', 'lean_mass_lbs', 'fat_mass_lbs']
 const trendMetrics = computed(() =>
@@ -248,27 +217,6 @@ function deltaValue(key: string) {
   return cur - prev
 }
 
-function deltaText(key: string) {
-  const d = deltaValue(key)
-  if (d === null) return ''
-  const sign = d >= 0 ? '+' : ''
-  return `${sign}${Math.abs(d) >= 10 ? Math.round(d) : d.toFixed(1)}`
-}
-
-function deltaIcon(key: string) {
-  const d = deltaValue(key)
-  if (!d || Math.abs(d) < 0.01) return 'i-lucide-minus'
-  return d > 0 ? 'i-lucide-trending-up' : 'i-lucide-trending-down'
-}
-
-function deltaColor(key: string) {
-  const d = deltaValue(key)
-  if (!d || Math.abs(d) < 0.01) return 'text-muted'
-  const lower = DEXA_TOTAL_METRICS[key]?.lowerIsBetter
-  if (lower === undefined) return 'text-muted'
-  return (lower && d < 0) || (!lower && d > 0) ? 'text-success' : 'text-error'
-}
-
 function trendData(key: string) {
   return entries.value
     .filter(e => getTotalValue(e, key) !== null)
@@ -291,12 +239,4 @@ function getModalValue(entry: typeof latest.value) {
   return Number.isInteger(v) ? v.toString() : v.toFixed(1)
 }
 
-function pdfLabel(src: string) {
-  const filename = src.split('/').pop() ?? src
-  return decodeURIComponent(filename).replace(/\.pdf$/i, '')
-}
-
-function formatDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 </script>

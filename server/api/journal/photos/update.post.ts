@@ -1,7 +1,7 @@
 const CATEGORIES = ['chest', 'left_bicep', 'right_bicep', 'face', 'hairline'] as const
 
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const body = await readBody<{
     id?: number
