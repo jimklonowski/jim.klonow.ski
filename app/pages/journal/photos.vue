@@ -10,7 +10,7 @@
 
       <!-- One-time backfill for photos uploaded before thumbnails existed -->
       <UAlert
-        v-if="missingThumbnails.length"
+        v-if="isOwner && missingThumbnails.length"
         color="warning"
         variant="subtle"
         icon="i-lucide-image"
@@ -20,7 +20,7 @@
       />
 
       <!-- Add Photos (bulk backfill - no need to visit a day's journal entry) -->
-      <UCard>
+      <UCard v-if="isOwner">
         <template #header><p class="text-sm font-semibold">Add Photos</p></template>
 
         <UFileUpload
@@ -189,7 +189,7 @@
         <div class="pt-4 border-t border-default">
           <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">All {{ photoCategoryLabel(category) }} photos</p>
           <div class="flex flex-wrap gap-2">
-            <UContextMenu v-for="opt in photoOptions" :key="opt.value" :items="menuItemsFor(opt.photo)">
+            <UContextMenu v-for="opt in photoOptions" :key="opt.value" :items="menuItemsFor(opt.photo)" :disabled="!isOwner">
               <button
                 class="relative rounded-lg overflow-hidden border transition-all"
                 :class="[
@@ -299,6 +299,7 @@ function photoCategoryLabel(value: string) {
 }
 
 const { data: photosData, refresh } = await usePhotoEntries()
+const { isOwner } = await useAuth()
 onMounted(refresh)
 
 // --- One-time thumbnail backfill for photos uploaded before thumbnails existed ---
@@ -517,9 +518,6 @@ function swapBeforeAfter() {
   afterId.value = tmp
 }
 
-function formatDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 // --- Lightbox + per-photo context menu ---
 

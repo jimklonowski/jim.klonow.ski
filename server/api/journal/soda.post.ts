@@ -8,7 +8,7 @@
 // landed, so the second write would silently clobber the first's addition). The updated array is
 // fetched with a follow-up SELECT rather than `... RETURNING sodas` - see soda.delete.ts for why.
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const body = await readBody<{ date?: string, time?: string, drink?: string, size?: string }>(event)
   const date = body?.date || new Date().toISOString().slice(0, 10)

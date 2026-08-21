@@ -31,7 +31,7 @@
                 {{ opt.label }}
               </UButton>
             </div>
-            <UDropdownMenu :items="generateItems" :content="{ align: 'end' }">
+            <UDropdownMenu v-if="isOwner" :items="generateItems" :content="{ align: 'end' }">
               <UButton size="xs" variant="outline" icon="i-lucide-sparkles" :loading="generating" trailing-icon="i-lucide-chevron-down">
                 Generate
               </UButton>
@@ -85,9 +85,15 @@ import type { Digest } from '~/composables/useDigests'
 
 const route = useRoute()
 const toast = useToast()
+const { role, isOwner } = await useAuth()
 
-// Only show inside the authed app areas (never on the login/landing pages).
-const visible = computed(() => /^\/(journal|labs)/.test(route.path) && route.path !== '/labs/login')
+// Only show inside the authed app areas (never on the login/landing pages). Digests recap
+// notes/sodas too, so the panel is owner+friend — the doctor role doesn't get it.
+const visible = computed(() =>
+  /^\/(journal|labs)/.test(route.path)
+  && route.path !== '/labs/login'
+  && (role.value === 'owner' || role.value === 'friend')
+)
 
 const open = ref(false)
 const { data, status, execute, refresh } = useDigests()

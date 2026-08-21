@@ -97,7 +97,7 @@
           <div>
             <p class="text-xs text-muted">Extracted from <span class="font-medium text-foreground">{{ filename }}</span></p>
             <div class="flex items-center gap-2 mt-1">
-              <p class="text-lg font-semibold">{{ formatDate(result.date) }}</p>
+              <p class="text-lg font-semibold">{{ formatDate(result.date, 'long') }}</p>
               <UBadge v-if="result.fasting" color="neutral" variant="subtle" size="sm">Fasting</UBadge>
             </div>
           </div>
@@ -141,7 +141,7 @@
         :color="saveResult.ok ? 'success' : 'error'"
         :title="saveResult.ok ? 'Saved!' : 'Could not save'"
         :description="saveResult.ok
-          ? `Saved ${formatDate(saveResult.date!)} — the dashboard will update automatically.`
+          ? `Saved ${formatDate(saveResult.date!, 'long')} — the dashboard will update automatically.`
           : saveResult.message"
       />
 
@@ -178,22 +178,6 @@ interface LabResult {
   fasting: boolean
   markers: Record<string, number>
   qualitative?: QualitativeResult[]
-}
-
-// Free-text narrative findings can't be reliably graded word-for-word, so this only flags
-// results that name an actual severity/finding — everything else (including full descriptive
-// sentences that merely mention "normal"/"no stenosis"/etc.) reads as reassuring, not alarming.
-function qualitativeColor(result: string) {
-  const text = result.toLowerCase()
-  const concerning = /\b(mild|moderate|severe|abnormal|elevated|thicken|dilat|enlarg|reduced|decreased|positive|heterozygous|homozygous)\b/.test(text)
-    || /(?<!not )\bdetected\b/.test(text)
-  if (concerning) {
-    return 'warning'
-  }
-  if (/\b(normal|no evidence|no significant|no stenosis|no regurgitation|not detected|negative|absent|unremarkable)\b/.test(text)) {
-    return 'success'
-  }
-  return 'neutral'
 }
 
 // PIN gate — validated server-side (httpOnly cookie, not readable by JS)
@@ -366,7 +350,4 @@ async function generateSummary(date: string) {
   }
 }
 
-function formatDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-}
 </script>

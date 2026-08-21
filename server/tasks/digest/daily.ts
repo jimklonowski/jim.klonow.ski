@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- wrangler's Env is ambient, not importable
 /// <reference path="../../../worker-configuration.d.ts" />
 
 export default defineTask({
@@ -5,7 +6,7 @@ export default defineTask({
     name: 'digest:daily',
     description: 'Generate the AI daily recap for yesterday and store it for in-app viewing'
   },
-  async run(event) {
+  async run(event): Promise<{ result: DigestResult | { error: string } }> {
     const db = ((event.context as unknown as { cloudflare: { env: Env } }).cloudflare.env).DB
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return { result: { error: 'ANTHROPIC_API_KEY not configured' } }

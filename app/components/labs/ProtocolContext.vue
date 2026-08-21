@@ -90,7 +90,4 @@ function lastDoseLabel(days: number) {
   return `${days}d before`
 }
 
-function formatDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 </script>

@@ -9,7 +9,7 @@ const EXT_BY_MIME: Record<string, string> = {
 }
 
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   // Raw binary body + query-string metadata rather than multipart/form-data - h3's multipart
   // parser has to scan the whole body for boundary markers, which is real CPU work on a

@@ -3,7 +3,7 @@ import type { DigestKind } from '../../../utils/digest'
 // On-demand digest generation, used by the "Generate" action in the digest panel and for testing.
 // The scheduled tasks (digest:daily, digest:weekly) call generateDigest directly on their crons.
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {

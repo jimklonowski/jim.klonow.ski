@@ -1,7 +1,7 @@
 // Insert a new vial (no id) or update an existing one (id present). Used for adding sealed
 // stock, editing any vial, and status changes (e.g. marking an active vial finished).
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const body = await readBody<Record<string, unknown>>(event)
   if (!body?.compound || typeof body.compound !== 'string') {
