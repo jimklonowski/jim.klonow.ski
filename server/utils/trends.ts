@@ -189,7 +189,14 @@ function detectDoseAdjustments(compound: string, days: DoseDay[], endDate: strin
   return events.filter(e => dayDiff(endDate, e.date) <= CHANGE_LOOKBACK_DAYS)
 }
 
-export function detectProtocolChanges(journal: TrendJournalRow[], endDate: string): ProtocolChange[] {
+// `includeAdjustments: false` skips the sliding-window dose-adjustment detector — by far the
+// most CPU-expensive part — for callers that only need start/stop events and run inside the
+// Workers free-plan 10ms CPU budget (the on-demand lab summary endpoint).
+export function detectProtocolChanges(
+  journal: TrendJournalRow[],
+  endDate: string,
+  { includeAdjustments = true }: { includeAdjustments?: boolean } = {}
+): ProtocolChange[] {
   const doseDates = new Map<string, string[]>()
   const doseDays = new Map<string, DoseDay[]>()
   for (const row of [...journal].sort((a, b) => a.date.localeCompare(b.date))) {
@@ -240,11 +247,13 @@ export function detectProtocolChanges(journal: TrendJournalRow[], endDate: strin
       }
     }
 
-    for (const adj of detectDoseAdjustments(compound, doseDays.get(compound) ?? [], endDate)) {
-      // An adjustment right before the compound's stop is the stop's shadow (the sliding window
-      // sees dose silence as a frequency collapse), not a real dosing change.
-      if (stopDate && dayDiff(stopDate, adj.date) <= CLUSTER_GAP_DAYS && adj.date <= stopDate) continue
-      events.push({ date: adj.date, label: adj.label, kind: 'adjust' })
+    if (includeAdjustments) {
+      for (const adj of detectDoseAdjustments(compound, doseDays.get(compound) ?? [], endDate)) {
+        // An adjustment right before the compound's stop is the stop's shadow (the sliding window
+        // sees dose silence as a frequency collapse), not a real dosing change.
+        if (stopDate && dayDiff(stopDate, adj.date) <= CLUSTER_GAP_DAYS && adj.date <= stopDate) continue
+        events.push({ date: adj.date, label: adj.label, kind: 'adjust' })
+      }
     }
   }
   events.sort((a, b) => a.date.localeCompare(b.date))
