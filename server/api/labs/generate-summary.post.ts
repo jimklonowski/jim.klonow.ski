@@ -56,7 +56,9 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
     lines.push('Current protocol: no compounds logged in the 3 weeks up to this draw.')
   }
 
-  const changes = detectProtocolChanges(journal, date)
+  // Adjustment detection is skipped: start/stop events carry the attribution signal the summary
+  // needs, and the sliding-window adjustment detector is the priciest CPU on this endpoint.
+  const changes = detectProtocolChanges(journal, date, { includeAdjustments: false })
   if (changes.length) {
     lines.push(`Protocol changes in the ~90 days before this draw: ${changes
       .map(c => c.kind === 'stop'
@@ -94,17 +96,20 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb(event)
+  // Fetch only the target draw + comparison window. This endpoint runs inside the Workers
+  // free-plan 10ms CPU budget, so materializing and JSON-parsing every historical draw is
+  // real money — LIMIT in SQL instead of slicing in JS.
   const { results } = await db.prepare(
-    'SELECT date, fasting, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date ASC'
+    `SELECT date, fasting, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date DESC LIMIT ${MAX_PRIOR_DRAWS + 1}`
   ).bind(date).all<LabsRow>()
 
-  const rows = results ?? []
+  const rows = (results ?? []).reverse()
   const targetRow = rows.at(-1)
   if (!targetRow || targetRow.date !== date) {
     throw createError({ statusCode: 404, message: `No labs entry found for ${date}` })
   }
 
-  const draws = [...rows.slice(0, -1).slice(-MAX_PRIOR_DRAWS), targetRow].map(r => ({
+  const draws = rows.map(r => ({
     date: r.date,
     fasting: !!r.fasting,
     markers: JSON.parse(r.markers || '{}') as Record<string, number | null>
