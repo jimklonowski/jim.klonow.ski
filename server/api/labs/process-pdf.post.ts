@@ -163,17 +163,8 @@ Rules:
 - Return ONLY valid JSON`
 
 export default defineEventHandler(async (event) => {
-  const authCookie = getCookie(event, 'labs-auth')
-  const secret = process.env.LABS_SECRET
-  if (!secret || !authCookie || authCookie !== secret) {
-    throw createError({ statusCode: 401, message: 'Unauthorized' })
-  }
-
-  const uploadPin = getCookie(event, 'labs-upload-auth')
-  const correctPin = process.env.LABS_UPLOAD_PIN
-  if (!correctPin || !uploadPin || uploadPin !== correctPin) {
-    throw createError({ statusCode: 403, message: 'Upload PIN required' })
-  }
+  requireOwner(event)
+  requireUploadPin(event)
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {

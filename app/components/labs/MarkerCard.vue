@@ -155,9 +155,6 @@ const changeColor = computed(() => {
   return improved ? 'text-success' : 'text-error'
 })
 
-function formatDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 const chartPoints = computed(() =>
   sorted.value

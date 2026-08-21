@@ -311,9 +311,6 @@ const sealedGroups = computed(() => {
 })
 
 // --- display helpers ---
-function formatDate(dateStr: string) {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 function opened(v: Vial) {
   return !!v.opened_date
 }

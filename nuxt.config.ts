@@ -1,5 +1,3 @@
-import { locales } from './i18n/locales'
-
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
@@ -10,23 +8,59 @@ export default defineNuxtConfig({
     '@nuxtjs/seo',
     '@vueuse/nuxt',
     '@nuxt/scripts',
-    '@nuxtjs/i18n',
-    '@pinia/nuxt',
     'nitro-cloudflare-dev',
     'nuxt-echarts',
     'nuxt-security'
   ],
 
-  compatibilityDate: '2026-05-01',
-
-  echarts: {
-    renderer: 'svg',
-    charts: ['LineChart', 'BarChart'],
-    components: ['GridComponent', 'TooltipComponent', 'LegendComponent'],
-    features: ['LabelLayout']
-  },
+  devtools: { enabled: true },
 
   css: ['~/assets/css/main.css'],
+
+  site: {
+    name: 'jim.klonow.ski',
+    url: 'https://jim.klonow.ski'
+  },
+
+  ui: {
+
+  },
+
+  routeRules: {
+    // '/': { prerender: true }
+    // Rate limiting is off everywhere except the two credential endpoints below (the '/**'
+    // rule disables the module's default global limiter, which would otherwise write to KV on
+    // every request). Counters live in the RATE_LIMIT KV namespace so they survive Worker
+    // isolate recycling; limits are per IP via cf-connecting-ip (set by Cloudflare, unspoofable).
+    '/**': { security: { rateLimiter: false } },
+    '/api/labs/auth': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 5,
+          interval: 300000, // 5 attempts per 5 minutes
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    },
+    '/api/labs/upload-auth': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 5,
+          interval: 900000, // 5 attempts per 15 minutes — the PIN is the smaller keyspace
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    },
+    '/api/auth/redeem': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 10,
+          interval: 300000, // share-link redemption; tokens are 24 random bytes so this is belt-and-suspenders
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    }
+  },
 
   devServer: {
     host: 'local.emkay.com',
@@ -37,19 +71,53 @@ export default defineNuxtConfig({
     }
   },
 
-  devtools: { enabled: true },
+  experimental: {
+    nitroAutoImports: true
+  },
+
+  compatibilityDate: '2026-05-01',
+
+  nitro: {
+    preset: 'cloudflare_module',
+    cloudflare: {
+      deployConfig: true,
+      nodeCompat: true
+    },
+    compressPublicAssets: true,
+    experimental: { websocket: true, tasks: true },
+    scheduledTasks: {
+      '0 11 * * *': ['whoop:sync'],
+      // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
+      '0 14 * * *': ['digest:daily'],
+      '0 15 * * 1': ['digest:weekly']
+    }
+  },
+
+  vite: {
+    optimizeDeps: {
+      include: [
+        '@unhead/schema-org/vue'
+      ]
+    },
+    server: {
+      allowedHosts: true
+    }
+  },
+
+  echarts: {
+    renderer: 'svg',
+    charts: ['LineChart', 'BarChart'],
+    components: ['GridComponent', 'TooltipComponent', 'LegendComponent'],
+    features: ['LabelLayout']
+  },
 
   eslint: {
     config: {
       stylistic: {
         commaDangle: 'never',
-        braceStyle: '1tbs'
+        braceStyle: 'stroustrup'
       }
     }
-  },
-
-  experimental: {
-    nitroAutoImports: true
   },
 
   fonts: {
@@ -87,16 +155,6 @@ export default defineNuxtConfig({
     ]
   },
 
-  i18n: {
-    baseUrl: 'https://jim.klonow.ski',
-    defaultDirection: 'ltr',
-    defaultLocale: 'en',
-    langDir: '../i18n/locales',
-    locales,
-    strategy: 'prefix_except_default',
-    vueI18n: '../i18n/i18n.config.ts'
-  },
-
   icon: {
     customCollections: [
       { prefix: 'jck', dir: './app/assets/icons' }
@@ -119,49 +177,6 @@ export default defineNuxtConfig({
     enabled: false
   },
 
-  nitro: {
-    preset: "cloudflare_module",
-    cloudflare: {
-      deployConfig: true,
-      nodeCompat: true
-    },
-    compressPublicAssets: true,
-    experimental: { websocket: true, tasks: true },
-    scheduledTasks: {
-      '0 11 * * *': ['whoop:sync'],
-      // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
-      '0 14 * * *': ['digest:daily'],
-      '0 15 * * 1': ['digest:weekly']
-    }
-  },
-
-  routeRules: {
-    // '/': { prerender: true }
-    // Rate limiting is off everywhere except the two credential endpoints below (the '/**'
-    // rule disables the module's default global limiter, which would otherwise write to KV on
-    // every request). Counters live in the RATE_LIMIT KV namespace so they survive Worker
-    // isolate recycling; limits are per IP via cf-connecting-ip (set by Cloudflare, unspoofable).
-    '/**': { security: { rateLimiter: false } },
-    '/api/labs/auth': {
-      security: {
-        rateLimiter: {
-          tokensPerInterval: 5,
-          interval: 300000, // 5 attempts per 5 minutes
-          ipHeader: 'cf-connecting-ip'
-        }
-      }
-    },
-    '/api/labs/upload-auth': {
-      security: {
-        rateLimiter: {
-          tokensPerInterval: 5,
-          interval: 900000, // 5 attempts per 15 minutes — the PIN is the smaller keyspace
-          ipHeader: 'cf-connecting-ip'
-        }
-      }
-    }
-  },
-
   // Rate limiting is the only feature enabled for now; everything else is off but listed here
   // so future features (CSP headers, etc.) are a one-line flip. The KV storage driver must be
   // declared on the global rateLimiter object — it's the only place the module reads it from —
@@ -179,26 +194,5 @@ export default defineNuxtConfig({
     sri: false,
     removeLoggers: false,
     hidePoweredBy: true
-  },
-
-  site: {
-    name: 'jim.klonow.ski',
-    url: 'https://jim.klonow.ski'
-  },
-
-  ui: {
-
-  },
-
-  vite: {
-    optimizeDeps: {
-      include: [
-        '@unhead/schema-org/vue',
-        'shaders/vue'
-      ]
-    },
-    server: {
-      allowedHosts: true
-    }
   }
 })

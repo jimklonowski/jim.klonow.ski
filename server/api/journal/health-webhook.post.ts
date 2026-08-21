@@ -46,9 +46,12 @@ function numOrQty(v: unknown): number | null {
 }
 
 export default defineEventHandler(async (event) => {
+  // Machine auth: WEBHOOK_TOKEN is the intended credential; LABS_SECRET is accepted as a
+  // fallback so the existing Health Auto Export config keeps working until it's updated.
+  // Once the iOS app carries WEBHOOK_TOKEN, rotate LABS_SECRET to retire the old value.
   const auth = getHeader(event, 'authorization')
-  const secret = process.env.LABS_SECRET
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const token = process.env.WEBHOOK_TOKEN || process.env.LABS_SECRET
+  if (!token || auth !== `Bearer ${token}`) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 

@@ -14,7 +14,7 @@
             icon="i-lucide-chevron-left"
           />
           <div>
-            <h1 class="text-2xl font-bold">{{ isNew ? 'New Entry' : formatDate(form.date) }}</h1>
+            <h1 class="text-2xl font-bold">{{ isNew ? 'New Entry' : formatDate(form.date, 'weekday') }}</h1>
             <p v-if="form.day" class="text-muted text-sm">Day {{ form.day }}</p>
           </div>
           <UButton
@@ -34,6 +34,7 @@
             icon="i-lucide-calendar"
           />
           <UButton
+            v-if="isOwner"
             size="sm"
             icon="i-lucide-save"
             :loading="saving"
@@ -41,6 +42,7 @@
           >
             Save
           </UButton>
+          <UBadge v-else variant="subtle" color="neutral" icon="i-lucide-eye">Read-only</UBadge>
         </div>
       </div>
 
@@ -85,7 +87,7 @@
           <div class="flex items-center justify-between">
             <p class="text-sm font-semibold">Peptides</p>
             <div class="flex gap-2">
-              <UButton v-if="prevEntry?.peptides?.length" size="xs" variant="ghost" icon="i-lucide-copy" @click="copyFromPrevious">Copy prev</UButton>
+              <UButton v-if="isOwner && prevEntry?.peptides?.length" size="xs" variant="ghost" icon="i-lucide-copy" @click="copyFromPrevious">Copy prev</UButton>
               <UButton size="xs" variant="outline" icon="i-lucide-plus" @click="addPeptide">Add</UButton>
             </div>
           </div>
@@ -242,7 +244,7 @@
       <UCard>
         <template #header><p class="text-sm font-semibold">Progress Photos</p></template>
 
-        <div class="flex flex-wrap gap-2 mb-4">
+        <div v-if="isOwner" class="flex flex-wrap gap-2 mb-4">
           <UButton
             v-for="c in PHOTO_CATEGORIES"
             :key="c.value"
@@ -255,6 +257,7 @@
         </div>
 
         <UFileUpload
+          v-if="isOwner"
           v-model="pendingFile"
           accept="image/*"
           layout="list"
@@ -294,6 +297,7 @@
                   @click="lightboxPhoto = photo"
                 />
                 <UButton
+                  v-if="isOwner"
                   variant="solid"
                   color="error"
                   size="xs"
@@ -356,7 +360,7 @@
       </UCard>
 
       <!-- Save -->
-      <div class="flex justify-end gap-3">
+      <div v-if="isOwner" class="flex justify-end gap-3">
         <UButton to="/journal" variant="ghost">Cancel</UButton>
         <UButton :loading="saving" icon="i-lucide-save" @click="save">Save Entry</UButton>
       </div>
@@ -381,6 +385,7 @@ const toast = useToast()
 const dateParam = computed(() => route.params.date as string)
 
 const { data: allEntries, refresh } = await useJournalEntries()
+const { isOwner } = await useAuth()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 
@@ -654,9 +659,4 @@ async function save() {
   }
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
-  })
-}
 </script>

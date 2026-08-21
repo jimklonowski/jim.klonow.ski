@@ -15,7 +15,6 @@
             <p class="text-sm text-muted">{{ onDays.length }} days used</p>
           </div>
         </div>
-        <UButton to="/journal/inventory" variant="ghost" size="xs" icon="i-lucide-package">Inventory</UButton>
       </div>
 
       <div v-if="!onDays.length" class="text-muted text-sm">
@@ -426,7 +425,4 @@ const recentInjections = computed(() =>
   [...allInjections.value].reverse().slice(0, 20)
 )
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 </script>
