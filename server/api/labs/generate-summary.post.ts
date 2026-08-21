@@ -22,13 +22,19 @@ function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-// Protocol context lines for the prompt: what's currently being dosed, and start/stop/adjust
-// events near the draw — so the model can attribute marker shifts (e.g. testosterone ->
-// more erythropoiesis -> ferritin drawdown) instead of reading trends in a vacuum.
+// Protocol context lines for the prompt: per-compound dosing facts and stop/adjust events near
+// the draw — so the model can attribute marker shifts (e.g. testosterone -> more erythropoiesis
+// -> ferritin drawdown) instead of reading trends in a vacuum.
+//
+// Each active compound gets its own line with its own first-dose date and unambiguous counts.
+// An earlier version passed a bare "(6 dose-days)" recent-window count plus the change
+// detector's CLUSTERED start events (starts within 14 days share the earliest date), and the
+// model fused them into "six dose-days into Testosterone Cypionate started <the HGH date>".
 async function protocolContext(db: D1Database, date: string): Promise<string[]> {
+  const windowStart = addDays(date, -PROTOCOL_LOOKBACK_DAYS)
   const { results } = await db.prepare(
     'SELECT date, peptides FROM journal_entries WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC'
-  ).bind(addDays(date, -PROTOCOL_LOOKBACK_DAYS), date).all()
+  ).bind(windowStart, date).all()
   const journal: TrendJournalRow[] = (results ?? []).map(r => ({
     date: r.date as string,
     weight_lbs: null,
@@ -39,33 +45,49 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
   }))
   if (!journal.length) return []
 
-  const current = new Map<string, number>()
+  // Unique dose dates per compound, ascending (rows are already sorted).
+  const doseDates = new Map<string, string[]>()
   for (const row of journal) {
-    if (row.date < addDays(date, -CURRENT_PROTOCOL_DAYS)) continue
     for (const p of row.peptides ?? []) {
-      if (p.compound) current.set(p.compound, (current.get(p.compound) ?? 0) + 1)
+      if (!p.compound) continue
+      const dates = doseDates.get(p.compound) ?? []
+      if (dates.at(-1) !== row.date) dates.push(row.date)
+      doseDates.set(p.compound, dates)
     }
   }
 
+  const recentCutoff = addDays(date, -CURRENT_PROTOCOL_DAYS)
+  const active = [...doseDates.entries()]
+    .map(([compound, dates]) => ({ compound, dates, recent: dates.filter(d => d >= recentCutoff).length }))
+    .filter(c => c.recent > 0)
+    .sort((a, b) => b.recent - a.recent)
+
   const lines: string[] = []
-  if (current.size) {
-    lines.push(`Current protocol (compounds dosed in the ${CURRENT_PROTOCOL_DAYS} days up to this draw): ${
-      [...current.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} (${n} dose-days)`).join(', ')}`)
+  if (active.length) {
+    lines.push(`Active protocol per compound (counts are dose-DAYS from the journal; "recently" = the ${CURRENT_PROTOCOL_DAYS} days up to this draw — a window count, NOT total exposure):`)
+    for (const { compound, dates, recent } of active) {
+      const first = dates[0]!
+      // Dosing that reaches back to the edge of the queried window started before it —
+      // don't present the window edge as a start date.
+      const since = first <= addDays(windowStart, 1)
+        ? `ongoing since before ${windowStart} (edge of available data)`
+        : `first logged dose ${first}`
+      lines.push(`- ${compound}: dosed ${recent} of the last ${CURRENT_PROTOCOL_DAYS} days, ${dates.length} dose-days in the last ${PROTOCOL_LOOKBACK_DAYS} days; ${since}`)
+    }
   }
   else {
-    lines.push('Current protocol: no compounds logged in the 3 weeks up to this draw.')
+    lines.push('Active protocol: no compounds logged in the 3 weeks up to this draw.')
   }
 
-  // Adjustment detection is skipped: start/stop events carry the attribution signal the summary
-  // needs, and the sliding-window adjustment detector is the priciest CPU on this endpoint.
-  const changes = detectProtocolChanges(journal, date, { includeAdjustments: false })
+  // Starts are covered precisely per compound above; the change detector adds what those lines
+  // can't show — discontinuations and sustained dosing changes. Its start events are clustered
+  // (nearby starts share the earliest date), so they are deliberately NOT passed to the prompt.
+  const changes = detectProtocolChanges(journal, date).filter(c => c.kind !== 'start')
   if (changes.length) {
-    lines.push(`Protocol changes in the ~90 days before this draw: ${changes
+    lines.push(`Discontinuations / dosing changes in the ~90 days before this draw: ${changes
       .map(c => c.kind === 'stop'
         ? `${c.compounds.join(' + ')} stopped around ${c.date}`
-        : c.kind === 'adjust'
-          ? `${c.compounds.join(' + ')} dosing changed ${c.date}`
-          : `${c.compounds.join(' + ')} began ${c.date}`)
+        : `${c.compounds.join(' + ')} dosing changed ${c.date}`)
       .join('; ')}`)
   }
   return lines
