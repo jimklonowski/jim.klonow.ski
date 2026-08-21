@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.08.18b",
+  "version": "2026.08.21",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
     "sync:local:r2": "node scripts/sync-r2-local.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
+    "@anthropic-ai/sdk": "^0.120.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/ibm-plex-serif": "^5.3.0",
@@ -44,7 +44,7 @@
     "typescript": "^6.0.3",
     "vue": "3.5.41",
     "vue-tsc": "^3.3.10",
-    "wrangler": "^4.124.0"
+    "wrangler": "^4.125.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
