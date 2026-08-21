@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   // A cron-fired scheduled() invocation hands the task its own { cloudflare } context automatically;
   // calling runTask manually from a request handler must forward this event's context explicitly

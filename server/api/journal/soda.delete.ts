@@ -10,7 +10,7 @@
 // updated array is fetched with a follow-up SELECT rather than an `UPDATE ... RETURNING`, which
 // separately also hung when it landed within ~1s of another write to the same row.
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const query = getQuery(event)
   const date = typeof query.date === 'string' ? query.date : undefined

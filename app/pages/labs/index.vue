@@ -9,54 +9,81 @@
             Latest draw: {{ formatDate(latest.date) }}
             <UBadge v-if="latest.fasting" variant="subtle" color="neutral" size="xs" class="ml-2">Fasting</UBadge>
           </p>
-          <UPopover v-if="allSources.length" :content="{ side: 'bottom', align: 'start' }" class="mt-2">
-            <UButton variant="outline" size="xs" icon="i-lucide-file-text" trailing-icon="i-lucide-chevron-down">
-              Source PDFs ({{ allSources.length }})
-            </UButton>
-            <template #content>
-              <div class="p-2 max-h-80 overflow-y-auto min-w-56 space-y-0.5">
-                <a
-                  v-for="src in sortedSources"
-                  :key="src"
-                  :href="src"
-                  target="_blank"
-                  class="flex items-center gap-2 text-sm px-2 py-1.5 rounded-md hover:bg-elevated hover:text-primary transition-colors"
-                >
-                  <UIcon name="i-lucide-file-text" class="w-3.5 h-3.5 shrink-0 text-muted" />
-                  <span class="truncate">{{ pdfLabel(src) }}</span>
-                </a>
-              </div>
-            </template>
-          </UPopover>
+          <SourcePdfsPopover :sources="allSources" class="mt-2" />
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <UButton variant="outline" size="xs" icon="i-lucide-scan" @click="goToDexa">
             Body Composition
           </UButton>
-          <UButton to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
+          <UButton v-if="isOwner" to="/labs/sharing" variant="outline" size="xs" icon="i-lucide-users">
+            Sharing
+          </UButton>
+          <UButton v-if="isOwner" to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
             Upload Results
           </UButton>
         </div>
       </div>
 
-      <!-- AI trend summary -->
-      <section v-if="latestSummary">
-        <UCollapsible :default-open="isRecentDraw" class="rounded-lg overflow-hidden bg-default ring ring-default">
-          <template #default="{ open }">
-            <button type="button" class="w-full flex items-center justify-between gap-2 p-4 sm:px-6 sm:py-4 text-left">
+      <!-- AI trend summary. The regenerate button can't live inside the collapsible trigger
+           (UCollapsible's default slot IS the trigger button — nesting buttons is invalid),
+           so the header is a plain row with the toggle and the button as siblings. -->
+      <section v-if="latest">
+        <div class="rounded-lg overflow-hidden bg-default ring ring-default">
+          <div class="flex items-center gap-1 p-4 sm:px-6 sm:py-4">
+            <button type="button" class="flex-1 flex items-center justify-between gap-2 text-left" @click="summaryOpen = !summaryOpen">
               <div class="flex items-center gap-2">
                 <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
                 <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">AI Summary</h2>
-                <p class="text-xs text-muted">{{ formatDate(latestSummary.date) }}</p>
+                <p v-if="latestSummary" class="text-xs text-muted">{{ formatDate(latestSummary.date) }}</p>
               </div>
-              <UIcon name="i-lucide-chevron-down" class="w-4 h-4 text-muted transition-transform" :class="{ 'rotate-180': open }" />
+              <UIcon name="i-lucide-chevron-down" class="w-4 h-4 text-muted transition-transform" :class="{ 'rotate-180': summaryOpen }" />
             </button>
-          </template>
-          <template #content>
-            <p class="text-sm leading-relaxed whitespace-pre-line px-4 pb-4 sm:px-6 sm:pb-6">{{ latestSummary.text }}</p>
-          </template>
-        </UCollapsible>
+            <UTooltip v-if="isOwner" :text="latestSummary ? 'Regenerate summary for the latest draw' : 'Generate summary for the latest draw'">
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-refresh-cw"
+                :loading="regenerating"
+                :aria-label="latestSummary ? 'Regenerate AI summary' : 'Generate AI summary'"
+                @click="regenerateSummary"
+              />
+            </UTooltip>
+          </div>
+          <UCollapsible v-model:open="summaryOpen">
+            <template #content>
+              <div v-if="regenerating" class="flex items-center gap-3 text-sm text-muted px-4 pb-4 sm:px-6 sm:pb-6">
+                <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
+                Comparing the {{ formatDate(latest.date) }} draw against your history...
+              </div>
+              <p v-else-if="latestSummary" class="text-sm leading-relaxed whitespace-pre-line px-4 pb-4 sm:px-6 sm:pb-6">{{ latestSummary.text }}</p>
+              <p v-else class="text-sm text-muted px-4 pb-4 sm:px-6 sm:pb-6">No AI summary for this draw yet — hit refresh to generate one.</p>
+            </template>
+          </UCollapsible>
+        </div>
       </section>
+
+      <!-- PIN gate for summary regeneration — same second factor as the upload page -->
+      <UModal v-model:open="pinModalOpen" title="Upload PIN required" description="Regenerating the AI summary is a write, so it needs your 9-digit upload PIN.">
+        <template #body>
+          <div class="space-y-3">
+            <UInput
+              v-model="pin"
+              type="password"
+              inputmode="numeric"
+              maxlength="9"
+              placeholder="9-digit PIN"
+              autofocus
+              class="w-full text-center tracking-widest"
+              @keydown.enter="submitPin"
+            />
+            <UButton class="w-full" :loading="pinLoading" :disabled="pin.length !== 9" @click="submitPin">
+              Unlock &amp; regenerate
+            </UButton>
+            <p v-if="pinError" class="text-sm text-error text-center">{{ pinError }}</p>
+          </div>
+        </template>
+      </UModal>
 
       <!-- Pinned / key markers -->
       <section>
@@ -109,19 +136,13 @@
       <section v-if="entries.length >= 2">
         <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Trends</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <UCard v-for="key in CHART_MARKERS" :key="key">
-            <template #header>
-              <p class="text-sm font-medium font-mono">{{ BIOMARKERS[key]?.label }}</p>
-              <p class="text-xs text-muted font-mono">{{ BIOMARKERS[key]?.unit }}</p>
-            </template>
-            <ClientOnly>
-              <AreaChart
-                :data="chartData(key)"
-                :categories="{ value: { name: BIOMARKERS[key]?.label ?? key, color: '#22c55e' } }"
-                :height="128"
-              />
-            </ClientOnly>
-          </UCard>
+          <TrendCard
+            v-for="key in CHART_MARKERS"
+            :key="key"
+            :label="BIOMARKERS[key]?.label ?? key"
+            :unit="BIOMARKERS[key]?.unit"
+            :data="chartData(key)"
+          />
         </div>
       </section>
 
@@ -181,6 +202,7 @@ definePageMeta({ middleware: 'labs-auth' })
 
 const { data, refresh } = await useLabsEntries()
 const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
+const { isOwner } = await useAuth()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data
 if (import.meta.client) {
@@ -204,10 +226,62 @@ const isRecentDraw = computed(() => {
   return days <= 7
 })
 
+// AI summary regeneration. The generate endpoint is PIN-gated like uploads (403 when the
+// labs-upload-auth session cookie is missing), so a 403 opens the PIN modal and the retry
+// happens after unlock. Always regenerates for the latest draw.
+const summaryOpen = ref(isRecentDraw.value)
+const regenerating = ref(false)
+const pinModalOpen = ref(false)
+const pin = ref('')
+const pinLoading = ref(false)
+const pinError = ref('')
+const toast = useToast()
+
+async function regenerateSummary() {
+  if (!latest.value || regenerating.value) return
+  regenerating.value = true
+  summaryOpen.value = true
+  try {
+    await $fetch('/api/labs/generate-summary', { method: 'POST', body: { date: latest.value.date } })
+    await refresh()
+    toast.add({ title: 'AI summary regenerated', description: `Draw from ${formatDate(latest.value.date)}`, color: 'success' })
+  }
+  catch (err) {
+    const e = err as { statusCode?: number, data?: { message?: string } }
+    if (e.statusCode === 403) {
+      pinModalOpen.value = true
+    }
+    else {
+      toast.add({ title: 'Summary generation failed', description: e.data?.message ?? 'Try again in a moment.', color: 'error' })
+    }
+  }
+  finally {
+    regenerating.value = false
+  }
+}
+
+async function submitPin() {
+  if (pin.value.length !== 9) return
+  pinLoading.value = true
+  pinError.value = ''
+  try {
+    await $fetch('/api/labs/upload-auth', { method: 'POST', body: { pin: pin.value } })
+    pinModalOpen.value = false
+    pin.value = ''
+    await regenerateSummary()
+  }
+  catch {
+    pinError.value = 'Incorrect PIN. Try again.'
+    pin.value = ''
+  }
+  finally {
+    pinLoading.value = false
+  }
+}
+
 const allSources = computed(() =>
   entries.value.flatMap(e => (e.sources ?? []).map((src: string) => src)).filter(Boolean)
 )
-const sortedSources = computed(() => [...allSources.value].reverse())
 
 // Echo reports were saved before results carried a `category` tag, so entries written
 // prior to that still need to be recognized by their known anatomical section names.
@@ -228,22 +302,6 @@ const allQualitativeResults = computed(() =>
 )
 const geneticResults = computed(() => allQualitativeResults.value.filter(item => !isEcho(item)))
 const echoResults = computed(() => allQualitativeResults.value.filter(isEcho))
-
-// Free-text narrative findings can't be reliably graded word-for-word, so this only flags
-// results that name an actual severity/finding — everything else (including full descriptive
-// sentences that merely mention "normal"/"no stenosis"/etc.) reads as reassuring, not alarming.
-function qualitativeColor(result: string) {
-  const text = result.toLowerCase()
-  const concerning = /\b(mild|moderate|severe|abnormal|elevated|thicken|dilat|enlarg|reduced|decreased|positive|heterozygous|homozygous)\b/.test(text)
-    || /(?<!not )\bdetected\b/.test(text)
-  if (concerning) {
-    return 'warning'
-  }
-  if (/\b(normal|no evidence|no significant|no stenosis|no regurgitation|not detected|negative|absent|unremarkable)\b/.test(text)) {
-    return 'success'
-  }
-  return 'neutral'
-}
 
 const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin', 'la_volume_index']
 
@@ -274,14 +332,5 @@ function chartData(markerKey: string) {
     }))
 }
 
-function goToDexa() { window.location.href = '/labs/dexa' }
-
-function pdfLabel(src: string) {
-  const filename = src.split('/').pop() ?? src
-  return decodeURIComponent(filename).replace(/\.pdf$/i, '')
-}
-
-function formatDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+function goToDexa() { navigateTo('/labs/dexa') }
 </script>

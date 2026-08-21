@@ -1,6 +1,10 @@
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 
 export default defineEventHandler(async (event) => {
+  // The browser redirect from Whoop carries the owner's cookies; the state cookie alone
+  // shouldn't be the only gate on storing new tokens.
+  requireOwner(event)
+
   const query = getQuery(event)
   const code = typeof query.code === 'string' ? query.code : null
   const state = typeof query.state === 'string' ? query.state : null

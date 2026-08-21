@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireRole(event, 'owner', 'friend')
 
   const rawKey = getRouterParam(event, 'key')
   if (!rawKey) {

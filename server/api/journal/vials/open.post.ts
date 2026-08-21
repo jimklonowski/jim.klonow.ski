@@ -2,7 +2,7 @@
 // spawn a new active vial (quantity 1) carrying over the batch's compound/supplier/size, with
 // opened_date + bac_water_ml recorded. Runs as a D1 batch so both writes land together.
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const body = await readBody<Record<string, unknown>>(event)
   if (body?.id == null) {

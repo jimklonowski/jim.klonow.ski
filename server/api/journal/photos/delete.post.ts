@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const body = await readBody<Record<string, unknown>>(event)
   if (body?.id == null) {

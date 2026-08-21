@@ -39,12 +39,6 @@ export interface Vial {
   created_at?: string
 }
 
-export const VIAL_STATUS_LABELS: Record<VialStatus, string> = {
-  sealed: 'Sealed',
-  active: 'Active',
-  finished: 'Finished'
-}
-
 export function blankVial(compound = ''): Vial {
   return {
     compound,

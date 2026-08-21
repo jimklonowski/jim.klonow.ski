@@ -2,7 +2,7 @@
 // bundled into one multipart request, so the main upload stays a single cheap raw-body PUT -
 // multipart parsing on Workers is itself real CPU cost on a multi-MB body.
 export default defineEventHandler(async (event) => {
-  requireLabsAuth(event)
+  requireOwner(event)
 
   const query = getQuery(event)
   const id = typeof query.id === 'string' ? Number(query.id) : NaN

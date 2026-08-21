@@ -1,11 +1,7 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (!to.path.startsWith('/journal')) return
+  // On SSR, server/middleware/auth.ts already validated the httpOnly cookie and role access,
+  // redirecting before this runs. Only SPA navigation needs the client-side check.
   if (import.meta.server) return
 
-  try {
-    await $fetch('/api/labs/validate')
-  }
-  catch {
-    return navigateTo('/labs/login')
-  }
+  return await checkClientAccess(to.path)
 })
