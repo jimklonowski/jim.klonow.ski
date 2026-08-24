@@ -1,135 +1,220 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-5xl mx-auto space-y-10">
+  <div>
+    <JournalHeader
+      section="INVENTORY"
+      meta="fridge stock &amp; active vial depletion"
+    >
+      <template #actions>
+        <span
+          v-if="expiringCount"
+          class="text-[11px] text-warn tracking-[0.06em] uppercase"
+        >▲ {{ expiringCount }} expiring</span>
+        <button
+          type="button"
+          class="tui-btn tui-btn-accent"
+          @click="openAddModal"
+        >
+          + ADD STOCK
+        </button>
+      </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <!-- Header -->
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <UButton to="/journal" variant="ghost" size="xs" icon="i-lucide-arrow-left" />
-          <div>
-            <h1 class="text-2xl font-bold">Vial Inventory</h1>
-            <p class="text-sm text-muted">Fridge stock &amp; active vial depletion</p>
-          </div>
-        </div>
-        <UButton size="sm" icon="i-lucide-plus" @click="openAddModal">Add Stock</UButton>
-      </div>
+    <p
+      v-if="!vials.length"
+      class="px-4 sm:px-6 py-5 text-[12px] text-muted"
+    >
+      No vials tracked yet. Use + ADD STOCK to log what's in your fridge.
+    </p>
 
+    <div class="px-4 sm:px-6 py-4 space-y-5">
       <!-- Summary -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <UCard>
-          <p class="text-xs text-muted uppercase tracking-wider mb-1">Active</p>
-          <p class="text-2xl font-bold font-mono">{{ activeVials.length }}</p>
-        </UCard>
-        <UCard>
-          <p class="text-xs text-muted uppercase tracking-wider mb-1">Sealed</p>
-          <p class="text-2xl font-bold font-mono">{{ sealedCount }}</p>
-        </UCard>
-        <UCard>
-          <p class="text-xs text-muted uppercase tracking-wider mb-1">Next to run out</p>
-          <p class="text-lg font-bold font-mono">{{ nextToRunOut ? `${Math.round(nextToRunOut.proj.daysLeft!)}d` : '—' }}</p>
-          <p v-if="nextToRunOut" class="text-xs text-muted mt-0.5 truncate">{{ nextToRunOut.vial.compound }}</p>
-        </UCard>
-        <UCard>
-          <p class="text-xs text-muted uppercase tracking-wider mb-1">Expiring soon</p>
-          <p class="text-2xl font-bold font-mono" :class="expiringCount ? 'text-warning' : ''">{{ expiringCount }}</p>
-        </UCard>
-      </div>
-
-      <div v-if="!vials.length" class="text-sm text-muted">
-        No vials tracked yet. Click <span class="font-medium">Add Stock</span> to log what's in your fridge.
+      <div
+        v-if="vials.length"
+        class="grid grid-cols-2 lg:grid-cols-4 gap-2.5"
+      >
+        <StatTile
+          label="Active"
+          :value="activeVials.length"
+          unit="open"
+        />
+        <StatTile
+          label="Sealed"
+          :value="sealedCount"
+          unit="vials"
+        />
+        <StatTile
+          label="Next to run out"
+          :value="nextOutDays"
+          unit="days"
+          :subtext="nextToRunOut?.vial.compound ?? undefined"
+        />
+        <StatTile
+          label="Expiring soon"
+          :value="expiringCount"
+          unit="vials"
+          :subtext="expiringCount ? 'check the dates below' : 'nothing in the window'"
+        />
       </div>
 
       <!-- Active vials -->
-      <section v-if="activeVials.length">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Active Vials</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <UCard v-for="{ vial, proj } in activeProjections" :key="vial.id">
-            <div class="space-y-4">
-              <!-- top row -->
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="w-3 h-3 rounded-full shrink-0" :style="{ background: getCompoundColor(vial.compound) }" />
-                  <div class="min-w-0">
-                    <p class="font-semibold truncate">{{ vial.compound }}</p>
-                    <p class="text-xs text-muted truncate">
-                      {{ vial.vial_amount }}{{ vial.vial_unit }}<template v-if="vial.bac_water_ml"> + {{ vial.bac_water_ml }}mL</template>
-                      <template v-if="vial.supplier"> · {{ vial.supplier }}</template>
-                    </p>
-                  </div>
-                </div>
-                <UDropdownMenu :items="activeMenu(vial)" :content="{ align: 'end' }">
-                  <UButton variant="ghost" size="xs" icon="i-lucide-ellipsis-vertical" />
-                </UDropdownMenu>
-              </div>
+      <section v-if="activeProjections.length">
+        <TuiHeader
+          :label="`ACTIVE VIALS · ${activeVials.length}`"
+          :dashes="7"
+        >
+          <span class="text-[10.5px] text-muted normal-case">depletion projected from logged doses</span>
+        </TuiHeader>
 
-              <!-- depletion bar -->
-              <div>
-                <div class="flex items-baseline justify-between mb-1">
-                  <span class="text-sm font-mono font-medium">{{ roundAmount(proj.remaining) }}<span class="text-muted"> / {{ vial.vial_amount }} {{ vial.vial_unit }}</span></span>
-                  <span class="text-xs text-muted">{{ Math.round(proj.pct * 100) }}%</span>
-                </div>
-                <div class="h-2 rounded-full bg-elevated overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all"
-                    :style="{ width: `${Math.max(2, proj.pct * 100)}%`, background: barColor(proj) }"
-                  />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 mt-2.5">
+          <div
+            v-for="{ vial, proj } in activeProjections"
+            :key="vial.id"
+            class="bg-raised border border-line-soft px-3.5 py-3"
+          >
+            <!-- identity -->
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span
+                  class="w-1.5 h-1.5 rounded-full shrink-0"
+                  :style="{ background: getCompoundColor(vial.compound) }"
+                />
+                <div class="min-w-0">
+                  <p class="text-[13px] text-hi truncate">
+                    {{ vial.compound }}
+                  </p>
+                  <p class="text-[11px] text-muted truncate">
+                    {{ vialSpec(vial) }}
+                  </p>
                 </div>
               </div>
-
-              <!-- projection -->
-              <div class="flex items-center justify-between text-xs">
-                <div>
-                  <template v-if="proj.daysLeft != null">
-                    <span class="font-semibold" :class="daysLeftClass(proj)">~{{ Math.round(proj.daysLeft) }} days left</span>
-                    <span class="text-muted"> · out ~{{ formatDate(proj.runOutDate!) }}</span>
-                  </template>
-                  <span v-else class="text-muted">Not enough data to project</span>
-                </div>
-                <span v-if="proj.dailyAmount" class="text-muted font-mono" :title="rateTitle(proj)">
-                  {{ roundAmount(proj.dailyAmount) }} {{ vial.vial_unit }}/d{{ proj.basis === 'typical' ? '*' : '' }}
-                </span>
-              </div>
-
-              <p v-if="opened(vial)" class="text-xs text-muted border-t border-default pt-2">
-                Opened {{ formatDate(vial.opened_date!) }} · {{ daysSinceOpened(vial) }}d ago
-                <template v-if="proj.basis === 'typical'"> · <span class="italic">*rate estimated from typical dosing</span></template>
-              </p>
+              <UDropdownMenu
+                :items="activeMenu(vial)"
+                :content="{ align: 'end' }"
+                :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
+              >
+                <button
+                  type="button"
+                  class="shrink-0 px-1 text-[14px] leading-none text-faint hover:text-accent cursor-pointer"
+                  aria-label="Vial actions"
+                >
+                  ⋯
+                </button>
+              </UDropdownMenu>
             </div>
-          </UCard>
+
+            <!-- depletion bar -->
+            <div class="mt-2.5">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-[12px]">
+                  <span class="num-display text-[16px]">{{ roundAmount(proj.remaining) }}</span>
+                  <span class="text-muted"> / {{ vial.vial_amount }} {{ vial.vial_unit }}</span>
+                </span>
+                <span class="text-[11px] text-muted">{{ Math.round(proj.pct * 100) }}%</span>
+              </div>
+              <div class="h-1.5 bg-inset mt-1.5">
+                <div
+                  class="h-full transition-all"
+                  :style="{ width: `${Math.max(2, proj.pct * 100)}%`, background: barColor(proj) }"
+                />
+              </div>
+            </div>
+
+            <!-- projection -->
+            <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mt-2 text-[11.5px]">
+              <span class="flex items-baseline gap-1.5">
+                <span :class="daysLeftClass(proj)">{{ daysLeftText(proj) }}</span>
+                <span
+                  v-if="runOutText(proj)"
+                  class="text-muted"
+                >{{ runOutText(proj) }}</span>
+              </span>
+              <span
+                v-if="rateText(vial, proj)"
+                class="text-muted"
+                :title="rateTitle(proj)"
+              >{{ rateText(vial, proj) }}</span>
+            </div>
+
+            <p
+              v-if="openedText(vial, proj)"
+              class="mt-2 pt-2 border-t border-line-soft text-[11px] text-faint"
+            >
+              {{ openedText(vial, proj) }}
+            </p>
+          </div>
         </div>
       </section>
 
       <!-- Sealed stock -->
       <section v-if="sealedGroups.length">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Sealed Stock (Fridge)</h2>
-        <div class="space-y-6">
-          <div v-for="group in sealedGroups" :key="group.compound">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: getCompoundColor(group.compound) }" />
-              <span class="text-sm font-medium">{{ group.compound }}</span>
-              <span class="text-xs text-muted">{{ group.totalVials }} vial{{ group.totalVials === 1 ? '' : 's' }}</span>
+        <TuiHeader
+          :label="`SEALED STOCK · FRIDGE · ${sealedCount}`"
+          :dashes="3"
+        >
+          <span class="text-[10.5px] text-muted normal-case">open one to start tracking it</span>
+        </TuiHeader>
+
+        <div class="mt-2.5 space-y-3">
+          <div
+            v-for="group in sealedGroups"
+            :key="group.compound"
+          >
+            <div class="flex items-baseline gap-2">
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :style="{ background: getCompoundColor(group.compound) }"
+              />
+              <span class="text-[12.5px] text-hi">{{ group.compound }}</span>
+              <span class="text-[11px] text-muted">{{ group.totalVials }} vial{{ group.totalVials === 1 ? '' : 's' }}</span>
             </div>
-            <div class="rounded-lg border border-default divide-y divide-default">
+
+            <div class="mt-1.5 border border-line-soft">
               <div
-                v-for="vial in group.batches"
-                :key="vial.id"
-                class="flex items-center justify-between gap-3 px-3 py-2.5 flex-wrap"
+                v-for="(row, i) in group.batches"
+                :key="row.vial.id"
+                class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-[#101a15] transition-colors"
+                :class="i % 2 ? 'bg-inset' : ''"
               >
-                <div class="flex items-center gap-3 text-sm min-w-0">
-                  <span class="font-mono font-medium">{{ vial.quantity }}×</span>
-                  <span class="font-mono">{{ vial.vial_amount }}{{ vial.vial_unit }}</span>
-                  <span v-if="vial.supplier" class="text-muted truncate">{{ vial.supplier }}</span>
-                  <UBadge v-if="isExpired(vial.expiry, today)" color="error" variant="subtle" size="sm">Expired</UBadge>
-                  <UBadge v-else-if="isExpiringSoon(vial.expiry, today)" color="warning" variant="subtle" size="sm">
-                    Exp {{ formatDate(vial.expiry!) }}
-                  </UBadge>
-                  <span v-else-if="vial.expiry" class="text-xs text-muted">exp {{ formatDate(vial.expiry) }}</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <UButton size="xs" variant="outline" icon="i-lucide-flask-conical" @click="openReconstituteModal(vial)">Open</UButton>
-                  <UButton size="xs" variant="ghost" icon="i-lucide-pencil" @click="openEditModal(vial)" />
-                  <UButton size="xs" variant="ghost" color="error" icon="i-lucide-trash-2" @click="confirmDelete(vial)" />
-                </div>
+                <span class="num-display text-[13px] shrink-0">{{ row.vial.quantity }}×</span>
+                <span class="text-[12px] text-body shrink-0">{{ row.vial.vial_amount }}{{ row.vial.vial_unit }}</span>
+                <span
+                  v-if="row.vial.supplier"
+                  class="text-[11.5px] text-muted truncate"
+                >{{ row.vial.supplier }}</span>
+                <UBadge
+                  v-if="row.expiryColor"
+                  :color="row.expiryColor"
+                  variant="subtle"
+                  size="sm"
+                  class="text-[10.5px] tracking-widest uppercase"
+                >
+                  {{ row.expiryText }}
+                </UBadge>
+                <span
+                  v-else-if="row.expiryText"
+                  class="text-[11px] text-muted"
+                >{{ row.expiryText }}</span>
+
+                <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
+                  <button
+                    type="button"
+                    class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+                    @click="openReconstituteModal(row.vial)"
+                  >⚗ open</button>
+                  <button
+                    type="button"
+                    class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    :aria-label="`Edit ${row.vial.compound} vial`"
+                    @click="openEditModal(row.vial)"
+                  >edit</button>
+                  <button
+                    type="button"
+                    class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    :aria-label="`Delete ${row.vial.compound} vial`"
+                    @click="confirmDelete(row.vial)"
+                  >✕</button>
+                </span>
               </div>
             </div>
           </div>
@@ -138,120 +223,297 @@
 
       <!-- Finished -->
       <section v-if="finishedVials.length">
-        <button class="flex items-center gap-2 text-sm font-semibold text-muted uppercase tracking-wider mb-4" @click="showFinished = !showFinished">
-          <UIcon :name="showFinished ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="w-4 h-4" />
-          Finished ({{ finishedVials.length }})
-        </button>
-        <div v-if="showFinished" class="rounded-lg border border-default divide-y divide-default">
-          <div
-            v-for="vial in finishedVials"
-            :key="vial.id"
-            class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+        <TuiHeader
+          :label="`FINISHED · ${finishedVials.length}`"
+          :dashes="9"
+        >
+          <button
+            type="button"
+            class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+            @click="showFinished = !showFinished"
           >
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: getCompoundColor(vial.compound) }" />
-              <span class="truncate">{{ vial.compound }}</span>
-              <span class="text-xs text-muted font-mono">{{ vial.vial_amount }}{{ vial.vial_unit }}</span>
-              <span v-if="vial.opened_date" class="text-xs text-muted">opened {{ formatDate(vial.opened_date) }}</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <UButton size="xs" variant="ghost" icon="i-lucide-rotate-ccw" title="Reactivate" @click="reactivate(vial)" />
-              <UButton size="xs" variant="ghost" color="error" icon="i-lucide-trash-2" @click="confirmDelete(vial)" />
-            </div>
+            {{ showFinished ? 'collapse ▴' : 'expand ▾' }}
+          </button>
+        </TuiHeader>
+
+        <div
+          v-if="showFinished"
+          class="mt-1.5 border border-line-soft"
+        >
+          <div
+            v-for="(vial, i) in finishedVials"
+            :key="vial.id"
+            class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-[#101a15] transition-colors"
+            :class="i % 2 ? 'bg-inset' : ''"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full shrink-0"
+              :style="{ background: getCompoundColor(vial.compound) }"
+            />
+            <span class="text-[12px] text-dim truncate">{{ vial.compound }}</span>
+            <span class="text-[11px] text-muted">{{ finishedMeta(vial) }}</span>
+
+            <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
+              <button
+                type="button"
+                class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                :aria-label="`Reactivate ${vial.compound} vial`"
+                @click="reactivate(vial)"
+              >↻ reactivate</button>
+              <button
+                type="button"
+                class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                :aria-label="`Delete ${vial.compound} vial`"
+                @click="confirmDelete(vial)"
+              >✕</button>
+            </span>
           </div>
         </div>
       </section>
 
-      <p class="text-xs text-muted italic">{{ GENERAL_DISCLAIMER }}</p>
+      <p class="text-[11px] text-faint">
+        {{ GENERAL_DISCLAIMER }}
+      </p>
     </div>
 
     <!-- Add / Edit modal -->
-    <UModal v-model:open="formModalOpen" :title="form.id ? 'Edit Vial' : 'Add Stock'">
+    <UModal
+      v-model:open="formModalOpen"
+      :title="form.id ? 'Edit Vial' : 'Add Stock'"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
       <template #body>
         <div class="space-y-4">
-          <UFormField label="Compound" required>
-            <UInput v-model="form.compound" list="inv-compounds" placeholder="BPC-157" class="w-full font-mono" />
+          <UFormField
+            label="Compound"
+            required
+            :ui="{ label: 'tui-label' }"
+          >
+            <UInput
+              v-model="form.compound"
+              list="inv-compounds"
+              placeholder="BPC-157"
+              class="w-full"
+            />
             <datalist id="inv-compounds">
-              <option v-for="c in KNOWN_COMPOUNDS" :key="c" :value="c" />
+              <option
+                v-for="c in KNOWN_COMPOUNDS"
+                :key="c"
+                :value="c"
+              />
             </datalist>
           </UFormField>
 
           <div class="grid grid-cols-3 gap-3">
-            <UFormField label="Vial size" required>
-              <UInput v-model.number="form.vial_amount" type="number" min="0" step="0.1" class="w-full font-mono" />
+            <UFormField
+              label="Vial size"
+              required
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                v-model.number="form.vial_amount"
+                type="number"
+                min="0"
+                step="0.1"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="Unit">
-              <USelect v-model="form.vial_unit" :items="DOSE_UNITS" value-key="value" label-key="label" class="w-full" />
+            <UFormField
+              label="Unit"
+              :ui="{ label: 'tui-label' }"
+            >
+              <USelect
+                v-model="form.vial_unit"
+                :items="DOSE_UNITS"
+                value-key="value"
+                label-key="label"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField :label="form.status === 'sealed' ? 'Quantity' : 'Qty'">
-              <UInput v-model.number="form.quantity" type="number" min="1" step="1" class="w-full font-mono" />
+            <UFormField
+              :label="form.status === 'sealed' ? 'Quantity' : 'Qty'"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                v-model.number="form.quantity"
+                type="number"
+                min="1"
+                step="1"
+                class="w-full"
+              />
             </UFormField>
           </div>
 
-          <UFormField label="Supplier">
-            <UInput v-model="form.supplier" placeholder="e.g. Supplier X" class="w-full" />
+          <UFormField
+            label="Supplier"
+            :ui="{ label: 'tui-label' }"
+          >
+            <UInput
+              :model-value="form.supplier ?? undefined"
+              placeholder="e.g. Supplier X"
+              class="w-full"
+              @update:model-value="form.supplier = $event"
+            />
           </UFormField>
 
           <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Lot #">
-              <UInput v-model="form.lot" class="w-full font-mono" />
+            <UFormField
+              label="Lot #"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                :model-value="form.lot ?? undefined"
+                class="w-full"
+                @update:model-value="form.lot = $event"
+              />
             </UFormField>
-            <UFormField label="Expiry">
-              <UInput v-model="form.expiry" type="date" class="w-full font-mono" />
+            <UFormField
+              label="Expiry"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                :model-value="form.expiry ?? undefined"
+                type="date"
+                class="w-full"
+                @update:model-value="form.expiry = $event"
+              />
             </UFormField>
           </div>
 
           <!-- active-only fields -->
-          <div v-if="form.status === 'active'" class="grid grid-cols-2 gap-3">
-            <UFormField label="Opened">
-              <UInput v-model="form.opened_date" type="date" class="w-full font-mono" />
+          <div
+            v-if="form.status === 'active'"
+            class="grid grid-cols-2 gap-3"
+          >
+            <UFormField
+              label="Opened"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                :model-value="form.opened_date ?? undefined"
+                type="date"
+                class="w-full"
+                @update:model-value="form.opened_date = $event"
+              />
             </UFormField>
-            <UFormField label="BAC water (mL)">
-              <UInput v-model.number="form.bac_water_ml" type="number" min="0" step="0.5" class="w-full font-mono" />
+            <UFormField
+              label="BAC water (mL)"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                :model-value="form.bac_water_ml ?? undefined"
+                type="number"
+                min="0"
+                step="0.5"
+                class="w-full"
+                @update:model-value="form.bac_water_ml = $event"
+              />
             </UFormField>
           </div>
 
-          <UFormField label="Notes">
-            <UTextarea v-model="form.notes" :rows="2" class="w-full" />
+          <UFormField
+            label="Notes"
+            :ui="{ label: 'tui-label' }"
+          >
+            <UTextarea
+              :model-value="form.notes ?? undefined"
+              :rows="2"
+              class="w-full"
+              @update:model-value="form.notes = $event"
+            />
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-2">
-            <UButton variant="ghost" @click="formModalOpen = false">Cancel</UButton>
-            <UButton :loading="saving" :disabled="!form.compound || !form.vial_amount" @click="saveVial">Save</UButton>
+            <button
+              type="button"
+              class="tui-btn"
+              @click="formModalOpen = false"
+            >
+              CANCEL
+            </button>
+            <UButton
+              :loading="saving"
+              :disabled="!form.compound || !form.vial_amount"
+              @click="saveVial"
+            >
+              Save
+            </UButton>
           </div>
         </div>
       </template>
     </UModal>
 
     <!-- Open / reconstitute modal -->
-    <UModal v-model:open="openModalOpen" title="Open Vial">
+    <UModal
+      v-model:open="openModalOpen"
+      title="Open Vial"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
       <template #body>
-        <div v-if="openTarget" class="space-y-4">
-          <p class="text-sm">
-            Reconstitute one <span class="font-medium">{{ openTarget.vial_amount }}{{ openTarget.vial_unit }} {{ openTarget.compound }}</span>
-            vial<template v-if="openTarget.supplier"> from {{ openTarget.supplier }}</template>.
+        <div
+          v-if="openTarget"
+          class="space-y-4"
+        >
+          <p class="text-[12.5px] leading-[1.7] text-dim">
+            Reconstitute one <span class="text-hi">{{ openTarget.vial_amount }}{{ openTarget.vial_unit }} {{ openTarget.compound }}</span>
+            {{ openSourceText }}
           </p>
-          <p v-if="reconstituteHint" class="text-xs text-muted">{{ reconstituteHint }}</p>
+          <p
+            v-if="reconstituteHint"
+            class="text-[11.5px] text-muted border border-line-input bg-inset px-2.5 py-2"
+          >
+            ⚗ {{ reconstituteHint }}
+          </p>
+
           <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Opened date">
-              <UInput v-model="openForm.opened_date" type="date" class="w-full font-mono" />
+            <UFormField
+              label="Opened date"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                v-model="openForm.opened_date"
+                type="date"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="BAC water (mL)">
-              <UInput v-model.number="openForm.bac_water_ml" type="number" min="0" step="0.5" class="w-full font-mono" />
+            <UFormField
+              label="BAC water (mL)"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                v-model.number="openForm.bac_water_ml"
+                type="number"
+                min="0"
+                step="0.5"
+                class="w-full"
+              />
             </UFormField>
           </div>
-          <p class="text-xs text-muted">
-            Marks it active. Remaining amount then tracks automatically from doses of {{ openTarget.compound }} you log on/after this date.
-            {{ openTarget.quantity > 1 ? `${openTarget.quantity - 1} will remain sealed.` : 'This was your last sealed one.' }}
+
+          <p class="text-[11.5px] text-muted leading-[1.7]">
+            {{ openOutcomeText }}
           </p>
+
           <div class="flex justify-end gap-2 pt-2">
-            <UButton variant="ghost" @click="openModalOpen = false">Cancel</UButton>
-            <UButton :loading="opening" icon="i-lucide-flask-conical" @click="doOpen">Open Vial</UButton>
+            <button
+              type="button"
+              class="tui-btn"
+              @click="openModalOpen = false"
+            >
+              CANCEL
+            </button>
+            <UButton
+              :loading="opening"
+              icon="i-lucide-flask-conical"
+              @click="doOpen"
+            >
+              Open vial
+            </UButton>
           </div>
         </div>
       </template>
     </UModal>
-  </UContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -269,7 +531,8 @@ const today: string = new Date().toISOString().slice(0, 10)
 
 const { data: vialsData, refresh } = await useVials()
 const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
-onMounted(() => { refresh(); refreshJournal() })
+onMounted(refresh)
+onMounted(refreshJournal)
 
 const vials = computed(() => vialsData.value ?? [])
 const entries = computed(() => journalData.value ?? [])
@@ -277,6 +540,8 @@ const entries = computed(() => journalData.value ?? [])
 const activeVials = computed(() => vials.value.filter(v => v.status === 'active'))
 const sealedVials = computed(() => vials.value.filter(v => v.status === 'sealed'))
 const finishedVials = computed(() => vials.value.filter(v => v.status === 'finished'))
+
+const showFinished = ref(false)
 
 const sealedCount = computed(() => sealedVials.value.reduce((s, v) => s + (v.quantity ?? 1), 0))
 
@@ -290,9 +555,22 @@ const nextToRunOut = computed(() =>
   activeProjections.value.find(p => p.proj.daysLeft != null) ?? null
 )
 
+const nextOutDays = computed(() => {
+  const days = nextToRunOut.value?.proj.daysLeft
+  return days == null ? null : Math.round(days)
+})
+
 const expiringCount = computed(() =>
   vials.value.filter(v => v.status !== 'finished' && (isExpired(v.expiry, today) || isExpiringSoon(v.expiry, today))).length
 )
+
+/** Expiry read-out for a sealed row: a colored badge when it needs attention, plain text otherwise. */
+function expiryTag(v: Vial): { text: string, color: 'error' | 'warning' | null } {
+  if (!v.expiry) return { text: '', color: null }
+  if (isExpired(v.expiry, today)) return { text: 'expired', color: 'error' }
+  const text = `exp ${formatDate(v.expiry, 'monthDay')}`
+  return { text, color: isExpiringSoon(v.expiry, today) ? 'warning' : null }
+}
 
 const sealedGroups = computed(() => {
   const map = new Map<string, Vial[]>()
@@ -304,31 +582,71 @@ const sealedGroups = computed(() => {
   return [...map.entries()]
     .map(([compound, batches]) => ({
       compound,
-      batches,
+      // Expiry state is resolved here so the dense rows stay free of branching markup.
+      batches: batches.map(vial => ({ vial, ...expiryTagFields(vial) })),
       totalVials: batches.reduce((s, b) => s + (b.quantity ?? 1), 0)
     }))
     .sort((a, b) => a.compound.localeCompare(b.compound))
 })
 
-// --- display helpers ---
-function opened(v: Vial) {
-  return !!v.opened_date
+function expiryTagFields(v: Vial) {
+  const { text, color } = expiryTag(v)
+  return { expiryText: text, expiryColor: color }
 }
+
+// --- display helpers ---
+// Multi-part row strings are assembled here rather than as adjacent template blocks, which
+// would lose the separating spaces to Vue's whitespace condensing.
+function vialSpec(v: Vial): string {
+  let spec = `${v.vial_amount}${v.vial_unit}`
+  if (v.bac_water_ml) spec += ` + ${v.bac_water_ml}mL`
+  return v.supplier ? `${spec} · ${v.supplier}` : spec
+}
+
 function daysSinceOpened(v: Vial) {
   if (!v.opened_date) return 0
   return Math.floor((new Date(today + 'T12:00:00').getTime() - new Date(v.opened_date + 'T12:00:00').getTime()) / 86400000)
 }
-function barColor(proj: VialProjection) {
-  if (proj.daysLeft != null && proj.daysLeft < 7) return '#ef4444'
-  if (proj.daysLeft != null && proj.daysLeft < 14) return '#f59e0b'
-  return '#14b8a6'
+
+function daysLeftText(proj: VialProjection): string {
+  return proj.daysLeft == null
+    ? 'not enough data to project'
+    : `~${Math.round(proj.daysLeft)} days left`
 }
+
+function runOutText(proj: VialProjection): string {
+  return proj.runOutDate ? `· out ~${formatDate(proj.runOutDate, 'monthDay')}` : ''
+}
+
+function rateText(v: Vial, proj: VialProjection): string {
+  if (!proj.dailyAmount) return ''
+  return `${roundAmount(proj.dailyAmount)} ${v.vial_unit}/d${proj.basis === 'typical' ? '*' : ''}`
+}
+
+function openedText(v: Vial, proj: VialProjection): string {
+  if (!v.opened_date) return ''
+  const base = `opened ${formatDate(v.opened_date, 'monthDay')} · ${daysSinceOpened(v)}d ago`
+  return proj.basis === 'typical' ? `${base} · *rate estimated from typical dosing` : base
+}
+
+function finishedMeta(v: Vial): string {
+  const spec = `${v.vial_amount}${v.vial_unit}`
+  return v.opened_date ? `${spec} · opened ${formatDate(v.opened_date, 'monthDay')}` : spec
+}
+
+function barColor(proj: VialProjection) {
+  if (proj.daysLeft != null && proj.daysLeft < 7) return '#e86a5e'
+  if (proj.daysLeft != null && proj.daysLeft < 14) return '#e8b34b'
+  return '#2ce8a4'
+}
+
 function daysLeftClass(proj: VialProjection) {
   if (proj.daysLeft == null) return 'text-muted'
-  if (proj.daysLeft < 7) return 'text-error'
-  if (proj.daysLeft < 14) return 'text-warning'
-  return 'text-success'
+  if (proj.daysLeft < 7) return 'text-danger'
+  if (proj.daysLeft < 14) return 'text-warn'
+  return 'text-accent'
 }
+
 function rateTitle(proj: VialProjection) {
   return proj.basis === 'typical'
     ? 'Estimated from typical dosing (not enough logged history yet)'
@@ -376,6 +694,19 @@ const reconstituteHint = computed(() =>
   openTarget.value ? getCompoundInfo(openTarget.value.compound)?.reconstitution?.instructions ?? '' : ''
 )
 
+const openSourceText = computed(() =>
+  openTarget.value?.supplier ? `vial from ${openTarget.value.supplier}.` : 'vial.'
+)
+
+const openOutcomeText = computed(() => {
+  const target = openTarget.value
+  if (!target) return ''
+  const remaining = (target.quantity ?? 1) > 1
+    ? `${(target.quantity ?? 1) - 1} will remain sealed.`
+    : 'This was your last sealed one.'
+  return `Marks it active. Remaining amount then tracks automatically from doses of ${target.compound} you log on/after this date. ${remaining}`
+})
+
 function openReconstituteModal(v: Vial) {
   openTarget.value = v
   openForm.opened_date = today
@@ -407,11 +738,11 @@ async function doOpen() {
 const activeMenu = (v: Vial) => [
   [
     { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => openEditModal(v) },
-    { label: 'Open in calculator', icon: 'i-lucide-calculator', to: calculatorLink(v) },
+    { label: 'Open in calculator', icon: 'i-lucide-calculator', to: calculatorLink(v) }
   ],
   [
     { label: 'Mark finished', icon: 'i-lucide-check-check', onSelect: () => setStatus(v, 'finished') },
-    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => confirmDelete(v) },
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => confirmDelete(v) }
   ]
 ]
 

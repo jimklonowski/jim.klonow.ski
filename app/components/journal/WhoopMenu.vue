@@ -1,28 +1,24 @@
 <template>
-  <UButton
+  <NuxtLink
     v-if="!connected"
-    variant="outline"
-    size="xs"
-    icon="i-lucide-link"
-    to="/api/whoop/authorize"
+    :to="AUTHORIZE_URL"
     external
+    class="tui-btn"
   >
-    Connect Whoop
-  </UButton>
+    CONNECT WHOOP
+  </NuxtLink>
   <UDropdownMenu
     v-else
     :items="menuItems"
     :content="{ align: 'start' }"
-    size="xs"
+    :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
   >
-    <UButton
-      variant="outline"
-      size="xs"
-      icon="i-lucide-check"
-      trailing-icon="i-lucide-chevron-down"
+    <button
+      type="button"
+      class="tui-btn"
     >
-      Whoop
-    </UButton>
+      WHOOP <span class="text-accent">✓</span>
+    </button>
   </UDropdownMenu>
 </template>
 
@@ -30,6 +26,10 @@
 // Whoop connection control for the journal header: a connect link when unlinked, otherwise a
 // Sync Now / Reconnect menu. Syncing refreshes the shared journal/health/workout stores, so the
 // page sections update without the parent knowing anything happened.
+// Nitro server routes (they 302 out to Whoop's OAuth consent screen), not page routes.
+const AUTHORIZE_URL = '/api/whoop/authorize'
+const RECONNECT_URL = `${AUTHORIZE_URL}?reconnect=true`
+
 const toast = useToast()
 const { refresh } = await useJournalEntries()
 const { refresh: refreshHealth } = await useHealthMetricsEntries()
@@ -78,7 +78,7 @@ const menuItems = computed(() => [
   {
     label: 'Reconnect',
     icon: 'i-lucide-rotate-ccw',
-    to: '/api/whoop/authorize?reconnect=true',
+    to: RECONNECT_URL,
     external: true
   }
 ])

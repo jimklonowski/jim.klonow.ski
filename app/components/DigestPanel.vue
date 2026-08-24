@@ -1,78 +1,94 @@
 <template>
   <div v-if="visible">
-    <!-- Floating action button -->
-    <UButton
-      icon="i-lucide-newspaper"
-      size="xl"
-      color="primary"
-      class="fixed bottom-6 right-6 z-50 w-14 h-14 p-0 flex items-center justify-center rounded-full shadow-lg shadow-primary/30"
-      :aria-label="'Open health digests'"
-      @click="openPanel"
-    />
-
     <USlideover
       v-model:open="open"
-      title="Health Digests"
-      description="AI recaps of your vitals, sleep, doses and training"
-      :ui="{ content: 'max-w-2xl' }"
+      title="AI DIGESTS"
+      description="Recaps of your vitals, sleep, doses and training"
+      :ui="{
+        content: 'max-w-2xl bg-bg border-l border-line ring-0',
+        header: 'border-b border-line',
+        title: 'num-display text-hi text-[18px]',
+        description: 'text-[11px] text-muted'
+      }"
     >
       <template #body>
-        <div class="space-y-4">
+        <div class="space-y-3">
           <!-- Generate + filter controls -->
           <div class="flex items-center justify-between gap-2">
-            <div class="flex gap-1">
-              <UButton
+            <span class="flex gap-2.5 text-[11px]">
+              <button
                 v-for="opt in FILTERS"
                 :key="opt.value"
-                size="xs"
-                :variant="filter === opt.value ? 'solid' : 'ghost'"
+                type="button"
+                class="cursor-pointer uppercase tracking-[0.12em]"
+                :class="filter === opt.value ? 'text-accent' : 'text-faint hover:text-accent'"
                 @click="filter = opt.value"
+              >{{ filter === opt.value ? `[${opt.label}]` : opt.label }}</button>
+            </span>
+            <UDropdownMenu
+              v-if="isOwner"
+              :items="generateItems"
+              :content="{ align: 'end' }"
+              :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
+            >
+              <button
+                type="button"
+                class="tui-btn"
+                :disabled="generating"
               >
-                {{ opt.label }}
-              </UButton>
-            </div>
-            <UDropdownMenu v-if="isOwner" :items="generateItems" :content="{ align: 'end' }">
-              <UButton size="xs" variant="outline" icon="i-lucide-sparkles" :loading="generating" trailing-icon="i-lucide-chevron-down">
-                Generate
-              </UButton>
+                {{ generating ? 'GENERATING…' : '✦ GENERATE ▾' }}
+              </button>
             </UDropdownMenu>
           </div>
 
-          <div v-if="status === 'pending'" class="py-10 text-center text-sm text-muted">Loading…</div>
+          <p
+            v-if="status === 'pending'"
+            class="py-8 text-center text-[12px] text-muted"
+          >
+            Loading…
+          </p>
 
-          <div v-else-if="!filtered.length" class="py-10 text-center text-sm text-muted">
+          <p
+            v-else-if="!filtered.length"
+            class="py-8 text-center text-[12px] text-muted"
+          >
             No {{ filter === 'all' ? '' : filter + ' ' }}digests yet.
-            <br>Use <span class="font-medium">Generate</span> to create one now, or wait for the scheduled run.
-          </div>
+            <br>Use <span class="text-accent">GENERATE</span> to create one now, or wait for the scheduled run.
+          </p>
 
-          <div v-else class="space-y-3">
-            <UCard v-for="d in filtered" :key="d.id">
-              <template #header>
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2">
-                    <UBadge :color="d.type === 'weekly' ? 'primary' : 'neutral'" variant="subtle" size="sm">
-                      {{ d.type === 'weekly' ? 'Weekly' : 'Daily' }}
-                    </UBadge>
-                    <span class="text-sm font-medium">{{ periodLabel(d) }}</span>
-                  </div>
-                  <span class="text-xs text-muted">{{ relativeTime(d.created_at) }}</span>
-                </div>
-              </template>
+          <div
+            v-else
+            class="space-y-2.5"
+          >
+            <article
+              v-for="d in filtered"
+              :key="d.id"
+              class="bg-raised border border-line-soft px-3.5 py-3"
+            >
+              <TuiHeader
+                :label="`${d.type === 'weekly' ? 'WEEKLY' : 'DAILY'} · ${periodLabel(d)}`"
+                :dashes="6"
+              >
+                <span class="text-[10.5px] text-muted">{{ relativeTime(d.created_at) }}</span>
+              </TuiHeader>
 
-              <div class="text-sm leading-relaxed [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_li+li]:mt-1 [&_strong]:font-semibold">
+              <div class="mt-2.5 text-[12.5px] leading-[1.7] text-dim digest-prose">
                 <Markdown :value="d.summary" />
               </div>
 
-              <div v-if="chips(d).length" class="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-default">
+              <div
+                v-if="chips(d).length"
+                class="flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-line-soft"
+              >
                 <span
                   v-for="chip in chips(d)"
                   :key="chip"
-                  class="text-xs font-mono px-2 py-0.5 rounded-md bg-elevated text-muted"
+                  class="text-[10.5px] px-1.5 py-0.5 border border-line-soft text-muted"
                 >
                   {{ chip }}
                 </span>
               </div>
-            </UCard>
+            </article>
           </div>
         </div>
       </template>
@@ -87,25 +103,25 @@ const route = useRoute()
 const toast = useToast()
 const { role, isOwner } = await useAuth()
 
-// Only show inside the authed app areas (never on the login/landing pages). Digests recap
-// notes/sodas too, so the panel is owner+friend — the doctor role doesn't get it.
+// Available everywhere the shell renders (opened via ⌘K or the home digest links), except
+// the login page. Digests recap notes/sodas too, so the panel is owner+friend — the doctor
+// role doesn't get it.
 const visible = computed(() =>
-  /^\/(journal|labs)/.test(route.path)
-  && route.path !== '/labs/login'
+  route.path !== '/labs/login'
   && (role.value === 'owner' || role.value === 'friend')
 )
 
-const open = ref(false)
+// Shared state so the footer status bar / command palette can open the panel too.
+const open = useState('digest-panel-open', () => false)
 const { data, status, execute, refresh } = useDigests()
 
 let loadedOnce = false
-function openPanel() {
-  open.value = true
-  if (!loadedOnce) {
+watch(open, (v) => {
+  if (v && !loadedOnce) {
     loadedOnce = true
     execute()
   }
-}
+}, { immediate: true })
 
 const FILTERS = [
   { label: 'All', value: 'all' as const },
@@ -121,14 +137,10 @@ const filtered = computed(() =>
 
 // --- generation ---
 const generating = ref(false)
-// Local (not UTC) YYYY-MM-DD, so an evening "today" doesn't roll over to tomorrow.
-function localToday(): string {
-  return new Date().toLocaleDateString('en-CA')
-}
 
 const generateItems = [
   [
-    { label: "Today's recap", icon: 'i-lucide-calendar-days', onSelect: () => generate('daily', localToday()) },
+    { label: 'Today\'s recap', icon: 'i-lucide-calendar-days', onSelect: () => generate('daily', localToday()) },
     { label: 'This past week', icon: 'i-lucide-calendar-range', onSelect: () => generate('weekly') }
   ]
 ]
@@ -177,7 +189,9 @@ function fmtSleep(min: number) {
 function chips(d: Digest): string[] {
   const s = d.stats ?? {}
   const out: string[] = []
-  const push = (v: number | null | undefined, fn: (n: number) => string) => { if (v != null) out.push(fn(v)) }
+  const push = (v: number | null | undefined, fn: (n: number) => string) => {
+    if (v != null) out.push(fn(v))
+  }
   if (d.type === 'daily') {
     push(s.recovery, v => `Recovery ${v}%`)
     push(s.sleep_min, v => `Sleep ${fmtSleep(v)}`)

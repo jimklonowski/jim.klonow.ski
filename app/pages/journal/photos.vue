@@ -1,28 +1,50 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-4xl mx-auto space-y-6">
+  <div>
+    <JournalHeader
+      section="PHOTOS"
+      :meta="headerMeta"
+    >
+      <template #actions>
+        <span class="text-[11px] text-muted hidden sm:inline">framing is non-destructive · originals untouched</span>
+      </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <!-- Header -->
-      <div class="flex items-center gap-3">
-        <UButton to="/journal" variant="ghost" size="xs" icon="i-lucide-arrow-left" />
-        <h1 class="text-2xl font-bold">Progress Photos</h1>
-      </div>
-
-      <!-- One-time backfill for photos uploaded before thumbnails existed -->
+    <!-- One-time backfill for photos uploaded before thumbnails existed -->
+    <div
+      v-if="isOwner && missingThumbnails.length"
+      class="px-4 sm:px-6 pt-4"
+    >
       <UAlert
-        v-if="isOwner && missingThumbnails.length"
         color="warning"
         variant="subtle"
         icon="i-lucide-image"
         title="Some photos are missing thumbnails"
-        :description="`${missingThumbnails.length} photo${missingThumbnails.length === 1 ? '' : 's'} uploaded before thumbnails existed — generate them now to speed up loading, no re-upload needed.`"
+        :description="backfillDescription"
         :actions="backfillActions"
+        :ui="{
+          root: 'bg-warn/10 border border-warn/25 ring-0 p-3 gap-2.5',
+          icon: 'size-4 text-warn',
+          title: 'text-[12px] text-hi font-medium',
+          description: 'text-[11.5px] text-dim opacity-100 mt-1',
+          actions: 'mt-2'
+        }"
       />
+    </div>
 
-      <!-- Add Photos (bulk backfill - no need to visit a day's journal entry) -->
-      <UCard v-if="isOwner">
-        <template #header><p class="text-sm font-semibold">Add Photos</p></template>
+    <!-- Add Photos (bulk backfill — no need to visit a day's journal entry) -->
+    <section
+      v-if="isOwner"
+      class="px-4 sm:px-6 pt-4"
+    >
+      <TuiHeader
+        label="ADD PHOTOS"
+        :dashes="11"
+      >
+        <span class="text-[10.5px] text-muted normal-case">date auto-detected from EXIF</span>
+      </TuiHeader>
 
+      <div class="mt-2 bg-raised border border-line-soft px-3.5 py-3">
         <UFileUpload
           v-model="files"
           multiple
@@ -33,17 +55,26 @@
           label="Drop photos here — old or new, one at a time or a whole batch"
           description="Date is detected automatically from each photo's EXIF data"
           class="w-full"
+          :ui="{
+            base: 'bg-inset border-line-input',
+            label: 'text-[12px] text-dim mt-2 font-normal',
+            description: 'text-[11px] text-muted mt-1',
+            icon: 'text-faint',
+            file: 'border-b border-line-soft last:border-0 py-2'
+          }"
         >
           <template #file="{ file, index, removeFile }">
             <div class="flex flex-col w-full">
-              <div class="flex items-center gap-3 w-full">
-                <img :src="previewUrlFor(file)" class="w-14 h-14 object-cover rounded-md shrink-0" />
+              <div class="flex items-center gap-2.5 w-full">
+                <img
+                  :src="previewUrlFor(file)"
+                  class="w-12 h-12 object-cover shrink-0 border border-line-soft"
+                >
                 <div class="flex-1 grid grid-cols-2 gap-2">
                   <UInput
                     v-model="metaFor(file).date"
                     type="date"
                     size="xs"
-                    class="font-mono"
                     :disabled="metaFor(file).status !== 'pending'"
                   />
                   <USelect
@@ -55,228 +86,402 @@
                     :disabled="metaFor(file).status !== 'pending'"
                   />
                 </div>
-                <UIcon v-if="metaFor(file).status === 'uploading'" name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-muted shrink-0" />
-                <UIcon v-else-if="metaFor(file).status === 'done'" name="i-lucide-check" class="w-4 h-4 text-success shrink-0" />
-                <UButton
-                  v-else
-                  variant="ghost"
-                  color="error"
-                  size="xs"
-                  icon="i-lucide-x"
-                  @click="removeFile(index)"
+                <UIcon
+                  v-if="metaFor(file).status === 'uploading'"
+                  name="i-lucide-loader-2"
+                  class="w-4 h-4 animate-spin text-muted shrink-0"
                 />
+                <UIcon
+                  v-else-if="metaFor(file).status === 'done'"
+                  name="i-lucide-check"
+                  class="w-4 h-4 text-accent shrink-0"
+                />
+                <button
+                  v-else
+                  type="button"
+                  class="text-[11px] text-faint hover:text-danger cursor-pointer shrink-0 px-1"
+                  aria-label="Remove file"
+                  @click="removeFile(index)"
+                >
+                  ✕
+                </button>
               </div>
-              <p v-if="metaFor(file).status === 'error'" class="text-xs text-error mt-1.5 w-full">{{ metaFor(file).error }}</p>
+              <p
+                v-if="metaFor(file).status === 'error'"
+                class="mt-1.5 w-full text-[11px] text-danger"
+              >
+                {{ metaFor(file).error }}
+              </p>
             </div>
           </template>
         </UFileUpload>
 
-        <div v-if="files.length" class="flex gap-2 pt-3">
-          <UButton
+        <div
+          v-if="files.length"
+          class="flex gap-2 pt-3"
+        >
+          <button
             v-if="pendingCount"
-            size="sm"
-            icon="i-lucide-upload"
-            :loading="uploadingAll"
+            type="button"
+            class="tui-btn tui-btn-accent disabled:opacity-50"
+            :disabled="uploadingAll"
             @click="uploadAllPending"
           >
-            Upload {{ pendingCount }} photo{{ pendingCount === 1 ? '' : 's' }}
-          </UButton>
-          <UButton v-if="hasFinished" size="sm" variant="ghost" @click="clearFinished">Clear finished</UButton>
+            {{ uploadLabel }}
+          </button>
+          <button
+            v-if="hasFinished"
+            type="button"
+            class="tui-btn"
+            @click="clearFinished"
+          >
+            CLEAR FINISHED
+          </button>
         </div>
-      </UCard>
+      </div>
+    </section>
 
-      <!-- Category selector -->
-      <div class="flex flex-wrap gap-2">
-        <UButton
+    <!-- Category selector -->
+    <div class="px-4 sm:px-6 pt-4">
+      <div class="grid grid-cols-3 sm:grid-cols-5 gap-px bg-line border border-line">
+        <button
           v-for="c in PHOTO_CATEGORIES"
           :key="c.value"
-          size="sm"
-          :variant="category === c.value ? 'solid' : 'outline'"
+          type="button"
+          class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
+          :class="category === c.value
+            ? 'bg-nav-active text-accent'
+            : 'bg-bg text-[#6b8578] hover:text-accent'"
           @click="category = c.value"
         >
-          {{ c.label }}
-        </UButton>
+          {{ c.label }} <span class="text-faint">{{ countByCategory[c.value] ?? 0 }}</span>
+        </button>
       </div>
+    </div>
 
-      <UEmpty
-        v-if="!photosForCategory.length"
-        icon="i-lucide-image-off"
-        title="No photos yet"
-        :description="`No ${photoCategoryLabel(category)} photos yet. Drop some above to get started.`"
-      />
+    <UEmpty
+      v-if="!photosForCategory.length"
+      icon="i-lucide-image-off"
+      title="No photos yet"
+      :description="emptyDescription"
+      :ui="{
+        root: 'p-6',
+        title: 'text-[13px] text-hi font-medium',
+        description: 'text-[12px] text-muted'
+      }"
+    />
 
-      <template v-else>
-        <!-- Before / After picker -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Before">
-            <USelect v-model.nullable="beforeId" :items="photoOptions" value-key="value" label-key="label" class="w-full" />
+    <template v-else>
+      <!-- Before / After picker + comparison -->
+      <section class="px-4 sm:px-6 py-4">
+        <TuiHeader
+          label="COMPARE"
+          :dashes="13"
+        >
+          <span class="text-[10.5px] text-muted normal-case">{{ compareMeta }}</span>
+        </TuiHeader>
+
+        <div class="mt-2 flex flex-wrap items-end gap-2.5">
+          <UFormField
+            label="Before"
+            class="flex-1 min-w-40"
+            :ui="{ label: 'tui-label' }"
+          >
+            <USelect
+              v-model.nullable="beforeId"
+              :items="photoOptions"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
           </UFormField>
-          <UFormField label="After">
-            <USelect v-model.nullable="afterId" :items="photoOptions" value-key="value" label-key="label" class="w-full" />
-          </UFormField>
-        </div>
-        <div class="flex justify-center -mt-2">
-          <UButton
-            icon="i-lucide-arrow-left-right"
-            size="xs"
-            variant="ghost"
+          <button
+            type="button"
+            class="tui-btn disabled:opacity-50"
             :disabled="beforeId == null || afterId == null"
             @click="swapBeforeAfter"
           >
-            Swap
-          </UButton>
+            ⇄ SWAP
+          </button>
+          <UFormField
+            label="After"
+            class="flex-1 min-w-40"
+            :ui="{ label: 'tui-label' }"
+          >
+            <USelect
+              v-model.nullable="afterId"
+              :items="photoOptions"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
         </div>
 
         <!-- Drag-to-reveal before/after comparison, full quality (not the thumbnail) -->
-        <PhotoCompareSlider
-          v-if="beforePhoto && afterPhoto"
-          :before-url="beforePhoto.url"
-          :after-url="afterPhoto.url"
-          :before-label="formatDate(beforePhoto.date)"
-          :after-label="formatDate(afterPhoto.date)"
-          :before-style="frameStyle(beforePhoto)"
-          :after-style="frameStyle(afterPhoto)"
-        >
-          <UButton
-            icon="i-lucide-maximize-2"
-            size="xs"
-            variant="solid"
-            color="neutral"
-            class="absolute top-2 left-2 opacity-80"
-            @pointerdown.stop
-            @click="lightboxPhoto = beforePhoto"
-          />
-          <UButton
-            icon="i-lucide-maximize-2"
-            size="xs"
-            variant="solid"
-            color="neutral"
-            class="absolute top-2 right-2 opacity-80"
-            @pointerdown.stop
-            @click="lightboxPhoto = afterPhoto"
-          />
-        </PhotoCompareSlider>
-        <div v-else class="grid grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <div
-              v-if="beforePhoto"
-              class="w-full aspect-square rounded-lg border border-default overflow-hidden cursor-zoom-in"
+        <div class="mt-2.5">
+          <PhotoCompareSlider
+            v-if="beforePhoto && afterPhoto"
+            :before-url="beforePhoto.url"
+            :after-url="afterPhoto.url"
+            :before-label="formatDate(beforePhoto.date)"
+            :after-label="formatDate(afterPhoto.date)"
+            :before-style="frameStyle(beforePhoto)"
+            :after-style="frameStyle(afterPhoto)"
+          >
+            <button
+              type="button"
+              class="absolute top-2 left-2 px-1.5 py-0.5 text-[11px] bg-bg/80 border border-line-accent text-accent cursor-pointer"
+              aria-label="Expand before photo"
+              @pointerdown.stop
               @click="lightboxPhoto = beforePhoto"
             >
-              <img :src="beforePhoto.url" class="w-full h-full object-cover" :style="frameStyle(beforePhoto)" />
-            </div>
-            <div v-else class="w-full aspect-square rounded-lg border border-dashed border-default flex items-center justify-center text-sm text-muted">
-              No photo
-            </div>
-            <p class="text-xs text-muted text-center">{{ beforePhoto ? formatDate(beforePhoto.date) : '' }}</p>
-          </div>
-          <div class="space-y-2">
-            <div
-              v-if="afterPhoto"
-              class="w-full aspect-square rounded-lg border border-default overflow-hidden cursor-zoom-in"
+              ⤢
+            </button>
+            <button
+              type="button"
+              class="absolute top-2 right-2 px-1.5 py-0.5 text-[11px] bg-bg/80 border border-line-accent text-accent cursor-pointer"
+              aria-label="Expand after photo"
+              @pointerdown.stop
               @click="lightboxPhoto = afterPhoto"
             >
-              <img :src="afterPhoto.url" class="w-full h-full object-cover" :style="frameStyle(afterPhoto)" />
-            </div>
-            <div v-else class="w-full aspect-square rounded-lg border border-dashed border-default flex items-center justify-center text-sm text-muted">
-              No photo
-            </div>
-            <p class="text-xs text-muted text-center">{{ afterPhoto ? formatDate(afterPhoto.date) : '' }}</p>
-          </div>
-        </div>
+              ⤢
+            </button>
+          </PhotoCompareSlider>
 
-        <!-- Every individual photo in this category, for quick stepping (a day can have more than one) -->
-        <div class="pt-4 border-t border-default">
-          <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">All {{ photoCategoryLabel(category) }} photos</p>
-          <div class="flex flex-wrap gap-2">
-            <UContextMenu v-for="opt in photoOptions" :key="opt.value" :items="menuItemsFor(opt.photo)" :disabled="!isOwner">
-              <button
-                class="relative rounded-lg overflow-hidden border transition-all"
-                :class="[
-                  opt.value === beforeId ? 'ring-2 ring-primary'
-                  : opt.value === afterId ? 'ring-2 ring-success'
-                  : 'border-default',
-                ]"
-                :title="opt.label"
-                @click="pickPhoto(opt.value)"
+          <div
+            v-else
+            class="grid grid-cols-2 gap-2.5"
+          >
+            <div>
+              <div
+                v-if="beforePhoto"
+                class="w-full aspect-square border border-line-soft overflow-hidden cursor-zoom-in"
+                @click="lightboxPhoto = beforePhoto"
               >
-                <img :src="opt.photo.thumbUrl ?? opt.photo.url" loading="lazy" class="w-16 h-16 object-cover" :style="frameStyle(opt.photo)" />
-              </button>
-            </UContextMenu>
-          </div>
-          <p class="text-xs text-muted mt-2 flex items-center gap-3 flex-wrap">
-            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full ring-2 ring-primary" />Before</span>
-            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full ring-2 ring-success" />After</span>
-            <span>Tap a thumbnail to fill Before, then again to fill After. Long-press for options.</span>
-          </p>
-        </div>
-      </template>
-
-      <UModal v-model:open="lightboxOpen" :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''">
-        <template #body>
-          <img v-if="lightboxPhoto" :src="lightboxPhoto.url" class="w-full h-auto rounded-lg" />
-        </template>
-      </UModal>
-
-      <UModal v-model:open="editOpen" title="Edit Photo">
-        <template #body>
-          <div class="space-y-4">
-            <UFormField label="Date">
-              <UInput v-model="editForm.date" type="date" class="w-full font-mono" />
-            </UFormField>
-            <UFormField label="Category">
-              <USelect v-model="editForm.category" :items="[...PHOTO_CATEGORIES]" value-key="value" label-key="label" class="w-full" />
-            </UFormField>
-            <div class="flex justify-end gap-2 pt-2">
-              <UButton variant="ghost" @click="editOpen = false">Cancel</UButton>
-              <UButton :loading="savingEdit" :disabled="!editForm.date" @click="saveEdit">Save</UButton>
+                <img
+                  :src="beforePhoto.url"
+                  class="w-full h-full object-cover"
+                  :style="frameStyle(beforePhoto)"
+                >
+              </div>
+              <div
+                v-else
+                class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-[12px] text-muted"
+              >
+                no photo
+              </div>
+              <p class="mt-1.5 text-[11px] text-muted text-center">
+                {{ beforePhoto ? formatDate(beforePhoto.date) : '' }}
+              </p>
+            </div>
+            <div>
+              <div
+                v-if="afterPhoto"
+                class="w-full aspect-square border border-line-soft overflow-hidden cursor-zoom-in"
+                @click="lightboxPhoto = afterPhoto"
+              >
+                <img
+                  :src="afterPhoto.url"
+                  class="w-full h-full object-cover"
+                  :style="frameStyle(afterPhoto)"
+                >
+              </div>
+              <div
+                v-else
+                class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-[12px] text-muted"
+              >
+                no photo
+              </div>
+              <p class="mt-1.5 text-[11px] text-muted text-center">
+                {{ afterPhoto ? formatDate(afterPhoto.date) : '' }}
+              </p>
             </div>
           </div>
-        </template>
-      </UModal>
+        </div>
+      </section>
 
-      <UModal v-model:open="reframeOpen" title="Reframe Photo">
-        <template #body>
-          <div class="space-y-4">
-            <div
-              ref="reframeContainerRef"
-              class="relative w-full max-w-xs mx-auto aspect-square rounded-lg overflow-hidden border border-default select-none touch-none cursor-move"
-              @pointerdown="onReframePointerDown"
-              @pointermove="onReframePointerMove"
-              @pointerup="onReframePointerUp"
-              @pointercancel="onReframePointerUp"
+      <!-- Every individual photo in this category, for quick stepping (a day can have more than one) -->
+      <section class="px-4 sm:px-6 py-4 border-t border-line">
+        <TuiHeader
+          :label="`ALL ${photoCategoryLabel(category).toUpperCase()} · ${photosForCategory.length}`"
+          :dashes="8"
+        >
+          <span class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-muted normal-case">
+            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-warn" />before</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-accent glow-dot" />after</span>
+          </span>
+        </TuiHeader>
+
+        <div class="flex flex-wrap gap-1.5 mt-2.5">
+          <UContextMenu
+            v-for="opt in photoOptions"
+            :key="opt.value"
+            :items="menuItemsFor(opt.photo)"
+            :disabled="!isOwner"
+            :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+          >
+            <button
+              type="button"
+              class="relative overflow-hidden border transition-colors cursor-pointer"
+              :class="[
+                opt.value === beforeId ? 'border-warn'
+                : opt.value === afterId ? 'border-accent'
+                  : 'border-line-soft hover:border-line-accent'
+              ]"
+              :title="opt.label"
+              @click="pickPhoto(opt.value)"
             >
               <img
-                v-if="reframingPhoto"
-                :src="reframingPhoto.url"
-                class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                :style="{ transform: `translate(${reframeForm.offsetX}%, ${reframeForm.offsetY}%) scale(${reframeForm.scale})` }"
-                draggable="false"
-              />
-              <div class="absolute inset-0 pointer-events-none">
-                <div class="absolute left-1/2 top-0 bottom-0 w-px bg-white/50" />
-                <div class="absolute top-1/2 left-0 right-0 h-px bg-white/50" />
-              </div>
-            </div>
-            <p class="text-xs text-muted text-center">Drag the photo to reposition, use the slider to zoom.</p>
+                :src="opt.photo.thumbUrl ?? opt.photo.url"
+                loading="lazy"
+                class="w-15 h-15 object-cover"
+                :style="frameStyle(opt.photo)"
+              >
+            </button>
+          </UContextMenu>
+        </div>
 
-            <UFormField label="Zoom">
-              <USlider v-model="reframeForm.scale" :min="1" :max="3" :step="0.05" />
-            </UFormField>
+        <p class="mt-2.5 text-[11px] text-muted">
+          Tap a thumbnail to fill Before, then again to fill After.{{ isOwner ? ' Long-press for reframe / edit / delete.' : '' }}
+        </p>
+      </section>
+    </template>
 
-            <div class="flex items-center justify-between gap-2 pt-2">
-              <UButton variant="ghost" size="sm" icon="i-lucide-rotate-ccw" @click="resetReframeForm">Reset</UButton>
-              <div class="flex gap-2">
-                <UButton variant="ghost" @click="reframeOpen = false">Cancel</UButton>
-                <UButton :loading="savingReframe" @click="saveReframe">Save</UButton>
-              </div>
+    <UModal
+      v-model:open="lightboxOpen"
+      :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
+      <template #body>
+        <img
+          v-if="lightboxPhoto"
+          :src="lightboxPhoto.url"
+          class="w-full h-auto"
+        >
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="editOpen"
+      title="Edit Photo"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField
+            label="Date"
+            :ui="{ label: 'tui-label' }"
+          >
+            <UInput
+              v-model="editForm.date"
+              type="date"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Category"
+            :ui="{ label: 'tui-label' }"
+          >
+            <USelect
+              v-model="editForm.category"
+              :items="[...PHOTO_CATEGORIES]"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              class="tui-btn"
+              @click="editOpen = false"
+            >
+              CANCEL
+            </button>
+            <UButton
+              :loading="savingEdit"
+              :disabled="!editForm.date"
+              @click="saveEdit"
+            >
+              Save
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="reframeOpen"
+      title="Reframe Photo"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <div
+            ref="reframeContainerRef"
+            class="relative w-full max-w-xs mx-auto aspect-square overflow-hidden border border-line-input select-none touch-none cursor-move"
+            @pointerdown="onReframePointerDown"
+            @pointermove="onReframePointerMove"
+            @pointerup="onReframePointerUp"
+            @pointercancel="onReframePointerUp"
+          >
+            <img
+              v-if="reframingPhoto"
+              :src="reframingPhoto.url"
+              class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+              :style="{ transform: `translate(${reframeForm.offsetX}%, ${reframeForm.offsetY}%) scale(${reframeForm.scale})` }"
+              draggable="false"
+            >
+            <div class="absolute inset-0 pointer-events-none">
+              <div class="absolute left-1/2 top-0 bottom-0 w-px bg-accent/40" />
+              <div class="absolute top-1/2 left-0 right-0 h-px bg-accent/40" />
             </div>
           </div>
-        </template>
-      </UModal>
+          <p class="text-[11px] text-muted text-center">
+            Drag the photo to reposition, use the slider to zoom.
+          </p>
 
-    </div>
-  </UContainer>
+          <UFormField
+            label="Zoom"
+            :ui="{ label: 'tui-label' }"
+          >
+            <USlider
+              v-model="reframeForm.scale"
+              :min="1"
+              :max="3"
+              :step="0.05"
+            />
+          </UFormField>
+
+          <div class="flex items-center justify-between gap-2 pt-2">
+            <button
+              type="button"
+              class="tui-btn"
+              @click="resetReframeForm"
+            >
+              ⟲ RESET
+            </button>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="tui-btn"
+                @click="reframeOpen = false"
+              >
+                CANCEL
+              </button>
+              <UButton
+                :loading="savingReframe"
+                @click="saveReframe"
+              >
+                Save
+              </UButton>
+            </div>
+          </div>
+        </div>
+      </template>
+    </UModal>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -332,8 +537,14 @@ async function backfillThumbnails() {
   await refresh()
 }
 
+const backfillDescription = computed(() => {
+  const n = missingThumbnails.value.length
+  return `${n} photo${n === 1 ? '' : 's'} uploaded before thumbnails existed — generate them now to speed up loading, no re-upload needed.`
+})
+
 const backfillActions = computed(() => [{
   label: backfilling.value ? `Generating (${backfillDone.value}/${backfillTotal.value})…` : 'Generate thumbnails',
+  size: 'xs' as const,
   loading: backfilling.value,
   onClick: backfillThumbnails
 }])
@@ -344,6 +555,28 @@ const photosForCategory = computed(() =>
   (photosData.value ?? [])
     .filter(p => p.category === category.value)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
+)
+
+/** Per-category totals for the segmented category row. */
+const countByCategory = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const p of photosData.value ?? []) counts[p.category] = (counts[p.category] ?? 0) + 1
+  return counts
+})
+
+// Multi-part strings are assembled here rather than in the template — adjacent <template v-if>
+// blocks lose the separating whitespace once Vue condenses them.
+const headerMeta = computed(() => {
+  const all = photosData.value ?? []
+  if (!all.length) return 'no photos yet'
+  const parts = [`${all.length} total`]
+  const latest = [...all].sort((a, b) => a.date.localeCompare(b.date)).at(-1)
+  if (latest) parts.push(`latest ${formatDateTerse(latest.date)}`)
+  return parts.join(' · ')
+})
+
+const emptyDescription = computed(() =>
+  `No ${photoCategoryLabel(category.value).toLowerCase()} photos yet.${isOwner.value ? ' Drop some above to get started.' : ''}`
 )
 
 // One option per photo (not per date) - a day can have more than one shot in the same
@@ -409,7 +642,9 @@ watch(files, (newFiles, oldFiles) => {
     previewUrls.set(f, URL.createObjectURL(f))
     const meta = reactive<PhotoMeta>({ date: '', category: category.value, status: 'pending' })
     fileMeta.set(f, meta)
-    resolveExifDate(f).then((d) => { meta.date = d })
+    resolveExifDate(f).then((d) => {
+      meta.date = d
+    })
   }
 })
 
@@ -423,6 +658,12 @@ function previewUrlFor(file: File): string {
 
 const pendingCount = computed(() => [...fileMeta.values()].filter(m => m.status === 'pending' || m.status === 'error').length)
 const hasFinished = computed(() => [...fileMeta.values()].some(m => m.status === 'done'))
+
+const uploadLabel = computed(() => {
+  if (uploadingAll.value) return 'UPLOADING…'
+  const n = pendingCount.value
+  return `↑ UPLOAD ${n} PHOTO${n === 1 ? '' : 'S'}`
+})
 
 // ofetch wraps failures as "[POST] \"/api/...\": <status> <text>" with the server's actual
 // error (from h3's createError) tucked away in `.data.message` - surface that instead so
@@ -489,6 +730,19 @@ watch(photoOptions, (opts) => {
 const beforePhoto = computed(() => photosForCategory.value.find(p => p.id === beforeId.value) ?? null)
 const afterPhoto = computed(() => photosForCategory.value.find(p => p.id === afterId.value) ?? null)
 
+/** "Jul 2 → Aug 22 · 51d apart" — the meta line on the COMPARE header. Spans that cross a
+ *  year boundary keep the year, otherwise "May 5 → Aug 16 · 833d apart" reads as nonsense. */
+const compareMeta = computed(() => {
+  const b = beforePhoto.value
+  const a = afterPhoto.value
+  if (!b || !a) return 'pick two photos'
+  const style = b.date.slice(0, 4) === a.date.slice(0, 4) ? 'monthDay' : 'short'
+  const days = Math.abs(Math.round(
+    (new Date(a.date + 'T12:00:00').getTime() - new Date(b.date + 'T12:00:00').getTime()) / 86400000
+  ))
+  return `${formatDate(b.date, style)} → ${formatDate(a.date, style)} · ${days}d apart`
+})
+
 // Clicking a thumbnail fills Before first, then After, then starts overwriting Before again.
 // Once both are filled, the earlier date always ends up on the left (Before) - use the swap
 // button below the pickers to override.
@@ -496,7 +750,10 @@ function pickPhoto(id: number) {
   if (id === beforeId.value || id === afterId.value) return
   if (beforeId.value == null) beforeId.value = id
   else if (afterId.value == null) afterId.value = id
-  else { beforeId.value = afterId.value; afterId.value = id }
+  else {
+    beforeId.value = afterId.value
+    afterId.value = id
+  }
   sortBeforeAfterByDate()
 }
 
@@ -517,7 +774,6 @@ function swapBeforeAfter() {
   beforeId.value = afterId.value
   afterId.value = tmp
 }
-
 
 // --- Lightbox + per-photo context menu ---
 
@@ -598,8 +854,10 @@ function menuItemsFor(photo: ProgressPhoto) {
 // --- Reframing (manual pan/zoom to line up consistent framing across photos) ---
 // Stored as a percent offset + scale on the photo row and applied as a CSS transform
 // wherever it renders - non-destructive, the original pixels are untouched.
-function frameStyle(photo: ProgressPhoto | null) {
-  if (!photo || !isReframed(photo)) return {}
+// Always returns the same key set so the style binding stays assignable to
+// `Record<string, string>` (PhotoCompareSlider's before/after style props).
+function frameStyle(photo: ProgressPhoto | null): Record<string, string> {
+  if (!photo || !isReframed(photo)) return { transform: 'none' }
   return { transform: `translate(${photo.frameOffsetX}%, ${photo.frameOffsetY}%) scale(${photo.frameScale})` }
 }
 

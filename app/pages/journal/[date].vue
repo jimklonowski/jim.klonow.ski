@@ -1,259 +1,523 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-5xl mx-auto space-y-6">
+  <div>
+    <JournalHeader
+      section="ENTRY"
+      :meta="headingLabel"
+    >
+      <template #meta>
+        <template v-if="form.day">
+          · day <span class="text-body">{{ form.day }}</span>
+        </template>
+      </template>
+      <template #actions>
+        <NuxtLink
+          v-if="prevEntry"
+          :to="`/journal/${prevEntry.date}`"
+          class="text-[13px] text-faint hover:text-accent"
+          aria-label="Previous entry"
+        >‹</NuxtLink>
+        <NuxtLink
+          v-if="nextEntry"
+          :to="`/journal/${nextEntry.date}`"
+          class="text-[13px] text-faint hover:text-accent"
+          aria-label="Next entry"
+        >›</NuxtLink>
+        <NuxtLink
+          to="/journal/calendar"
+          class="tui-btn"
+        >
+          CALENDAR
+        </NuxtLink>
+        <button
+          v-if="isOwner"
+          type="button"
+          class="tui-btn tui-btn-accent"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ saving ? 'SAVING…' : '✓ SAVE' }}
+        </button>
+        <span
+          v-else
+          class="text-[10.5px] text-faint border border-line-input px-2 py-1.5 uppercase tracking-[0.08em]"
+        >read-only</span>
+      </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <!-- Header -->
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
-          <UButton to="/journal" variant="ghost" size="xs" icon="i-lucide-arrow-left" />
-          <UButton
-            v-if="prevEntry"
-            :to="`/journal/${prevEntry.date}`"
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-chevron-left"
-          />
-          <div>
-            <h1 class="text-2xl font-bold">{{ isNew ? 'New Entry' : formatDate(form.date, 'weekday') }}</h1>
-            <p v-if="form.day" class="text-muted text-sm">Day {{ form.day }}</p>
-          </div>
-          <UButton
-            v-if="nextEntry"
-            :to="`/journal/${nextEntry.date}`"
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-chevron-right"
-          />
-        </div>
-        <div class="flex gap-2">
-          <UButton
-            v-if="!isNew"
-            :to="`/journal/calendar`"
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-calendar"
-          />
-          <UButton
-            v-if="isOwner"
-            size="sm"
-            icon="i-lucide-save"
-            :loading="saving"
-            @click="save"
+    <div class="px-4 sm:px-6 py-4 space-y-5">
+      <!-- Date & vitals -->
+      <section>
+        <TuiHeader
+          label="DATE · VITALS"
+          :dashes="12"
+        />
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 mt-2.5">
+          <UFormField
+            label="Date"
+            :ui="FIELD_UI"
           >
-            Save
-          </UButton>
-          <UBadge v-else variant="subtle" color="neutral" icon="i-lucide-eye">Read-only</UBadge>
+            <UInput
+              v-model="form.date"
+              type="date"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Day #"
+            :ui="FIELD_UI"
+          >
+            <UInput
+              v-model.number="form.day"
+              type="number"
+              placeholder="35"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Weight (lbs)"
+            :ui="FIELD_UI"
+          >
+            <UInput
+              v-model.number="form.weight_lbs"
+              type="number"
+              step="0.1"
+              placeholder="155.0"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="BP Sys"
+            :ui="FIELD_UI"
+          >
+            <UInput
+              v-model.number="form.bp_systolic"
+              type="number"
+              placeholder="120"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="BP Dia"
+            :ui="FIELD_UI"
+          >
+            <UInput
+              v-model.number="form.bp_diastolic"
+              type="number"
+              placeholder="80"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="RHR (bpm)"
+            :ui="FIELD_UI"
+          >
+            <UInput
+              v-model.number="form.rhr"
+              type="number"
+              placeholder="50"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="HRV (ms)"
+            :ui="FIELD_UI"
+          >
+            <UInput
+              v-model.number="form.hrv"
+              type="number"
+              placeholder="44"
+              class="w-full"
+            />
+          </UFormField>
         </div>
-      </div>
-
-      <!-- Date & Day -->
-      <UCard>
-        <template #header><p class="text-sm font-semibold">Date</p></template>
-        <div class="grid grid-cols-2 gap-4">
-          <UFormField label="Date">
-            <UInput v-model="form.date" type="date" class="w-full font-mono" />
-          </UFormField>
-          <UFormField label="Day #">
-            <UInput v-model.number="form.day" type="number" placeholder="e.g. 35" class="w-full font-mono" />
-          </UFormField>
-        </div>
-      </UCard>
-
-      <!-- Vitals -->
-      <UCard>
-        <template #header><p class="text-sm font-semibold">Vitals</p></template>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <UFormField label="Weight (lbs)">
-            <UInput v-model.number="form.weight_lbs" type="number" step="0.1" placeholder="155.0" class="w-full font-mono" />
-          </UFormField>
-          <UFormField label="BP Systolic">
-            <UInput v-model.number="form.bp_systolic" type="number" placeholder="120" class="w-full font-mono" />
-          </UFormField>
-          <UFormField label="BP Diastolic">
-            <UInput v-model.number="form.bp_diastolic" type="number" placeholder="80" class="w-full font-mono" />
-          </UFormField>
-          <UFormField label="RHR (bpm)">
-            <UInput v-model.number="form.rhr" type="number" placeholder="50" class="w-full font-mono" />
-          </UFormField>
-          <UFormField label="HRV (ms)">
-            <UInput v-model.number="form.hrv" type="number" placeholder="44" class="w-full font-mono" />
-          </UFormField>
-        </div>
-      </UCard>
+      </section>
 
       <!-- Peptides -->
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <p class="text-sm font-semibold">Peptides</p>
-            <div class="flex gap-2">
-              <UButton v-if="isOwner && prevEntry?.peptides?.length" size="xs" variant="ghost" icon="i-lucide-copy" @click="copyFromPrevious">Copy prev</UButton>
-              <UButton size="xs" variant="outline" icon="i-lucide-plus" @click="addPeptide">Add</UButton>
-            </div>
-          </div>
-        </template>
+      <section>
+        <TuiHeader
+          label="PROTOCOL · DOSES"
+          :dashes="10"
+        >
+          <span class="flex items-center gap-3 text-[11px]">
+            <button
+              v-if="isOwner && prevEntry?.peptides?.length"
+              type="button"
+              class="text-accent hover:text-accent-hover cursor-pointer"
+              @click="copyFromPrevious"
+            >copy prev</button>
+            <button
+              type="button"
+              class="text-accent hover:text-accent-hover cursor-pointer"
+              @click="addPeptide"
+            >+ add</button>
+          </span>
+        </TuiHeader>
 
-        <div v-if="form.peptides.length" class="space-y-3">
+        <div
+          v-if="form.peptides.length"
+          class="space-y-2 mt-2.5"
+        >
           <div
             v-for="(peptide, i) in form.peptides"
             :key="i"
             class="grid grid-cols-12 gap-2 items-end"
           >
-            <UFormField label="Time" class="col-span-2">
-              <UInput v-model="peptide.time" type="time" class="w-full font-mono text-sm" />
+            <UFormField
+              label="Time"
+              class="col-span-4 sm:col-span-2"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model="peptide.time"
+                type="time"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="Compound" class="col-span-4">
+            <UFormField
+              label="Compound"
+              class="col-span-8 sm:col-span-4"
+              :ui="FIELD_UI"
+            >
               <UInput
                 v-model="peptide.compound"
                 :list="`compounds-${i}`"
                 placeholder="MOTS-C"
-                class="w-full font-mono text-sm"
+                class="w-full"
               />
               <datalist :id="`compounds-${i}`">
-                <option v-for="c in KNOWN_COMPOUNDS" :key="c" :value="c" />
+                <option
+                  v-for="c in KNOWN_COMPOUNDS"
+                  :key="c"
+                  :value="c"
+                />
               </datalist>
             </UFormField>
-            <UFormField label="Dose" class="col-span-2">
-              <UInput v-model.number="peptide.dose" type="number" step="0.1" placeholder="2.5" class="w-full font-mono text-sm" />
+            <UFormField
+              label="Dose"
+              class="col-span-4 sm:col-span-2"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="peptide.dose"
+                type="number"
+                step="0.1"
+                placeholder="2.5"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="Unit" class="col-span-1">
-              <USelect v-model="peptide.unit" :items="DOSE_UNITS" value-key="value" label-key="label" class="w-full text-sm" />
+            <UFormField
+              label="Unit"
+              class="col-span-3 sm:col-span-1"
+              :ui="FIELD_UI"
+            >
+              <USelect
+                v-model="peptide.unit"
+                :items="DOSE_UNITS"
+                value-key="value"
+                label-key="label"
+                class="w-full"
+                :ui="SELECT_UI"
+              />
             </UFormField>
-            <UFormField label="Site" class="col-span-2">
-              <USelect v-model="peptide.site" :items="INJECTION_SITES" value-key="value" label-key="label" class="w-full text-sm" />
+            <UFormField
+              label="Site"
+              class="col-span-4 sm:col-span-2"
+              :ui="FIELD_UI"
+            >
+              <USelect
+                v-model="peptide.site"
+                :items="INJECTION_SITES"
+                value-key="value"
+                label-key="label"
+                class="w-full"
+                :ui="SELECT_UI"
+              />
             </UFormField>
-            <div class="col-span-1 flex items-end pb-0.5">
-              <UButton variant="ghost" color="error" size="xs" icon="i-lucide-x" @click="removePeptide(i)" />
+            <div class="col-span-1 flex items-end pb-2">
+              <button
+                type="button"
+                class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                :aria-label="`Remove dose ${i + 1}`"
+                @click="removePeptide(i)"
+              >
+                ✕
+              </button>
             </div>
           </div>
         </div>
-        <p v-else class="text-sm text-muted">No peptides logged. Click Add to record injections.</p>
-      </UCard>
+        <p
+          v-else
+          class="mt-2.5 text-[12px] text-muted"
+        >
+          No doses logged. Use + add to record injections.
+        </p>
+      </section>
 
       <!-- Reconstitutions -->
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-semibold">Vial Reconstitutions</p>
-              <p class="text-xs text-muted">Log new vials mixed today</p>
-            </div>
-            <UButton size="xs" variant="outline" icon="i-lucide-flask-conical" @click="addReconstitution">Add</UButton>
-          </div>
-        </template>
+      <section>
+        <TuiHeader
+          label="VIAL RECONSTITUTIONS"
+          :dashes="6"
+        >
+          <button
+            type="button"
+            class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+            @click="addReconstitution"
+          >
+            ⚗ add
+          </button>
+        </TuiHeader>
 
-        <div v-if="form.reconstitutions.length" class="space-y-3">
+        <div
+          v-if="form.reconstitutions.length"
+          class="space-y-2 mt-2.5"
+        >
           <div
             v-for="(r, i) in form.reconstitutions"
             :key="i"
             class="grid grid-cols-12 gap-2 items-end"
           >
-            <UFormField label="Compound" class="col-span-3">
+            <UFormField
+              label="Compound"
+              class="col-span-6 sm:col-span-3"
+              :ui="FIELD_UI"
+            >
               <UInput
                 v-model="r.compound"
                 :list="`recon-compounds-${i}`"
                 placeholder="GHK-Cu"
-                class="w-full font-mono text-sm"
+                class="w-full"
               />
               <datalist :id="`recon-compounds-${i}`">
-                <option v-for="c in KNOWN_COMPOUNDS" :key="c" :value="c" />
+                <option
+                  v-for="c in KNOWN_COMPOUNDS"
+                  :key="c"
+                  :value="c"
+                />
               </datalist>
             </UFormField>
-            <UFormField label="Vial size" class="col-span-2">
-              <UInput v-model.number="r.vial_amount" type="number" placeholder="50" class="w-full font-mono text-sm" />
+            <UFormField
+              label="Vial size"
+              class="col-span-3 sm:col-span-2"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="r.vial_amount"
+                type="number"
+                placeholder="50"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="Unit" class="col-span-1">
-              <USelect v-model="r.vial_unit" :items="DOSE_UNITS" value-key="value" label-key="label" class="w-full text-sm" />
+            <UFormField
+              label="Unit"
+              class="col-span-2 sm:col-span-1"
+              :ui="FIELD_UI"
+            >
+              <USelect
+                v-model="r.vial_unit"
+                :items="DOSE_UNITS"
+                value-key="value"
+                label-key="label"
+                class="w-full"
+                :ui="SELECT_UI"
+              />
             </UFormField>
-            <UFormField label="Supplier" class="col-span-3">
-              <UInput v-model="r.supplier" placeholder="EZ Peptides" class="w-full text-sm" />
+            <UFormField
+              label="Supplier"
+              class="col-span-6 sm:col-span-3"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model="r.supplier"
+                placeholder="EZ Peptides"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="BAC water (mL)" class="col-span-2">
-              <UInput v-model.number="r.bac_water_ml" type="number" step="0.5" placeholder="2" class="w-full font-mono text-sm" />
+            <UFormField
+              label="BAC water (mL)"
+              class="col-span-5 sm:col-span-2"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="r.bac_water_ml"
+                type="number"
+                step="0.5"
+                placeholder="2"
+                class="w-full"
+              />
             </UFormField>
-            <div class="col-span-1 flex items-end pb-0.5">
-              <UButton variant="ghost" color="error" size="xs" icon="i-lucide-x" @click="removeReconstitution(i)" />
+            <div class="col-span-1 flex items-end pb-2">
+              <button
+                type="button"
+                class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                :aria-label="`Remove reconstitution ${i + 1}`"
+                @click="removeReconstitution(i)"
+              >
+                ✕
+              </button>
             </div>
           </div>
         </div>
-        <p v-else class="text-sm text-muted">No reconstitutions today.</p>
-      </UCard>
+        <p
+          v-else
+          class="mt-2.5 text-[12px] text-muted"
+        >
+          No reconstitutions today.
+        </p>
+      </section>
 
-      <!-- Food -->
-      <UCard>
-        <template #header><p class="text-sm font-semibold">Food</p></template>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField label="Breakfast">
-            <UInput v-model="form.food.breakfast" list="meal-history" placeholder="Protein shake + creatine" class="w-full" />
-          </UFormField>
-          <UFormField label="Snack">
-            <UInput v-model="form.food.snack" list="meal-history" placeholder="Sourdough" class="w-full" />
-          </UFormField>
-          <UFormField label="Lunch">
-            <UInput v-model="form.food.lunch" list="meal-history" placeholder="Chipotle bowl" class="w-full" />
-          </UFormField>
-          <UFormField label="Dinner">
-            <UInput v-model="form.food.dinner" list="meal-history" placeholder="Steak + veggies" class="w-full" />
-          </UFormField>
-        </div>
-        <datalist id="meal-history">
-          <option v-for="m in mealHistory" :key="m" :value="m" />
-        </datalist>
-      </UCard>
-
-      <!-- Sodas -->
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <p class="text-sm font-semibold">Sodas</p>
-            <UButton size="xs" variant="outline" icon="i-lucide-plus" @click="addSoda">Add</UButton>
+      <!-- Food + sodas -->
+      <div class="grid gap-5 lg:grid-cols-2">
+        <section>
+          <TuiHeader
+            label="FOOD"
+            :dashes="20"
+          />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
+            <UFormField
+              v-for="slot in MEAL_SLOTS"
+              :key="slot.key"
+              :label="slot.label"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model="form.food[slot.key]"
+                list="meal-history"
+                :placeholder="slot.placeholder"
+                class="w-full"
+              />
+            </UFormField>
           </div>
-        </template>
+          <datalist id="meal-history">
+            <option
+              v-for="m in mealHistory"
+              :key="m"
+              :value="m"
+            />
+          </datalist>
+        </section>
 
-        <div v-if="form.sodas.length" class="space-y-3">
-          <div
-            v-for="(soda, i) in form.sodas"
-            :key="i"
-            class="grid grid-cols-12 gap-2 items-end"
+        <section>
+          <TuiHeader
+            label="SODA"
+            :dashes="20"
           >
-            <UFormField label="Time" class="col-span-3">
-              <UInput v-model="soda.time" type="time" class="w-full font-mono text-sm" />
-            </UFormField>
-            <UFormField label="Drink" class="col-span-5">
-              <UInput v-model="soda.drink" list="soda-drinks" placeholder="Dr Pepper" class="w-full text-sm" />
-            </UFormField>
-            <UFormField label="Size" class="col-span-3">
-              <UInput v-model="soda.size" list="soda-sizes" placeholder="12oz can" class="w-full text-sm" />
-            </UFormField>
-            <div class="col-span-1 flex items-end pb-0.5">
-              <UButton variant="ghost" color="error" size="xs" icon="i-lucide-x" @click="removeSoda(i)" />
+            <button
+              type="button"
+              class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+              @click="addSoda"
+            >
+              + add
+            </button>
+          </TuiHeader>
+
+          <div
+            v-if="form.sodas.length"
+            class="space-y-2 mt-2.5"
+          >
+            <div
+              v-for="(soda, i) in form.sodas"
+              :key="i"
+              class="grid grid-cols-12 gap-2 items-end"
+            >
+              <UFormField
+                label="Time"
+                class="col-span-3"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model="soda.time"
+                  type="time"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Drink"
+                class="col-span-4"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model="soda.drink"
+                  list="soda-drinks"
+                  placeholder="Dr Pepper"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Size"
+                class="col-span-4"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model="soda.size"
+                  list="soda-sizes"
+                  placeholder="12oz can"
+                  class="w-full"
+                />
+              </UFormField>
+              <div class="col-span-1 flex items-end pb-2">
+                <button
+                  type="button"
+                  class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                  :aria-label="`Remove soda ${i + 1}`"
+                  @click="removeSoda(i)"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        <p v-else class="text-sm text-muted">No sodas logged.</p>
+          <p
+            v-else
+            class="mt-2.5 text-[12px] text-muted"
+          >
+            No sodas logged.
+          </p>
 
-        <datalist id="soda-drinks">
-          <option v-for="d in SODA_DRINKS" :key="d" :value="d" />
-        </datalist>
-        <datalist id="soda-sizes">
-          <option v-for="s in SODA_SIZES" :key="s" :value="s" />
-        </datalist>
-      </UCard>
+          <datalist id="soda-drinks">
+            <option
+              v-for="d in SODA_DRINKS"
+              :key="d"
+              :value="d"
+            />
+          </datalist>
+          <datalist id="soda-sizes">
+            <option
+              v-for="s in SODA_SIZES"
+              :key="s"
+              :value="s"
+            />
+          </datalist>
+        </section>
+      </div>
 
-      <!-- Progress Photos -->
-      <UCard>
-        <template #header><p class="text-sm font-semibold">Progress Photos</p></template>
+      <!-- Progress photos -->
+      <section>
+        <TuiHeader
+          label="PROGRESS PHOTOS"
+          :dashes="8"
+        >
+          <span
+            v-if="dayPhotos.length"
+            class="text-[10.5px] text-muted"
+          >{{ dayPhotos.length }} on file</span>
+        </TuiHeader>
 
-        <div v-if="isOwner" class="flex flex-wrap gap-2 mb-4">
-          <UButton
+        <div
+          v-if="isOwner"
+          class="flex flex-wrap gap-2 mt-2.5"
+        >
+          <button
             v-for="c in PHOTO_CATEGORIES"
             :key="c.value"
-            size="xs"
-            :variant="uploadCategory === c.value ? 'solid' : 'outline'"
+            type="button"
+            class="tui-btn"
+            :class="uploadCategory === c.value ? 'tui-btn-accent' : ''"
             @click="uploadCategory = c.value"
           >
             {{ c.label }}
-          </UButton>
+          </button>
         </div>
 
         <UFileUpload
@@ -265,46 +529,93 @@
           icon="i-lucide-camera"
           :label="`Drop a ${photoCategoryLabel(uploadCategory)} photo here`"
           description="or click to browse — date is detected automatically from EXIF"
-          class="w-full"
+          class="w-full mt-2.5"
+          :ui="{
+            base: 'bg-raised border border-dashed border-line-input',
+            label: 'text-[12.5px] text-body',
+            description: 'text-[11px] text-muted'
+          }"
         >
           <template #file="{ removeFile }">
             <div class="flex items-center gap-4 w-full">
-              <img v-if="pendingPreviewUrl" :src="pendingPreviewUrl" class="w-24 h-24 object-cover rounded-lg border border-default" />
+              <img
+                v-if="pendingPreviewUrl"
+                :src="pendingPreviewUrl"
+                class="w-24 h-24 object-cover border border-line"
+              >
               <div class="flex-1 space-y-2">
-                <UFormField label="Date" description="Detected from the photo's EXIF data — edit if it's wrong">
-                  <UInput v-model="pendingDate" type="date" class="w-full font-mono" />
+                <UFormField
+                  label="Date"
+                  description="Detected from the photo's EXIF data — edit if it's wrong"
+                  :ui="FIELD_UI"
+                >
+                  <UInput
+                    v-model="pendingDate"
+                    type="date"
+                    class="w-full"
+                  />
                 </UFormField>
                 <div class="flex gap-2">
-                  <UButton size="xs" icon="i-lucide-upload" :loading="photoUploading" @click="confirmUploadPhoto">Upload</UButton>
-                  <UButton size="xs" variant="ghost" @click="removeFile">Cancel</UButton>
+                  <button
+                    type="button"
+                    class="tui-btn tui-btn-accent"
+                    :disabled="photoUploading"
+                    @click="confirmUploadPhoto"
+                  >
+                    {{ photoUploading ? 'UPLOADING…' : '↑ UPLOAD' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="tui-btn"
+                    @click="removeFile()"
+                  >
+                    CANCEL
+                  </button>
                 </div>
               </div>
             </div>
           </template>
         </UFileUpload>
 
-        <p v-if="photoError" class="text-sm text-error mt-2">{{ photoError }}</p>
+        <p
+          v-if="photoError"
+          class="mt-2 text-[12px] text-danger"
+        >
+          {{ photoError }}
+        </p>
 
-        <template v-for="c in PHOTO_CATEGORIES" :key="c.value">
-          <div v-if="photosFor(c.value).length" class="mt-4">
-            <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">{{ c.label }}</p>
+        <template
+          v-for="c in PHOTO_CATEGORIES"
+          :key="c.value"
+        >
+          <div
+            v-if="photosFor(c.value).length"
+            class="mt-3"
+          >
+            <p class="text-[10.5px] text-muted uppercase tracking-[0.12em] mb-1.5">
+              {{ c.label }}
+            </p>
             <div class="flex flex-wrap gap-2">
-              <div v-for="photo in photosFor(c.value)" :key="photo.id" class="relative group">
+              <div
+                v-for="photo in photosFor(c.value)"
+                :key="photo.id"
+                class="relative group"
+              >
                 <img
                   :src="photo.thumbUrl ?? photo.url"
                   loading="lazy"
-                  class="w-20 h-20 object-cover rounded-lg border border-default cursor-pointer"
+                  class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
                   @click="lightboxPhoto = photo"
-                />
-                <UButton
+                >
+                <button
                   v-if="isOwner"
-                  variant="solid"
-                  color="error"
-                  size="xs"
-                  icon="i-lucide-x"
-                  class="absolute -top-1.5 -right-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  type="button"
+                  class="absolute top-0 right-0 px-1 text-[11px] bg-bg text-faint hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  aria-label="Delete photo"
                   @click="deletePhoto(photo.id)"
-                />
+                >
+                  ✕
+                </button>
               </div>
             </div>
           </div>
@@ -316,67 +627,100 @@
           title="No progress photos"
           description="No progress photos for this day yet."
           class="mt-2"
+          :ui="{ title: 'text-[12.5px] text-body', description: 'text-[11px] text-muted' }"
         />
-      </UCard>
+      </section>
 
-      <UModal v-model:open="lightboxOpen" :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''">
-        <template #body>
-          <img v-if="lightboxPhoto" :src="lightboxPhoto.url" class="w-full h-auto rounded-lg" />
-        </template>
-      </UModal>
-
-      <!-- Synced workouts (Apple Health / Whoop) -->
-      <UCard v-if="dayWorkouts.length">
-        <template #header><p class="text-sm font-semibold">Workouts (synced)</p></template>
-        <div class="space-y-2">
+      <!-- Synced workouts -->
+      <section v-if="dayWorkouts.length">
+        <TuiHeader
+          label="WORKOUTS · SYNCED"
+          :dashes="8"
+        />
+        <div class="mt-2.5">
           <div
-            v-for="w in dayWorkouts"
+            v-for="(w, i) in dayWorkouts"
             :key="w.id"
-            class="flex items-center justify-between text-sm border-b border-neutral-800 last:border-0 pb-2 last:pb-0"
+            class="flex items-baseline justify-between gap-3 px-2 py-1.5 text-[12.5px]"
+            :class="i % 2 ? 'bg-inset' : ''"
+            :title="w.sources.length > 1 ? w.sources.join(' + ') : undefined"
           >
-            <div class="flex items-center gap-2">
-              <UIcon :name="workoutIcon(w.workout_type)" class="w-3.5 h-3.5 text-muted" />
-              <span class="font-medium">{{ w.workout_type ?? 'Workout' }}</span>
-              <span v-if="w.sources.length > 1" class="text-xs text-muted">{{ w.sources.join(' + ') }}</span>
-            </div>
-            <div class="flex items-center gap-3 text-xs font-mono text-muted">
-              <span v-if="w.duration_min != null">{{ w.duration_min }} min</span>
-              <span v-if="w.calories != null">{{ w.calories }} kcal</span>
-              <span v-if="w.avg_hr != null">♥ {{ w.avg_hr }}</span>
-              <span v-if="w.distance_mi != null">{{ w.distance_mi }} mi</span>
-            </div>
+            <span class="text-hi">{{ w.workout_type ?? 'Workout' }}</span>
+            <span class="text-muted">{{ workoutMeta(w) }}</span>
           </div>
         </div>
-      </UCard>
+      </section>
 
       <!-- Notes -->
-      <UCard>
-        <template #header><p class="text-sm font-semibold">Notes</p></template>
-        <div class="space-y-4">
-          <UFormField label="Notes">
-            <UTextarea v-model="form.notes" placeholder="Any observations, how you felt, etc." :rows="3" class="w-full" />
-          </UFormField>
-        </div>
-      </UCard>
+      <section>
+        <TuiHeader
+          label="NOTES"
+          :dashes="20"
+        />
+        <UTextarea
+          v-model="form.notes"
+          placeholder="Any observations, how you felt, etc."
+          :rows="3"
+          class="w-full mt-2.5"
+        />
+      </section>
 
-      <!-- Save -->
-      <div v-if="isOwner" class="flex justify-end gap-3">
-        <UButton to="/journal" variant="ghost">Cancel</UButton>
-        <UButton :loading="saving" icon="i-lucide-save" @click="save">Save Entry</UButton>
+      <div
+        v-if="isOwner"
+        class="flex justify-end gap-2"
+      >
+        <NuxtLink
+          to="/journal"
+          class="tui-btn"
+        >
+          CANCEL
+        </NuxtLink>
+        <button
+          type="button"
+          class="tui-btn tui-btn-accent"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ saving ? 'SAVING…' : '✓ SAVE ENTRY' }}
+        </button>
       </div>
-
     </div>
-  </UContainer>
+
+    <UModal
+      v-model:open="lightboxOpen"
+      :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
+      <template #body>
+        <img
+          v-if="lightboxPhoto"
+          :src="lightboxPhoto.url"
+          class="w-full h-auto"
+        >
+      </template>
+    </UModal>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
-import { workoutIcon } from '~/data/workouts'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
+import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
 import exifr from 'exifr'
 
 definePageMeta({ middleware: 'journal-auth' })
+
+// Shared :ui overrides so every field on this long form reads the same.
+const FIELD_UI = { label: 'tui-label' }
+const SELECT_UI = { content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }
+
+const MEAL_SLOTS = [
+  { key: 'breakfast', label: 'Breakfast', placeholder: 'Protein shake + creatine' },
+  { key: 'snack', label: 'Snack', placeholder: 'Sourdough' },
+  { key: 'lunch', label: 'Lunch', placeholder: 'Chipotle bowl' },
+  { key: 'dinner', label: 'Dinner', placeholder: 'Steak + veggies' }
+] as const
 
 const nuxtApp = useNuxtApp()
 const route = useRoute()
@@ -394,6 +738,22 @@ onMounted(refreshWorkouts)
 onMounted(refreshPhotos)
 
 const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
+
+/** "MON 2026-08-24" — the terminal heading form. */
+const headingLabel = computed(() => {
+  if (isNew.value) return 'NEW ENTRY'
+  const weekday = new Date(form.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })
+  return `${weekday.toUpperCase()} ${form.date}`
+})
+
+function workoutMeta(w: WorkoutEntry) {
+  return [
+    w.duration_min != null ? `${w.duration_min} min` : null,
+    w.calories != null ? `${w.calories} kcal` : null,
+    w.avg_hr != null ? `♥ ${w.avg_hr}` : null,
+    w.distance_mi != null ? `${w.distance_mi} mi` : null
+  ].filter(Boolean).join(' · ')
+}
 
 // --- Progress Photos ---
 
@@ -423,10 +783,7 @@ const photoUploading = ref(false)
 const photoError = ref('')
 
 function toLocalDateStr(d: Date) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  return d.toLocaleDateString('en-CA')
 }
 
 // UFileUpload owns selection/drag-drop via its v-model - react to the file it hands us instead
@@ -496,7 +853,9 @@ async function deletePhoto(id: number) {
 const lightboxPhoto = ref<ProgressPhoto | null>(null)
 const lightboxOpen = computed({
   get: () => !!lightboxPhoto.value,
-  set: (v: boolean) => { if (!v) lightboxPhoto.value = null }
+  set: (v: boolean) => {
+    if (!v) lightboxPhoto.value = null
+  }
 })
 
 const existingEntry = computed(() =>
@@ -507,19 +866,17 @@ const isNew = computed(() => !existingEntry.value)
 
 const prevEntry = computed(() => {
   if (!allEntries.value?.length) return null
-  const earlier = allEntries.value.filter(e => e.date < dateParam.value)
-  return earlier.at(-1) ?? null
+  return allEntries.value.filter(e => e.date < dateParam.value).at(-1) ?? null
 })
 
 const nextEntry = computed(() => {
   if (!allEntries.value?.length) return null
-  const later = allEntries.value.filter(e => e.date > dateParam.value)
-  return later[0] ?? null
+  return allEntries.value.filter(e => e.date > dateParam.value)[0] ?? null
 })
 
 function copyFromPrevious() {
   if (!prevEntry.value?.peptides?.length) return
-  form.peptides = prevEntry.value.peptides.map((p: PeptideEntry) => ({ ...p }))
+  form.peptides = prevEntry.value.peptides.map(p => ({ ...p }))
 }
 
 // Pooled across all four meal slots (and all days) so an order typed for lunch once
@@ -527,8 +884,8 @@ function copyFromPrevious() {
 const mealHistory = computed(() => {
   const counts: Record<string, number> = {}
   for (const e of allEntries.value ?? []) {
-    for (const slot of ['breakfast', 'snack', 'lunch', 'dinner'] as const) {
-      const v = e.food?.[slot]?.trim()
+    for (const slot of MEAL_SLOTS) {
+      const v = e.food?.[slot.key]?.trim()
       if (v) counts[v] = (counts[v] ?? 0) + 1
     }
   }
@@ -583,15 +940,15 @@ function buildForm() {
     bp_diastolic: entry.bp_diastolic ?? null,
     rhr: entry.rhr ?? null,
     hrv: entry.hrv ?? null,
-    peptides: (entry.peptides ?? []).map((p: PeptideEntry) => ({ ...p })),
-    reconstitutions: (entry.reconstitutions ?? []).map((r: ReconstitutionEntry) => ({ ...r })),
+    peptides: (entry.peptides ?? []).map(p => ({ ...p })),
+    reconstitutions: (entry.reconstitutions ?? []).map(r => ({ ...r })),
     food: {
       breakfast: entry.food?.breakfast ?? '',
       snack: entry.food?.snack ?? '',
       lunch: entry.food?.lunch ?? '',
       dinner: entry.food?.dinner ?? ''
     },
-    sodas: (entry.sodas ?? []).map((s: SodaEntry) => ({ ...s })),
+    sodas: (entry.sodas ?? []).map(s => ({ ...s })),
     notes: entry.notes ?? ''
   }
 }
@@ -658,5 +1015,4 @@ async function save() {
     saving.value = false
   }
 }
-
 </script>
