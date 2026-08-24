@@ -102,7 +102,8 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: {
       include: [
-        '@unhead/schema-org/vue'
+        '@unhead/schema-org/vue',
+        'exifr'
       ]
     },
     server: {

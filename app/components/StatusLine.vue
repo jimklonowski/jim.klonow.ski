@@ -1,6 +1,8 @@
 <template>
   <div class="bg-status border-b border-line">
-    <div class="flex items-center gap-4 sm:gap-5 px-3 sm:px-4 h-7.5 text-[10.5px] tracking-[0.06em] uppercase whitespace-nowrap overflow-x-auto">
+    <!-- Wraps below sm rather than scrolling sideways: on a phone the tail of the bar
+         (last draw, soda) was simply unreachable. -->
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-[10.5px] tracking-[0.06em] uppercase whitespace-nowrap overflow-x-auto">
       <span class="text-muted shrink-0">
         {{ todayLabel }}
         <template v-if="latestEntry?.day != null"> · day <span class="text-body font-medium">{{ latestEntry.day }}</span></template>
@@ -39,7 +41,7 @@
         </span>
       </template>
 
-      <span class="ml-auto shrink-0 text-ghost normal-case tracking-normal hidden sm:inline">
+      <span class="sm:ml-auto shrink-0 text-ghost normal-case tracking-normal hidden sm:inline">
         <template v-if="hasSession && latestMetrics">whoop ✓ apple-health ✓ · synced {{ formatDate(latestMetrics.date, 'monthDay').toLowerCase() }}</template>
         <template v-else-if="!hasSession">guest session · <NuxtLink
           to="/labs/login"
