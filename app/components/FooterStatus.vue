@@ -1,6 +1,8 @@
 <template>
   <footer class="bg-status border-t border-line">
-    <div class="flex items-center gap-4 sm:gap-5 px-3 sm:px-4 h-7.5 text-[10.5px] text-ghost whitespace-nowrap overflow-x-auto">
+    <!-- Same wrap-below-sm treatment as StatusLine: sign in / sign out sat off the right
+         edge of a phone screen behind a horizontal scroll nobody would find. -->
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-[10.5px] text-ghost whitespace-nowrap overflow-x-auto">
       <span class="shrink-0">jim.klonow.ski v2</span>
 
       <template v-if="hasSession">
@@ -17,7 +19,7 @@
         </span>
       </template>
 
-      <span class="ml-auto shrink-0 flex items-center gap-1.5">
+      <span class="sm:ml-auto shrink-0 flex items-center gap-1.5">
         <span class="hidden sm:inline">⌘K command</span>
         <template v-if="role">
           <span class="hidden sm:inline">·</span>

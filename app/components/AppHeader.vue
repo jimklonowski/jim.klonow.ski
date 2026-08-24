@@ -1,6 +1,9 @@
 <template>
   <header class="border-b border-line bg-bg">
-    <div class="flex items-center gap-3 sm:gap-5 px-3 sm:px-4 h-13">
+    <!-- Wraps below md: the nav drops to its own full-width row so the header can never
+         push the document wider than the viewport (which used to scroll the whole page
+         sideways on a phone and clip the status/footer bars with it). -->
+    <div class="flex flex-wrap md:flex-nowrap items-center gap-x-3 sm:gap-x-5 gap-y-1.5 px-3 sm:px-4 py-2 md:py-0 md:h-13">
       <!-- Logo -->
       <NuxtLink
         to="/"
@@ -26,20 +29,21 @@
       <!-- Mobile palette trigger -->
       <button
         type="button"
-        class="md:hidden ml-auto text-[10px] text-faint border border-line-input px-1.5 py-1"
+        class="md:hidden ml-auto text-[10px] text-faint border border-line-input px-2 py-1.5"
         aria-label="Open command palette"
         @click="paletteOpen = true"
       >
         ⌘K
       </button>
 
-      <!-- Nav -->
-      <nav class="flex items-center gap-1 shrink-0 overflow-x-auto">
+      <!-- Nav: own row under the logo on mobile (`order-last` keeps the session dot up on
+           the logo row), inline in the bar from md up. -->
+      <nav class="max-md:order-last w-full md:w-auto md:shrink-0 flex items-center gap-1 overflow-x-auto">
         <NuxtLink
           v-for="item in items"
           :key="item.to"
           :to="item.to"
-          class="px-2.5 py-1.5 text-[11px] font-medium tracking-[0.08em] uppercase whitespace-nowrap border transition-colors"
+          class="shrink-0 px-2.5 py-1.5 text-[11px] font-medium tracking-[0.08em] uppercase whitespace-nowrap border transition-colors"
           :class="isActive(item) ? 'bg-nav-active text-accent border-line-accent' : 'text-[#6b8578] border-transparent hover:text-accent'"
         >
           {{ item.label }}
