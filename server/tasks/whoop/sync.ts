@@ -1,4 +1,5 @@
 /// <reference path="../../../worker-configuration.d.ts" />
+import { HOME_TZ } from '#shared/utils/time'
 import type { HealthMetricField, WorkoutUpsert } from '../../utils/db'
 
 interface WhoopCollectionResponse<T> {
@@ -37,10 +38,8 @@ interface WhoopCycleRecord {
 
 // Whoop timestamps are UTC; bucketing by their date string put any evening workout (7pm+ local)
 // on the next day, where it could no longer line up with the Apple Health copy of the same
-// session. Convert to home timezone before taking the date. The en-CA locale is used purely
-// because it formats dates as ISO YYYY-MM-DD (en-US would give 07/20/2026); the timeZone
-// option does the actual conversion.
-const HOME_TZ = 'America/Chicago'
+// session. Convert to home timezone before taking the date. HOME_TZ comes from
+// shared/utils/time.ts, which is also where "today" is derived for the same reason.
 const localDateFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: HOME_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
 })

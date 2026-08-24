@@ -16,11 +16,6 @@ export interface FlaggedMarker {
   delta: number | null
 }
 
-/** Local (not UTC) YYYY-MM-DD, so an evening "today" doesn't roll over to tomorrow. */
-export function localToday(): string {
-  return new Date().toLocaleDateString('en-CA')
-}
-
 // Shared aggregator behind the shell (header status line, footer, command palette) and the
 // mission-control home page. The list endpoints 401 without a session, so every fetch is
 // gated on the role — guests get empty arrays instead of failed requests. Login is a hard
@@ -66,19 +61,15 @@ export function useOverview(role: Ref<Role | null>) {
     [...(workouts?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
   )
 
-  /** Consecutive logged days ending at the most recent entry. */
-  const streak = computed(() => {
-    const last = latestEntry.value
-    if (!last) return 0
-    const dates = new Set(entries.value.map(e => e.date))
-    let count = 0
-    const d = new Date(last.date + 'T12:00:00')
-    while (dates.has(d.toLocaleDateString('en-CA'))) {
-      count++
-      d.setDate(d.getDate() - 1)
-    }
-    return count
-  })
+  /**
+   * Days with something hand-entered, oldest first. `entries` above deliberately stays
+   * unfiltered — the vitals-only rows are what the weight/RHR/HRV series read — but any
+   * "how much have I logged" figure has to use this instead. See app/utils/journalLog.ts.
+   */
+  const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
+
+  /** Consecutive logged days ending today (or yesterday, if today isn't logged yet). */
+  const streak = computed(() => loggedStreak(entries.value, localToday()))
 
   const todayEntry = computed(() => entries.value.find(e => e.date === localToday()) ?? null)
   const sodasToday = computed(() => todayEntry.value?.sodas?.length ?? 0)
@@ -142,6 +133,7 @@ export function useOverview(role: Ref<Role | null>) {
   return {
     hasSession,
     entries,
+    loggedEntries,
     latestEntry,
     todayEntry,
     draws,

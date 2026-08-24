@@ -79,7 +79,6 @@ export interface Supplement {
 
 export interface JournalEntry {
   date: string
-  day?: number | null
   weight_lbs?: number | null
   bp_systolic?: number | null
   bp_diastolic?: number | null
@@ -247,7 +246,6 @@ export function formatSite(site: string): string {
 export function blankEntry(date: string): JournalEntry {
   return {
     date,
-    day: null,
     weight_lbs: null,
     bp_systolic: null,
     bp_diastolic: null,

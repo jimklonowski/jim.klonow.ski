@@ -15,6 +15,7 @@
         placeholder="jump to a marker, day, or compound…"
         icon=""
         close
+        :fuse="{ resultLimit: 100 }"
         :ui="{
           root: 'bg-raised divide-line-soft',
           input: '[&>input]:text-[12.5px] [&>input]:h-11',
@@ -90,14 +91,20 @@ const jumpItems = computed(() => {
       { label: 'photos', suffix: '/journal/photos', onSelect: () => go('/journal/photos') }
     )
   }
-  if (isOwner.value) {
-    items.push(
-      { label: 'inventory · vials', suffix: '/journal/inventory', onSelect: () => go('/journal/inventory') },
-      { label: 'import', suffix: '/journal/import', onSelect: () => go('/journal/import') },
-      { label: 'sharing', suffix: '/labs/sharing', onSelect: () => go('/labs/sharing') }
-    )
-  }
   return items
+})
+
+// Owner-only management surfaces, kept out of JUMP so neither list runs long. They were the tail
+// of JUMP until UCommandPalette's default `resultLimit: 12` started silently slicing them off
+// once the owner list hit 15 entries — hence the explicit :fuse limit above as well. Suffixes
+// carry the words worth searching for ("invite", "share", "apple health").
+const manageItems = computed(() => {
+  if (!isOwner.value) return []
+  return [
+    { label: 'sharing · invite links', suffix: 'share with friends + doctor', onSelect: () => go('/labs/sharing') },
+    { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/journal/import') },
+    { label: 'inventory · vials', suffix: '/journal/inventory', onSelect: () => go('/journal/inventory') }
+  ]
 })
 
 const actionItems = computed(() => {
@@ -158,6 +165,7 @@ const dateItems = computed(() => {
 const groups = computed(() => {
   const list = [{ id: 'jump', label: 'JUMP', items: jumpItems.value }]
   if (actionItems.value.length) list.push({ id: 'actions', label: 'ACTIONS', items: actionItems.value })
+  if (manageItems.value.length) list.push({ id: 'manage', label: 'MANAGE', items: manageItems.value })
   if (markerItems.value.length) list.push({ id: 'markers', label: 'MARKERS', items: markerItems.value })
   if (compoundItems.value.length) list.push({ id: 'compounds', label: 'COMPOUNDS', items: compoundItems.value })
   if (dateItems.value.length) list.push({ id: 'dates', label: 'DAYS', items: dateItems.value })
