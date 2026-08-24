@@ -129,6 +129,27 @@ CREATE TABLE IF NOT EXISTS progress_photos (
 CREATE INDEX IF NOT EXISTS idx_progress_photos_date ON progress_photos(date);
 CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(category);
 
+-- Standing vitamin/supplement/skin-routine stack. Unlike journal peptides these are not
+-- dose-logged day by day — rows describe the ongoing regimen and feed the AI digest and
+-- lab-summary prompts as protocol context (see server/utils/protocol.ts).
+-- status 'on_hand' = owned but not being taken (support supplements staged for a future
+-- cycle, a possible finasteride->dutasteride switch, etc.) — listed to the AI separately.
+-- status 'stopped' rows are kept: recent stops are relevant context for lab trends.
+-- dose and schedule are freeform text ("160 mg", "2 capsules", "~10 min each morning").
+CREATE TABLE IF NOT EXISTS supplements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  dose TEXT,
+  category TEXT NOT NULL DEFAULT 'supplement', -- 'supplement' | 'skin'
+  status TEXT NOT NULL DEFAULT 'active',       -- 'active' | 'on_hand' | 'stopped'
+  schedule TEXT NOT NULL DEFAULT 'daily',
+  started TEXT,  -- YYYY-MM-DD; NULL = long-standing / unknown
+  stopped TEXT,  -- YYYY-MM-DD; set when status = 'stopped'
+  notes TEXT,    -- shown to the AI too, e.g. "raised from 25 mg on 2026-08-22"
+  sort INTEGER NOT NULL DEFAULT 100,
+  created_at TEXT NOT NULL
+);
+
 -- Share invites: owner-minted links (/share/<id>) that grant read-only role sessions.
 -- Redemption is gated by expires_at/max_uses; setting revoked=1 (or deleting the row) also
 -- invalidates every session cookie minted from the invite — the auth middleware re-checks
@@ -162,6 +183,9 @@ CREATE TABLE IF NOT EXISTS invites (
 
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE journal_entries ADD COLUMN sodas TEXT NOT NULL DEFAULT '[]';
+
+-- One-time seed, do not re-run after it lands on an environment (plain INSERTs, would duplicate):
+-- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/seed-supplements.sql
 
 -- One-time migration, do not re-run after it lands on an environment.
 -- Folds the retired freehand `workout` field into `notes` (structured workouts now come from

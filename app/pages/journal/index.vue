@@ -42,6 +42,14 @@
             Photos
           </UButton>
           <UButton
+            to="/journal/supplements"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-pill"
+          >
+            Supplements
+          </UButton>
+          <UButton
             v-if="isOwner"
             to="/journal/import"
             variant="outline"
