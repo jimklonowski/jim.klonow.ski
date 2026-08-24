@@ -1,11 +1,14 @@
 <template>
-  <div>
+  <div class="min-h-screen flex flex-col bg-bg">
     <AppHeader />
-    
-    <UMain>
-      <slot />
-    </UMain>
+    <StatusLine />
 
+    <main class="flex-1 min-w-0">
+      <slot />
+    </main>
+
+    <FooterStatus />
     <DigestPanel />
+    <CommandPalette />
   </div>
 </template>

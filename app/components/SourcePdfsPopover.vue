@@ -2,28 +2,24 @@
   <UPopover
     v-if="sources.length"
     :content="{ side: 'bottom', align }"
+    :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
   >
-    <UButton
-      variant="outline"
-      size="xs"
-      icon="i-lucide-file-text"
-      trailing-icon="i-lucide-chevron-down"
+    <button
+      type="button"
+      class="tui-btn"
     >
-      Source PDFs ({{ sources.length }})
-    </UButton>
+      SOURCE PDFS ({{ sources.length }}) ▾
+    </button>
     <template #content>
-      <div class="p-2 max-h-80 overflow-y-auto min-w-56 space-y-0.5">
+      <div class="py-1 max-h-80 overflow-y-auto min-w-64">
         <a
           v-for="src in sorted"
           :key="src"
           :href="src"
           target="_blank"
-          class="flex items-center gap-2 text-sm px-2 py-1.5 rounded-md hover:bg-elevated hover:text-primary transition-colors"
+          class="flex items-center gap-2 text-[12px] px-3 py-1.5 text-dim hover:bg-nav-active hover:text-accent transition-colors"
         >
-          <UIcon
-            name="i-lucide-file-text"
-            class="w-3.5 h-3.5 shrink-0 text-muted"
-          />
+          <span class="text-faint shrink-0">▪</span>
           <span class="truncate">{{ pdfLabel(src) }}</span>
         </a>
       </div>

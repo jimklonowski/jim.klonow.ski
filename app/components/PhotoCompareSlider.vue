@@ -1,34 +1,48 @@
 <template>
   <div
     ref="containerRef"
-    class="relative w-full aspect-square rounded-lg overflow-hidden border border-default select-none touch-none cursor-ew-resize"
+    class="relative w-full aspect-square overflow-hidden border border-line select-none touch-none cursor-ew-resize"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerUp"
   >
-    <img :src="afterUrl" class="absolute inset-0 w-full h-full object-cover pointer-events-none" :style="afterStyle" draggable="false" />
+    <img
+      :src="afterUrl"
+      class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+      :style="afterStyle"
+      draggable="false"
+    >
     <img
       :src="beforeUrl"
       class="absolute inset-0 w-full h-full object-cover pointer-events-none"
       :style="{ clipPath: `inset(0 ${100 - pct}% 0 0)`, ...beforeStyle }"
       draggable="false"
-    />
+    >
 
     <!-- Divider + drag handle -->
-    <div class="absolute top-0 bottom-0 w-0.5 bg-white/90 shadow pointer-events-none" :style="{ left: `${pct}%` }" />
     <div
-      class="absolute top-1/2 size-8 -mt-4 -ml-4 rounded-full bg-white shadow-lg flex items-center justify-center pointer-events-none"
+      class="absolute top-0 bottom-0 w-px bg-accent pointer-events-none"
+      :style="{ left: `${pct}%` }"
+    />
+    <div
+      class="absolute top-1/2 w-5 h-5 -mt-2.5 -ml-2.5 bg-bg border border-accent flex items-center justify-center text-[10px] text-accent pointer-events-none"
       :style="{ left: `${pct}%` }"
     >
-      <UIcon name="i-lucide-chevrons-left-right" class="size-4 text-neutral-700" />
+      ‹›
     </div>
 
     <!-- Labels -->
-    <span v-if="beforeLabel" class="absolute bottom-2 left-2 text-xs font-medium px-1.5 py-0.5 rounded bg-black/60 text-white pointer-events-none">
+    <span
+      v-if="beforeLabel"
+      class="absolute bottom-2 left-2 text-[10.5px] px-1.5 py-0.5 bg-bg/85 border border-line-input text-dim pointer-events-none"
+    >
       {{ beforeLabel }}
     </span>
-    <span v-if="afterLabel" class="absolute bottom-2 right-2 text-xs font-medium px-1.5 py-0.5 rounded bg-black/60 text-white pointer-events-none">
+    <span
+      v-if="afterLabel"
+      class="absolute bottom-2 right-2 text-[10.5px] px-1.5 py-0.5 bg-bg/85 border border-line-input text-dim pointer-events-none"
+    >
       {{ afterLabel }}
     </span>
 
@@ -51,7 +65,9 @@ const pct = ref(50)
 const dragging = ref(false)
 
 // Recenter whenever a different pair is being compared.
-watch(() => [props.beforeUrl, props.afterUrl], () => { pct.value = 50 })
+watch(() => [props.beforeUrl, props.afterUrl], () => {
+  pct.value = 50
+})
 
 function updateFromClientX(clientX: number) {
   const el = containerRef.value

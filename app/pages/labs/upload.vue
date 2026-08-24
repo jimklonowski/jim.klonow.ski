@@ -1,19 +1,53 @@
 <template>
-  <div class="py-8 max-w-3xl mx-auto space-y-6">
-    <div class="flex items-center gap-3">
-      <UButton to="/labs" variant="ghost" icon="i-lucide-arrow-left" size="sm">Labs</UButton>
-      <h1 class="text-2xl font-bold">Upload Lab Results</h1>
+  <div>
+    <!-- Breadcrumb title row -->
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-3.5 border-b border-line">
+      <span class="text-[11px] text-muted tracking-[0.06em] uppercase">
+        <NuxtLink
+          to="/labs"
+          class="hover:text-accent"
+        >labs</NuxtLink> /
+      </span>
+      <h1 class="num-display text-hi text-[24px] leading-none">
+        UPLOAD
+      </h1>
+      <p class="text-[11px] text-muted tracking-[0.06em] uppercase truncate">
+        {{ statusMeta }}
+      </p>
+
+      <div class="flex items-center gap-2 ml-auto">
+        <button
+          v-if="result || error"
+          type="button"
+          class="tui-btn"
+          @click="reset"
+        >
+          ⟳ RESET
+        </button>
+        <NuxtLink
+          to="/labs"
+          class="tui-btn"
+        >
+          BLOODWORK →
+        </NuxtLink>
+      </div>
     </div>
 
     <!-- PIN gate -->
-    <UCard v-if="!uploadAuthed">
-      <div class="flex flex-col items-center py-12 space-y-5">
-        <UIcon name="i-lucide-lock" class="w-10 h-10 text-muted" />
-        <div class="text-center">
-          <p class="font-medium">Upload PIN required</p>
-          <p class="text-sm text-muted mt-1">Enter your 9-digit upload PIN to continue</p>
-        </div>
-        <div class="w-full max-w-xs space-y-3">
+    <section
+      v-if="!uploadAuthed"
+      class="px-4 sm:px-6 py-4"
+    >
+      <div class="max-w-md bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="UPLOAD PIN REQUIRED"
+          :dashes="4"
+        />
+        <p class="mt-2.5 text-[12px] text-muted leading-[1.7]">
+          Saving results is a write, so it needs your 9-digit upload PIN.
+        </p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="shrink-0 text-accent text-[13px] leading-none">❯</span>
           <UInput
             v-model="pin"
             type="password"
@@ -24,141 +58,297 @@
             class="w-full text-center tracking-widest"
             @keydown.enter="submitPin"
           />
-          <UButton class="w-full" :loading="pinLoading" :disabled="pin.length !== 9" @click="submitPin">
-            Unlock
-          </UButton>
-          <p v-if="pinError" class="text-sm text-error text-center">{{ pinError }}</p>
         </div>
+        <UButton
+          class="w-full justify-center mt-3"
+          :loading="pinLoading"
+          :disabled="pin.length !== 9"
+          @click="submitPin"
+        >
+          Unlock
+        </UButton>
+        <p
+          v-if="pinError"
+          class="mt-2.5 text-[12px] text-danger"
+        >
+          ✕ {{ pinError }}
+        </p>
       </div>
-    </UCard>
+    </section>
 
     <!-- Drop zone -->
-    <UCard v-else-if="!processing && !result && !error">
-      <!-- Report type selector -->
-      <div class="flex gap-2 mb-6">
-        <UButton
+    <section
+      v-else-if="!processing && !result && !error"
+      class="px-4 sm:px-6 py-4"
+    >
+      <TuiHeader
+        label="REPORT TYPE"
+        :dashes="9"
+      />
+      <div class="grid grid-cols-3 gap-px bg-line border border-line mt-2">
+        <button
           v-for="t in REPORT_TYPES"
           :key="t.value"
-          :variant="reportType === t.value ? 'solid' : 'outline'"
-          size="sm"
-          :icon="t.icon"
+          type="button"
+          class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
+          :class="reportType === t.value
+            ? 'bg-nav-active text-accent'
+            : 'bg-bg text-[#6b8578] hover:text-accent'"
           @click="reportType = t.value"
         >
           {{ t.label }}
-        </UButton>
+        </button>
       </div>
+
+      <TuiHeader
+        label="SOURCE PDF"
+        :dashes="10"
+        class="mt-4"
+      />
       <div
-        class="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
-        :class="dragging ? 'border-primary bg-primary/5' : 'border-neutral-700 hover:border-neutral-500'"
+        class="mt-2 border border-dashed cursor-pointer transition-colors"
+        :class="dragging
+          ? 'border-accent bg-nav-active'
+          : 'border-line-input bg-inset hover:border-line-accent'"
         @click="fileInput?.click()"
         @dragover.prevent="dragging = true"
         @dragleave="dragging = false"
         @drop.prevent="onDrop"
       >
-        <UIcon name="i-lucide-upload-cloud" class="w-14 h-14 text-muted mb-4" />
-        <p class="text-lg font-medium">Drop your {{ dropZoneLabel }} PDF here</p>
-        <p class="text-sm text-muted mt-1">or click to browse</p>
-        <input ref="fileInput" type="file" accept=".pdf,application/pdf" class="hidden" @change="onFileSelect" />
+        <div class="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
+          <span
+            class="num-display text-[28px] leading-none"
+            :class="dragging ? 'text-accent' : 'text-faint'"
+          >↑</span>
+          <p class="text-[12.5px] text-hi tracking-[0.06em] uppercase">
+            drop your {{ dropZoneLabel }} pdf here
+          </p>
+          <p class="text-[11px] text-muted">
+            or click to browse · Claude reads the PDF, values land in D1
+          </p>
+        </div>
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".pdf,application/pdf"
+          class="hidden"
+          @change="onFileSelect"
+        >
       </div>
-    </UCard>
+    </section>
 
     <!-- Processing -->
-    <UCard v-else-if="processing">
-      <div class="flex flex-col items-center py-16 space-y-4">
-        <div class="relative">
-          <UIcon name="i-lucide-file-text" class="w-16 h-16 text-muted" />
-          <div class="absolute -bottom-1 -right-1 bg-primary rounded-full p-1.5">
-            <UIcon name="i-lucide-sparkles" class="w-3.5 h-3.5 text-white" />
-          </div>
-        </div>
-        <div class="text-center">
-          <p class="font-medium">Reading your lab report...</p>
-          <p class="text-sm text-muted mt-1">Claude is extracting your biomarker values</p>
-        </div>
+    <section
+      v-else-if="processing"
+      class="px-4 sm:px-6 py-4"
+    >
+      <div class="bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="EXTRACTING"
+          :dashes="8"
+        >
+          <span class="text-[10.5px] text-accent">⟳ working</span>
+        </TuiHeader>
+        <p class="flex items-center gap-2 mt-2.5 text-[12.5px] text-dim">
+          <span class="text-accent">❯</span>
+          <span class="truncate">reading {{ filename }}</span>
+          <span class="w-[7px] h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
+        </p>
+        <p class="mt-1.5 text-[11px] text-muted">
+          Pulling biomarker values out of the report — this takes a few seconds.
+        </p>
       </div>
-    </UCard>
+    </section>
 
     <!-- Error -->
-    <UCard v-else-if="error">
-      <div class="flex flex-col items-center py-12 space-y-4 text-center">
-        <UIcon name="i-lucide-alert-circle" class="w-12 h-12 text-error" />
-        <div>
-          <p class="font-medium">Extraction failed</p>
-          <p class="text-sm text-muted mt-1 max-w-sm">{{ error }}</p>
-        </div>
-        <UButton @click="reset">Try again</UButton>
+    <section
+      v-else-if="error"
+      class="px-4 sm:px-6 py-4"
+    >
+      <div class="max-w-xl bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="EXTRACTION FAILED"
+          :dashes="4"
+        >
+          <span class="text-[10.5px] text-danger">✕ error</span>
+        </TuiHeader>
+        <p class="mt-2.5 text-[12.5px] text-danger leading-[1.7]">
+          {{ error }}
+        </p>
+        <button
+          type="button"
+          class="tui-btn mt-3"
+          @click="reset"
+        >
+          ⟳ TRY AGAIN
+        </button>
       </div>
-    </UCard>
+    </section>
 
     <!-- Results -->
     <template v-if="result">
-      <UCard>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-xs text-muted">Extracted from <span class="font-medium text-foreground">{{ filename }}</span></p>
-            <div class="flex items-center gap-2 mt-1">
-              <p class="text-lg font-semibold">{{ formatDate(result.date, 'long') }}</p>
-              <UBadge v-if="result.fasting" color="neutral" variant="subtle" size="sm">Fasting</UBadge>
-            </div>
-          </div>
-          <UBadge color="success" variant="subtle" size="lg">{{ markerEntries.length }} markers found</UBadge>
-        </div>
-      </UCard>
-
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <UCard v-for="[key, value] in markerEntries" :key="key">
-          <div class="space-y-1.5">
-            <p class="text-xs text-muted leading-tight">{{ BIOMARKERS[key]?.label ?? key }}</p>
-            <p class="text-2xl font-bold tabular-nums">{{ value }}</p>
-            <p v-if="BIOMARKERS[key]" class="text-xs text-muted">{{ BIOMARKERS[key].unit }}</p>
-            <UBadge v-else color="neutral" variant="subtle" size="xs">Unrecognized key</UBadge>
-          </div>
-        </UCard>
-      </div>
-
-      <div v-if="result.qualitative?.length" class="space-y-2">
-        <p class="text-xs font-semibold text-muted uppercase tracking-wider">Genetic &amp; Qualitative Results</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <UCard v-for="item in result.qualitative" :key="item.name">
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-sm font-medium">{{ item.name }}</p>
-              <UBadge :color="qualitativeColor(item.result)" variant="subtle">{{ item.result }}</UBadge>
-            </div>
-          </UCard>
+      <!-- Headline readouts -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line border-b border-line">
+        <div
+          v-for="cell in resultCells"
+          :key="cell.label"
+          class="bg-bg px-4 py-3.5"
+        >
+          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+            {{ cell.label }}
+          </p>
+          <p
+            class="num-display text-[24px] leading-none mt-1.5 whitespace-nowrap"
+            :class="cell.accent ? 'text-accent' : ''"
+          >
+            {{ cell.value }}
+          </p>
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-3">
-        <UButton icon="i-lucide-download" @click="downloadJson">Download JSON</UButton>
-        <UButton variant="outline" icon="i-lucide-save" :loading="saving" @click="saveToSite">
-          Save to Site
-        </UButton>
-        <UButton variant="ghost" icon="i-lucide-refresh-cw" @click="reset">Upload another</UButton>
+      <!-- Extracted markers -->
+      <section class="px-4 sm:px-6 py-4">
+        <TuiHeader
+          :label="`MARKERS · ${markerEntries.length}`"
+          :dashes="8"
+        >
+          <span class="text-[10.5px] text-muted normal-case truncate">{{ filename }}</span>
+        </TuiHeader>
+
+        <div
+          v-if="markerEntries.length"
+          class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-px bg-line border border-line mt-2.5"
+        >
+          <div
+            v-for="[key, value] in markerEntries"
+            :key="key"
+            class="bg-raised px-3 py-2.5"
+          >
+            <p
+              class="text-[10.5px] text-muted uppercase tracking-[0.08em] leading-tight truncate"
+              :title="markerLabel(key)"
+            >
+              {{ markerLabel(key) }}
+            </p>
+            <p class="num-display text-[22px] leading-none mt-1.5">
+              {{ value }}
+            </p>
+            <p
+              class="mt-1.5 text-[10.5px]"
+              :class="BIOMARKERS[key] ? 'text-muted' : 'text-warn'"
+            >
+              {{ markerUnit(key) }}
+            </p>
+          </div>
+        </div>
+
+        <p
+          v-else
+          class="mt-2.5 text-[12px] text-muted"
+        >
+          No numeric markers in this report.
+        </p>
+      </section>
+
+      <!-- Qualitative findings -->
+      <section
+        v-if="result.qualitative?.length"
+        class="px-4 sm:px-6 py-4 border-t border-line"
+      >
+        <TuiHeader
+          label="GENETIC · QUALITATIVE"
+          :dashes="4"
+        />
+        <div class="mt-2.5 text-[12px]">
+          <div
+            v-for="(item, i) in result.qualitative"
+            :key="item.name"
+            class="flex items-baseline justify-between gap-4 px-2 py-1.5"
+            :class="i % 2 ? 'bg-inset' : ''"
+          >
+            <span class="text-muted shrink-0">{{ item.name }}</span>
+            <span
+              class="text-right"
+              :class="colorClass(item.result)"
+            >{{ item.result }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3.5 border-t border-line">
+        <button
+          type="button"
+          class="tui-btn tui-btn-accent disabled:opacity-50"
+          :disabled="saving"
+          @click="saveToSite"
+        >
+          {{ saving ? 'SAVING…' : '↑ SAVE TO SITE' }}
+        </button>
+        <button
+          type="button"
+          class="tui-btn"
+          @click="downloadJson"
+        >
+          ↓ DOWNLOAD JSON
+        </button>
+        <button
+          type="button"
+          class="tui-btn"
+          @click="reset"
+        >
+          ⟳ UPLOAD ANOTHER
+        </button>
       </div>
 
-      <UAlert
+      <div
         v-if="saveResult"
-        :color="saveResult.ok ? 'success' : 'error'"
-        :title="saveResult.ok ? 'Saved!' : 'Could not save'"
-        :description="saveResult.ok
-          ? `Saved ${formatDate(saveResult.date!, 'long')} — the dashboard will update automatically.`
-          : saveResult.message"
-      />
+        class="px-4 sm:px-6 pb-3.5"
+      >
+        <UAlert
+          :color="saveResult.ok ? 'success' : 'error'"
+          variant="subtle"
+          :title="saveResult.ok ? 'Saved' : 'Could not save'"
+          :description="saveMessage"
+          :ui="{
+            root: 'ring-0 border border-line-input bg-inset p-3',
+            title: 'text-[12px]',
+            description: 'text-[11.5px] text-muted'
+          }"
+        />
+      </div>
 
-      <UCard v-if="summarizing || summary || summaryError">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
-            <p class="text-sm font-medium">AI Summary</p>
-          </div>
-        </template>
-        <div v-if="summarizing" class="flex items-center gap-3 text-sm text-muted py-2">
-          <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
-          Comparing this draw against your history...
+      <!-- AI summary readout -->
+      <div
+        v-if="summarizing || summary || summaryError"
+        class="mx-4 sm:mx-6 mb-4 px-3.5 py-3 border border-line-input bg-inset"
+      >
+        <div class="flex items-baseline gap-3">
+          <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ AI SUMMARY</span>
+          <span
+            v-if="summarizing"
+            class="text-[10.5px] text-muted tracking-[0.06em] uppercase"
+          >working ⟳</span>
         </div>
-        <p v-else-if="summary" class="text-sm leading-relaxed whitespace-pre-line">{{ summary }}</p>
-        <p v-else class="text-sm text-muted">{{ summaryError }}</p>
-      </UCard>
+        <p
+          v-if="summarizing"
+          class="mt-2 text-[12.5px] text-muted"
+        >
+          Comparing this draw against your history…
+        </p>
+        <p
+          v-else-if="summary"
+          class="mt-2 text-[12.5px] leading-[1.7] text-dim whitespace-pre-line"
+        >
+          {{ summary }}
+        </p>
+        <p
+          v-else
+          class="mt-2 text-[12.5px] text-muted"
+        >
+          {{ summaryError }}
+        </p>
+      </div>
     </template>
   </div>
 </template>
@@ -215,13 +405,18 @@ async function submitPin() {
 
 // Report type
 const REPORT_TYPES = [
-  { value: 'bloodwork', label: 'Bloodwork', icon: 'i-lucide-test-tube' },
-  { value: 'dexa', label: 'DEXA Scan', icon: 'i-lucide-scan' },
-  { value: 'echo', label: 'Echocardiogram', icon: 'i-lucide-heart-pulse' }
+  { value: 'bloodwork', label: 'Bloodwork' },
+  { value: 'dexa', label: 'DEXA' },
+  { value: 'echo', label: 'Echo' }
 ] as const
 type ReportType = 'bloodwork' | 'dexa' | 'echo'
 const reportType = ref<ReportType>('bloodwork')
 
+const REPORT_LABELS: Record<ReportType, string> = {
+  bloodwork: 'Bloodwork',
+  dexa: 'DEXA scan',
+  echo: 'Echocardiogram'
+}
 const DROP_ZONE_LABELS: Record<ReportType, string> = {
   bloodwork: 'lab',
   dexa: 'DEXA scan',
@@ -250,6 +445,54 @@ const markerEntries = computed(() =>
     return a.localeCompare(b)
   })
 )
+
+// Multi-part meta strings are assembled here — adjacent <template v-if> blocks in the markup
+// lose the spaces between them once Vue condenses whitespace.
+const statusMeta = computed(() => {
+  if (!uploadAuthed.value) return 'pin locked'
+  if (processing.value) return 'reading pdf'
+  if (error.value) return 'extraction failed'
+  if (result.value) {
+    const parts = [`${markerEntries.value.length} markers`, formatDateTerse(result.value.date)]
+    if (result.value.fasting) parts.push('fasting')
+    return parts.join(' · ')
+  }
+  return `awaiting ${dropZoneLabel.value} pdf`
+})
+
+const resultCells = computed(() => {
+  const res = result.value
+  if (!res) return []
+  return [
+    { label: 'draw date', value: formatDateTerse(res.date), accent: false },
+    { label: 'markers found', value: `${markerEntries.value.length}`, accent: true },
+    { label: 'fasting', value: res.fasting ? 'YES' : 'NO', accent: false },
+    { label: 'report', value: REPORT_LABELS[reportType.value].toUpperCase(), accent: false }
+  ]
+})
+
+const saveMessage = computed(() => {
+  const res = saveResult.value
+  if (!res) return ''
+  if (!res.ok) return res.message ?? 'Failed to save. Please try again.'
+  return `Saved ${res.date ? formatDate(res.date, 'long') : 'this draw'} — the dashboard will update automatically.`
+})
+
+function markerLabel(key: string) {
+  return BIOMARKERS[key]?.label ?? key
+}
+
+function markerUnit(key: string) {
+  return BIOMARKERS[key]?.unit ?? 'unrecognized key'
+}
+
+function colorClass(res: string) {
+  return {
+    warning: 'text-warn',
+    success: 'text-accent',
+    neutral: 'text-body'
+  }[qualitativeColor(res)]
+}
 
 async function upload(file: File) {
   if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
@@ -349,5 +592,4 @@ async function generateSummary(date: string) {
     summarizing.value = false
   }
 }
-
 </script>

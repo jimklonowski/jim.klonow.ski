@@ -1,103 +1,219 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-2xl mx-auto space-y-8">
+  <div>
+    <JournalHeader
+      section="CALCULATOR"
+      meta="reconstitution · u-100 syringe units"
+    >
+      <template #actions>
+        <span class="text-[11px] text-muted hidden sm:inline">{{ mixSummary }}</span>
+      </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <!-- Header -->
-      <div class="flex items-center gap-3">
-        <UButton to="/journal" variant="ghost" size="xs" icon="i-lucide-arrow-left" />
-        <div>
-          <h1 class="text-2xl font-bold">Peptide Calculator</h1>
-          <p class="text-sm text-muted">Reconstitution and insulin syringe unit math</p>
+    <!-- Inputs: mix | dose -->
+    <div class="grid gap-px bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] border-b border-line">
+      <section class="bg-bg px-4 sm:px-6 py-4">
+        <TuiHeader
+          label="YOUR MIX"
+          :dashes="12"
+        >
+          <span class="text-[10.5px] text-muted normal-case">what's in the vial</span>
+        </TuiHeader>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-2.5">
+          <UFormField
+            label="Vial Amount"
+            :ui="{ label: 'tui-label' }"
+          >
+            <UInput
+              v-model.number="vialAmount"
+              type="number"
+              min="0"
+              step="0.1"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Unit"
+            :ui="{ label: 'tui-label' }"
+          >
+            <USelect
+              v-model="vialUnit"
+              :items="DOSE_UNITS"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="BAC Water (mL)"
+            :ui="{ label: 'tui-label' }"
+          >
+            <UInput
+              v-model.number="bacWaterMl"
+              type="number"
+              min="0.1"
+              step="0.5"
+              class="w-full"
+            />
+          </UFormField>
         </div>
+
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <span class="tui-label">common</span>
+          <button
+            v-for="ml in COMMON_BAC_ML"
+            :key="ml"
+            type="button"
+            class="px-2.5 py-1 border text-[12px] cursor-pointer transition-colors"
+            :class="bacWaterMl === ml
+              ? 'bg-nav-active border-line-accent text-accent'
+              : 'border-line-soft text-faint hover:text-accent hover:border-line-accent'"
+            @click="bacWaterMl = ml"
+          >
+            {{ ml }} mL
+          </button>
+        </div>
+      </section>
+
+      <section class="bg-bg px-4 sm:px-6 py-4">
+        <TuiHeader
+          label="DESIRED DOSE"
+          :dashes="8"
+        >
+          <span class="text-[10.5px] text-muted normal-case">per injection</span>
+        </TuiHeader>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
+          <UFormField
+            label="Dose Amount"
+            :ui="{ label: 'tui-label' }"
+          >
+            <UInput
+              v-model.number="dose"
+              type="number"
+              min="0"
+              step="1"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Unit"
+            :ui="{ label: 'tui-label' }"
+          >
+            <USelect
+              v-model="doseUnit"
+              :items="DOSE_UNITS"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+      </section>
+    </div>
+
+    <!-- Result readout -->
+    <div
+      v-if="unitsNeeded != null"
+      class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-line border-b border-line"
+    >
+      <div class="bg-bg px-4 sm:px-6 py-4 col-span-2 sm:col-span-1">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          Draw to
+        </p>
+        <p class="num-display text-accent text-[44px] leading-none mt-1.5 whitespace-nowrap">
+          {{ round(unitsNeeded, 1) }}<span class="text-[11px] text-muted ml-1.5 tracking-[0.12em] uppercase">units</span>
+        </p>
+        <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
+          on a u-100 insulin syringe
+        </p>
       </div>
 
-      <!-- Mix -->
-      <section>
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Your Mix</h2>
-        <UCard>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <UFormField label="Vial Amount">
-              <UInput v-model.number="vialAmount" type="number" min="0" step="0.1" class="w-full font-mono" />
-            </UFormField>
-            <UFormField label="Unit">
-              <USelect v-model="vialUnit" :items="DOSE_UNITS" value-key="value" label-key="label" class="w-full" />
-            </UFormField>
-            <UFormField label="BAC Water (mL)">
-              <UInput v-model.number="bacWaterMl" type="number" min="0.1" step="0.5" class="w-full font-mono" />
-            </UFormField>
-          </div>
+      <div class="bg-bg px-4 sm:px-6 py-4">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          Volume
+        </p>
+        <p class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap">
+          {{ round(unitsNeeded / 100, 3) }}<span class="text-[10.5px] text-muted ml-1">mL</span>
+        </p>
+        <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
+          {{ doseSummary }}
+        </p>
+      </div>
 
-          <div class="flex items-center gap-2 mt-4">
-            <span class="text-xs text-muted">Common:</span>
-            <UButton
-              v-for="ml in [1, 2, 3, 5]"
-              :key="ml"
-              size="xs"
-              :variant="bacWaterMl === ml ? 'solid' : 'outline'"
-              @click="() => { bacWaterMl = ml }"
-            >
-              {{ ml }} mL
-            </UButton>
-          </div>
-
-          <p v-if="concentration != null" class="text-sm mt-5 pt-4 border-t border-default">
-            Concentration: <span class="font-mono font-medium">{{ round(concentration, 3) }} {{ vialUnit }}/mL</span>
-          </p>
-        </UCard>
-      </section>
-
-      <!-- Dose -->
-      <section>
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Desired Dose</h2>
-        <UCard>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <UFormField label="Dose Amount">
-              <UInput v-model.number="dose" type="number" min="0" step="1" class="w-full font-mono" />
-            </UFormField>
-            <UFormField label="Unit">
-              <USelect v-model="doseUnit" :items="DOSE_UNITS" value-key="value" label-key="label" class="w-full" />
-            </UFormField>
-          </div>
-
-          <div v-if="unitsNeeded != null" class="mt-6 py-6 rounded-lg bg-elevated text-center">
-            <p class="text-4xl font-bold font-mono">{{ round(unitsNeeded, 1) }}</p>
-            <p class="text-xs text-muted uppercase tracking-wider mt-1">units on a U-100 insulin syringe</p>
-            <p class="text-xs text-muted mt-1">≈ {{ round(unitsNeeded / 100, 3) }} mL</p>
-          </div>
-          <p v-else class="text-sm text-muted mt-4">
-            {{ mismatchedUnits ? 'Vial and dose units must both be mass-based (mg/mcg) or both IU.' : 'Enter a vial amount, BAC water volume, and dose to calculate.' }}
-          </p>
-        </UCard>
-      </section>
-
-      <!-- Reference table -->
-      <section v-if="referenceTable.length">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Quick Reference</h2>
-        <UCard>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm font-mono">
-              <thead>
-                <tr class="border-b border-default">
-                  <th class="text-left py-2 pr-4 text-xs text-muted font-medium uppercase tracking-wider">Units</th>
-                  <th class="text-right py-2 px-4 text-xs text-muted font-medium uppercase tracking-wider">mL</th>
-                  <th class="text-right py-2 pl-4 text-xs text-muted font-medium uppercase tracking-wider">Dose ({{ doseUnit }})</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in referenceTable" :key="row.units" class="border-b border-default last:border-0">
-                  <td class="py-2 pr-4">{{ row.units }}</td>
-                  <td class="py-2 px-4 text-right text-muted">{{ row.ml }}</td>
-                  <td class="py-2 pl-4 text-right">{{ row.dose ?? '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </UCard>
-      </section>
-
-      <p class="text-xs text-muted italic">{{ GENERAL_DISCLAIMER }}</p>
+      <div class="bg-bg px-4 sm:px-6 py-4">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          Concentration
+        </p>
+        <p class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap">
+          {{ concentration != null ? round(concentration, 3) : '—' }}<span class="text-[10.5px] text-muted ml-1">{{ vialUnit }}/mL</span>
+        </p>
+        <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
+          {{ mixSummary }}
+        </p>
+      </div>
     </div>
-  </UContainer>
+
+    <p
+      v-else
+      class="px-4 sm:px-6 py-5 text-[12.5px] text-warn border-b border-line"
+    >
+      {{ blockedMessage }}
+    </p>
+
+    <!-- Reference table -->
+    <section
+      v-if="referenceTable.length"
+      class="px-4 sm:px-6 py-4"
+    >
+      <TuiHeader
+        label="QUICK REFERENCE"
+        :dashes="8"
+      >
+        <span class="text-[10.5px] text-muted normal-case">{{ mixSummary }}</span>
+      </TuiHeader>
+
+      <div class="overflow-x-auto mt-2.5">
+        <table class="w-full text-[12.5px] min-w-80">
+          <thead>
+            <tr class="border-b border-line">
+              <th class="text-left py-2 pr-4 tui-label">
+                Units
+              </th>
+              <th class="text-right py-2 px-4 tui-label">
+                mL
+              </th>
+              <th class="text-right py-2 pl-4 tui-label">
+                Dose ({{ doseUnit }})
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, i) in referenceTable"
+              :key="row.units"
+              :class="i % 2 ? 'bg-inset' : ''"
+            >
+              <td class="py-1.5 pr-4 num-display text-[14px]">
+                {{ row.units }}
+              </td>
+              <td class="py-1.5 px-4 text-right text-muted">
+                {{ row.ml }}
+              </td>
+              <td class="py-1.5 pl-4 text-right text-hi">
+                {{ row.dose ?? '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="px-4 sm:px-6 py-3 border-t border-line text-[11px] text-faint">
+      {{ GENERAL_DISCLAIMER }}
+    </p>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -108,6 +224,8 @@ import { calcConcentration, calcUnits, calcDoseForUnits, type MixUnit } from '~/
 definePageMeta({ middleware: 'journal-auth' })
 
 const route = useRoute()
+
+const COMMON_BAC_ML = [1, 2, 3, 5]
 
 function queryNumber(key: string, fallback: number) {
   const val = Number(route.query[key])
@@ -136,9 +254,20 @@ const unitsNeeded = computed(() =>
   calcUnits(dose.value, doseUnit.value, vialAmount.value, vialUnit.value, bacWaterMl.value)
 )
 
+// Multi-part captions are assembled here, not as adjacent <template v-if> blocks — Vue's
+// whitespace condensing would run the pieces together.
+const mixSummary = computed(() => `${vialAmount.value} ${vialUnit.value} / ${bacWaterMl.value} mL bac`)
+const doseSummary = computed(() => `${dose.value} ${doseUnit.value} per shot`)
+
+const blockedMessage = computed(() =>
+  mismatchedUnits.value
+    ? 'Vial and dose units must both be mass-based (mg/mcg) or both IU.'
+    : 'Enter a vial amount, BAC water volume, and dose to calculate.'
+)
+
 const referenceTable = computed(() => {
   if (concentration.value == null) return []
-  return [5, 10, 15, 20, 25, 30, 40, 50].map(units => {
+  return [5, 10, 15, 20, 25, 30, 40, 50].map((units) => {
     const doseValue = calcDoseForUnits(units, vialAmount.value, vialUnit.value, bacWaterMl.value, doseUnit.value)
     return {
       units,

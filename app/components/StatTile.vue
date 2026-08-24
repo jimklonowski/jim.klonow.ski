@@ -1,45 +1,44 @@
 <template>
-  <UCard
-    :class="clickable ? 'cursor-pointer hover:ring-1 hover:ring-primary/50 transition-shadow' : ''"
+  <component
+    :is="clickable ? 'button' : 'div'"
+    :type="clickable ? 'button' : undefined"
+    class="bg-raised border border-line-soft px-3.5 py-3 text-left w-full"
+    :class="clickable ? 'cursor-pointer hover:bg-[#101a15] transition-colors' : ''"
     @click="clickable && emit('click')"
   >
-    <div class="space-y-2 font-mono">
-      <p class="text-xs text-muted uppercase tracking-wider leading-tight">
-        {{ label }}
-      </p>
-      <div class="flex items-end gap-1">
-        <span class="text-2xl font-bold tabular-nums">{{ value ?? '—' }}</span>
-        <span
-          v-if="unit"
-          class="text-xs text-muted mb-0.5"
-        >{{ unit }}</span>
-      </div>
-      <div
-        v-if="delta != null"
-        class="flex items-center gap-1 text-xs text-muted"
-      >
-        <UIcon
-          :name="deltaIcon"
-          :class="deltaColorClass"
-          class="w-3.5 h-3.5 shrink-0"
-        />
-        <span :class="deltaColorClass">{{ deltaText || fallbackDeltaText }}</span>
-        <span>{{ deltaLabel }}</span>
-      </div>
-      <p
-        v-else-if="subtext"
-        class="text-xs text-muted"
-      >
-        {{ subtext }}
-      </p>
-      <p
-        v-if="asOf"
-        class="text-xs text-muted/70"
-      >
-        as of {{ asOf }}
-      </p>
+    <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+      {{ label }}
+    </p>
+
+    <div class="flex items-baseline gap-1.5 mt-1.5">
+      <span class="num-display text-[26px] leading-none">{{ value ?? '—' }}</span>
+      <span
+        v-if="unit"
+        class="text-[10.5px] text-muted"
+      >{{ unit }}</span>
     </div>
-  </UCard>
+
+    <p
+      v-if="delta != null"
+      class="mt-1.5 text-[11px]"
+      :class="deltaClass"
+    >
+      {{ arrow }} {{ deltaText || fallbackDeltaText }}<span class="text-muted"> {{ deltaLabel }}</span>
+    </p>
+    <p
+      v-else-if="subtext"
+      class="mt-1.5 text-[11px] text-muted"
+    >
+      {{ subtext }}
+    </p>
+
+    <p
+      v-if="asOf"
+      class="mt-1 text-[10.5px] text-faint"
+    >
+      as of {{ asOf }}
+    </p>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -51,7 +50,7 @@ const props = withDefaults(defineProps<{
   /** Pre-formatted display value; null renders an em dash. */
   value: string | number | null
   unit?: string
-  /** Raw numeric delta — drives the trend icon and good/bad coloring. */
+  /** Raw numeric delta — drives the trend arrow and good/bad coloring. */
   delta?: number | null
   /** Pre-formatted delta text; defaults to the signed rounded delta. */
   deltaText?: string
@@ -67,16 +66,17 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ click: [] }>()
 
-const deltaIcon = computed(() => {
+const arrow = computed(() => {
   const d = props.delta
-  if (d == null || Math.abs(d) < 0.01) return 'i-lucide-minus'
-  return d > 0 ? 'i-lucide-trending-up' : 'i-lucide-trending-down'
+  if (d == null || Math.abs(d) < 0.01) return '●'
+  return d > 0 ? '▲' : '▼'
 })
 
-const deltaColorClass = computed(() => {
+const deltaClass = computed(() => {
   const d = props.delta
   if (d == null || Math.abs(d) < 0.01 || props.lowerIsBetter === undefined) return 'text-muted'
-  return (props.lowerIsBetter && d < 0) || (!props.lowerIsBetter && d > 0) ? 'text-success' : 'text-error'
+  const good = props.lowerIsBetter ? d < 0 : d > 0
+  return good ? 'text-accent' : 'text-warn'
 })
 
 const fallbackDeltaText = computed(() => {

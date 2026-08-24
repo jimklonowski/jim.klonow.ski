@@ -1,232 +1,290 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-4xl mx-auto space-y-10">
+  <div>
+    <JournalHeader
+      section="IMPORT"
+      meta="apple health → journal vitals"
+    >
+      <template #actions>
+        <span class="text-[11px] text-muted hidden md:inline">parsed in your browser · nothing leaves the page until you import</span>
+      </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <!-- Header -->
-      <div class="flex items-center gap-3">
-        <UButton to="/journal" variant="ghost" size="xs" icon="i-lucide-arrow-left" />
-        <div>
-          <h1 class="text-2xl font-bold">Import Health Data</h1>
-          <p class="text-sm text-muted">Fill in vitals from Apple Health</p>
+    <div class="px-4 sm:px-6 py-4 space-y-5">
+      <!-- One-time XML import -->
+      <section class="bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="ONE-TIME XML IMPORT"
+          :dashes="8"
+        >
+          <span class="text-[10.5px] text-muted normal-case">{{ fileMeta }}</span>
+        </TuiHeader>
+
+        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+          On your iPhone: <span class="text-hi">Health</span> → tap your profile photo → <span class="text-hi">Export All Health Data</span>
+          → share the ZIP to your Mac → unzip → drop <code class="text-accent">export.xml</code> below.
+        </p>
+
+        <UFileUpload
+          v-model="selectedFile"
+          accept=".xml"
+          icon="i-lucide-upload-cloud"
+          label="Drop export.xml here"
+          description="or click to browse — the file is read locally, never uploaded"
+          class="w-full mt-3"
+          :ui="{
+            base: 'bg-inset border-line-input hover:border-line-accent p-5',
+            icon: 'text-faint',
+            label: 'text-[12.5px] text-dim mt-2',
+            description: 'text-[11px] text-muted mt-1',
+            file: 'border-line-input bg-inset text-[11.5px]',
+            fileName: 'text-body',
+            fileSize: 'text-muted'
+          }"
+        />
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3">
+          <button
+            v-if="selectedFile && !parsing"
+            type="button"
+            class="tui-btn tui-btn-accent"
+            @click="parseFile"
+          >
+            ⌖ PARSE FILE
+          </button>
+          <span
+            v-if="parsing"
+            class="flex flex-wrap items-baseline gap-x-1.5 text-[12px] text-muted"
+          >
+            <span>parsing…</span>
+            <span class="num-display text-hi">{{ parseProgress }}%</span>
+            <span class="text-faint">· {{ fileSizeMb }} MB file, this takes a moment</span>
+          </span>
         </div>
-      </div>
 
-      <!-- XML Import -->
-      <section class="space-y-4">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">One-time XML Import</h2>
+        <UProgress
+          v-if="parsing"
+          :value="parseProgress"
+          size="sm"
+          class="mt-2.5"
+        />
 
-        <UCard class="space-y-4">
-          <p class="text-sm text-muted">
-            On your iPhone: <strong>Health</strong> → tap your profile photo → <strong>Export All Health Data</strong> → share the ZIP to your Mac → unzip → upload <code class="font-mono bg-elevated px-1 rounded">export.xml</code> below.
-          </p>
+        <!-- Parse results -->
+        <div
+          v-if="rows.length"
+          class="mt-3.5"
+        >
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+            <span class="flex items-center gap-1.5 text-body">
+              <span class="w-1.5 h-1.5 rounded-full bg-accent glow-dot shrink-0" />
+              <span class="num-display text-hi">{{ newCount }}</span> new entries
+            </span>
+            <span class="flex items-center gap-1.5 text-body">
+              <span class="w-1.5 h-1.5 rounded-full bg-dim shrink-0" />
+              <span class="num-display text-hi">{{ updateCount }}</span> filling missing vitals
+            </span>
+            <span class="text-muted">{{ rows.length }} total rows</span>
+            <span class="ml-auto text-muted">{{ selectedCount }} selected</span>
+          </div>
 
-          <div class="flex items-center gap-3 flex-wrap">
-            <input
-              ref="fileInput"
-              type="file"
-              accept=".xml"
-              class="hidden"
-              @change="onFileChange"
-            />
-            <UButton variant="outline" icon="i-lucide-upload" @click="fileInput?.click()">
-              {{ fileName || 'Choose export.xml' }}
-            </UButton>
-            <UButton
-              v-if="fileName && !parsing"
-              icon="i-lucide-scan-line"
-              @click="parseFile"
+          <!-- Preview table -->
+          <div class="mt-2.5 border border-line-soft max-h-104 overflow-auto">
+            <table class="w-full text-[12px]">
+              <thead class="sticky top-0 z-10">
+                <tr class="bg-inset border-b border-line">
+                  <th class="py-1.5 px-2.5 w-8">
+                    <UCheckbox
+                      :model-value="allSelected"
+                      :indeterminate="someSelected && !allSelected"
+                      size="xs"
+                      @update:model-value="toggleAll"
+                    />
+                  </th>
+                  <th
+                    v-for="col in COLUMNS"
+                    :key="col.key"
+                    class="py-1.5 px-2.5 text-[10.5px] tracking-[0.12em] uppercase text-faint font-medium"
+                    :class="col.align === 'right' ? 'text-right' : 'text-left'"
+                  >
+                    {{ col.label }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(row, i) in rows"
+                  :key="row.date"
+                  class="border-b border-line-soft last:border-0 hover:bg-[#101a15] transition-colors"
+                  :class="[i % 2 ? 'bg-inset' : '', row.selected ? '' : 'opacity-45']"
+                >
+                  <td class="py-1.5 px-2.5">
+                    <UCheckbox
+                      v-model="row.selected"
+                      size="xs"
+                    />
+                  </td>
+                  <td class="py-1.5 px-2.5 text-muted whitespace-nowrap">
+                    {{ row.date }}
+                  </td>
+                  <td class="py-1.5 px-2.5 text-right">
+                    <span :class="valueClass(row, 'weight_lbs')">{{ row.weight_lbs ?? '—' }}</span>
+                  </td>
+                  <td class="py-1.5 px-2.5 text-right whitespace-nowrap">
+                    <span :class="valueClass(row, 'bp_systolic')">{{ bpText(row) }}</span>
+                  </td>
+                  <td class="py-1.5 px-2.5 text-right">
+                    <span :class="valueClass(row, 'rhr')">{{ row.rhr ?? '—' }}</span>
+                  </td>
+                  <td class="py-1.5 px-2.5 text-right">
+                    <span :class="valueClass(row, 'hrv')">{{ row.hrv ?? '—' }}</span>
+                  </td>
+                  <td class="py-1.5 px-2.5">
+                    <span
+                      class="text-[10.5px] tracking-widest uppercase border px-1.5 py-0.5 whitespace-nowrap"
+                      :class="row.action === 'create'
+                        ? 'text-accent border-line-accent'
+                        : 'text-dim border-line-input'"
+                    >
+                      {{ row.action === 'create' ? 'new' : 'fill' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Import -->
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3">
+            <button
+              type="button"
+              class="tui-btn tui-btn-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="importing || selectedCount === 0"
+              @click="importRows"
             >
-              Parse
-            </UButton>
-            <span v-if="parsing" class="text-sm text-muted">
-              Parsing… {{ parseProgress }}%
-              <span class="text-xs">({{ fileSizeMb }} MB file — this takes a moment)</span>
+              {{ importing ? 'IMPORTING ⟳' : importButtonLabel }}
+            </button>
+            <span
+              v-if="importing || importDone"
+              class="flex flex-wrap items-center gap-x-2 text-[11px] text-muted"
+            >
+              <span><span class="num-display text-hi">{{ done }}</span> / {{ selectedCount }} saved</span>
+              <span
+                v-if="importDone && !failedDates.length"
+                class="text-accent"
+              >· done ✓</span>
+              <span
+                v-else-if="failedText"
+                class="text-danger"
+              >· {{ failedText }}</span>
             </span>
           </div>
+        </div>
 
-          <UProgress v-if="parsing" :value="parseProgress" class="mt-2" />
-
-          <!-- Parse results summary -->
-          <div v-if="rows.length" class="space-y-4">
-            <div class="flex flex-wrap gap-4 text-sm">
-              <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-success" />
-                {{ newCount }} new entries
-              </span>
-              <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-primary" />
-                {{ updateCount }} filling missing vitals
-              </span>
-              <span class="text-muted">{{ rows.length }} total rows</span>
-            </div>
-
-            <!-- Preview table -->
-            <div class="overflow-x-auto rounded-lg border border-default">
-              <table class="w-full text-xs font-mono">
-                <thead>
-                  <tr class="border-b border-default bg-elevated">
-                    <th class="py-2 px-3 text-left font-medium text-muted w-8">
-                      <UCheckbox
-                        :model-value="allSelected"
-                        :indeterminate="someSelected && !allSelected"
-                        @update:model-value="toggleAll"
-                      />
-                    </th>
-                    <th class="py-2 px-3 text-left font-medium text-muted">Date</th>
-                    <th class="py-2 px-3 text-right font-medium text-muted">Weight</th>
-                    <th class="py-2 px-3 text-right font-medium text-muted">BP</th>
-                    <th class="py-2 px-3 text-right font-medium text-muted">RHR</th>
-                    <th class="py-2 px-3 text-right font-medium text-muted">HRV</th>
-                    <th class="py-2 px-3 text-left font-medium text-muted">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in rows"
-                    :key="row.date"
-                    class="border-b border-default last:border-0 hover:bg-elevated/50 transition-colors"
-                    :class="!row.selected ? 'opacity-50' : ''"
-                  >
-                    <td class="py-2 px-3">
-                      <UCheckbox v-model="row.selected" />
-                    </td>
-                    <td class="py-2 px-3">{{ row.date }}</td>
-                    <td class="py-2 px-3 text-right">
-                      <span v-if="row.weight_lbs" :class="row.updates.weight_lbs != null ? 'text-success' : 'text-muted'">
-                        {{ row.weight_lbs }}
-                      </span>
-                      <span v-else class="text-muted opacity-40">—</span>
-                    </td>
-                    <td class="py-2 px-3 text-right">
-                      <span v-if="row.bp_systolic" :class="row.updates.bp_systolic != null ? 'text-success' : 'text-muted'">
-                        {{ row.bp_systolic }}/{{ row.bp_diastolic }}
-                      </span>
-                      <span v-else class="text-muted opacity-40">—</span>
-                    </td>
-                    <td class="py-2 px-3 text-right">
-                      <span v-if="row.rhr" :class="row.updates.rhr != null ? 'text-success' : 'text-muted'">
-                        {{ row.rhr }}
-                      </span>
-                      <span v-else class="text-muted opacity-40">—</span>
-                    </td>
-                    <td class="py-2 px-3 text-right">
-                      <span v-if="row.hrv" :class="row.updates.hrv != null ? 'text-success' : 'text-muted'">
-                        {{ row.hrv }}
-                      </span>
-                      <span v-else class="text-muted opacity-40">—</span>
-                    </td>
-                    <td class="py-2 px-3">
-                      <span
-                        class="px-1.5 py-0.5 rounded text-xs"
-                        :class="row.action === 'create' ? 'bg-success/15 text-success' : 'bg-primary/15 text-primary'"
-                      >
-                        {{ row.action === 'create' ? 'New entry' : 'Fill missing' }}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Import button -->
-            <div class="flex items-center gap-4">
-              <UButton
-                :loading="importing"
-                :disabled="selectedCount === 0"
-                icon="i-lucide-download"
-                @click="importRows"
-              >
-                Import {{ selectedCount }} {{ selectedCount === 1 ? 'entry' : 'entries' }}
-              </UButton>
-              <div v-if="importing || importDone" class="text-sm text-muted">
-                {{ done }} / {{ selectedCount }} saved
-                <span v-if="importDone && !failedDates.length" class="text-success ml-2">Done!</span>
-                <span v-if="failedDates.length" class="text-error ml-2">
-                  {{ failedDates.length }} failed ({{ failedDates.join(', ') }}) — re-run import to retry
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <p v-else-if="parsed && !rows.length" class="text-sm text-muted">
-            No new vitals found — all dates in this export already have complete data in your journal.
-          </p>
-        </UCard>
+        <p
+          v-else-if="parsed"
+          class="mt-3 text-[12px] text-muted"
+        >
+          No new vitals found — every date in this export already has complete data in your journal.
+        </p>
       </section>
 
       <!-- Auto-sync webhook setup -->
-      <section class="space-y-4">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">Auto-Sync (Health Auto Export)</h2>
+      <section class="bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="AUTO-SYNC · HEALTH AUTO EXPORT"
+          :dashes="4"
+        >
+          <span class="text-[10.5px] text-muted normal-case">daily push, no manual export</span>
+        </TuiHeader>
 
-        <UCard class="space-y-6">
-          <p class="text-sm text-muted">
-            <a href="https://www.healthexportapp.com" target="_blank" class="text-primary underline">Health Auto Export</a>
-            (~$4 on the App Store) can POST your daily metrics to this app automatically. Once set up, weight, RHR, HRV, and BP populate without touching the form.
-          </p>
+        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+          <a
+            href="https://www.healthexportapp.com"
+            target="_blank"
+            class="text-accent hover:text-accent-hover underline"
+          >Health Auto Export</a>
+          (~$4 on the App Store) can POST your daily metrics to this app automatically. Once set up, weight,
+          RHR, HRV, and BP populate without touching the form.
+        </p>
 
-          <ol class="space-y-5 text-sm">
-            <li class="flex gap-3">
-              <span class="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">1</span>
-              <div>
-                <p class="font-medium">Install the app</p>
-                <p class="text-muted mt-0.5">Search "Health Auto Export" in the App Store. The paid version supports REST API exports.</p>
-              </div>
-            </li>
-            <li class="flex gap-3">
-              <span class="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">2</span>
-              <div>
-                <p class="font-medium">Create a new REST API export</p>
-                <p class="text-muted mt-0.5">In the app: <strong>Automations</strong> → <strong>+</strong> → <strong>REST API</strong></p>
-              </div>
-            </li>
-            <li class="flex gap-3">
-              <span class="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">3</span>
-              <div>
-                <p class="font-medium">Configure the endpoint</p>
-                <div class="mt-2 space-y-2 font-mono text-xs bg-elevated rounded-lg p-3">
-                  <div class="flex gap-2">
-                    <span class="text-muted w-20 shrink-0">URL</span>
-                    <span>{{ webhookUrl }}</span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="text-muted w-20 shrink-0">Method</span>
-                    <span>POST</span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="text-muted w-20 shrink-0">Header</span>
-                    <span>Authorization: Bearer <em class="not-italic text-muted">[your LABS_SECRET value]</em></span>
-                  </div>
+        <ol class="mt-3 space-y-3 text-[12px]">
+          <li class="flex gap-2.5">
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">1</span>
+            <div class="min-w-0">
+              <p class="text-hi">
+                Install the app
+              </p>
+              <p class="text-muted mt-0.5">
+                Search "Health Auto Export" in the App Store. The paid version supports REST API exports.
+              </p>
+            </div>
+          </li>
+          <li class="flex gap-2.5">
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">2</span>
+            <div class="min-w-0">
+              <p class="text-hi">
+                Create a new REST API export
+              </p>
+              <p class="text-muted mt-0.5">
+                In the app: <span class="text-dim">Automations</span> → <span class="text-dim">+</span> → <span class="text-dim">REST API</span>
+              </p>
+            </div>
+          </li>
+          <li class="flex gap-2.5">
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">3</span>
+            <div class="min-w-0 w-full">
+              <p class="text-hi">
+                Configure the endpoint
+              </p>
+              <div class="mt-1.5 border border-line-input bg-inset px-2.5 py-2 text-[11.5px] space-y-1">
+                <div class="flex gap-2.5">
+                  <span class="shrink-0 w-16 text-[10.5px] tracking-[0.12em] uppercase text-faint">url</span>
+                  <span class="text-accent break-all">{{ webhookUrl }}</span>
+                </div>
+                <div class="flex gap-2.5">
+                  <span class="shrink-0 w-16 text-[10.5px] tracking-[0.12em] uppercase text-faint">method</span>
+                  <span class="text-body">POST</span>
+                </div>
+                <div class="flex gap-2.5">
+                  <span class="shrink-0 w-16 text-[10.5px] tracking-[0.12em] uppercase text-faint">header</span>
+                  <span class="text-body break-all">Authorization: Bearer <span class="text-muted">[your LABS_SECRET value]</span></span>
                 </div>
               </div>
-            </li>
-            <li class="flex gap-3">
-              <span class="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">4</span>
-              <div>
-                <p class="font-medium">Select these metrics</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <span
-                    v-for="m in METRICS"
-                    :key="m"
-                    class="px-2 py-0.5 bg-elevated rounded text-xs font-mono"
-                  >
-                    {{ m }}
-                  </span>
-                </div>
+            </div>
+          </li>
+          <li class="flex gap-2.5">
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">4</span>
+            <div class="min-w-0">
+              <p class="text-hi">
+                Select these metrics
+              </p>
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                <span
+                  v-for="m in METRICS"
+                  :key="m"
+                  class="px-2 py-0.5 border border-line-soft text-[11px] text-muted"
+                >
+                  {{ m }}
+                </span>
               </div>
-            </li>
-            <li class="flex gap-3">
-              <span class="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">5</span>
-              <div>
-                <p class="font-medium">Set schedule</p>
-                <p class="text-muted mt-0.5">Daily at a time after your morning measurements. The endpoint only fills in fields that are blank — it won't overwrite values you've entered manually.</p>
-              </div>
-            </li>
-          </ol>
-        </UCard>
+            </div>
+          </li>
+          <li class="flex gap-2.5">
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">5</span>
+            <div class="min-w-0">
+              <p class="text-hi">
+                Set schedule
+              </p>
+              <p class="text-muted mt-0.5">
+                Daily at a time after your morning measurements. The endpoint only fills in fields that are
+                blank — it won't overwrite values you've entered manually.
+              </p>
+            </div>
+          </li>
+        </ol>
       </section>
-
     </div>
-  </UContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -236,12 +294,21 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const METRICS = ['Body Mass', 'Resting Heart Rate', 'Heart Rate Variability', 'Blood Pressure']
 
+const COLUMNS = [
+  { key: 'date', label: 'Date', align: 'left' },
+  { key: 'weight', label: 'Weight', align: 'right' },
+  { key: 'bp', label: 'BP', align: 'right' },
+  { key: 'rhr', label: 'RHR', align: 'right' },
+  { key: 'hrv', label: 'HRV', align: 'right' },
+  { key: 'status', label: 'Status', align: 'left' }
+]
+
 const RECORD_TYPES: Record<string, string> = {
   HKQuantityTypeIdentifierBodyMass: 'weight',
   HKQuantityTypeIdentifierRestingHeartRate: 'rhr',
   HKQuantityTypeIdentifierHeartRateVariabilitySDNN: 'hrv',
   HKQuantityTypeIdentifierBloodPressureSystolic: 'bp_systolic',
-  HKQuantityTypeIdentifierBloodPressureDiastolic: 'bp_diastolic',
+  HKQuantityTypeIdentifierBloodPressureDiastolic: 'bp_diastolic'
 }
 
 const { data: allEntries } = await useJournalEntries()
@@ -261,21 +328,17 @@ const webhookUrl = computed(() =>
 )
 
 // --- File handling ---
-const fileInput = ref<HTMLInputElement | null>(null)
-const fileName = ref('')
+// UFileUpload owns the picker + drag/drop; `selectedFile` is its v-model.
 const selectedFile = ref<File | null>(null)
 const fileSizeMb = computed(() =>
   selectedFile.value ? Math.round(selectedFile.value.size / 1024 / 1024) : 0
 )
 
-function onFileChange(e: Event) {
-  const f = (e.target as HTMLInputElement).files?.[0]
-  if (!f) return
-  selectedFile.value = f
-  fileName.value = f.name
-  rows.value = []
-  parsed.value = false
-}
+const fileMeta = computed(() =>
+  selectedFile.value
+    ? `${selectedFile.value.name} · ${fileSizeMb.value} MB`
+    : 'export.xml from a Health data export'
+)
 
 // --- Parsing ---
 interface HealthData {
@@ -298,6 +361,12 @@ const parseProgress = ref(0)
 const parsed = ref(false)
 const rows = ref<ParsedRow[]>([])
 
+// A different file means the previous preview no longer describes what's staged.
+watch(selectedFile, () => {
+  rows.value = []
+  parsed.value = false
+})
+
 const typeRe = /type="([^"]+)"/
 const dateRe = /startDate="(\d{4}-\d{2}-\d{2})/
 const valueRe = /\bvalue="([^"]+)"/
@@ -306,29 +375,28 @@ const unitRe = /\bunit="([^"]+)"/
 function processLine(line: string, byDate: Record<string, HealthData>) {
   if (!line.includes('<Record')) return
 
-  const typeMatch = typeRe.exec(line)
-  if (!typeMatch || !RECORD_TYPES[typeMatch[1]]) return
+  const recordType = typeRe.exec(line)?.[1]
+  const field = recordType ? RECORD_TYPES[recordType] : undefined
+  if (!field) return
 
-  const dateMatch = dateRe.exec(line)
-  if (!dateMatch) return
-  const dateStr = dateMatch[1]
+  const dateStr = dateRe.exec(line)?.[1]
+  if (!dateStr) return
 
-  const valueMatch = valueRe.exec(line)
-  if (!valueMatch) return
-  const value = parseFloat(valueMatch[1])
+  const rawValue = valueRe.exec(line)?.[1]
+  if (rawValue == null) return
+  const value = parseFloat(rawValue)
   if (isNaN(value)) return
 
-  if (!byDate[dateStr]) byDate[dateStr] = {}
-  const field = RECORD_TYPES[typeMatch[1]]
+  const day = (byDate[dateStr] ??= {})
 
   if (field === 'weight') {
     const unit = unitRe.exec(line)?.[1] ?? 'lb'
-    byDate[dateStr].weight_lbs = unit === 'kg'
+    day.weight_lbs = unit === 'kg'
       ? Math.round(value * 2.20462 * 10) / 10
       : Math.round(value * 10) / 10
   }
   else {
-    (byDate[dateStr] as Record<string, number>)[field] = Math.round(value)
+    (day as Record<string, number>)[field] = Math.round(value)
   }
 }
 
@@ -396,6 +464,17 @@ async function parseFile() {
   }
 }
 
+// --- Preview formatting ---
+/** Values that will actually be written read as accent; already-present ones stay muted. */
+function valueClass(row: ParsedRow, field: keyof HealthData) {
+  if (row[field] == null) return 'text-ghost'
+  return row.updates[field] != null ? 'text-accent' : 'text-muted'
+}
+
+function bpText(row: ParsedRow) {
+  return row.bp_systolic ? `${row.bp_systolic}/${row.bp_diastolic}` : '—'
+}
+
 // --- Selection ---
 const newCount = computed(() => rows.value.filter(r => r.action === 'create').length)
 const updateCount = computed(() => rows.value.filter(r => r.action === 'update').length)
@@ -403,8 +482,10 @@ const selectedCount = computed(() => rows.value.filter(r => r.selected).length)
 const allSelected = computed(() => rows.value.length > 0 && rows.value.every(r => r.selected))
 const someSelected = computed(() => rows.value.some(r => r.selected))
 
-function toggleAll(val: boolean) {
-  for (const row of rows.value) row.selected = val
+// UCheckbox's header state is tri-state, so only an explicit `true` selects everything.
+function toggleAll(value: boolean | 'indeterminate') {
+  const next = value === true
+  for (const row of rows.value) row.selected = next
 }
 
 // --- Import ---
@@ -412,6 +493,16 @@ const importing = ref(false)
 const importDone = ref(false)
 const done = ref(0)
 const failedDates = ref<string[]>([])
+
+const importButtonLabel = computed(() =>
+  `↓ IMPORT ${selectedCount.value} ${selectedCount.value === 1 ? 'ENTRY' : 'ENTRIES'}`
+)
+
+const failedText = computed(() =>
+  failedDates.value.length
+    ? `${failedDates.value.length} failed (${failedDates.value.join(', ')}) — re-run import to retry`
+    : ''
+)
 
 async function importRows() {
   importing.value = true
@@ -437,7 +528,7 @@ async function importRows() {
           rhr: row.rhr ?? null,
           hrv: row.hrv ?? null,
           bp_systolic: row.bp_systolic ?? null,
-          bp_diastolic: row.bp_diastolic ?? null,
+          bp_diastolic: row.bp_diastolic ?? null
         }
       }
 
