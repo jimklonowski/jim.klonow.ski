@@ -23,7 +23,8 @@ const DOCTOR_PAGES = [
   /^\/journal$/,
   /^\/journal\/calendar$/,
   /^\/journal\/calculator$/,
-  /^\/journal\/compound\//
+  /^\/journal\/compound\//,
+  /^\/journal\/supplements$/
 ]
 
 export function canAccessPage(role: Role, path: string): boolean {
