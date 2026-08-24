@@ -22,6 +22,12 @@ export default defineNuxtConfig({
     url: 'https://jim.klonow.ski'
   },
 
+  // Phosphor Terminal is a dark-only design — default (and fall back) to dark.
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark'
+  },
+
   ui: {
 
   },
@@ -132,24 +138,10 @@ export default defineNuxtConfig({
         styles: ['normal']
       },
       {
-        name: 'IBM Plex Mono',
+        name: 'JetBrains Mono',
         provider: 'fontsource',
-        weights: [100, 200, 300, 400, 500, 600, 700],
-        styles: ['normal', 'italic'],
-        subsets: ['latin']
-      },
-      {
-        name: 'IBM Plex Sans',
-        provider: 'fontsource',
-        weights: [100, 200, 300, 400, 500, 600, 700],
-        styles: ['normal', 'italic'],
-        subsets: ['latin']
-      },
-      {
-        name: 'IBM Plex Serif',
-        provider: 'fontsource',
-        weights: [100, 200, 300, 400, 500, 600, 700],
-        styles: ['normal', 'italic'],
+        weights: [400, 500, 700],
+        styles: ['normal'],
         subsets: ['latin']
       }
     ]

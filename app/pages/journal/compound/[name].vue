@@ -1,252 +1,324 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-4xl mx-auto space-y-8">
-
-      <!-- Header -->
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <UButton to="/journal" variant="ghost" size="xs" icon="i-lucide-arrow-left" />
-          <span
-            class="w-3 h-3 rounded-full shrink-0"
-            :style="{ background: getCompoundColor(compoundName) }"
-          />
-          <div>
-            <h1 class="text-2xl font-bold">{{ compoundName }}</h1>
-            <p class="text-sm text-muted">{{ onDays.length }} days used</p>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="!onDays.length" class="text-muted text-sm">
-        No entries found for {{ compoundName }}.
-      </div>
-
-      <template v-else>
-
-        <!-- Stats cards -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Total Injections</p>
-            <p class="text-2xl font-bold font-mono">{{ totalInjections }}</p>
-          </UCard>
-          <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Avg Dose</p>
-            <p class="text-2xl font-bold font-mono">{{ avgDose }}<span class="text-sm font-normal text-muted ml-1">{{ unit }}</span></p>
-          </UCard>
-          <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">First Used</p>
-            <p class="text-lg font-bold font-mono">{{ formatDate(onDays[0]!.date) }}</p>
-          </UCard>
-          <UCard>
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Last Used</p>
-            <p class="text-lg font-bold font-mono">{{ formatDate(onDays.at(-1)!.date) }}</p>
-            <p class="text-xs text-muted mt-1">{{ daysAgo }} days ago</p>
-          </UCard>
-        </div>
+  <div>
+    <JournalHeader
+      section="COMPOUND"
+      :meta="compoundName"
+    >
+      <template #actions>
+        <span
+          class="w-2.5 h-2.5 rounded-full shrink-0 glow-dot"
+          :style="{ background: compoundColor, boxShadow: `0 0 8px ${compoundColor}` }"
+        />
+        <span
+          v-if="info"
+          class="text-[11px] text-accent border border-line-accent px-2 py-1 uppercase tracking-[0.08em]"
+        >{{ info.category }}</span>
+        <span
+          v-if="onDays.length"
+          class="text-[11px] text-muted tracking-[0.06em] uppercase"
+        >{{ usageSummary }}</span>
       </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <!-- Compound info (always shown so unused compounds still have an info page) -->
-      <section v-if="info">
-          <div class="flex items-baseline justify-between mb-4">
-            <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">About {{ compoundName }}</h2>
-            <UBadge variant="subtle" size="sm">{{ info.category }}</UBadge>
-          </div>
-          <UCard>
-            <div class="space-y-5">
-              <p v-if="info.aka" class="text-xs text-muted -mt-1">Also known as: {{ info.aka }}</p>
-              <p class="text-sm leading-relaxed">{{ info.summary }}</p>
+    <!-- Stat cells -->
+    <div
+      v-if="onDays.length"
+      class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-b border-line"
+    >
+      <div class="bg-bg px-4 sm:px-6 py-3.5">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          Total injections
+        </p>
+        <p class="num-display text-[28px] leading-none mt-1.5">
+          {{ totalInjections }}
+        </p>
+      </div>
+      <div class="bg-bg px-4 sm:px-6 py-3.5">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          Avg dose
+        </p>
+        <p class="num-display text-[28px] leading-none mt-1.5">
+          {{ avgDose }}<span class="text-[11px] text-muted"> {{ unit }}</span>
+        </p>
+      </div>
+      <div class="bg-bg px-4 sm:px-6 py-3.5">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          First used
+        </p>
+        <p class="num-display text-[28px] leading-none mt-1.5">
+          {{ formatDate(onDays[0]!.date, 'monthDay').toUpperCase() }}
+        </p>
+      </div>
+      <div class="bg-bg px-4 sm:px-6 py-3.5">
+        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          Sites
+        </p>
+        <p class="text-[13px] text-body mt-2.5">
+          {{ sitesLabel || '—' }}
+        </p>
+      </div>
+    </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Typical Dosing</p>
-                  <p class="text-sm font-medium">{{ info.dosing.range }}</p>
-                  <p class="text-xs text-muted mt-0.5">{{ info.dosing.frequency }}</p>
-                  <p v-if="info.dosing.timing" class="text-xs text-muted mt-0.5">{{ info.dosing.timing }}</p>
-                  <p v-if="info.dosing.notes" class="text-xs text-muted mt-0.5">{{ info.dosing.notes }}</p>
-                </div>
-                <div v-if="info.reconstitution">
-                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Reconstitution</p>
-                  <p class="text-sm">{{ info.reconstitution.instructions }}</p>
-                  <p v-if="info.reconstitution.measuring" class="text-xs text-muted mt-0.5">{{ info.reconstitution.measuring }}</p>
-                </div>
-                <div v-if="info.cycling">
-                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Cycling</p>
-                  <p class="text-sm">{{ info.cycling }}</p>
-                </div>
-                <div>
-                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Storage</p>
-                  <p class="text-sm">{{ info.storage }}</p>
-                </div>
-                <div v-if="info.halfLife">
-                  <p class="text-xs text-muted uppercase tracking-wider mb-1">Half-Life</p>
-                  <p class="text-sm">{{ info.halfLife }}</p>
-                </div>
-              </div>
+    <p
+      v-if="!onDays.length"
+      class="px-4 sm:px-6 py-4 text-[12px] text-muted"
+    >
+      No doses of {{ compoundName }} logged yet.
+    </p>
 
-              <p v-if="info.caution" class="text-xs text-warning border-t border-default pt-3">{{ info.caution }}</p>
-              <p class="text-xs text-muted italic border-t border-default pt-3">{{ GENERAL_DISCLAIMER }}</p>
+    <!-- Main split -->
+    <div class="grid gap-px bg-line lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+      <section class="bg-bg px-4 sm:px-6 py-4 space-y-4">
+        <!-- Vitals on vs off -->
+        <div v-if="hasVitalsData">
+          <TuiHeader
+            label="VITALS · ON DAYS VS OFF"
+            :dashes="4"
+          />
+          <table class="w-full mt-2.5 text-[12.5px]">
+            <thead>
+              <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                <th class="text-left font-medium py-1.5">
+                  Metric
+                </th>
+                <th class="text-right font-medium py-1.5">
+                  <span class="inline-flex items-center gap-1.5">
+                    <span
+                      class="w-1.5 h-1.5 rounded-full"
+                      :style="{ background: compoundColor }"
+                    />
+                    On
+                  </span>
+                </th>
+                <th class="text-right font-medium py-1.5">
+                  Off
+                </th>
+                <th class="text-right font-medium py-1.5">
+                  Diff
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in vitalsRows"
+                :key="row.label"
+                class="border-t border-line-soft"
+              >
+                <td class="py-2 text-muted uppercase text-[11px] tracking-[0.08em]">
+                  {{ row.label }}
+                </td>
+                <td class="py-2 text-right text-hi">
+                  {{ row.on ?? '—' }}
+                </td>
+                <td class="py-2 text-right text-muted">
+                  {{ row.off ?? '—' }}
+                </td>
+                <td
+                  class="py-2 text-right"
+                  :class="row.deltaClass"
+                >
+                  {{ row.deltaText }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="mt-2 text-[11px] text-faint leading-[1.6]">
+            {{ onDaysWithVitals }} on-day vs {{ offDaysWithVitals.toLocaleString('en-US') }} off-day readings · correlation only — not causal
+          </p>
+        </div>
+
+        <!-- Dossier -->
+        <div v-if="info">
+          <TuiHeader
+            label="DOSSIER"
+            :dashes="20"
+          />
+          <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+            {{ info.summary }}
+          </p>
+          <dl class="mt-3 space-y-2 text-[12px]">
+            <div v-if="info.aka">
+              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                Also known as
+              </dt>
+              <dd class="text-dim">
+                {{ info.aka }}
+              </dd>
             </div>
-          </UCard>
-        </section>
-
-      <template v-if="onDays.length">
-
-        <!-- Syringe units -->
-        <section v-if="currentMix">
-          <div class="flex items-baseline justify-between mb-4">
-            <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">Syringe Units (Your Mix)</h2>
-            <UButton
-              :to="calculatorLink"
-              variant="ghost"
-              size="xs"
-              icon="i-lucide-calculator"
-            >
-              Open in Calculator
-            </UButton>
-          </div>
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium">
-                {{ currentMix.vial_amount }}{{ currentMix.vial_unit }} vial + {{ currentMix.bac_water_ml }}mL BAC water
-              </p>
-              <p class="text-xs text-muted">
-                ≈ {{ concentrationPerMl }} {{ currentMix.vial_unit }}/mL · 1 unit (0.01 mL) ≈ {{ mcgPerUnit }} {{ unit }}
-              </p>
-            </template>
-            <ClientOnly>
-              <BarChart
-                :data="syringeChart"
-                :categories="{ units: { name: 'Units', color: getCompoundColor(compoundName) } }"
-                :y-axis-keys="['units']"
-                x-axis-key="dose"
-                :height="180"
-                :radius="4"
-              />
-            </ClientOnly>
-            <p class="text-xs text-muted mt-4">
-              Based on your most recently logged mix ({{ formatDate(currentMix.date) }}). Units shown are for a U-100 insulin syringe (1 unit = 0.01 mL) — recalculate if you switch to a different vial size or dilution.
-            </p>
-          </UCard>
-        </section>
-
-        <!-- Vitals impact -->
-        <section v-if="hasVitalsData">
-          <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Vitals: On Days vs Off Days</h2>
-          <UCard>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b border-default">
-                    <th class="text-left py-2 pr-4 text-muted font-medium text-xs uppercase tracking-wider">Metric</th>
-                    <th class="text-right py-2 px-4 font-medium">
-                      <span class="flex items-center justify-end gap-1.5">
-                        <span class="w-2 h-2 rounded-full" :style="{ background: getCompoundColor(compoundName) }" />
-                        On days
-                      </span>
-                    </th>
-                    <th class="text-right py-2 px-4 font-medium text-muted">Off days</th>
-                    <th class="text-right py-2 pl-4 font-medium text-muted text-xs uppercase tracking-wider">Diff</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in vitalsRows" :key="row.label" class="border-b border-default last:border-0">
-                    <td class="py-3 pr-4 text-muted text-xs uppercase tracking-wider">{{ row.label }}</td>
-                    <td class="py-3 px-4 text-right font-mono font-medium">
-                      {{ row.on ?? '—' }}
-                    </td>
-                    <td class="py-3 px-4 text-right font-mono text-muted">
-                      {{ row.off ?? '—' }}
-                    </td>
-                    <td class="py-3 pl-4 text-right font-mono text-xs">
-                      <span
-                        v-if="row.on != null && row.off != null"
-                        :class="row.betterClass"
-                      >
-                        {{ row.delta > 0 ? '+' : '' }}{{ row.delta }}
-                      </span>
-                      <span v-else class="text-muted">—</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div>
+              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                Typical dosing
+              </dt>
+              <dd class="text-dim">
+                {{ dosingLine }}
+              </dd>
             </div>
-            <p class="text-xs text-muted mt-4">
-              Based on {{ onDaysWithVitals }} on-day readings and {{ offDaysWithVitals }} off-day readings.
-              Correlation only — not causal.
-            </p>
-          </UCard>
-        </section>
+            <div v-if="info.reconstitution">
+              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                Reconstitution
+              </dt>
+              <dd class="text-dim">
+                {{ info.reconstitution.instructions }}
+              </dd>
+              <dd
+                v-if="info.reconstitution.measuring"
+                class="text-faint"
+              >
+                {{ info.reconstitution.measuring }}
+              </dd>
+            </div>
+            <div v-if="info.cycling">
+              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                Cycling
+              </dt>
+              <dd class="text-dim">
+                {{ info.cycling }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                Storage
+              </dt>
+              <dd class="text-dim">
+                {{ info.storage }}
+              </dd>
+            </div>
+            <div v-if="info.halfLife">
+              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                Half-life
+              </dt>
+              <dd class="text-dim">
+                {{ info.halfLife }}
+              </dd>
+            </div>
+          </dl>
+          <p
+            v-if="info.caution"
+            class="mt-3 text-[12px] text-warn leading-[1.6]"
+          >
+            ⚠ {{ info.caution }}
+          </p>
+        </div>
+      </section>
 
-        <!-- Dose history chart -->
-        <section v-if="doseChart.length >= 2">
-          <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Dose History</h2>
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium">Daily dose over time</p>
-              <p class="text-xs text-muted">{{ unit }}</p>
-            </template>
+      <section class="bg-bg px-4 sm:px-6 py-4 space-y-4">
+        <!-- Daily dose step chart -->
+        <div v-if="doseChart.length >= 2">
+          <TuiHeader :label="`DAILY DOSE · ${unit.toUpperCase()}`">
+            <span class="text-[10.5px] text-muted">{{ doseRangeLabel }}</span>
+          </TuiHeader>
+          <div class="mt-2.5">
             <ClientOnly>
               <AreaChart
                 :data="doseChart"
-                :categories="{ dose: { name: 'Dose', color: getCompoundColor(compoundName) } }"
-                :height="160"
+                :categories="{ dose: { name: `Dose (${unit})`, color: compoundColor } }"
+                :height="150"
+                step
               />
+              <template #fallback>
+                <div class="h-38" />
+              </template>
             </ClientOnly>
-          </UCard>
-        </section>
-
-        <!-- Most common sites -->
-        <section v-if="siteBreakdown.length">
-          <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Injection Sites</h2>
-          <div class="flex flex-wrap gap-2">
-            <div
-              v-for="[site, count] in siteBreakdown"
-              :key="site"
-              class="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm"
-            >
-              <span class="font-medium">{{ formatSite(site) }}</span>
-              <span class="text-xs text-muted">{{ count }}×</span>
-            </div>
           </div>
-        </section>
+          <div class="flex items-baseline justify-between gap-3 mt-1 text-[11px] text-muted">
+            <span>{{ doseSummary.start }}</span>
+            <span>{{ doseSummary.recent }}</span>
+          </div>
+        </div>
 
         <!-- Recent injections -->
-        <section>
-          <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Recent Injections</h2>
-          <div class="overflow-x-auto rounded-lg border border-default">
-            <table class="w-full text-sm font-mono">
-              <thead>
-                <tr class="border-b border-default bg-elevated">
-                  <th class="text-left py-2 px-3 text-xs text-muted font-medium">Date</th>
-                  <th class="text-left py-2 px-3 text-xs text-muted font-medium">Time</th>
-                  <th class="text-right py-2 px-3 text-xs text-muted font-medium">Dose</th>
-                  <th class="text-left py-2 px-3 text-xs text-muted font-medium">Site</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="inj in recentInjections"
-                  :key="`${inj.date}-${inj.time}`"
-                  class="border-b border-default last:border-0 hover:bg-elevated/50 cursor-pointer transition-colors"
-                  @click="navigateTo(`/journal/${inj.date}`)"
-                >
-                  <td class="py-2 px-3">{{ inj.date }}</td>
-                  <td class="py-2 px-3 text-muted">{{ inj.time || '—' }}</td>
-                  <td class="py-2 px-3 text-right">{{ inj.dose }} {{ inj.unit }}</td>
-                  <td class="py-2 px-3 text-muted">{{ formatSite(inj.site) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <div v-if="recentInjections.length">
+          <TuiHeader
+            label="RECENT INJECTIONS"
+            :dashes="10"
+          />
+          <table class="w-full mt-2.5 text-[12.5px]">
+            <thead>
+              <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                <th class="text-left font-medium py-1.5">
+                  Date
+                </th>
+                <th class="text-left font-medium py-1.5">
+                  Time
+                </th>
+                <th class="text-right font-medium py-1.5">
+                  Dose
+                </th>
+                <th class="text-right font-medium py-1.5">
+                  Site
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(inj, i) in recentInjections"
+                :key="`${inj.date}-${inj.time}-${i}`"
+                class="cursor-pointer hover:bg-[#101a15] transition-colors"
+                :class="i % 2 ? 'bg-inset' : ''"
+                @click="navigateTo(`/journal/${inj.date}`)"
+              >
+                <td class="py-1.5 text-body">
+                  {{ inj.date }}
+                </td>
+                <td class="py-1.5 text-muted">
+                  {{ inj.time || '—' }}
+                </td>
+                <td class="py-1.5 text-right text-hi">
+                  {{ inj.dose }} <span class="text-muted">{{ inj.unit }}</span>
+                </td>
+                <td class="py-1.5 text-right text-muted uppercase">
+                  {{ shortSite(inj.site) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      </template>
+        <!-- Syringe units for the current mix -->
+        <div v-if="currentMix && syringeChart.length">
+          <TuiHeader
+            label="SYRINGE UNITS · YOUR MIX"
+            :dashes="4"
+          >
+            <NuxtLink
+              :to="calculatorLink"
+              class="text-[10.5px] text-accent hover:text-accent-hover"
+            >calculator →</NuxtLink>
+          </TuiHeader>
+          <p class="mt-2 text-[11px] text-muted">
+            {{ mixLine }}
+          </p>
+          <div class="mt-2">
+            <ClientOnly>
+              <BarChart
+                :data="syringeChart"
+                :categories="{ units: { name: 'Units', color: compoundColor } }"
+                :y-axis-keys="['units']"
+                x-axis-key="dose"
+                :height="150"
+              />
+              <template #fallback>
+                <div class="h-38" />
+              </template>
+            </ClientOnly>
+          </div>
+          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+            Based on your most recently logged mix ({{ formatDate(currentMix.date) }}). Units are for a U-100 insulin syringe (1 unit = 0.01 mL) — recalculate if you change vial size or dilution.
+          </p>
+        </div>
+      </section>
     </div>
-  </UContainer>
+
+    <p class="px-4 sm:px-6 py-3 text-[11px] text-ghost border-t border-line">
+      {{ GENERAL_DISCLAIMER }}
+    </p>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor, formatSite } from '~/data/journal'
+import { getCompoundColor } from '~/data/journal'
+import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcUnits, type MixUnit } from '~/utils/peptideCalc'
 
@@ -254,6 +326,7 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const route = useRoute()
 const compoundName = computed(() => decodeURIComponent(route.params.name as string))
+const compoundColor = computed(() => getCompoundColor(compoundName.value))
 const info = computed(() => getCompoundInfo(compoundName.value))
 
 const { data, refresh } = await useJournalEntries()
@@ -261,30 +334,19 @@ onMounted(refresh)
 
 const entries = computed(() => data.value ?? [])
 
-type Peptide = { time: string; compound: string; dose: number; unit: string; site: string }
+function dosesOf(entry: { peptides?: PeptideEntry[] }) {
+  return (entry.peptides ?? []).filter(p => p.compound === compoundName.value)
+}
 
-const onDays = computed(() =>
-  entries.value.filter(e =>
-    (e.peptides ?? []).some((p: Peptide) => p.compound === compoundName.value)
-  )
-)
-
-const offDays = computed(() =>
-  entries.value.filter(e =>
-    !(e.peptides ?? []).some((p: Peptide) => p.compound === compoundName.value)
-  )
-)
+const onDays = computed(() => entries.value.filter(e => dosesOf(e).length > 0))
+const offDays = computed(() => entries.value.filter(e => dosesOf(e).length === 0))
 
 // --- Stats ---
 const allInjections = computed(() =>
-  onDays.value.flatMap(e =>
-    (e.peptides ?? []).filter((p: Peptide) => p.compound === compoundName.value)
-      .map((p: Peptide) => ({ ...p, date: e.date }))
-  )
+  onDays.value.flatMap(e => dosesOf(e).map(p => ({ ...p, date: e.date })))
 )
 
 const totalInjections = computed(() => allInjections.value.length)
-
 const unit = computed(() => allInjections.value.at(-1)?.unit ?? 'mg')
 
 const avgDose = computed(() => {
@@ -299,89 +361,126 @@ const daysAgo = computed(() => {
   return Math.floor((Date.now() - new Date(last + 'T12:00:00').getTime()) / 86400000)
 })
 
+/** "18 days used · last -3d" — the title-row usage note, assembled here so Vue's whitespace
+ * condensing can't eat the separators. */
+const usageSummary = computed(() => {
+  const base = `${onDays.value.length} days used`
+  if (daysAgo.value == null) return base
+  return `${base} · last ${daysAgo.value === 0 ? 'today' : `-${daysAgo.value}d`}`
+})
+
+/** "R glute 18× · L glute 3×" — the sites cell in the stat row. */
+const sitesLabel = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const inj of allInjections.value) {
+    if (inj.site) counts[inj.site] = (counts[inj.site] ?? 0) + 1
+  }
+  return Object.entries(counts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([site, count]) => `${shortSite(site)} ${count}×`)
+    .join(' · ')
+})
+
+const dosingLine = computed(() => {
+  const d = info.value?.dosing
+  if (!d) return ''
+  return [d.range, d.frequency, d.timing, d.notes].filter(Boolean).join(' · ')
+})
+
 // --- Vitals correlation ---
-function avgVital(list: typeof entries.value, field: string): number | null {
+// Needs at least 5 readings on each side before it means anything; below that the average
+// swings too much on a single day to be worth showing.
+const MIN_READINGS = 5
+
+function avgVital(list: typeof entries.value, field: keyof typeof entries.value[number]): number | null {
   const vals = list
-    .map(e => (e as unknown as Record<string, unknown>)[field] as number | null)
+    .map(e => e[field] as number | null | undefined)
     .filter((v): v is number => v != null && v > 0)
-  if (vals.length < 5) return null
+  if (vals.length < MIN_READINGS) return null
   return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10
 }
 
-const onDaysWithVitals = computed(() =>
-  onDays.value.filter(e => e.hrv != null || e.rhr != null).length
-)
-const offDaysWithVitals = computed(() =>
-  offDays.value.filter(e => e.hrv != null || e.rhr != null).length
-)
-const hasVitalsData = computed(() => onDaysWithVitals.value >= 5)
+const onDaysWithVitals = computed(() => onDays.value.filter(e => e.hrv != null || e.rhr != null).length)
+const offDaysWithVitals = computed(() => offDays.value.filter(e => e.hrv != null || e.rhr != null).length)
+const hasVitalsData = computed(() => onDaysWithVitals.value >= MIN_READINGS)
 
-const vitalsRows = computed(() => {
-  const on = onDays.value
-  const off = offDays.value
+const VITALS_FIELDS = [
+  { label: 'HRV', field: 'hrv', higherIsBetter: true },
+  { label: 'RHR', field: 'rhr', higherIsBetter: false },
+  { label: 'BP Sys', field: 'bp_systolic', higherIsBetter: false },
+  { label: 'Weight', field: 'weight_lbs', higherIsBetter: null }
+] as const
 
-  const rows = [
-    { label: 'HRV', field: 'hrv', higherIsBetter: true, unit: 'ms' },
-    { label: 'RHR', field: 'rhr', higherIsBetter: false, unit: 'bpm' },
-    { label: 'BP Sys', field: 'bp_systolic', higherIsBetter: false, unit: 'mmHg' },
-    { label: 'Weight', field: 'weight_lbs', higherIsBetter: null, unit: 'lbs' },
-  ]
-
-  return rows.map(r => {
-    const onVal = avgVital(on, r.field)
-    const offVal = avgVital(off, r.field)
-    const delta = onVal != null && offVal != null
-      ? Math.round((onVal - offVal) * 10) / 10
-      : 0
-
-    let betterClass = 'text-muted'
-    if (r.higherIsBetter !== null && onVal != null && offVal != null) {
-      const better = r.higherIsBetter ? delta > 0 : delta < 0
-      betterClass = better ? 'text-success font-medium' : delta === 0 ? 'text-muted' : 'text-warning font-medium'
+const vitalsRows = computed(() =>
+  VITALS_FIELDS.map((r) => {
+    const on = avgVital(onDays.value, r.field)
+    const off = avgVital(offDays.value, r.field)
+    if (on == null || off == null) {
+      return { label: r.label, on, off, deltaText: '—', deltaClass: 'text-muted' }
     }
-
-    return { ...r, on: onVal, off: offVal, delta, betterClass }
+    const delta = Math.round((on - off) * 10) / 10
+    let deltaClass = 'text-muted'
+    if (r.higherIsBetter !== null && delta !== 0) {
+      deltaClass = (r.higherIsBetter ? delta > 0 : delta < 0) ? 'text-accent' : 'text-warn'
+    }
+    return { label: r.label, on, off, deltaText: `${delta > 0 ? '+' : ''}${delta}`, deltaClass }
   })
-})
+)
 
 // --- Dose chart ---
 const doseChart = computed(() =>
-  onDays.value.map(e => {
-    const doses = (e.peptides ?? [])
-      .filter((p: Peptide) => p.compound === compoundName.value)
-      .map((p: Peptide) => p.dose)
-    const total = Math.round(doses.reduce((a, b) => a + b, 0) * 10) / 10
-    return { date: e.date.substring(5), dose: total }
+  onDays.value.map((e) => {
+    const total = dosesOf(e).reduce((sum, p) => sum + p.dose, 0)
+    return { date: formatDate(e.date, 'monthDay'), dose: Math.round(total * 10) / 10 }
   })
 )
 
-// --- Syringe units ---
-type Reconstitution = { compound: string; vial_amount: number; vial_unit: MixUnit; bac_water_ml: number }
+const doseRangeLabel = computed(() => {
+  const first = onDays.value[0]?.date
+  const last = onDays.value.at(-1)?.date
+  if (!first || !last) return ''
+  return `${formatDate(first, 'monthDay').toUpperCase()} → ${formatDate(last, 'monthDay').toUpperCase()}`
+})
 
+/** Captions under the step chart: where the dose started, and where it sits now. */
+const doseSummary = computed(() => {
+  const doses = doseChart.value.map(d => d.dose)
+  if (!doses.length) return { start: '', recent: '' }
+  const first = doses[0]!
+  const last = doses.at(-1)!
+  // The mode is a better "steady" reading than the mean when a dose steps between levels.
+  const counts = new Map<number, number>()
+  for (const d of doses) counts.set(d, (counts.get(d) ?? 0) + 1)
+  const steady = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0]
+  const recent = steady === last
+    ? `${last}${unit.value} steady`
+    : `${steady}${unit.value} steady · ${last}${unit.value} last`
+  return { start: `${first}${unit.value} start`, recent }
+})
+
+// --- Syringe units ---
 const reconstitutions = computed(() =>
   entries.value
     .flatMap(e =>
       (e.reconstitutions ?? [])
-        .filter((r: Reconstitution) => r.compound === compoundName.value)
-        .map((r: Reconstitution) => ({ ...r, date: e.date }))
+        .filter(r => r.compound === compoundName.value)
+        .map(r => ({ ...r, date: e.date }))
     )
     .sort((a, b) => a.date.localeCompare(b.date))
 )
 
 const currentMix = computed(() => reconstitutions.value.at(-1) ?? null)
 
-const concentrationPerMl = computed(() => {
+const mixLine = computed(() => {
   const mix = currentMix.value
-  if (!mix || !mix.bac_water_ml) return null
-  return Math.round((mix.vial_amount / mix.bac_water_ml) * 1000) / 1000
-})
-
-const mcgPerUnit = computed(() => {
-  const mix = currentMix.value
-  if (!mix) return null
+  if (!mix) return ''
+  const parts = [`${mix.vial_amount}${mix.vial_unit} vial + ${mix.bac_water_ml}mL BAC water`]
+  const perMl = mix.bac_water_ml ? Math.round((mix.vial_amount / mix.bac_water_ml) * 1000) / 1000 : null
+  if (perMl != null) parts.push(`≈ ${perMl} ${mix.vial_unit}/mL`)
   const units = calcUnits(1, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
-  if (!units) return null
-  return Math.round((1 / units) * 1000) / 1000
+  if (units) parts.push(`1 unit ≈ ${Math.round((1 / units) * 1000) / 1000} ${unit.value}`)
+  return parts.join(' · ')
 })
 
 const syringeChart = computed(() => {
@@ -389,7 +488,7 @@ const syringeChart = computed(() => {
   if (!mix) return []
   const doses = [...new Set(allInjections.value.map(p => p.dose))].sort((a, b) => a - b)
   return doses
-    .map(dose => {
+    .map((dose) => {
       const units = calcUnits(dose, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
       return { dose: `${dose} ${unit.value}`, units: units != null ? Math.round(units * 10) / 10 : null }
     })
@@ -411,18 +510,7 @@ const calculatorLink = computed(() => {
   }
 })
 
-// --- Site breakdown ---
-const siteBreakdown = computed(() => {
-  const counts: Record<string, number> = {}
-  for (const inj of allInjections.value) {
-    counts[inj.site] = (counts[inj.site] ?? 0) + 1
-  }
-  return Object.entries(counts).sort(([, a], [, b]) => b - a)
-})
+const recentInjections = computed(() => [...allInjections.value].reverse().slice(0, 20))
 
-// --- Recent injections ---
-const recentInjections = computed(() =>
-  [...allInjections.value].reverse().slice(0, 20)
-)
-
+useSeoMeta({ title: () => compoundName.value })
 </script>

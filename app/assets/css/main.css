@@ -1,11 +1,64 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/* ── Phosphor Terminal design tokens ─────────────────────────────────────────
+   Dark-only terminal system: near-black green-tinted surfaces, phosphor-green
+   accent, monospace everywhere, no rounded corners. See
+   design_handoff_phosphor_terminal/README.md "Design Tokens". */
 @theme static {
-  --font-mono: 'Departure Mono', 'IBM Plex Mono', monospace;
-  --font-sans: 'IBM Plex Sans', sans-serif;
-  --font-serif: 'IBM Plex Serif', serif;
+  /* JetBrains Mono is the base face; Departure Mono is display/numbers only. */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --font-sans: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --font-serif: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --font-display: 'Departure Mono', 'JetBrains Mono', monospace;
 
+  /* Surfaces */
+  --color-bg: #070a09;
+  --color-raised: #0d1310;
+  --color-inset: #0a0f0c;
+  --color-status: #090d0b;
+  --color-nav-active: #12211a;
+
+  /* Borders */
+  --color-line: #1a2620;
+  --color-line-soft: #16211b;
+  --color-line-accent: #24382f;
+  --color-line-input: #1e2d26;
+  /* Form-field border. Brighter than the panel borders on purpose: an input has to read as
+     an input on a near-black page, where --color-line-accent alone all but vanishes. */
+  --color-line-field: #33503f;
+
+  /* Status colors */
+  --color-accent: #2ce8a4;
+  --color-accent-hover: #7df0c9;
+  --color-warn: #e8b34b;
+  --color-danger: #e86a5e;
+
+  /* Text ramp (muted/dimmed also flow through the --ui-text-* overrides below) */
+  --color-hi: #e6f2ec;
+  --color-body: #c7d4cd;
+  --color-dim: #a7bcb0;
+  --color-faint: #4a6357;
+  --color-ghost: #3f5449;
+
+  /* Misc series colors from the handoff */
+  --color-indigo-dot: #8593ea;
+  --color-soda: #7a2e35;
+
+  /* Phosphor scale so Nuxt UI's `primary` alias resolves to the accent */
+  --color-phosphor-50: #eafff7;
+  --color-phosphor-100: #c8ffe9;
+  --color-phosphor-200: #9bf8d8;
+  --color-phosphor-300: #7df0c9;
+  --color-phosphor-400: #2ce8a4;
+  --color-phosphor-500: #1fce8f;
+  --color-phosphor-600: #17a674;
+  --color-phosphor-700: #147f5b;
+  --color-phosphor-800: #135f46;
+  --color-phosphor-900: #114d3a;
+  --color-phosphor-950: #062a1f;
+
+  /* Legacy palette — still referenced by pre-redesign components */
   --color-green-50: #EFFDF5;
   --color-green-100: #D9FBE8;
   --color-green-200: #B3F5D1;
@@ -23,6 +76,142 @@
   --container-12xl: 120rem;
 }
 
-:root {
-  --ui-container: var(--container-10xl);
+/* Nuxt UI semantic tokens → phosphor palette. The design is dark-only, so the
+   same values apply in both modes (color-mode preference defaults to dark). */
+:root, .dark {
+  --ui-container: var(--container-12xl);
+  --ui-radius: 0px;
+
+  --ui-bg: var(--color-bg);
+  --ui-bg-muted: var(--color-inset);
+  --ui-bg-elevated: var(--color-raised);
+  --ui-bg-accented: var(--color-nav-active);
+  --ui-bg-inverted: var(--color-hi);
+
+  --ui-text-dimmed: var(--color-faint);
+  --ui-text-muted: #5d7a6d;
+  --ui-text-toned: var(--color-dim);
+  --ui-text: var(--color-body);
+  --ui-text-highlighted: var(--color-hi);
+  --ui-text-inverted: var(--color-bg);
+
+  --ui-border: var(--color-line);
+  --ui-border-muted: var(--color-line-soft);
+  /* Nuxt UI form controls ring on `accented` — point it at the brighter field border. */
+  --ui-border-accented: var(--color-line-field);
+  --ui-border-inverted: var(--color-hi);
+
+  --ui-primary: var(--color-accent);
+  --ui-success: var(--color-accent);
+  --ui-warning: var(--color-warn);
+  --ui-error: var(--color-danger);
+}
+
+@layer base {
+  /* No rounded corners anywhere — tiny status dots opt back in via `rounded-full`. */
+  *, ::before, ::after {
+    border-radius: 0;
+  }
+
+  html {
+    background-color: var(--color-bg);
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-body);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-accent) transparent;
+  }
+}
+
+@layer components {
+  /* TUI section header text: ┌ LABEL ───── (box-drawing fill drawn by TuiHeader.vue) */
+  .tui-label {
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+
+  /* Terminal buttons */
+  .tui-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 7px 12px;
+    border: 1px solid var(--color-line-input);
+    color: var(--color-dim);
+    background: var(--color-raised);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.1s, border-color 0.1s, background-color 0.1s;
+  }
+  .tui-btn:hover {
+    border-color: var(--color-line-accent);
+    color: var(--color-accent);
+  }
+  .tui-btn-accent {
+    border-color: var(--color-line-accent);
+    color: var(--color-accent);
+    background: #0f2418;
+  }
+  .tui-btn-accent:hover {
+    background: #173125;
+  }
+
+  /* Live/status dot with phosphor glow */
+  .glow-dot {
+    box-shadow: 0 0 8px var(--color-accent);
+  }
+
+  /* Big metric values are always Departure Mono */
+  .num-display {
+    font-family: var(--font-display);
+    color: var(--color-hi);
+  }
+
+  /* Model-written digest markdown: bold the numbers that matter, keep the paragraph
+     rhythm tight enough for a dense column. Shared by the home digest column and the
+     digest slideover. */
+  .digest-prose p + p {
+    margin-top: 0.6em;
+  }
+  .digest-prose strong {
+    color: var(--color-hi);
+    font-weight: 500;
+  }
+  .digest-prose em {
+    color: var(--color-body);
+  }
+  .digest-prose ul {
+    margin: 0.5em 0;
+    padding-left: 1.1em;
+    list-style: none;
+  }
+  .digest-prose li::before {
+    content: '· ';
+    color: var(--color-faint);
+  }
+}
+
+@keyframes tui-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
