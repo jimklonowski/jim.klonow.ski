@@ -56,6 +56,27 @@ export function blankVial(compound = ''): Vial {
   }
 }
 
+// Standing vitamin/supplement/skin-routine stack — the regimen itself, not day-by-day dose
+// logs. 'on_hand' rows are owned but not being taken; 'stopped' rows are kept as history
+// (recent stops stay relevant to lab trends). Feeds the AI digest/lab-summary prompts via
+// server/utils/protocol.ts.
+export type SupplementCategory = 'supplement' | 'skin'
+export type SupplementStatus = 'active' | 'on_hand' | 'stopped'
+
+export interface Supplement {
+  id?: number
+  name: string
+  dose?: string | null
+  category: SupplementCategory
+  status: SupplementStatus
+  schedule: string
+  started?: string | null
+  stopped?: string | null
+  notes?: string | null
+  sort?: number
+  created_at?: string
+}
+
 export interface JournalEntry {
   date: string
   day?: number | null

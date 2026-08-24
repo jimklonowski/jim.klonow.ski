@@ -384,7 +384,9 @@ async function buildWeekly(db: D1Database, start: string, end: string) {
 
 // Standing context injected into every digest prompt — this is what steers the model's
 // priorities and tone. Edit to taste as goals change.
-const READER_CONTEXT = `About the reader: an adult man running a self-directed hormone protocol alongside regular training. The core of the protocol is testosterone (TRT), HGH, and hCG — these are the compounds that matter when connecting protocol to outcomes, and they are ongoing. Ancillary peptides (BPC-157, TB-500, MOTS-C, NAD+, GHK-Cu, and the like) come and go around that core; treat their starts and stops as secondary context, not headlines. He is also weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals, so anything bearing on that decision — blood pressure, resting HR, recovery, and (when labs appear) lipids, hematocrit, and iron/ferritin — deserves attention. He is not currently taking an aromatase inhibitor, but keeps Anastrozole on hand from his TRT clinic for symptomatic use; his estradiol is running high (recently over 100 pg/mL), so when the data hints at estrogen-related effects (water retention, blood-pressure drift, mood/sleep changes), connect that dot explicitly. His priorities: body recomposition (adding lean mass to arms/chest without adding fat), sleep and recovery quality, and keeping cardiovascular markers — blood pressure and resting HR — in a healthy range while on protocol. He tracks soda intake because he is trying to keep it low. He wants honest signal over encouragement: if something looks off or is trending the wrong way, say so directly.`
+const READER_CONTEXT = `About the reader: an adult man running a self-directed hormone protocol alongside regular training. The core of the protocol is testosterone (TRT), HGH, and hCG — these are the compounds that matter when connecting protocol to outcomes, and they are ongoing. Ancillary peptides (BPC-157, TB-500, MOTS-C, NAD+, GHK-Cu, and the like) come and go around that core; treat their starts and stops as secondary context, not headlines. He is also weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals, so anything bearing on that decision — blood pressure, resting HR, recovery, and (when labs appear) lipids, hematocrit, and iron/ferritin — deserves attention. He is not currently taking an aromatase inhibitor, but keeps Anastrozole on hand from his TRT clinic for symptomatic use; his estradiol is running high (recently over 100 pg/mL), so when the data hints at estrogen-related effects (water retention, blood-pressure drift, mood/sleep changes), connect that dot explicitly. His priorities: body recomposition (adding lean mass to arms/chest without adding fat), sleep and recovery quality, and keeping cardiovascular markers — blood pressure and resting HR — in a healthy range while on protocol. He tracks soda intake because he is trying to keep it low. He wants honest signal over encouragement: if something looks off or is trending the wrong way, say so directly.
+
+${PROTOCOL_SCHEDULE}`
 
 const STYLE_RULES = `Ground rules:
 - The dashboard already shows the raw stats below your summary, so don't inventory every metric — cite a number only when you're interpreting it (a delta, a comparison against a baseline, something out of range).
@@ -397,24 +399,24 @@ const STYLE_RULES = `Ground rules:
 - No greeting, no closing, no medical-advice disclaimers.
 - End with 1-3 concrete recommendations grounded in the data above: what to watch, adjust, or try, and why. Each should be specific enough to act on this week (a habit to tweak, a metric to recheck, a timing change to test) — skip generic advice like "sleep more" or "stay hydrated".`
 
-function dailyPrompt(date: string, facts: string): string {
-  return `You are writing a short daily recap for a personal health dashboard. The reader is the person these metrics belong to — address them as "you". ${READER_CONTEXT}
+function dailyPrompt(date: string, facts: string, supplements: string): string {
+  return `You are writing a short daily recap for a personal health dashboard. The reader is the person these metrics belong to — address them as "you". ${READER_CONTEXT}${supplements ? `\n\n${supplements}` : ''}
 
 Recap for ${fmtDate(date)}:
 ${facts}
 
-Write 2-3 short paragraphs highlighting what stands out about the day — notable vitals against the prior-7-day baseline, recovery/sleep quality, whether they trained, and their protocol adherence. If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "your resting HR has averaged X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Each change carries its age: prefer trends tied to the ongoing core protocol over ones anchored to an ancillary peptide stopped weeks ago, which by now rate a clause, not a headline. Be factual, specific, and warm but concise. If it was an unremarkable day, say so briefly.
+Write 2-3 short paragraphs highlighting what stands out about the day — notable vitals against the prior-7-day baseline, recovery/sleep quality, whether they trained, and their protocol adherence measured against the intended schedule above (a day with no testosterone or hCG logged may simply not be one of its scheduled days). If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "your resting HR has averaged X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Each change carries its age: prefer trends tied to the ongoing core protocol over ones anchored to an ancillary peptide stopped weeks ago, which by now rate a clause, not a headline. Be factual, specific, and warm but concise. If it was an unremarkable day, say so briefly.
 
 ${STYLE_RULES}`
 }
 
-function weeklyPrompt(start: string, end: string, facts: string): string {
-  return `You are writing a weekly summary for a personal health dashboard. The reader is the person these metrics belong to — address them as "you". ${READER_CONTEXT}
+function weeklyPrompt(start: string, end: string, facts: string, supplements: string): string {
+  return `You are writing a weekly summary for a personal health dashboard. The reader is the person these metrics belong to — address them as "you". ${READER_CONTEXT}${supplements ? `\n\n${supplements}` : ''}
 
 Week of ${fmtDate(start)} – ${fmtDate(end)}:
 ${facts}
 
-Write 3-4 short paragraphs, in order of importance: overall trends this week against the previous week (weight, recovery, sleep, HRV/RHR, blood pressure), training volume, and protocol adherence (which compounds, how consistently). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "your resting HR has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Each change carries its age: a finding anchored to the ongoing core protocol outranks one anchored to an ancillary peptide stopped weeks ago, which by now rates a clause, not a headline. Call out anything notably better or worse than the previous week. Be factual, specific, and concise.
+Write 3-4 short paragraphs, in order of importance: overall trends this week against the previous week (weight, recovery, sleep, HRV/RHR, blood pressure), training volume, and protocol adherence measured against the intended schedule above (e.g. testosterone on 2 of 7 days is full adherence, not a thin log; flag misses or extras, not matches). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "your resting HR has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Each change carries its age: a finding anchored to the ongoing core protocol outranks one anchored to an ancillary peptide stopped weeks ago, which by now rates a clause, not a headline. Call out anything notably better or worse than the previous week. Be factual, specific, and concise.
 
 ${STYLE_RULES}`
 }
@@ -507,8 +509,12 @@ export async function generateDigest(
     }))
   }
 
+  // Standing supplement stack from the supplements table — regimen context the dose log
+  // doesn't carry (vitamins/meds are taken daily but not logged).
+  const supplements = await supplementContext(db, end)
+
   const facts = built.lines.join('\n')
-  const prompt = kind === 'weekly' ? weeklyPrompt(start, end, facts) : dailyPrompt(end, facts)
+  const prompt = kind === 'weekly' ? weeklyPrompt(start, end, facts, supplements) : dailyPrompt(end, facts, supplements)
   const summary = await callClaude(apiKey, prompt)
   await storeDigest(db, kind, start, end, summary, built.stats)
 
