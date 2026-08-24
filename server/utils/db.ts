@@ -43,7 +43,6 @@ export function parseProgressPhotoRow(row: Record<string, unknown>) {
 export function parseJournalRow(row: Record<string, unknown>) {
   return {
     date: row.date as string,
-    day: (row.day as number | null) ?? null,
     weight_lbs: (row.weight_lbs as number | null) ?? null,
     bp_systolic: (row.bp_systolic as number | null) ?? null,
     bp_diastolic: (row.bp_diastolic as number | null) ?? null,

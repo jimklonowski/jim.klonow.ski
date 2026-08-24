@@ -2,9 +2,12 @@
   <div>
     <JournalHeader
       section="ENTRIES"
-      :meta="entries.length.toLocaleString('en-US')"
+      :meta="`${entries.length.toLocaleString('en-US')} rows`"
     >
+      <!-- Row count stays on `meta` because the ledger below lists every row; the logged count
+           is the subset that was hand-entered rather than synced from the watch. -->
       <template #meta>
+        · {{ loggedEntries.length.toLocaleString('en-US') }} logged
         <template v-if="streak">
           · <span class="text-accent font-medium">streak {{ streak }}d</span>
         </template>
@@ -46,7 +49,6 @@
         :class="gridCols"
       >
         <span>Date</span>
-        <span>Day</span>
         <span>Vitals</span>
         <span>Doses</span>
         <span v-if="showSoda">Soda</span>
@@ -62,7 +64,6 @@
         :class="[gridCols, row.isToday ? 'bg-inset' : '', canOpenDays ? 'hover:bg-[#101a15] transition-colors' : 'pointer-events-none']"
       >
         <span class="text-hi uppercase">{{ formatDate(row.date, 'monthDay') }}</span>
-        <span class="text-muted">{{ row.day ?? '' }}</span>
         <span class="text-dim truncate">{{ row.vitals }}</span>
 
         <span class="flex items-center gap-1 flex-wrap">
@@ -182,8 +183,8 @@ const canOpenDays = computed(() => role.value !== 'doctor')
 
 const gridCols = computed(() =>
   showSoda.value
-    ? 'lg:grid-cols-[90px_50px_minmax(0,1fr)_130px_60px_40px_110px] grid-cols-[auto_1fr]'
-    : 'lg:grid-cols-[90px_50px_minmax(0,1fr)_130px_40px_110px] grid-cols-[auto_1fr]'
+    ? 'lg:grid-cols-[90px_minmax(0,1fr)_130px_60px_40px_110px] grid-cols-[auto_1fr]'
+    : 'lg:grid-cols-[90px_minmax(0,1fr)_130px_40px_110px] grid-cols-[auto_1fr]'
 )
 
 function countByDate(list: { date: string }[] | null | undefined) {
@@ -195,22 +196,15 @@ const workoutCounts = computed(() => countByDate(workoutsData.value))
 const photoCounts = computed(() => countByDate(photosData.value))
 const drawDates = computed(() => new Set((labsData.value ?? []).map(l => l.date)))
 
-const streak = computed(() => {
-  const dates = new Set(entries.value.map(e => e.date))
-  const start = entries.value[0]?.date
-  if (!start) return 0
-  let count = 0
-  const d = new Date(start + 'T12:00:00')
-  while (dates.has(d.toLocaleDateString('en-CA'))) {
-    count++
-    d.setDate(d.getDate() - 1)
-  }
-  return count
-})
+// Logged days only, here and in the strip below: the ledger lists every row (vitals-only ones
+// included), but "logged" has to mean hand-entered or the strip is solid green for any day the
+// watch synced. See app/utils/journalLog.ts.
+const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
+const streak = computed(() => loggedStreak(entries.value, today))
 
 // --- 60-day streak strip ---
 const streakStrip = computed(() => {
-  const byDate = new Map(entries.value.map(e => [e.date, e]))
+  const byDate = new Map(loggedEntries.value.map(e => [e.date, e]))
   const cells: Array<{ date: string, logged: boolean, class: string, title: string }> = []
   const d = new Date(today + 'T12:00:00')
   d.setDate(d.getDate() - 59)
@@ -259,7 +253,6 @@ const pageRows = computed(() =>
     const isDraw = drawDates.value.has(e.date)
     return {
       date: e.date,
-      day: e.day,
       isToday: e.date === today,
       isDraw,
       vitals: vitalsLine(e),

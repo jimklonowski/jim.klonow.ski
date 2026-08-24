@@ -4,11 +4,6 @@
       section="ENTRY"
       :meta="headingLabel"
     >
-      <template #meta>
-        <template v-if="form.day">
-          · day <span class="text-body">{{ form.day }}</span>
-        </template>
-      </template>
       <template #actions>
         <NuxtLink
           v-if="prevEntry"
@@ -52,7 +47,7 @@
           label="DATE · VITALS"
           :dashes="12"
         />
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 mt-2.5">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-2.5">
           <UFormField
             label="Date"
             :ui="FIELD_UI"
@@ -60,17 +55,6 @@
             <UInput
               v-model="form.date"
               type="date"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="Day #"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model.number="form.day"
-              type="number"
-              placeholder="35"
               class="w-full"
             />
           </UFormField>
@@ -896,7 +880,6 @@ const mealHistory = computed(() => {
 
 const form = reactive<{
   date: string
-  day: number | null
   weight_lbs: number | null
   bp_systolic: number | null
   bp_diastolic: number | null
@@ -919,7 +902,6 @@ function buildForm() {
     const blank = blankEntry(dateParam.value)
     return {
       date: blank.date,
-      day: blank.day ?? null,
       weight_lbs: blank.weight_lbs ?? null,
       bp_systolic: blank.bp_systolic ?? null,
       bp_diastolic: blank.bp_diastolic ?? null,
@@ -934,7 +916,6 @@ function buildForm() {
   }
   return {
     date: entry.date,
-    day: entry.day ?? null,
     weight_lbs: entry.weight_lbs ?? null,
     bp_systolic: entry.bp_systolic ?? null,
     bp_diastolic: entry.bp_diastolic ?? null,
