@@ -29,6 +29,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
 | `/journal/compound/[name]` | Dosing history for a single compound |
 | `/journal/calculator` | Peptide reconstitution & syringe unit calculator |
+| `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
 | `/journal/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
 | `/journal/inventory` | Peptide vial inventory (parked — page exists but is unlinked) |
 
@@ -51,8 +52,10 @@ The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token (fall
 - All entries (journal, labs, DEXA, health metrics, workouts, vials, digests, invites) live in **D1** — see `server/database/schema.sql`.
 - Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary.
 - **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/workout data on a schedule into `health_metrics` and `workouts`.
+- **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/journal/import`).
 - Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`server/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced via `DigestPanel.vue`.
 - The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events) and can be regenerated from the labs dashboard.
+- Both AI features share standing protocol context from `server/utils/protocol.ts`: the intended injectable schedule (hand-maintained constant) plus the supplement stack rendered live from the `supplements` table, so edits on `/journal/supplements` reach the prompts without a deploy.
 
 ## Dev
 
