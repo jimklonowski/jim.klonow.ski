@@ -1,219 +1,330 @@
 <template>
-  <UContainer>
-    <div class="py-8 space-y-10">
-      <!-- Header -->
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-bold">Bloodwork Tracker</h1>
-          <p v-if="latest" class="text-muted mt-1">
-            Latest draw: {{ formatDate(latest.date) }}
-            <UBadge v-if="latest.fasting" variant="subtle" color="neutral" size="xs" class="ml-2">Fasting</UBadge>
-          </p>
-          <SourcePdfsPopover :sources="allSources" class="mt-2" />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <UButton variant="outline" size="xs" icon="i-lucide-scan" @click="goToDexa">
-            Body Composition
-          </UButton>
-          <UButton v-if="isOwner" to="/labs/sharing" variant="outline" size="xs" icon="i-lucide-users">
-            Sharing
-          </UButton>
-          <UButton v-if="isOwner" to="/labs/upload" variant="solid" size="xs" icon="i-lucide-upload">
-            Upload Results
-          </UButton>
-        </div>
+  <div>
+    <!-- Title row -->
+    <div class="flex flex-wrap items-baseline gap-x-4 gap-y-3 px-4 sm:px-6 pt-4">
+      <h1 class="num-display text-hi text-[26px] leading-none">
+        BLOODWORK
+      </h1>
+      <p
+        v-if="latest"
+        class="text-[11px] text-muted tracking-[0.06em] uppercase"
+      >
+        last draw <span class="text-hi font-medium">{{ formatDateTerse(latest.date) }}</span>
+        <template v-if="latest.fasting">
+          · fasting
+        </template>
+        <template v-if="pdfCount">
+          · {{ pdfCount }} source pdfs
+        </template>
+      </p>
+
+      <div class="flex flex-wrap items-center gap-2 ml-auto">
+        <SourcePdfsPopover
+          v-if="allSources.length"
+          :sources="allSources"
+        />
+        <NuxtLink
+          v-if="isOwner"
+          to="/labs/sharing"
+          class="tui-btn"
+        >
+          SHARING
+        </NuxtLink>
+        <NuxtLink
+          to="/labs/dexa"
+          class="tui-btn"
+        >
+          BODY COMP →
+        </NuxtLink>
+        <NuxtLink
+          v-if="isOwner"
+          to="/labs/upload"
+          class="tui-btn tui-btn-accent"
+        >
+          ↑ UPLOAD RESULTS
+        </NuxtLink>
+      </div>
+    </div>
+
+    <!-- AI summary readout -->
+    <div
+      v-if="latest"
+      class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-line-input bg-inset"
+    >
+      <div class="flex items-baseline gap-3">
+        <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ AI SUMMARY</span>
+        <span
+          v-if="latestSummary"
+          class="text-[10.5px] text-muted tracking-[0.06em] uppercase"
+        >{{ formatDate(latestSummary.date, 'monthDay').toUpperCase() }}</span>
+        <span class="ml-auto flex items-center gap-2.5 text-[11px]">
+          <button
+            type="button"
+            class="text-accent hover:text-accent-hover cursor-pointer"
+            @click="summaryOpen = !summaryOpen"
+          >{{ summaryOpen ? 'collapse ▴' : 'expand ▾' }}</button>
+          <template v-if="isOwner">
+            <span class="text-faint">·</span>
+            <button
+              type="button"
+              class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
+              :disabled="regenerating"
+              @click="regenerateSummary"
+            >{{ regenerating ? 'working ⟳' : 'regen ⟳' }}</button>
+          </template>
+        </span>
       </div>
 
-      <!-- AI trend summary. The regenerate button can't live inside the collapsible trigger
-           (UCollapsible's default slot IS the trigger button — nesting buttons is invalid),
-           so the header is a plain row with the toggle and the button as siblings. -->
-      <section v-if="latest">
-        <div class="rounded-lg overflow-hidden bg-default ring ring-default">
-          <div class="flex items-center gap-1 p-4 sm:px-6 sm:py-4">
-            <button type="button" class="flex-1 flex items-center justify-between gap-2 text-left" @click="summaryOpen = !summaryOpen">
-              <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-primary" />
-                <h2 class="text-sm font-semibold text-muted uppercase tracking-wider">AI Summary</h2>
-                <p v-if="latestSummary" class="text-xs text-muted">{{ formatDate(latestSummary.date) }}</p>
-              </div>
-              <UIcon name="i-lucide-chevron-down" class="w-4 h-4 text-muted transition-transform" :class="{ 'rotate-180': summaryOpen }" />
-            </button>
-            <UTooltip v-if="isOwner" :text="latestSummary ? 'Regenerate summary for the latest draw' : 'Generate summary for the latest draw'">
-              <UButton
-                variant="ghost"
-                color="neutral"
-                size="xs"
-                icon="i-lucide-refresh-cw"
-                :loading="regenerating"
-                :aria-label="latestSummary ? 'Regenerate AI summary' : 'Generate AI summary'"
-                @click="regenerateSummary"
-              />
-            </UTooltip>
-          </div>
-          <UCollapsible v-model:open="summaryOpen">
-            <template #content>
-              <div v-if="regenerating" class="flex items-center gap-3 text-sm text-muted px-4 pb-4 sm:px-6 sm:pb-6">
-                <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" />
-                Comparing the {{ formatDate(latest.date) }} draw against your history...
-              </div>
-              <p v-else-if="latestSummary" class="text-sm leading-relaxed whitespace-pre-line px-4 pb-4 sm:px-6 sm:pb-6">{{ latestSummary.text }}</p>
-              <p v-else class="text-sm text-muted px-4 pb-4 sm:px-6 sm:pb-6">No AI summary for this draw yet — hit refresh to generate one.</p>
-            </template>
-          </UCollapsible>
-        </div>
-      </section>
-
-      <!-- PIN gate for summary regeneration — same second factor as the upload page -->
-      <UModal v-model:open="pinModalOpen" title="Upload PIN required" description="Regenerating the AI summary is a write, so it needs your 9-digit upload PIN.">
-        <template #body>
-          <div class="space-y-3">
-            <UInput
-              v-model="pin"
-              type="password"
-              inputmode="numeric"
-              maxlength="9"
-              placeholder="9-digit PIN"
-              autofocus
-              class="w-full text-center tracking-widest"
-              @keydown.enter="submitPin"
-            />
-            <UButton class="w-full" :loading="pinLoading" :disabled="pin.length !== 9" @click="submitPin">
-              Unlock &amp; regenerate
-            </UButton>
-            <p v-if="pinError" class="text-sm text-error text-center">{{ pinError }}</p>
-          </div>
-        </template>
-      </UModal>
-
-      <!-- Pinned / key markers -->
-      <section>
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Key Markers</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <LabsMarkerCard
-            v-for="key in PINNED_MARKERS"
-            :key="key"
-            :biomarker-key="key"
-            :entries="entries"
-          />
-        </div>
-      </section>
-
-      <!-- Genetic & qualitative results -->
-      <section v-if="geneticResults.length">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-1">Genetic &amp; Qualitative Results</h2>
-        <p class="text-xs text-muted mb-4">One-time results — not tracked as trends.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <UCard v-for="item in geneticResults" :key="`${item.date}-${item.name}`">
-            <div class="space-y-2">
-              <div>
-                <p class="text-sm font-medium">{{ item.name }}</p>
-                <p class="text-xs text-muted mt-0.5">{{ formatDate(item.date) }}</p>
-              </div>
-              <UBadge :color="qualitativeColor(item.result)" variant="subtle" class="w-fit">{{ item.result }}</UBadge>
-            </div>
-          </UCard>
-        </div>
-      </section>
-
-      <!-- Echocardiogram findings -->
-      <section v-if="echoResults.length">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-1">Echocardiogram</h2>
-        <p class="text-xs text-muted mb-4">Findings from your most recent echo report.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <UCard v-for="item in echoResults" :key="`${item.date}-${item.name}`">
-            <div class="space-y-2">
-              <div>
-                <p class="text-sm font-medium">{{ item.name }}</p>
-                <p class="text-xs text-muted mt-0.5">{{ formatDate(item.date) }}</p>
-              </div>
-              <UBadge :color="qualitativeColor(item.result)" variant="subtle" class="w-fit">{{ item.result }}</UBadge>
-            </div>
-          </UCard>
-        </div>
-      </section>
-
-      <!-- Trend charts for key markers -->
-      <section v-if="entries.length >= 2">
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Trends</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <TrendCard
-            v-for="key in CHART_MARKERS"
-            :key="key"
-            :label="BIOMARKERS[key]?.label ?? key"
-            :unit="BIOMARKERS[key]?.unit"
-            :data="chartData(key)"
-          />
-        </div>
-      </section>
-
-      <!-- Full panel by category -->
-      <section>
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Full Panel</h2>
-        <UTabs :items="tabItems" class="w-full">
-          <template #hormones>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
-              <LabsMarkerCard v-for="key in byCategory('hormones')" :key="key" :biomarker-key="key" :entries="entries" />
-            </div>
-          </template>
-          <template #metabolic>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
-              <LabsMarkerCard v-for="key in byCategory('metabolic')" :key="key" :biomarker-key="key" :entries="entries" />
-            </div>
-          </template>
-          <template #lipids>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
-              <LabsMarkerCard v-for="key in byCategory('lipids')" :key="key" :biomarker-key="key" :entries="entries" />
-            </div>
-          </template>
-          <template #cbc>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
-              <LabsMarkerCard v-for="key in byCategory('cbc')" :key="key" :biomarker-key="key" :entries="entries" />
-            </div>
-          </template>
-          <template #inflammation>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
-              <LabsMarkerCard v-for="key in byCategory('inflammation')" :key="key" :biomarker-key="key" :entries="entries" />
-            </div>
-          </template>
-          <template #cardiac>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-4">
-              <LabsMarkerCard v-for="key in byCategory('cardiac')" :key="key" :biomarker-key="key" :entries="entries" />
-            </div>
-          </template>
-        </UTabs>
-      </section>
-
-      <!-- Protocol context: what was running when each draw happened -->
-      <LabsProtocolContext
-        v-if="entries.length && journalEntries.length"
-        :labs-entries="entries"
-        :journal-entries="journalEntries"
-      />
+      <p
+        v-if="regenerating"
+        class="mt-2 text-[12.5px] text-muted"
+      >
+        Comparing the {{ formatDate(latest.date) }} draw against your history…
+      </p>
+      <p
+        v-else-if="latestSummary"
+        class="mt-2 text-[12.5px] leading-[1.7] text-dim whitespace-pre-line"
+        :class="summaryOpen ? '' : 'line-clamp-1'"
+      >
+        {{ latestSummary.text }}
+      </p>
+      <p
+        v-else
+        class="mt-2 text-[12.5px] text-muted"
+      >
+        No AI summary for this draw yet{{ isOwner ? ' — hit regen to generate one.' : '.' }}
+      </p>
     </div>
-  </UContainer>
+
+    <div class="px-4 sm:px-6 py-4 space-y-2.5">
+      <!-- Category tabs: equal-width segmented row with per-category counts -->
+      <div class="grid grid-cols-3 md:grid-cols-6 gap-px bg-line border border-line">
+        <button
+          v-for="cat in categories"
+          :key="cat.key"
+          type="button"
+          class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
+          :class="activeCategory === cat.key
+            ? 'bg-nav-active text-accent'
+            : 'bg-bg text-[#6b8578] hover:text-accent'"
+          @click="activeCategory = cat.key"
+        >
+          {{ cat.short }} <span class="text-faint">{{ cat.count }}</span>
+        </button>
+      </div>
+
+      <!-- Marker cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+        <LabsMarkerCard
+          v-for="key in activeMarkers"
+          :key="key"
+          :biomarker-key="key"
+          :entries="entries"
+        />
+      </div>
+      <p
+        v-if="!activeMarkers.length"
+        class="py-4 text-[12px] text-muted"
+      >
+        No markers recorded in this category yet.
+      </p>
+    </div>
+
+    <!-- Bottom split: echo | genetic, each taking half the row -->
+    <div
+      class="grid gap-px bg-line border-t border-line"
+      :class="geneticResults.length ? 'lg:grid-cols-2' : ''"
+    >
+      <section class="bg-bg px-4 sm:px-6 py-4">
+        <TuiHeader
+          :label="echoDate ? `ECHO · ${formatDateTerse(echoDate)}` : 'ECHO'"
+          :dashes="6"
+        >
+          <button
+            v-if="echoResults.length"
+            type="button"
+            class="text-[10.5px] text-accent hover:text-accent-hover cursor-pointer normal-case"
+            @click="echoOpen = true"
+          >
+            view all {{ echoResults.length }} →
+          </button>
+        </TuiHeader>
+
+        <div
+          v-if="echoResults.length"
+          class="mt-2.5 text-[12px] leading-[1.7]"
+        >
+          <div class="flex flex-wrap gap-x-5 gap-y-1">
+            <span
+              v-for="item in echoHighlights"
+              :key="item.name"
+              class="text-muted"
+            >
+              {{ item.name }} <span :class="colorClass(item.result)">{{ item.result }}</span>
+            </span>
+          </div>
+          <p class="mt-2 text-muted">
+            {{ normalCount }} findings normal
+          </p>
+        </div>
+        <p
+          v-else
+          class="mt-2.5 text-[12px] text-muted"
+        >
+          No echocardiogram on file.
+        </p>
+      </section>
+
+      <section
+        v-if="geneticResults.length"
+        class="bg-bg px-4 sm:px-6 py-4"
+      >
+        <TuiHeader
+          label="GENETIC · QUALITATIVE"
+          :dashes="4"
+        >
+          <span class="text-[10.5px] text-muted normal-case">one-time results · not trended</span>
+        </TuiHeader>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2.5 text-[12px]">
+          <span
+            v-for="item in geneticResults"
+            :key="`${item.date}-${item.name}`"
+            class="text-muted"
+          >
+            {{ item.name }} <span :class="colorClass(item.result)">{{ item.result }}</span>
+          </span>
+        </div>
+      </section>
+    </div>
+
+    <!-- Trend charts for the key markers -->
+    <section
+      v-if="entries.length >= 2"
+      class="px-4 sm:px-6 py-4 border-t border-line"
+    >
+      <TuiHeader label="TRENDS" />
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 mt-2.5">
+        <TrendCard
+          v-for="key in CHART_MARKERS"
+          :key="key"
+          :label="BIOMARKERS[key]?.label ?? key"
+          :unit="BIOMARKERS[key]?.unit"
+          :data="chartData(key)"
+        />
+      </div>
+    </section>
+
+    <!-- Full echo findings -->
+    <UModal
+      v-model:open="echoOpen"
+      title="Echocardiogram"
+      description="Findings from your most recent echo report"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
+      <template #body>
+        <div class="text-[12px]">
+          <div
+            v-for="(item, i) in echoResults"
+            :key="`${item.date}-${item.name}`"
+            class="flex items-baseline justify-between gap-4 px-2 py-2"
+            :class="i % 2 ? 'bg-inset' : ''"
+          >
+            <span class="text-muted shrink-0">{{ item.name }}</span>
+            <span
+              class="text-right"
+              :class="colorClass(item.result)"
+            >{{ item.result }}</span>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- PIN gate for summary regeneration — same second factor as the upload page -->
+    <UModal
+      v-model:open="pinModalOpen"
+      title="Upload PIN required"
+      description="Regenerating the AI summary is a write, so it needs your 9-digit upload PIN."
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
+    >
+      <template #body>
+        <div class="space-y-3">
+          <UInput
+            v-model="pin"
+            type="password"
+            inputmode="numeric"
+            maxlength="9"
+            placeholder="9-digit PIN"
+            autofocus
+            class="w-full text-center tracking-widest"
+            @keydown.enter="submitPin"
+          />
+          <UButton
+            class="w-full justify-center"
+            :loading="pinLoading"
+            :disabled="pin.length !== 9"
+            @click="submitPin"
+          >
+            Unlock &amp; regenerate
+          </UButton>
+          <p
+            v-if="pinError"
+            class="text-[12px] text-danger text-center"
+          >
+            {{ pinError }}
+          </p>
+        </div>
+      </template>
+    </UModal>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { BIOMARKERS, CATEGORY_LABELS, PINNED_MARKERS } from '~/data/biomarkers'
+import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
-import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 definePageMeta({ middleware: 'labs-auth' })
 
 const { data, refresh } = await useLabsEntries()
-const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
 const { isOwner } = await useAuth()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data
 if (import.meta.client) {
   onMounted(refresh)
-  onMounted(refreshJournal)
 }
 
 const entries = computed(() => data.value ?? [])
-const journalEntries = computed(() => journalData.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
 
+// --- category tabs ---
+const CATEGORY_SHORT: Record<Category, string> = {
+  hormones: 'Hormones',
+  metabolic: 'Metabolic',
+  lipids: 'Lipids',
+  cbc: 'CBC',
+  inflammation: 'Inflam',
+  cardiac: 'Cardiac'
+}
+
+function byCategory(cat: Category) {
+  return Object.entries(BIOMARKERS)
+    .filter(([, m]) => m.category === cat)
+    // Only markers this draw history actually has readings for — an empty card is noise.
+    .filter(([key]) => entries.value.some(e => e.markers[key] != null))
+    .map(([key]) => key)
+}
+
+const categories = computed(() =>
+  (Object.keys(CATEGORY_SHORT) as Category[]).map(key => ({
+    key,
+    short: CATEGORY_SHORT[key],
+    count: byCategory(key).length
+  }))
+)
+
+const activeCategory = ref<Category>('hormones')
+const activeMarkers = computed(() => byCategory(activeCategory.value))
+
+// --- AI summary ---
 // Most recent draw that has a generated summary — older draws predate the feature.
 const latestSummary = computed(() => {
   const entry = [...entries.value].reverse().find(e => e.ai_summary)
@@ -226,9 +337,8 @@ const isRecentDraw = computed(() => {
   return days <= 7
 })
 
-// AI summary regeneration. The generate endpoint is PIN-gated like uploads (403 when the
-// labs-upload-auth session cookie is missing), so a 403 opens the PIN modal and the retry
-// happens after unlock. Always regenerates for the latest draw.
+// The regenerate endpoint is PIN-gated like uploads (403 when the labs-upload-auth session
+// cookie is missing), so a 403 opens the PIN modal and the retry happens after unlock.
 const summaryOpen = ref(isRecentDraw.value)
 const regenerating = ref(false)
 const pinModalOpen = ref(false)
@@ -279,10 +389,13 @@ async function submitPin() {
   }
 }
 
+// --- sources ---
 const allSources = computed(() =>
-  entries.value.flatMap(e => (e.sources ?? []).map((src: string) => src)).filter(Boolean)
+  entries.value.flatMap(e => e.sources ?? []).filter(Boolean)
 )
+const pdfCount = computed(() => new Set(allSources.value).size)
 
+// --- qualitative results ---
 // Echo reports were saved before results carried a `category` tag, so entries written
 // prior to that still need to be recognized by their known anatomical section names.
 const ECHO_SECTION_NAMES = new Set([
@@ -298,39 +411,34 @@ function isEcho(item: { name: string, category?: string }) {
 const allQualitativeResults = computed(() =>
   [...entries.value]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .flatMap(e => (e.qualitative ?? []).map((q: { name: string, result: string, category?: string }) => ({ ...q, date: e.date })))
+    .flatMap(e => (e.qualitative ?? []).map(q => ({ ...q, date: e.date })))
 )
 const geneticResults = computed(() => allQualitativeResults.value.filter(item => !isEcho(item)))
 const echoResults = computed(() => allQualitativeResults.value.filter(isEcho))
+const echoDate = computed(() => echoResults.value[0]?.date ?? null)
+const echoOpen = ref(false)
+
+/** The findings worth surfacing inline: anything that isn't plainly reassuring. */
+const echoHighlights = computed(() =>
+  echoResults.value.filter(r => qualitativeColor(r.result) !== 'success').slice(0, 4)
+)
+const normalCount = computed(() =>
+  echoResults.value.filter(r => qualitativeColor(r.result) === 'success').length
+)
+
+function colorClass(result: string) {
+  return {
+    warning: 'text-warn',
+    success: 'text-accent',
+    neutral: 'text-body'
+  }[qualitativeColor(result)]
+}
 
 const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin', 'la_volume_index']
 
-const breakpoints = useBreakpoints(breakpointsTailwind)
-const isMobile = breakpoints.smaller('sm')
-
-const tabItems = computed(() => [
-  { label: isMobile.value ? undefined : 'Hormones', icon: 'i-lucide-activity', slot: 'hormones' as const },
-  { label: isMobile.value ? undefined : 'Metabolic', icon: 'i-lucide-flask-conical', slot: 'metabolic' as const },
-  { label: isMobile.value ? undefined : 'Lipids', icon: 'i-lucide-heart', slot: 'lipids' as const },
-  { label: isMobile.value ? undefined : 'CBC', icon: 'i-lucide-test-tube', slot: 'cbc' as const },
-  { label: isMobile.value ? undefined : CATEGORY_LABELS.inflammation, icon: 'i-lucide-leaf', slot: 'inflammation' as const },
-  { label: isMobile.value ? undefined : CATEGORY_LABELS.cardiac, icon: 'i-lucide-heart-pulse', slot: 'cardiac' as const }
-])
-
-function byCategory(cat: Category) {
-  return Object.entries(BIOMARKERS)
-    .filter(([, m]) => m.category === cat)
-    .map(([key]) => key)
-}
-
 function chartData(markerKey: string) {
   return entries.value
-    .filter((e: { date: string, markers: Record<string, number | null> }) => e.markers[markerKey] != null)
-    .map((e: { date: string, markers: Record<string, number | null> }) => ({
-      date: formatDate(e.date),
-      value: e.markers[markerKey] as number
-    }))
+    .filter(e => e.markers[markerKey] != null)
+    .map(e => ({ date: formatDate(e.date, 'monthDay'), value: e.markers[markerKey] as number }))
 }
-
-function goToDexa() { navigateTo('/labs/dexa') }
 </script>

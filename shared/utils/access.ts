@@ -16,11 +16,19 @@ const OWNER_PAGES = [
 ]
 
 // The doctor allowlist. Everything not listed here is off-limits for that role —
-// notably /journal/<date> daily entries, /journal/photos, and the write surfaces.
+// notably /journal/<date> daily entries, /journal/entries (the day-log ledger),
+// /journal/photos, and the write surfaces.
+//
+// trends/compounds/workouts are listed because they were sections of /journal before the
+// hub-and-spoke split; leaving them off would have quietly revoked access the doctor already
+// had. /journal/entries is deliberately absent — the daily log was never in this view.
 const DOCTOR_PAGES = [
   /^\/labs$/,
   /^\/labs\/dexa$/,
   /^\/journal$/,
+  /^\/journal\/trends$/,
+  /^\/journal\/compounds$/,
+  /^\/journal\/workouts$/,
   /^\/journal\/calendar$/,
   /^\/journal\/calculator$/,
   /^\/journal\/compound\//,

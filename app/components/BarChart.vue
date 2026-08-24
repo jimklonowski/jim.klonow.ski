@@ -1,18 +1,34 @@
 <template>
-  <VChart :option="option" autoresize :style="{ height: typeof height === 'number' ? `${height}px` : height }">
+  <VChart
+    :option="option"
+    autoresize
+    :style="{ height: typeof height === 'number' ? `${height}px` : height }"
+  >
     <template #tooltip="raw">
-      <slot name="tooltip" :params="asPoints(raw)">
-        <div
-          class="rounded-lg px-3 py-2 text-xs min-w-32"
-          :style="{ background: isDark ? '#1e293b' : '#ffffff', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, color: isDark ? '#e2e8f0' : '#1e293b' }"
-        >
-          <p v-if="asPoints(raw)[0]" class="font-medium mb-1 opacity-70">{{ asPoints(raw)[0]?.axisValueLabel ?? asPoints(raw)[0]?.axisValue }}</p>
-          <div v-for="p in asPoints(raw)" :key="p.seriesName" class="flex items-center justify-between gap-3">
+      <slot
+        name="tooltip"
+        :params="asPoints(raw)"
+      >
+        <div class="px-2.5 py-1.5 text-[11px] min-w-32 bg-raised border border-line-accent text-body">
+          <p
+            v-if="asPoints(raw)[0]"
+            class="text-muted mb-1"
+          >
+            {{ asPoints(raw)[0]?.axisValueLabel ?? asPoints(raw)[0]?.axisValue }}
+          </p>
+          <div
+            v-for="p in asPoints(raw)"
+            :key="p.seriesName"
+            class="flex items-center justify-between gap-3"
+          >
             <span class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: p.color }" />
+              <span
+                class="w-2 h-2 rounded-full shrink-0"
+                :style="{ background: p.color }"
+              />
               {{ p.seriesName }}
             </span>
-            <span class="font-mono font-medium">{{ p.value }}</span>
+            <span class="text-hi">{{ p.value }}</span>
           </div>
         </div>
       </slot>
@@ -21,6 +37,8 @@
 </template>
 
 <script setup lang="ts">
+import { CHART_AXIS, CHART_GRID, CHART_TEXT } from '~/utils/chartTheme'
+
 export interface BarTooltipPoint {
   seriesName?: string
   color?: string
@@ -43,33 +61,30 @@ const props = withDefaults(defineProps<{
   yAxisKeys: string[]
   xAxisKey?: string
   stacked?: boolean
-  radius?: number
   height?: number | string
   showLegend?: boolean
+  /** Hide the y-axis entirely — used by the dense mini bar charts. */
+  hideYAxis?: boolean
+  /** Hide the x-axis too, for a bare stacked strip. Tooltips still work. */
+  hideXAxis?: boolean
 }>(), {
   xAxisKey: 'date',
   stacked: false,
-  radius: 0,
   height: 160,
-  showLegend: false
+  showLegend: false,
+  hideYAxis: false,
+  hideXAxis: false
 })
 
-const colorMode = useColorMode()
-const isDark = computed(() => colorMode.value === 'dark')
-const labelColor = computed(() => isDark.value ? '#94a3b8' : '#64748b')
-const splitLineColor = computed(() => isDark.value ? '#334155' : '#e2e8f0')
-
 const option = computed<ECOption>(() => ({
-  grid: {
-    top: props.showLegend ? 28 : 8,
-    left: 4,
-    right: 4,
-    bottom: 4,
-    containLabel: true
-  },
+  backgroundColor: 'transparent',
+  textStyle: CHART_TEXT,
+  grid: props.hideXAxis && props.hideYAxis
+    ? { top: 2, left: 2, right: 2, bottom: 2, containLabel: false }
+    : { ...CHART_GRID, top: props.showLegend ? 26 : 8 },
   tooltip: {
     trigger: 'axis',
-    axisPointer: { type: 'shadow' },
+    axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(44,232,164,0.06)' } },
     padding: 0,
     borderWidth: 0,
     backgroundColor: 'transparent',
@@ -78,29 +93,32 @@ const option = computed<ECOption>(() => ({
   legend: {
     show: props.showLegend,
     top: 0,
-    textStyle: { color: labelColor.value }
+    itemWidth: 10,
+    itemHeight: 10,
+    icon: 'rect',
+    textStyle: { ...CHART_TEXT, color: CHART_AXIS.label }
   },
   xAxis: {
     type: 'category',
     data: props.data.map(d => d[props.xAxisKey] as string),
-    axisLabel: { color: labelColor.value, fontSize: 11 },
-    axisLine: { lineStyle: { color: splitLineColor.value } },
+    show: !props.hideXAxis,
+    axisLabel: { color: CHART_AXIS.label, fontSize: 10 },
+    axisLine: { lineStyle: { color: CHART_AXIS.line } },
     axisTick: { show: false }
   },
   yAxis: {
     type: 'value',
-    axisLabel: { color: labelColor.value, fontSize: 11 },
-    splitLine: { lineStyle: { color: splitLineColor.value } }
+    show: !props.hideYAxis,
+    axisLabel: { color: CHART_AXIS.label, fontSize: 10 },
+    axisLine: { show: false },
+    splitLine: { lineStyle: { color: CHART_AXIS.split } }
   },
   series: props.yAxisKeys.map(key => ({
     type: 'bar',
     name: props.categories[key]?.name ?? key,
     stack: props.stacked ? 'total' : undefined,
     data: props.data.map(d => d[key] as number),
-    itemStyle: {
-      color: props.categories[key]?.color,
-      borderRadius: props.radius ? [props.radius, props.radius, 0, 0] : 0
-    }
+    itemStyle: { color: props.categories[key]?.color, borderRadius: 0 }
   }))
 }))
 </script>

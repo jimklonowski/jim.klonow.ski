@@ -1,110 +1,97 @@
 <template>
-  <UContainer>
-    <div class="py-8 max-w-4xl mx-auto space-y-10">
-      <!-- Header -->
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <UButton
-            to="/journal"
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-arrow-left"
-          />
-          <div>
-            <h1 class="text-2xl font-bold">
-              Supplements
-            </h1>
-            <p class="text-sm text-muted">
-              Standing vitamins, meds &amp; skin routine — feeds the AI digests as protocol context
-            </p>
-          </div>
-        </div>
-        <UButton
+  <div>
+    <JournalHeader
+      section="SUPPLEMENTS"
+      :meta="`${activeCount} active`"
+    >
+      <template #actions>
+        <span class="text-[11px] text-muted hidden sm:inline">feeds AI digests as protocol context</span>
+        <button
           v-if="isOwner"
-          size="sm"
-          icon="i-lucide-plus"
+          type="button"
+          class="tui-btn tui-btn-accent"
           @click="openAddModal"
         >
-          Add
-        </UButton>
-      </div>
+          + ADD
+        </button>
+      </template>
+    </JournalHeader>
+    <JournalNav />
 
-      <div
-        v-if="!supplements.length"
-        class="text-sm text-muted"
-      >
-        Nothing tracked yet.<template v-if="isOwner">
-          Click <span class="font-medium">Add</span> to record your daily stack.
-        </template>
-      </div>
+    <p
+      v-if="!supplements.length"
+      class="px-4 sm:px-6 py-5 text-[12px] text-muted"
+    >
+      Nothing tracked yet.{{ isOwner ? ' Use + ADD to record your daily stack.' : '' }}
+    </p>
 
+    <div class="px-4 sm:px-6 py-4 space-y-5">
       <section
         v-for="group in groups"
-        :key="group.title"
+        :key="group.key"
       >
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wider mb-1">
-          {{ group.title }}
-        </h2>
-        <p class="text-xs text-muted mb-4">
-          {{ group.hint }}
-        </p>
-        <div class="rounded-lg border border-default divide-y divide-default">
+        <TuiHeader
+          :label="`${group.title} · ${group.items.length}`"
+          :dashes="group.dashes"
+        >
+          <span class="text-[10.5px] text-muted normal-case">{{ group.hint }}</span>
+        </TuiHeader>
+
+        <!-- Collapsed groups keep their rows behind a link, per the mockup's ON HAND section -->
+        <button
+          v-if="group.collapsible && !expanded[group.key]"
+          type="button"
+          class="mt-1.5 text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+          @click="expanded[group.key] = true"
+        >
+          view →
+        </button>
+
+        <div
+          v-else
+          class="mt-1.5"
+        >
           <div
             v-for="s in group.items"
             :key="s.id"
-            class="flex items-center justify-between gap-3 px-3 py-2.5 flex-wrap"
+            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-[#10160f] last:border-0 group"
           >
-            <div class="min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span
-                  class="text-sm font-medium"
-                  :class="s.status === 'stopped' ? 'line-through text-muted' : ''"
-                >{{ s.name }}</span>
-                <span
-                  v-if="s.dose"
-                  class="text-xs text-muted font-mono"
-                >{{ s.dose }}</span>
-                <UBadge
-                  v-if="s.schedule && s.schedule !== 'daily'"
-                  variant="subtle"
-                  size="sm"
-                >
-                  {{ s.schedule }}
-                </UBadge>
-                <span
-                  v-if="s.status === 'stopped' && s.stopped"
-                  class="text-xs text-muted"
-                >stopped {{ formatDate(s.stopped) }}</span>
-                <span
-                  v-else-if="s.started"
-                  class="text-xs text-muted"
-                >since {{ formatDate(s.started) }}</span>
-              </div>
-              <p
-                v-if="s.notes"
-                class="text-xs text-muted italic mt-0.5"
-              >
-                {{ s.notes }}
-              </p>
-            </div>
-            <div
-              v-if="isOwner"
-              class="flex items-center gap-1 shrink-0"
-            >
-              <UButton
-                size="xs"
-                variant="ghost"
-                icon="i-lucide-pencil"
-                @click="openEditModal(s)"
-              />
-              <UButton
-                size="xs"
-                variant="ghost"
-                color="error"
-                icon="i-lucide-trash-2"
-                @click="confirmDelete(s)"
-              />
-            </div>
+            <span
+              class="text-[13px]"
+              :class="s.status === 'stopped' ? 'line-through text-muted' : 'text-hi'"
+            >{{ s.name }}</span>
+
+            <span
+              v-if="annotation(s)"
+              class="text-[11.5px]"
+              :class="annotation(s)!.class"
+            >{{ annotation(s)!.text }}</span>
+
+            <span
+              v-if="cadence(s)"
+              class="text-[11px] text-accent border border-line-accent px-1.5 py-0.5"
+            >{{ cadence(s) }}</span>
+
+            <span class="ml-auto flex items-baseline gap-2 shrink-0">
+              <span
+                v-if="s.dose"
+                class="text-[12.5px] text-muted"
+              >{{ s.dose }}</span>
+              <template v-if="isOwner">
+                <button
+                  type="button"
+                  class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  :aria-label="`Edit ${s.name}`"
+                  @click="openEditModal(s)"
+                >edit</button>
+                <button
+                  type="button"
+                  class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  :aria-label="`Delete ${s.name}`"
+                  @click="confirmDelete(s)"
+                >✕</button>
+              </template>
+            </span>
           </div>
         </div>
       </section>
@@ -114,12 +101,14 @@
     <UModal
       v-model:open="formModalOpen"
       :title="form.id ? 'Edit Supplement' : 'Add Supplement'"
+      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="space-y-4">
           <UFormField
             label="Name"
             required
+            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model="form.name"
@@ -129,14 +118,20 @@
           </UFormField>
 
           <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Dose">
+            <UFormField
+              label="Dose"
+              :ui="{ label: 'tui-label' }"
+            >
               <UInput
                 v-model="form.dose"
                 placeholder="160 mg"
-                class="w-full font-mono"
+                class="w-full"
               />
             </UFormField>
-            <UFormField label="Schedule">
+            <UFormField
+              label="Schedule"
+              :ui="{ label: 'tui-label' }"
+            >
               <UInput
                 v-model="form.schedule"
                 placeholder="daily"
@@ -146,7 +141,10 @@
           </div>
 
           <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Category">
+            <UFormField
+              label="Category"
+              :ui="{ label: 'tui-label' }"
+            >
               <USelect
                 v-model="form.category"
                 :items="CATEGORY_OPTIONS"
@@ -155,7 +153,10 @@
                 class="w-full"
               />
             </UFormField>
-            <UFormField label="Status">
+            <UFormField
+              label="Status"
+              :ui="{ label: 'tui-label' }"
+            >
               <USelect
                 v-model="form.status"
                 :items="STATUS_OPTIONS"
@@ -170,21 +171,23 @@
             <UFormField
               label="Started"
               help="Blank = long-standing"
+              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.started"
                 type="date"
-                class="w-full font-mono"
+                class="w-full"
               />
             </UFormField>
             <UFormField
               v-if="form.status === 'stopped'"
               label="Stopped"
+              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.stopped"
                 type="date"
-                class="w-full font-mono"
+                class="w-full"
               />
             </UFormField>
           </div>
@@ -192,6 +195,7 @@
           <UFormField
             label="Notes"
             help="Included in AI context — dose-change history goes here"
+            :ui="{ label: 'tui-label' }"
           >
             <UTextarea
               v-model="form.notes"
@@ -201,12 +205,13 @@
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-2">
-            <UButton
-              variant="ghost"
+            <button
+              type="button"
+              class="tui-btn"
               @click="formModalOpen = false"
             >
-              Cancel
-            </UButton>
+              CANCEL
+            </button>
             <UButton
               :loading="saving"
               :disabled="!form.name?.trim()"
@@ -218,7 +223,7 @@
         </div>
       </template>
     </UModal>
-  </UContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -233,29 +238,62 @@ const { data, refresh } = await useSupplements()
 onMounted(() => refresh())
 
 const supplements = computed(() => data.value ?? [])
+const activeCount = computed(() => supplements.value.filter(s => s.status === 'active').length)
 
 const groups = computed(() => [
   {
-    title: 'Daily stack',
-    hint: 'Taken consistently — not dose-logged in the journal.',
+    key: 'daily',
+    title: 'DAILY STACK',
+    dashes: 11,
+    hint: 'taken consistently, not dose-logged',
     items: supplements.value.filter(s => s.category !== 'skin' && s.status === 'active')
   },
   {
-    title: 'Skin & hair',
-    hint: 'Topicals and routine.',
+    key: 'skin',
+    title: 'SKIN & HAIR',
+    dashes: 12,
+    hint: 'topicals and routine',
     items: supplements.value.filter(s => s.category === 'skin' && s.status === 'active')
   },
   {
-    title: 'On hand',
-    hint: 'Owned but not currently taking — context for pending decisions.',
+    key: 'onhand',
+    title: 'ON HAND · NOT TAKING',
+    dashes: 7,
+    hint: '',
+    collapsible: true,
     items: supplements.value.filter(s => s.status === 'on_hand')
   },
   {
-    title: 'Discontinued',
-    hint: 'Kept as history — recent stops stay relevant to lab trends.',
+    key: 'stopped',
+    title: 'DISCONTINUED',
+    dashes: 9,
+    hint: 'recent stops stay relevant to lab trends',
+    collapsible: true,
     items: supplements.value.filter(s => s.status === 'stopped')
   }
 ].filter(g => g.items.length))
+
+const expanded = reactive<Record<string, boolean>>({})
+
+// The schedule field is freeform text. "daily" is the assumed default so it stays off the row;
+// anything else is a real cadence worth calling out in a chip.
+function cadence(s: Supplement): string | null {
+  const schedule = s.schedule?.trim()
+  if (!schedule || schedule.toLowerCase() === 'daily') return null
+  return schedule
+}
+
+/** The inline note after the name — a dose change reads as a warn, provenance as faint. */
+function annotation(s: Supplement): { text: string, class: string } | null {
+  if (s.status === 'stopped' && s.stopped) {
+    return { text: `stopped ${formatDate(s.stopped, 'monthDay')}`, class: 'text-faint' }
+  }
+  const note = s.notes?.trim()
+  if (!note) return null
+  // A note describing a change (an arrow, "raised"/"lowered") is the actionable kind.
+  const isChange = /[→>]|\braised\b|\blowered\b|\bincreased\b|\bdecreased\b/i.test(note)
+  return { text: isChange ? `▲ ${note}` : note, class: isChange ? 'text-warn' : 'text-faint' }
+}
 
 const CATEGORY_OPTIONS = [
   { label: 'Supplement / med', value: 'supplement' },
@@ -339,9 +377,5 @@ async function confirmDelete(s: Supplement) {
   catch (err) {
     toast.add({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
   }
-}
-
-function formatDate(d: string): string {
-  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 </script>
