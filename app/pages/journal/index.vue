@@ -1,6 +1,6 @@
 <template>
   <div>
-    <JournalHeader :meta="`${entries.length.toLocaleString('en-US')} entries`">
+    <JournalHeader :meta="`${loggedEntries.length.toLocaleString('en-US')} logged`">
       <template #meta>
         <template v-if="streak">
           · <span class="text-accent font-medium">streak {{ streak }}d</span>
@@ -164,18 +164,10 @@ const isFullAccess = computed(() => role.value !== 'doctor')
 const entries = computed(() => data.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
 
-const streak = computed(() => {
-  const dates = new Set(entries.value.map(e => e.date))
-  const start = entries.value.at(-1)?.date
-  if (!start) return 0
-  let count = 0
-  const d = new Date(start + 'T12:00:00')
-  while (dates.has(d.toLocaleDateString('en-CA'))) {
-    count++
-    d.setDate(d.getDate() - 1)
-  }
-  return count
-})
+// Logged days only — journal_entries also holds passively-imported vitals rows, which used to
+// make this count Apple Watch coverage. See app/utils/journalLog.ts.
+const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
+const streak = computed(() => loggedStreak(entries.value, today))
 
 // --- vital tiles ---
 /** Trailing 30 days of a journal field, oldest first, nulls dropped. */
@@ -356,7 +348,7 @@ const spokeCards = computed(() => {
     cards.push({
       label: 'ENTRIES',
       to: '/journal/entries',
-      meta: `${entries.value.length.toLocaleString('en-US')} · streak ${streak.value}d`
+      meta: `${loggedEntries.value.length.toLocaleString('en-US')} logged · streak ${streak.value}d`
     })
   }
   return cards
