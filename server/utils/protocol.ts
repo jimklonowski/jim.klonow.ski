@@ -6,6 +6,7 @@
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
 export const PROTOCOL_SCHEDULE = `Intended dosing schedule (the reference for adherence — journal dose logs should line up with this; call out deviations, don't re-announce matches):
 - Every day: HGH 2 IU + GHK-Cu 2 mg.
+- Every morning: Tadalafil 5 mg oral (daily-protocol Cialis, since ~June 2025 — 7 mg gummies until June 2, 2026, 5 mg tablets since). Taken for endothelial/BP support; it is deliberately NOT in the dose log, so never read its absence there as a missed dose. Its mild BP-lowering effect is standing context when interpreting blood-pressure trends.
 - Monday + Thursday: Testosterone Cypionate 75 mg per injection (150 mg/week — reduced from 100 mg/injection, 200 mg/week, in late August 2026).
 - Tuesday + Friday + Sunday: hCG 250 IU.
 - BPC-157 is as-needed only (for soreness/tightness), so sporadic logging is expected, not a lapse.`
