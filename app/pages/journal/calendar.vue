@@ -137,7 +137,7 @@
       </TuiHeader>
 
       <p
-        v-if="!timelineCompounds.length"
+        v-if="!timelineRows.length"
         class="mt-2.5 text-[12px] text-muted"
       >
         No compound data yet.
@@ -148,7 +148,7 @@
         class="mt-3 space-y-1"
       >
         <div
-          v-for="compound in timelineCompounds"
+          v-for="compound in timelineRows"
           :key="compound.name"
           class="flex items-center gap-3"
         >
@@ -176,7 +176,7 @@
           </div>
 
           <span class="shrink-0 w-9 text-[11px] text-muted text-right">
-            {{ compound.activeSlots.size }}{{ zoom === 'week' ? 'w' : 'mo' }}
+            {{ compound.count }}{{ zoom === 'week' ? 'w' : 'mo' }}
           </span>
         </div>
 
@@ -207,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor } from '~/data/journal'
+import { getCompoundColor, STANDING_COMPOUNDS } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -473,8 +473,40 @@ const timelineCompounds = computed(() => {
 
   return Object.entries(usage)
     .sort(([a], [b]) => (firstUse[a] ?? '').localeCompare(firstUse[b] ?? ''))
-    .map(([name, activeSlots]) => ({ name, activeSlots, runs: toRuns(activeSlots, name) }))
+    .map(([name, activeSlots]) => ({ name, count: activeSlots.size, runs: toRuns(activeSlots, name) }))
 })
+
+// Standing meds (STANDING_COMPOUNDS) as backfilled rows: date ranges → bars, clamped to the
+// log window. These never appear in the dose log, so they're merged in here rather than
+// derived from entries — the tooltip carries the real dates and dose form.
+const standingRows = computed(() => {
+  const all = slots.value
+  if (!all.length) return []
+  const unit = 100 / all.length
+  // `covered` is a set because adjacent ranges (a dose-form switch mid-week) can land their
+  // boundary in the same slot — counting per-range would tally that week twice.
+  const byName = new Map<string, { name: string, covered: Set<number>, runs: Run[] }>()
+  for (const s of STANDING_COMPOUNDS) {
+    const endDate = s.to != null && s.to < todayDate ? s.to : todayDate
+    const startKey = slotKey(s.from)
+    const endKey = slotKey(endDate)
+    if (endKey < all[0]!) continue // range ended before the log window
+    const startIdx = all.indexOf(startKey) >= 0 ? all.indexOf(startKey) : 0
+    const endIdx = all.indexOf(endKey) >= 0 ? all.indexOf(endKey) : all.length - 1
+    const row = byName.get(s.compound) ?? { name: s.compound, covered: new Set<number>(), runs: [] }
+    for (let i = startIdx; i <= endIdx; i++) row.covered.add(i)
+    row.runs.push({
+      left: startIdx * unit,
+      width: (endIdx - startIdx + 1) * unit,
+      title: `${s.compound} ${s.label} · ${formatDate(s.from)} → ${s.to ? formatDate(s.to) : 'now'}`
+    })
+    byName.set(s.compound, row)
+  }
+  return [...byName.values()].map(r => ({ name: r.name, count: r.covered.size, runs: r.runs }))
+})
+
+/** Standing meds first (they predate the log), then logged compounds by first use. */
+const timelineRows = computed(() => [...standingRows.value, ...timelineCompounds.value])
 
 const labMarks = computed(() => {
   const all = slots.value
