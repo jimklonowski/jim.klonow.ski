@@ -28,10 +28,10 @@
     >
       <div class="bg-bg px-4 sm:px-6 py-3.5">
         <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-          Total injections
+          Total {{ isInjected ? 'injections' : 'doses' }}
         </p>
         <p class="num-display text-[28px] leading-none mt-1.5">
-          {{ totalInjections }}
+          {{ totalDoses }}
         </p>
       </div>
       <div class="bg-bg px-4 sm:px-6 py-3.5">
@@ -52,7 +52,7 @@
       </div>
       <div class="bg-bg px-4 sm:px-6 py-3.5">
         <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-          Sites
+          {{ isInjected ? 'Sites' : 'Route' }}
         </p>
         <p class="text-[13px] text-body mt-2.5">
           {{ sitesLabel || '—' }}
@@ -227,10 +227,10 @@
           </div>
         </div>
 
-        <!-- Recent injections -->
-        <div v-if="recentInjections.length">
+        <!-- Recent doses -->
+        <div v-if="recentDoses.length">
           <TuiHeader
-            label="RECENT INJECTIONS"
+            :label="isInjected ? 'RECENT INJECTIONS' : 'RECENT DOSES'"
             :dashes="10"
           />
           <table class="w-full mt-2.5 text-[12.5px]">
@@ -246,13 +246,13 @@
                   Dose
                 </th>
                 <th class="text-right font-medium py-1.5">
-                  Site
+                  {{ isInjected ? 'Site' : 'Route' }}
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="(inj, i) in recentInjections"
+                v-for="(inj, i) in recentDoses"
                 :key="`${inj.date}-${inj.time}-${i}`"
                 class="cursor-pointer hover:bg-[#101a15] transition-colors"
                 :class="i % 2 ? 'bg-inset' : ''"
@@ -276,7 +276,7 @@
         </div>
 
         <!-- Syringe units for the current mix -->
-        <div v-if="currentMix && syringeChart.length">
+        <div v-if="isInjected && currentMix && syringeChart.length">
           <TuiHeader
             label="SYRINGE UNITS · YOUR MIX"
             :dashes="4"
@@ -317,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor } from '~/data/journal'
+import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcUnits, type MixUnit } from '~/utils/peptideCalc'
@@ -342,15 +342,27 @@ const onDays = computed(() => entries.value.filter(e => dosesOf(e).length > 0))
 const offDays = computed(() => entries.value.filter(e => dosesOf(e).length === 0))
 
 // --- Stats ---
-const allInjections = computed(() =>
+const allDoses = computed(() =>
   onDays.value.flatMap(e => dosesOf(e).map(p => ({ ...p, date: e.date })))
 )
 
-const totalInjections = computed(() => allInjections.value.length)
-const unit = computed(() => allInjections.value.at(-1)?.unit ?? 'mg')
+const totalDoses = computed(() => allDoses.value.length)
+const unit = computed(() => allDoses.value.at(-1)?.unit ?? 'mg')
+
+/**
+ * Whether every logged dose of this compound went in through a needle — the whole page
+ * says "injections" only when that holds. Orals and nasal sprays (finasteride, modafinil)
+ * get neutral "dose" wording, and so does a compound logged both ways, since one label has
+ * to cover every row in the table. Read off the logged sites rather than a hand-kept list:
+ * a few compounds are legitimately taken either way.
+ */
+const isInjected = computed(() => {
+  const sites = allDoses.value.map(p => p.site).filter(Boolean)
+  return sites.length > 0 && sites.every(isInjectedSite)
+})
 
 const avgDose = computed(() => {
-  const doses = allInjections.value.map(p => p.dose)
+  const doses = allDoses.value.map(p => p.dose)
   if (!doses.length) return 0
   return Math.round(doses.reduce((a, b) => a + b, 0) / doses.length * 10) / 10
 })
@@ -372,14 +384,14 @@ const usageSummary = computed(() => {
 /** "R glute 18× · L glute 3×" — the sites cell in the stat row. */
 const sitesLabel = computed(() => {
   const counts: Record<string, number> = {}
-  for (const inj of allInjections.value) {
+  for (const inj of allDoses.value) {
     if (inj.site) counts[inj.site] = (counts[inj.site] ?? 0) + 1
   }
-  return Object.entries(counts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([site, count]) => `${shortSite(site)} ${count}×`)
-    .join(' · ')
+  const ranked = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 3)
+  // For an oral or nasal compound there's only one route and its count just restates the
+  // total, so that cell names the route and stops there.
+  if (!isInjected.value) return ranked.map(([site]) => shortSite(site)).join(' · ')
+  return ranked.map(([site, count]) => `${shortSite(site)} ${count}×`).join(' · ')
 })
 
 const dosingLine = computed(() => {
@@ -486,7 +498,7 @@ const mixLine = computed(() => {
 const syringeChart = computed(() => {
   const mix = currentMix.value
   if (!mix) return []
-  const doses = [...new Set(allInjections.value.map(p => p.dose))].sort((a, b) => a - b)
+  const doses = [...new Set(allDoses.value.map(p => p.dose))].sort((a, b) => a - b)
   return doses
     .map((dose) => {
       const units = calcUnits(dose, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
@@ -510,7 +522,7 @@ const calculatorLink = computed(() => {
   }
 })
 
-const recentInjections = computed(() => [...allInjections.value].reverse().slice(0, 20))
+const recentDoses = computed(() => [...allDoses.value].reverse().slice(0, 20))
 
 useSeoMeta({ title: () => compoundName.value })
 </script>
