@@ -5,7 +5,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 ## Stack
 
 - **Nuxt 4** + Vue 3 + TypeScript
-- **Nuxt UI v4** + Tailwind CSS v4
+- **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" dark-only TUI theme (JetBrains Mono / Departure Mono)
 - **Cloudflare Workers** — deployed via Wrangler (nodejs_compat)
 - **Cloudflare D1** — primary data store (journal, labs, DEXA, health metrics, workouts, digests, share invites)
 - **Cloudflare R2** — lab PDF and progress photo storage
@@ -18,12 +18,18 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 | Route | Description |
 |---|---|
+| `/` | Overview dashboard — flagged markers, vitals, today's doses + latest workout, quick links (sign-in prompt when signed out) |
 | `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries |
 | `/labs/dexa` | DEXA body composition scans |
 | `/labs/upload` | Upload a new lab PDF (parsed server-side into structured markers) — owner only |
 | `/labs/sharing` | Mint, list, and revoke share links — owner only |
+| `/labs/login` | Owner password sign-in |
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
-| `/journal` | Daily vitals, peptide dosing, streaks, 30/60/90d charts, section jump-nav, digest panel |
+| `/journal` | Hub — vital tiles with sparklines, today's doses + workout, soda/Whoop strip, and cards into each spoke below |
+| `/journal/trends` | Every vitals + Whoop/Apple Watch chart under one shared range picker (30/60/90d/all, optional 7d smoothing) |
+| `/journal/compounds` | Active protocol and every tracked compound, linking out to the calculator and vial inventory |
+| `/journal/workouts` | Session log merged from Apple Health + Whoop, with stat cells and type mix |
+| `/journal/entries` | Day-log ledger of every journal row — hidden from the doctor role |
 | `/journal/[date]` | Create or edit a day's entry (read-only for guests) |
 | `/journal/calendar` | Month view with compound-colored dots + protocol timeline |
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
@@ -31,7 +37,10 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/calculator` | Peptide reconstitution & syringe unit calculator |
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
 | `/journal/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
-| `/journal/inventory` | Peptide vial inventory (parked — page exists but is unlinked) |
+| `/journal/inventory` | Peptide vial inventory and depletion tracking — owner only, reached from `/journal/compounds` |
+| `/privacy` | Privacy notice |
+
+`/journal` is a hub-and-spoke section: the overview links into trends/compounds/workouts/entries, and every `/journal/*` page carries the same sub-nav (`app/components/journal/Nav.vue`), which drops tabs the current role can't open. Site-wide chrome lives in `app/layouts/default.vue` — header nav, status line, the digest panel, and a ⌘K command palette that jumps to any marker, day, or compound.
 
 ## Auth & sharing
 
@@ -39,9 +48,9 @@ Cookie sessions are HMAC-signed tokens (key: `LABS_SECRET`) carrying one of thre
 
 - **owner** — logs in with `LABS_PASSWORD`; full read/write. Writes to lab data additionally require a 9-digit `LABS_UPLOAD_PIN` (second-factor cookie, 12h).
 - **friend** — read-only mirror of the whole site.
-- **doctor** — clinical slice only: labs, DEXA, vitals/protocol trends. Daily entries, notes, sodas, photos, and digests are blocked (notes/sodas are stripped server-side).
+- **doctor** — clinical slice only: labs, DEXA, vitals/protocol trends, compounds, workouts. Daily entries, the `/journal/entries` ledger, notes, sodas, photos, and digests are blocked (notes/sodas are stripped server-side).
 
-Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/labs/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-out lives in the header.
+Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/labs/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
 
 Enforcement is layered: `server/middleware/auth.ts` verifies the cookie once per request and gates page navigation, `shared/utils/access.ts` holds the role→page policy shared with the client route middleware, and every API handler asserts its own requirement (`requireLabsAuth` / `requireOwner` / `requireRole` in `server/utils/auth.ts`).
 

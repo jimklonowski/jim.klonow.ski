@@ -307,9 +307,26 @@
           :label="`ALL ${photoCategoryLabel(category).toUpperCase()} · ${photosForCategory.length}`"
           :dashes="8"
         >
-          <span class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-muted normal-case">
-            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-warn" />before</span>
-            <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-accent glow-dot" />after</span>
+          <!-- Doubles as the legend and the slot picker: whichever chip is armed is the slot
+               the next thumbnail tap fills. -->
+          <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] normal-case">
+            <button
+              v-for="slot in (['before', 'after'] as const)"
+              :key="slot"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-1.5 py-0.5 border cursor-pointer transition-colors"
+              :class="pickTarget === slot
+                ? (slot === 'before' ? 'border-warn text-warn' : 'border-accent text-accent')
+                : 'border-transparent text-muted hover:text-hi'"
+              :aria-pressed="pickTarget === slot"
+              @click="pickTarget = slot"
+            >
+              <span
+                class="w-2 h-2 rounded-full"
+                :class="slot === 'before' ? 'bg-warn' : 'bg-accent glow-dot'"
+              />
+              {{ slot }}
+            </button>
           </span>
         </TuiHeader>
 
@@ -338,12 +355,18 @@
                 class="w-15 h-15 object-cover"
                 :style="frameStyle(opt.photo)"
               >
+              <!-- The border colour alone is easy to miss at thumbnail size on a phone. -->
+              <span
+                v-if="opt.value === beforeId || opt.value === afterId"
+                class="absolute top-0 left-0 px-1 text-[9px] leading-normal text-bg"
+                :class="opt.value === beforeId ? 'bg-warn' : 'bg-accent'"
+              >{{ opt.value === beforeId ? 'B' : 'A' }}</span>
             </button>
           </UContextMenu>
         </div>
 
         <p class="mt-2.5 text-[11px] text-muted">
-          Tap a thumbnail to fill Before, then again to fill After.{{ isOwner ? ' Long-press for reframe / edit / delete.' : '' }}
+          Tap <span class="text-warn">before</span> or <span class="text-accent">after</span> above to pick the slot you're filling, then tap a thumbnail. Filling Before arms After for you.{{ isOwner ? ' Long-press a thumbnail for reframe / edit / delete.' : '' }}
         </p>
       </section>
     </template>
@@ -743,29 +766,29 @@ const compareMeta = computed(() => {
   return `${formatDate(b.date, style)} → ${formatDate(a.date, style)} · ${days}d apart`
 })
 
-// Clicking a thumbnail fills Before first, then After, then starts overwriting Before again.
-// Once both are filled, the earlier date always ends up on the left (Before) - use the swap
-// button below the pickers to override.
-function pickPhoto(id: number) {
-  if (id === beforeId.value || id === afterId.value) return
-  if (beforeId.value == null) beforeId.value = id
-  else if (afterId.value == null) afterId.value = id
-  else {
-    beforeId.value = afterId.value
-    afterId.value = id
-  }
-  sortBeforeAfterByDate()
-}
+/**
+ * Which slot the next thumbnail tap fills. Both slots are pre-filled on load, so a tap always
+ * has to overwrite one of them — arming a slot explicitly is the only way that reads as
+ * predictable on a phone. The old rolling behaviour (fill Before, then After, then shift both
+ * along and re-sort by date) meant the photo you tapped often landed in the slot you weren't
+ * aiming at.
+ */
+type CompareSlot = 'before' | 'after'
+const pickTarget = ref<CompareSlot>('before')
 
-function sortBeforeAfterByDate() {
-  const b = photosForCategory.value.find(p => p.id === beforeId.value)
-  const a = photosForCategory.value.find(p => p.id === afterId.value)
-  if (!b || !a) return
-  const beforeIsLater = b.date > a.date || (b.date === a.date && b.id > a.id)
-  if (beforeIsLater) {
-    const tmp = beforeId.value
-    beforeId.value = afterId.value
-    afterId.value = tmp
+// Filling Before hands the arm to After, so the usual "set both" pass is two taps rather than
+// four. Staying on After afterwards makes stepping through later photos one tap each.
+function pickPhoto(id: number) {
+  if (pickTarget.value === 'before') {
+    // Picking the photo already in the other slot would leave both sides identical; give that
+    // slot the outgoing photo instead, which reads as a swap.
+    if (afterId.value === id) afterId.value = beforeId.value
+    beforeId.value = id
+    pickTarget.value = 'after'
+  }
+  else {
+    if (beforeId.value === id) beforeId.value = afterId.value
+    afterId.value = id
   }
 }
 
