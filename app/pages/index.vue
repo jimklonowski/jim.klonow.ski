@@ -247,10 +247,17 @@ function doseLabel(dose: PeptideEntry) {
 // Kept as separate parts, not one joined string, so each metric renders non-breaking —
 // otherwise this 390px column splits "18.9 min" across two lines.
 function workoutParts(w: typeof allWorkouts.value[number]) {
+  // start_time is stored as "2026-08-24 17:37:44 -0500" — the first HH:MM is the clock time.
+  const time = w.start_time?.match(/\d{2}:\d{2}/)?.[0] ?? null
+  // "♥ 119/141" = avg/max; whichever is missing drops out rather than showing a dash.
+  const hr = w.avg_hr != null
+    ? `♥ ${w.avg_hr}${w.max_hr != null ? `/${w.max_hr}` : ''}`
+    : w.max_hr != null ? `♥ max ${w.max_hr}` : null
   return [
+    time,
     w.duration_min != null ? `${w.duration_min.toFixed(1)} min` : null,
     w.calories != null ? `${w.calories} kcal` : null,
-    w.avg_hr != null ? `♥ ${w.avg_hr}` : null
+    hr
   ].filter((v): v is string => v != null)
 }
 
