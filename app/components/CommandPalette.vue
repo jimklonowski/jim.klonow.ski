@@ -190,8 +190,33 @@ const dossierItems = computed(() => {
     }))
 })
 
+/**
+ * A fully-typed ISO date, or null. Rejects 2026-13-40 — Date rolls overflow forward into the
+ * next month rather than failing, so the parsed parts are compared back against the input.
+ */
+const typedDate = computed(() => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(searchTerm.value.trim())
+  if (!m) return null
+  const [iso, , month, day] = m
+  const d = new Date(`${iso}T12:00:00`)
+  if (Number.isNaN(d.getTime()) || d.getMonth() + 1 !== +month! || d.getDate() !== +day!) return null
+  return iso!
+})
+
 const dateItems = computed(() => {
   if (!isFullAccess.value) return []
+  // Typing a date jumps to that exact day, whether or not it's in the recent list below and
+  // whether or not it has an entry yet ([date].vue opens a blank form for empty days). Without
+  // this the list was the only candidate set, and Fuse scored "2026-08-20" as a hit for a typed
+  // "2026-03-20" — one character apart — offering the wrong day as the only result.
+  if (typedDate.value) {
+    const entry = entries.value.find(e => e.date === typedDate.value)
+    return [{
+      label: typedDate.value,
+      suffix: entry?.weight_lbs != null ? `${entry.weight_lbs} lbs` : entry ? '' : 'no entry yet',
+      onSelect: () => go(`/journal/${typedDate.value}`)
+    }]
+  }
   return [...entries.value]
     .reverse()
     .slice(0, 14)
