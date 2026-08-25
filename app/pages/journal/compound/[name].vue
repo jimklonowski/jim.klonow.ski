@@ -21,6 +21,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <!-- Stat cells -->
     <div
       v-if="onDays.length"
@@ -329,7 +334,7 @@ const compoundName = computed(() => decodeURIComponent(route.params.name as stri
 const compoundColor = computed(() => getCompoundColor(compoundName.value))
 const info = computed(() => getCompoundInfo(compoundName.value))
 
-const { data, refresh } = await useJournalEntries()
+const { data, refresh, error } = await useJournalEntries()
 onMounted(refresh)
 
 const entries = computed(() => data.value ?? [])

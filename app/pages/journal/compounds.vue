@@ -19,6 +19,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <div class="px-4 sm:px-6 py-3.5 space-y-4">
       <!-- Active protocol -->
       <section>
@@ -180,7 +185,7 @@ import type { PeptideEntry } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
 
-const { data, refresh } = await useJournalEntries()
+const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { isOwner } = await useAuth()
 

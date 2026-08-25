@@ -18,6 +18,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <p
       v-if="!supplements.length"
       class="px-4 sm:px-6 py-5 text-[12px] text-muted"
@@ -234,7 +239,7 @@ definePageMeta({ middleware: 'journal-auth' })
 const toast = useToast()
 const { isOwner } = await useAuth()
 
-const { data, refresh } = await useSupplements()
+const { data, refresh, error } = await useSupplements()
 onMounted(() => refresh())
 
 const supplements = computed(() => data.value ?? [])

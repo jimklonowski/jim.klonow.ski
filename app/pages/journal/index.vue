@@ -26,6 +26,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="fetchError"
+      @retry="retryAll"
+    />
+
     <div class="px-4 sm:px-6 py-4 space-y-3">
       <!-- Vital tiles with sparklines -->
       <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -149,9 +154,16 @@ import { KNOWN_COMPOUNDS } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
 
-const { data, refresh } = await useJournalEntries()
-const { data: healthData, refresh: refreshHealth } = await useHealthMetricsEntries()
-const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
+const { data, refresh, error } = await useJournalEntries()
+const { data: healthData, refresh: refreshHealth, error: healthError } = await useHealthMetricsEntries()
+const { data: workoutsData, refresh: refreshWorkouts, error: workoutsError } = await useWorkoutsEntries()
+
+const fetchError = computed(() => error.value ?? healthError.value ?? workoutsError.value ?? null)
+function retryAll() {
+  refresh()
+  refreshHealth()
+  refreshWorkouts()
+}
 const { role, isOwner } = await useAuth()
 
 onMounted(refresh)
