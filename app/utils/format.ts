@@ -20,6 +20,13 @@ export function formatDateTerse(d: string): string {
   return formatDate(d, 'short').replace(',', '').toUpperCase()
 }
 
+// Workout start_time arrives as "2026-08-24 17:37:44 -0500" — already local to where the
+// session happened, so the first HH:MM is the clock time. Parsing it into a Date would
+// re-shift it into the viewer's zone; the regex keeps what the tracker recorded.
+export function workoutTime(startTime: string | null): string | null {
+  return startTime?.match(/\d{2}:\d{2}/)?.[0] ?? null
+}
+
 // Injection sites in the dense terminal rows: "Right Glute" → "R glute", "Oral" → "oral".
 // Only the side prefix keeps its capital, so the eye catches L/R without the row growing.
 export function shortSite(site: string): string {
