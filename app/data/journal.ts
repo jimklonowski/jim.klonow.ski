@@ -170,10 +170,28 @@ export const COMPOUND_GROUPS: Record<string, string[]> = {
     'Clomiphene', 'Tamoxifen', 'Anastrozole', 'Enclomiphene'
   ],
   'Other': [
-    'Clenbuterol', 'Finasteride', 'Dutasteride',
+    'Clenbuterol', 'Finasteride', 'Dutasteride', 'Tadalafil',
     '5-Amino-1MQ', 'SLU-PP-332', 'Modafinil', 'Bromantane'
   ]
 }
+
+export interface StandingCompound {
+  compound: string
+  /** First day of the range (may predate the dose log — the timeline clamps it). */
+  from: string
+  /** Last day of the range, or null while ongoing. */
+  to: string | null
+  /** Dose/form note for the timeline tooltip, e.g. "7 mg gummy". */
+  label: string
+}
+
+// Daily meds running since before the dose log existed — too routine to log per-day, but real
+// protocol. Rendered as extra rows on the calendar's protocol timeline (not stored in D1);
+// hand-maintained like the server's PROTOCOL_SCHEDULE, edit here to update.
+export const STANDING_COMPOUNDS: StandingCompound[] = [
+  { compound: 'Tadalafil', from: '2025-06-01', to: '2026-06-01', label: '7 mg gummy' },
+  { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet' }
+]
 
 export const KNOWN_COMPOUNDS = Object.values(COMPOUND_GROUPS).flat()
 
@@ -198,6 +216,7 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Enclomiphene': '#7c3aed',
   'Finasteride': '#059669',
   'Dutasteride': '#047857',
+  'Tadalafil': '#d946ef',
   'Semaglutide': '#0891b2',
   'Tirzepatide': '#0e7490',
   'Retatrutide': '#0369a1',

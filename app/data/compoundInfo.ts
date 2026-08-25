@@ -22,8 +22,8 @@ export interface CompoundInfo {
   caution?: string
 }
 
-export const GENERAL_DISCLAIMER =
-  'For research and educational purposes only. Not medical advice — consult a physician before starting, stopping, or adjusting any protocol.'
+export const GENERAL_DISCLAIMER
+  = 'For research and educational purposes only. Not medical advice — consult a physician before starting, stopping, or adjusting any protocol.'
 
 export const COMPOUND_INFO: Record<string, CompoundInfo> = {
   'BPC-157': {
@@ -794,6 +794,21 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     storage: 'Room temperature, in original packaging. Soft gelatin capsules — do not open or handle if damaged.',
     halfLife: '~4-5 weeks at steady state — dramatically longer than finasteride (~5-6 hours), so missed doses matter little but it also takes months to fully clear.',
     caution: 'Same class-wide risks as finasteride — sexual side effects in a subset of users (with the added caveat that the long half-life means any side effects take much longer to resolve after stopping), and PSA suppression (~50%) that must be accounted for when interpreting prostate labs. Like finasteride, it does not lower compounds that are already DHT-derived (methenolone, oxandrolone). Pregnant women should not handle leaking/damaged capsules (teratogenic). Blood donation deferral: 6 months after the last dose (vs 1 month for finasteride) due to teratogenicity risk.'
+  },
+
+  'Tadalafil': {
+    category: 'PDE5 Inhibitor',
+    aka: 'Cialis',
+    summary: 'A long-acting PDE5 inhibitor approved for erectile dysfunction, BPH, and pulmonary hypertension. At low daily doses it is used for steady endothelial support rather than on-demand effect — improved blood flow, modest blood-pressure reduction, and smoother erectile function without timing doses around activity. Its ~17-hour half-life is what separates it from sildenafil (~4 hours) and makes the daily protocol practical.',
+    dosing: {
+      range: '2.5–5 mg/day (daily protocol; 10–20 mg as-needed is the episodic alternative)',
+      frequency: 'Once daily',
+      timing: 'Oral, any time of day, with or without food; consistency matters more than timing since steady state is the point of daily dosing.'
+    },
+    cycling: 'Taken continuously on the daily protocol — effects on blood flow persist only while it is in the system.',
+    storage: 'Room temperature, in original packaging.',
+    halfLife: '~17.5 hours — steady state builds over ~5 days of daily dosing.',
+    caution: 'Never combine with nitrates (severe hypotension risk) and use care alongside alpha-blockers or other BP-lowering compounds — note the mild additive BP reduction when interpreting BP trends. Common side effects: headache, flushing, nasal congestion, back/muscle aches (the myalgia is characteristic of tadalafil specifically). Seek care for vision/hearing changes or priapism.'
   },
 
   'Semaglutide': {

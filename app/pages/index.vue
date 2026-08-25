@@ -67,21 +67,30 @@
       </p>
 
       <!-- Mirrors the dose rows above: label left, value right-aligned, stats on their own
-           line so nothing has to wrap mid-metric in this 390px column. -->
+           line so nothing has to wrap mid-metric in this 390px column. Lists every session
+           from the most recent workout day — a three-workout day used to show only its last. -->
       <div
-        v-if="latestWorkout"
-        class="mt-3.5 text-[12px] text-muted"
+        v-if="latestWorkouts.length"
+        class="mt-3.5 text-[12px] text-muted space-y-2"
       >
-        <div class="flex items-baseline gap-2">
-          <span class="shrink-0">└ workout:</span>
-          <span class="ml-auto text-body text-right">{{ latestWorkout.workout_type ?? 'Session' }}</span>
-        </div>
-        <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
-          <span
-            v-for="(part, i) in workoutParts"
-            :key="part"
-            class="whitespace-nowrap"
-          >{{ i ? `· ${part}` : part }}</span>
+        <div
+          v-for="(w, i) in latestWorkouts"
+          :key="`${w.date}-${w.start_time ?? i}`"
+        >
+          <div class="flex items-baseline gap-2">
+            <span
+              v-if="i === 0"
+              class="shrink-0"
+            >└ workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
+            <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
+          </div>
+          <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
+            <span
+              v-for="(part, j) in workoutParts(w)"
+              :key="part"
+              class="whitespace-nowrap"
+            >{{ j ? `· ${part}` : part }}</span>
+          </div>
         </div>
       </div>
 
@@ -137,7 +146,7 @@
           class="text-accent hover:text-accent-hover"
         >full panel →</NuxtLink>
         <NuxtLink
-          to="/journal"
+          to="/journal/trends"
           class="text-accent hover:text-accent-hover"
         >trends →</NuxtLink>
         <NuxtLink
@@ -181,13 +190,14 @@
     <!--
       The digest is the one panel with no length ceiling — a wordy weekly recap used to set the
       row height and leave the other two columns sitting above a screen of dead space. Capped to
-      the viewport (chrome is 7.1875rem: 53px header + 31px status + 31px footer) and scrolled
-      internally instead. Stays stretched rather than self-start so the grid's gap background
+      the viewport (chrome is 7.1875rem: 53px header + 31px status + 31px footer) as a flex
+      column: HomeDigest scrolls its prose region internally and keeps its action bar in flow
+      at the bottom. Stays stretched rather than self-start so the grid's gap background
       doesn't show through below it.
     -->
     <section
       v-if="isFullAccess"
-      class="bg-bg px-6 pt-4 pb-5 lg:max-h-[calc(100dvh-7.25rem)] lg:overflow-y-auto"
+      class="bg-bg px-6 pt-4 pb-5 lg:max-h-[calc(100dvh-7.25rem)] lg:flex lg:flex-col lg:min-h-0"
     >
       <HomeDigest
         :digests="digests"
@@ -220,7 +230,14 @@ const { data: digestData, execute: loadDigests, refresh: refreshDigests } = useD
 if (isFullAccess.value) await loadDigests()
 const digests = computed(() => digestData.value ?? [])
 
-const latestWorkout = computed(() => allWorkouts.value.at(-1) ?? null)
+/** Every session from the most recent day with a workout, earliest first. */
+const latestWorkouts = computed(() => {
+  const last = allWorkouts.value.at(-1)
+  if (!last) return []
+  return allWorkouts.value
+    .filter(w => w.date === last.date)
+    .sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))
+})
 
 function doseLabel(dose: PeptideEntry) {
   const unit = dose.unit === 'iu' ? 'IU' : dose.unit
@@ -229,15 +246,13 @@ function doseLabel(dose: PeptideEntry) {
 
 // Kept as separate parts, not one joined string, so each metric renders non-breaking —
 // otherwise this 390px column splits "18.9 min" across two lines.
-const workoutParts = computed(() => {
-  const w = latestWorkout.value
-  if (!w) return []
+function workoutParts(w: typeof allWorkouts.value[number]) {
   return [
     w.duration_min != null ? `${w.duration_min.toFixed(1)} min` : null,
     w.calories != null ? `${w.calories} kcal` : null,
     w.avg_hr != null ? `♥ ${w.avg_hr}` : null
   ].filter((v): v is string => v != null)
-})
+}
 
 /** Flagged markers that are expected on-protocol get a plain-language note under the rows. */
 const contextNote = computed(() => {

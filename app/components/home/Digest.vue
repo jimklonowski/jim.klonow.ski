@@ -1,7 +1,9 @@
 <template>
-  <!-- min-h-full, not h-full: the home column caps its own height and scrolls, so this box has
-       to be free to grow past it rather than clip the recap at the fold. -->
-  <div class="flex flex-col min-h-full">
+  <!-- On lg the home column caps this box's height (flex column, see index.vue): the prose
+       wrapper below is the only thing that scrolls, so the action bar keeps its place in
+       normal flow at the very bottom — nothing can render behind or past it. On mobile the
+       page scrolls as usual and min-h-full just keeps the bar at the panel's foot. -->
+  <div class="flex flex-col min-h-full lg:min-h-0 lg:flex-1">
     <TuiHeader
       label="AI DIGEST · WEEKLY"
       :dashes="9"
@@ -9,56 +11,56 @@
       <span class="text-[10.5px] text-muted">{{ weekly ? weeklyPeriod : '—' }}</span>
     </TuiHeader>
 
-    <div
-      v-if="weekly"
-      class="mt-3 text-[12.5px] leading-[1.75] text-dim digest-prose"
-    >
-      <Markdown :value="weeklyParts.prose" />
-    </div>
-    <p
-      v-else
-      class="mt-3 text-[12px] text-muted"
-    >
-      No weekly digest yet.
-    </p>
-
-    <div
-      v-if="weeklyParts.recommendations.length"
-      class="mt-3.5 px-3.5 py-3 bg-raised border border-line-input"
-    >
-      <div class="text-[10.5px] text-warn tracking-[0.12em] mb-2">
-        ▲ {{ weeklyParts.recommendations.length }} RECOMMENDATIONS
+    <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+      <div
+        v-if="weekly"
+        class="mt-3 text-[12.5px] leading-[1.75] text-dim digest-prose"
+      >
+        <Markdown :value="weeklyParts.prose" />
       </div>
-      <div class="text-[12px] leading-[1.7] text-dim">
-        <div
-          v-for="(rec, i) in weeklyParts.recommendations"
-          :key="i"
-        >
-          <span class="text-faint">{{ String(i + 1).padStart(2, '0') }}</span> {{ rec }}
+      <p
+        v-else
+        class="mt-3 text-[12px] text-muted"
+      >
+        No weekly digest yet.
+      </p>
+
+      <div
+        v-if="weeklyParts.recommendations.length"
+        class="mt-3.5 px-3.5 py-3 bg-raised border border-line-input"
+      >
+        <div class="text-[10.5px] text-warn tracking-[0.12em] mb-2">
+          ▲ {{ weeklyParts.recommendations.length }} RECOMMENDATIONS
+        </div>
+        <div class="text-[12px] leading-[1.7] text-dim">
+          <div
+            v-for="(rec, i) in weeklyParts.recommendations"
+            :key="i"
+          >
+            <span class="text-faint">{{ String(i + 1).padStart(2, '0') }}</span> {{ rec }}
+          </div>
         </div>
       </div>
+
+      <TuiHeader
+        label="DAILY · TODAY"
+        class="mt-4.5"
+      />
+      <div
+        v-if="daily"
+        class="mt-2.5 text-[12px] leading-[1.7] text-dim digest-prose"
+      >
+        <Markdown :value="dailyParts.prose" />
+      </div>
+      <p
+        v-else
+        class="mt-2.5 text-[12px] text-muted"
+      >
+        No daily digest yet.
+      </p>
     </div>
 
-    <TuiHeader
-      label="DAILY · TODAY"
-      class="mt-4.5"
-    />
-    <div
-      v-if="daily"
-      class="mt-2.5 text-[12px] leading-[1.7] text-dim digest-prose"
-    >
-      <Markdown :value="dailyParts.prose" />
-    </div>
-    <p
-      v-else
-      class="mt-2.5 text-[12px] text-muted"
-    >
-      No daily digest yet.
-    </p>
-
-    <!-- Pinned to the bottom of the scrollport so "all digests" and "regenerate" stay reachable
-         without scrolling to the end of the recap. -->
-    <div class="mt-auto lg:sticky lg:bottom-0 pt-3 pb-1 bg-bg border-t border-line-soft flex flex-wrap items-baseline gap-3.5 text-[11.5px]">
+    <div class="mt-auto pt-3 border-t border-line-soft flex flex-wrap items-baseline gap-3.5 text-[11.5px]">
       <button
         type="button"
         class="text-accent hover:text-accent-hover cursor-pointer"
