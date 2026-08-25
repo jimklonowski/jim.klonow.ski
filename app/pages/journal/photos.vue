@@ -10,6 +10,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <!-- One-time backfill for photos uploaded before thumbnails existed -->
     <div
       v-if="isOwner && missingThumbnails.length"
@@ -526,7 +531,7 @@ function photoCategoryLabel(value: string) {
   return PHOTO_CATEGORIES.find(c => c.value === value)?.label ?? value
 }
 
-const { data: photosData, refresh } = await usePhotoEntries()
+const { data: photosData, refresh, error } = await usePhotoEntries()
 const { isOwner } = await useAuth()
 onMounted(refresh)
 

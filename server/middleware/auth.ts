@@ -9,6 +9,7 @@ export default defineEventHandler(async (event) => {
   const isApi = path.startsWith('/api')
   const isProtectedPage = path === '/labs' || path.startsWith('/labs/')
     || path === '/journal' || path.startsWith('/journal/')
+    || path === '/ask'
   if (!isApi && !isProtectedPage) return
 
   let auth = readAuthCookie(event)

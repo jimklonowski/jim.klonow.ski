@@ -10,6 +10,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="fetchError"
+      @retry="retryAll"
+    />
+
     <div class="px-4 sm:px-6 py-3.5 space-y-3.5">
       <!-- Vitals: manual entry + Withings scale -->
       <section>
@@ -147,8 +152,14 @@ import { CHART_ACCENT, CHART_DANGER, CHART_INDIGO, CHART_WARN } from '~/utils/ch
 
 definePageMeta({ middleware: 'journal-auth' })
 
-const { data: journalData, refresh } = await useJournalEntries()
-const { data: healthData, refresh: refreshHealth } = await useHealthMetricsEntries()
+const { data: journalData, refresh, error } = await useJournalEntries()
+const { data: healthData, refresh: refreshHealth, error: healthError } = await useHealthMetricsEntries()
+
+const fetchError = computed(() => error.value ?? healthError.value ?? null)
+function retryAll() {
+  refresh()
+  refreshHealth()
+}
 const { data: labsData } = await useLabsEntries()
 
 onMounted(refresh)

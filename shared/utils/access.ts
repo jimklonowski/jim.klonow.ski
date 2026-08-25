@@ -7,12 +7,14 @@
 //          notes, photos, or soda tracking.
 export type Role = 'owner' | 'friend' | 'doctor'
 
-// Pages only the owner can open: write surfaces and access management.
+// Pages only the owner can open: write surfaces, access management, and the AI chat
+// (which spends Anthropic tokens — same policy as digest regeneration).
 const OWNER_PAGES = [
   /^\/labs\/upload$/,
   /^\/labs\/sharing$/,
   /^\/journal\/import$/,
-  /^\/journal\/inventory$/
+  /^\/journal\/inventory$/,
+  /^\/ask$/
 ]
 
 // The doctor allowlist. Everything not listed here is off-limits for that role —
