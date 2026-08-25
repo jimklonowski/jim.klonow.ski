@@ -81,9 +81,11 @@
               class="text-[12px]"
               :class="cell.isToday ? 'text-accent' : 'text-muted'"
             >{{ cell.day }}</span>
+            <!-- "· TODAY" needs ~52px and a mobile cell is only ~47px wide, so it wraps out of
+                 the box — dropped below md, where the accent outline and day number already mark it. -->
             <span
               v-if="cell.isToday"
-              class="text-[10.5px] text-accent tracking-[0.12em]"
+              class="hidden md:inline text-[10.5px] text-accent tracking-[0.12em]"
             >· TODAY</span>
           </div>
 

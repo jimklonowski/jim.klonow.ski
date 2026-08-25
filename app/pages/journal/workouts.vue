@@ -78,7 +78,7 @@
         <div
           v-for="w in group.rows"
           :key="w.id"
-          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_90px_80px_70px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-[#10160f] last:border-0 text-[11.5px]"
+          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_54px_90px_80px_88px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-[#10160f] last:border-0 text-[11.5px]"
         >
           <span class="text-muted uppercase">{{ formatDate(w.date, 'monthDay') }}</span>
           <span class="text-hi truncate">
@@ -88,12 +88,19 @@
               class="text-[10px] text-ghost"
             >{{ w.sources.join('+') }}</span>
           </span>
+          <span class="num-display text-muted text-right whitespace-nowrap">{{ workoutTime(w.start_time) ?? '' }}</span>
           <span class="text-dim text-right whitespace-nowrap">{{ w.duration_min != null ? `${w.duration_min} min` : '' }}</span>
           <span class="text-dim text-right whitespace-nowrap">{{ w.calories != null ? `${w.calories} kcal` : '' }}</span>
+          <!-- Coloured by avg, not max: max spikes on nearly every session and would light the
+               whole column up. The max reads dimmer so the pair stays scannable as avg-first. -->
           <span
             class="text-right whitespace-nowrap"
             :class="hrClass(w.avg_hr)"
-          >{{ w.avg_hr != null ? `♥ ${w.avg_hr}` : '' }}</span>
+          >{{ w.avg_hr != null ? `♥ ${w.avg_hr}` : w.max_hr != null ? '♥ —' : ''
+          }}<span
+            v-if="w.max_hr != null"
+            class="text-muted"
+          >/{{ w.max_hr }}</span></span>
           <span class="text-muted text-right whitespace-nowrap">{{ w.distance_mi != null ? `${w.distance_mi} mi` : '' }}</span>
         </div>
       </template>
@@ -143,9 +150,14 @@ definePageMeta({ middleware: 'journal-auth' })
 const { data, refresh, error } = await useWorkoutsEntries()
 onMounted(refresh)
 
-/** Newest first — the log reads backwards from today. */
+// Newest first — the log reads backwards from today. Sorting on date alone left a day's
+// sessions in whatever order the API returned, so a morning lift could sit above an evening
+// stretch; start_time breaks the tie (nulls last, since '' loses every descending compare).
 const workouts = computed(() =>
-  [...(data.value ?? [])].sort((a, b) => b.date.localeCompare(a.date))
+  [...(data.value ?? [])].sort((a, b) =>
+    b.date.localeCompare(a.date)
+    || (b.start_time ?? '').localeCompare(a.start_time ?? '')
+  )
 )
 
 const today = localToday()
