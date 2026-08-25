@@ -1,5 +1,7 @@
 <template>
-  <div class="flex flex-col h-full">
+  <!-- min-h-full, not h-full: the home column caps its own height and scrolls, so this box has
+       to be free to grow past it rather than clip the recap at the fold. -->
+  <div class="flex flex-col min-h-full">
     <TuiHeader
       label="AI DIGEST · WEEKLY"
       :dashes="9"
@@ -54,7 +56,9 @@
       No daily digest yet.
     </p>
 
-    <div class="mt-auto pt-4 flex flex-wrap items-baseline gap-3.5 text-[11.5px]">
+    <!-- Pinned to the bottom of the scrollport so "all digests" and "regenerate" stay reachable
+         without scrolling to the end of the recap. -->
+    <div class="mt-auto lg:sticky lg:bottom-0 pt-3 pb-1 bg-bg border-t border-line-soft flex flex-wrap items-baseline gap-3.5 text-[11.5px]">
       <button
         type="button"
         class="text-accent hover:text-accent-hover cursor-pointer"
