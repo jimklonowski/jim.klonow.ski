@@ -130,8 +130,15 @@ export function useOverview(role: Ref<Role | null>) {
     ])
   }
 
+  /** First fetch failure across the five sources, for the page-level error panel. */
+  const error = computed(() =>
+    journal?.error.value ?? labs?.error.value ?? metrics?.error.value
+    ?? dexa?.error.value ?? workouts?.error.value ?? null
+  )
+
   return {
     hasSession,
+    error,
     entries,
     loggedEntries,
     latestEntry,

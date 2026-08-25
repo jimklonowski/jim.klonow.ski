@@ -10,6 +10,14 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      :empty="!workouts.length"
+      empty-title="No workouts synced"
+      empty-description="Sessions arrive from Apple Health and Whoop automatically."
+      @retry="refresh"
+    />
+
     <!-- Stat cells + type mix -->
     <div class="grid grid-cols-2 lg:grid-cols-[repeat(4,1fr)_1.6fr] gap-px bg-line border-b border-line">
       <div
@@ -132,7 +140,7 @@ import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 
 definePageMeta({ middleware: 'journal-auth' })
 
-const { data, refresh } = await useWorkoutsEntries()
+const { data, refresh, error } = await useWorkoutsEntries()
 onMounted(refresh)
 
 /** Newest first — the log reads backwards from today. */

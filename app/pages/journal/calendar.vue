@@ -30,6 +30,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <!-- Compound colour legend for the dose dots in the grid below -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 sm:px-6 py-2 border-b border-line-soft text-[11px]">
       <span
@@ -208,7 +213,7 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const { data, refresh } = await useJournalEntries()
+const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()

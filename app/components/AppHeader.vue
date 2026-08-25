@@ -61,23 +61,26 @@
 </template>
 
 <script setup lang="ts">
-const items = [
+const route = useRoute()
+const { role, isOwner } = await useAuth()
+const paletteOpen = useState('command-palette-open', () => false)
+
+const items = computed(() => [
   { label: 'Home', to: '/' },
   { label: 'Labs', to: '/labs' },
   { label: 'DEXA', to: '/labs/dexa' },
   { label: 'Journal', to: '/journal' },
-  { label: 'Calc', to: '/journal/calculator' }
-]
-
-const route = useRoute()
-const { role } = await useAuth()
-const paletteOpen = useState('command-palette-open', () => false)
+  { label: 'Calc', to: '/journal/calculator' },
+  // The AI chat spends tokens, so the page is owner-only (see shared/utils/access.ts) —
+  // don't show guests a tab that bounces them to /labs.
+  ...(isOwner.value ? [{ label: 'Ask', to: '/ask' }] : [])
+])
 
 // Longest-match wins so /labs/dexa lights DEXA (not LABS) and /journal/calculator
 // lights CALC (not JOURNAL).
 function isActive(item: { to: string }) {
   const path = route.path.replace(/\/+$/, '') || '/'
-  const matches = items.filter(i => path === i.to || (i.to !== '/' && path.startsWith(i.to + '/')))
+  const matches = items.value.filter(i => path === i.to || (i.to !== '/' && path.startsWith(i.to + '/')))
   const best = matches.sort((a, b) => b.to.length - a.to.length)[0]
   return best?.to === item.to
 }

@@ -35,14 +35,15 @@
       </div>
     </div>
 
-    <p
-      v-if="!latest"
-      class="px-4 sm:px-6 py-6 text-[12px] text-muted border-t border-line"
-    >
-      No DEXA scans on file yet.
-    </p>
+    <TuiDataState
+      :error="error"
+      :empty="!latest"
+      empty-title="No DEXA scans yet"
+      empty-description="Upload a scan PDF and the body-comp trends land here."
+      @retry="refresh"
+    />
 
-    <template v-else>
+    <template v-if="latest">
       <!-- Headline readouts — 1px-gap cell row, click a cell for its scan history -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-line border-y border-line">
         <button
@@ -190,7 +191,7 @@ import type { DexaEntry, DexaRegion } from '~/composables/useDexaEntries'
 
 definePageMeta({ middleware: 'labs-auth' })
 
-const { data, refresh } = await useDexaEntries()
+const { data, refresh, error } = await useDexaEntries()
 const { isOwner } = await useAuth()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data

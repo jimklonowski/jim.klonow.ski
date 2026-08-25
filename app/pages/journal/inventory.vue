@@ -20,6 +20,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <p
       v-if="!vials.length"
       class="px-4 sm:px-6 py-5 text-[12px] text-muted"
@@ -529,7 +534,7 @@ definePageMeta({ middleware: 'journal-auth' })
 const toast = useToast()
 const today: string = new Date().toISOString().slice(0, 10)
 
-const { data: vialsData, refresh } = await useVials()
+const { data: vialsData, refresh, error } = await useVials()
 const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
 onMounted(refresh)
 onMounted(refreshJournal)
