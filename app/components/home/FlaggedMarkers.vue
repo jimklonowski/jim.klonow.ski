@@ -73,12 +73,12 @@ function format(v: number) {
   return Number.isInteger(v) ? v.toString() : v.toFixed(v < 10 ? 1 : 0)
 }
 
-/** e.g. "HIGH ▲1782", or "LOW · suppressed" on a first-ever reading. */
+/** e.g. "HIGH ▲ 1782", or "LOW · first" on a first-ever reading. */
 function tag(f: FlaggedMarker) {
   const label = f.status.toUpperCase()
   if (f.delta == null) return `${label} · first`
   const arrow = f.delta >= 0 ? '▲' : '▼'
   const magnitude = Math.abs(f.delta)
-  return `${label} ${arrow}${magnitude >= 10 ? Math.round(magnitude) : magnitude.toFixed(1)}`
+  return `${label} ${arrow} ${magnitude >= 10 ? Math.round(magnitude) : magnitude.toFixed(1)}`
 }
 </script>
