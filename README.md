@@ -6,6 +6,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 - **Nuxt 4** + Vue 3 + TypeScript
 - **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" dark-only TUI theme (JetBrains Mono / Departure Mono)
+- **Installable PWA** — standalone display, afib-heartbeat icon set (`public/`), iOS homescreen metas in `app/app.vue`
 - **Cloudflare Workers** — deployed via Wrangler (nodejs_compat)
 - **Cloudflare D1** — primary data store (journal, labs, DEXA, health metrics, workouts, digests, share invites)
 - **Cloudflare R2** — lab PDF and progress photo storage
@@ -18,7 +19,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 | Route | Description |
 |---|---|
-| `/` | Overview dashboard — flagged markers, vitals, today's doses + latest workout, quick links (sign-in prompt when signed out) |
+| `/` | Overview dashboard — flagged markers, vitals, today's doses + the latest day's workouts, quick links (sign-in prompt when signed out) |
 | `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries |
 | `/labs/dexa` | DEXA body composition scans |
 | `/labs/upload` | Upload a new lab PDF (parsed server-side into structured markers) — owner only |
@@ -31,7 +32,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/workouts` | Session log merged from Apple Health + Whoop, with stat cells and type mix |
 | `/journal/entries` | Day-log ledger of every journal row — hidden from the doctor role |
 | `/journal/[date]` | Create or edit a day's entry (read-only for guests) |
-| `/journal/calendar` | Month view with compound-colored dots + protocol timeline |
+| `/journal/calendar` | Month view with compound-colored dots + protocol timeline (logged compounds, plus standing meds backfilled from the `STANDING_COMPOUNDS` constant) |
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
 | `/journal/compound/[name]` | Dosing history for a single compound |
 | `/journal/calculator` | Peptide reconstitution & syringe unit calculator |
@@ -41,7 +42,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/ask` | AI analysis console — streaming chat over the full tracked history (labs, DEXA, journal, Whoop, protocol) — owner only |
 | `/privacy` | Privacy notice |
 
-`/journal` is a hub-and-spoke section: the overview links into trends/compounds/workouts/entries, and every `/journal/*` page carries the same sub-nav (`app/components/journal/Nav.vue`), which drops tabs the current role can't open. Site-wide chrome lives in `app/layouts/default.vue` — header nav, status line, the digest panel, and a ⌘K command palette that jumps to any marker, day, or compound.
+`/journal` is a hub-and-spoke section: the overview links into trends/compounds/workouts/entries, and every `/journal/*` page carries the same sub-nav (`app/components/journal/Nav.vue`), which drops tabs the current role can't open. Site-wide chrome lives in `app/layouts/default.vue` — header nav, status line, the digest panel, a route-change loading bar, and a ⌘K command palette that jumps to any marker, day, or compound — including never-logged compound dossiers, searchable by brand name ("primo", "cialis").
 
 ## Auth & sharing
 
@@ -65,7 +66,8 @@ The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token (fall
 - **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/journal/import`).
 - Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`server/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced via `DigestPanel.vue`.
 - The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events) and can be regenerated from the labs dashboard.
-- Both AI features share standing protocol context from `server/utils/protocol.ts`: the intended injectable schedule (hand-maintained constant) plus the supplement stack rendered live from the `supplements` table, so edits on `/journal/supplements` reach the prompts without a deploy.
+- The **`/ask` console** (`server/api/ai/ask.post.ts`) streams answers to freeform questions over a per-request fact sheet built by `server/utils/askContext.ts` — every lab draw, every DEXA scan, all-time compound history, precomputed trends, and recent daily detail. Owner-only and KV rate-limited, since every question is an Anthropic call.
+- All three AI surfaces share standing protocol context from `server/utils/protocol.ts`: the intended dosing schedule (hand-maintained constant, including standing meds that never hit the dose log) plus the supplement stack rendered live from the `supplements` table, so edits on `/journal/supplements` reach the prompts without a deploy.
 
 ## Dev
 

@@ -213,7 +213,7 @@ const deltaText = computed(() => {
   const d = delta.value
   if (d == null || Math.abs(d) < 0.05) return null
   const magnitude = Math.abs(d) >= 10 ? Math.round(Math.abs(d)).toString() : Math.abs(d).toFixed(1)
-  return `${d > 0 ? '▲+' : '▼-'}${magnitude}`
+  return `${d > 0 ? '▲ +' : '▼ -'}${magnitude}`
 })
 
 // Direction is only meaningful when the marker has a "better" direction; otherwise the
