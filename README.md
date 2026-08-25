@@ -11,7 +11,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 - **Cloudflare R2** — lab PDF and progress photo storage
 - **Cloudflare KV** — rate limiting
 - **nuxt-echarts** — trend charts
-- **Anthropic SDK** — server-side lab PDF parsing, protocol-aware lab summaries, and daily/weekly health digests
+- **Anthropic SDK** — server-side lab PDF parsing, protocol-aware lab summaries, daily/weekly health digests, and the `/ask` chat
 - **Whoop API** — OAuth sync for recovery, sleep, and workout data
 
 ## Sections
@@ -38,6 +38,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
 | `/journal/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
 | `/journal/inventory` | Peptide vial inventory and depletion tracking — owner only, reached from `/journal/compounds` |
+| `/ask` | AI analysis console — streaming chat over the full tracked history (labs, DEXA, journal, Whoop, protocol) — owner only |
 | `/privacy` | Privacy notice |
 
 `/journal` is a hub-and-spoke section: the overview links into trends/compounds/workouts/entries, and every `/journal/*` page carries the same sub-nav (`app/components/journal/Nav.vue`), which drops tabs the current role can't open. Site-wide chrome lives in `app/layouts/default.vue` — header nav, status line, the digest panel, and a ⌘K command palette that jumps to any marker, day, or compound.

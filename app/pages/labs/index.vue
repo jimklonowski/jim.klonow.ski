@@ -46,6 +46,14 @@
       </div>
     </div>
 
+    <TuiDataState
+      :error="error"
+      :empty="!latest"
+      empty-title="No bloodwork yet"
+      empty-description="Upload a lab PDF and the markers land here."
+      @retry="refresh"
+    />
+
     <!-- AI summary readout -->
     <div
       v-if="latest"
@@ -284,7 +292,7 @@ import type { Category } from '~/data/biomarkers'
 
 definePageMeta({ middleware: 'labs-auth' })
 
-const { data, refresh } = await useLabsEntries()
+const { data, refresh, error } = await useLabsEntries()
 const { isOwner } = await useAuth()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data

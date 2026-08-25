@@ -128,7 +128,10 @@ const actionItems = computed(() => {
     )
   }
   if (isOwner.value) {
-    items.push({ label: '↑ upload lab results', suffix: 'pdf', onSelect: () => go('/labs/upload') })
+    items.push(
+      { label: '↑ upload lab results', suffix: 'pdf', onSelect: () => go('/labs/upload') },
+      { label: '? ask the data', suffix: 'ai analysis console', onSelect: () => go('/ask') }
+    )
   }
   return items
 })

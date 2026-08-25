@@ -17,6 +17,12 @@
     </NuxtLink>
   </div>
 
+  <TuiDataState
+    v-else-if="overviewError"
+    :error="overviewError"
+    @retry="refreshOverview"
+  />
+
   <div
     v-else
     class="grid gap-px bg-line border-b border-line"
@@ -198,7 +204,8 @@ import type { PeptideEntry } from '~/data/journal'
 const { role, isOwner } = await useAuth()
 const {
   hasSession, entries, healthMetrics, latestDraw, latestDexa,
-  allWorkouts, dosesToday, flagged, flagCounts
+  allWorkouts, dosesToday, flagged, flagCounts,
+  error: overviewError, refresh: refreshOverview
 } = useOverview(role)
 
 const today = localToday()

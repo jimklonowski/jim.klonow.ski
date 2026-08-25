@@ -24,6 +24,11 @@
     </JournalHeader>
     <JournalNav />
 
+    <TuiDataState
+      :error="error"
+      @retry="refresh"
+    />
+
     <!-- 60-day streak strip -->
     <div class="flex items-center gap-3.5 px-4 sm:px-6 py-2.5 border-b border-line-soft">
       <span class="tui-label shrink-0">Last 60d</span>
@@ -158,7 +163,7 @@ import { getCompoundColor } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
 
-const { data, refresh } = await useJournalEntries()
+const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 const { data: labsData } = await useLabsEntries()

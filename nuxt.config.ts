@@ -65,6 +65,15 @@ export default defineNuxtConfig({
           ipHeader: 'cf-connecting-ip'
         }
       }
+    },
+    '/api/ai/ask': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 20,
+          interval: 300000, // owner-only chat, but each request spends Anthropic tokens — cap runaways
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
     }
   },
 
