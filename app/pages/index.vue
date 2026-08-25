@@ -172,9 +172,16 @@
       </div>
     </section>
 
+    <!--
+      The digest is the one panel with no length ceiling — a wordy weekly recap used to set the
+      row height and leave the other two columns sitting above a screen of dead space. Capped to
+      the viewport (chrome is 7.1875rem: 53px header + 31px status + 31px footer) and scrolled
+      internally instead. Stays stretched rather than self-start so the grid's gap background
+      doesn't show through below it.
+    -->
     <section
       v-if="isFullAccess"
-      class="bg-bg px-6 pt-4 pb-5"
+      class="bg-bg px-6 pt-4 pb-5 lg:max-h-[calc(100dvh-7.25rem)] lg:overflow-y-auto"
     >
       <HomeDigest
         :digests="digests"

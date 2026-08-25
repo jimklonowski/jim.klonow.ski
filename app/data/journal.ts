@@ -243,6 +243,16 @@ export function formatSite(site: string): string {
   return INJECTION_SITE_LABELS[site] ?? site
 }
 
+// Routes that don't involve a needle. The site picker covers oral and nasal compounds too
+// (finasteride, modafinil, semax), so "injection" wording has to be earned per compound
+// rather than assumed — see isInjectedSite.
+const NON_INJECTED_SITES = new Set(['oral', 'intranasal'])
+
+/** Whether a logged site means the dose actually went in through a needle. */
+export function isInjectedSite(site: string): boolean {
+  return !!site && !NON_INJECTED_SITES.has(site)
+}
+
 export function blankEntry(date: string): JournalEntry {
   return {
     date,

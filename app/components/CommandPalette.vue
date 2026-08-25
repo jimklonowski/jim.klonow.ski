@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
+import type { CompoundInfo } from '~/data/compoundInfo'
 
 const open = useState('command-palette-open', () => false)
 const digestOpen = useState('digest-panel-open', () => false)
@@ -50,8 +51,18 @@ defineShortcuts({
   meta_k: () => { open.value = !open.value }
 })
 
-watch(open, (v) => {
-  if (!v) searchTerm.value = ''
+// The dossier file is ~70KB of prose and this component sits in the default layout, so a static
+// import would ride along on every page load. Fetch it the first time the palette opens instead.
+const dossiers = shallowRef<Record<string, CompoundInfo>>({})
+
+watch(open, async (v) => {
+  if (!v) {
+    searchTerm.value = ''
+    return
+  }
+  if (!Object.keys(dossiers.value).length) {
+    dossiers.value = (await import('~/data/compoundInfo')).COMPOUND_INFO
+  }
 })
 
 function go(to: string) {
@@ -136,18 +147,44 @@ const markerItems = computed(() => {
   })
 })
 
-const compoundItems = computed(() => {
+/** Compound → date it was last dosed, most-recent use first. */
+const loggedCompounds = computed(() => {
   const seen = new Map<string, string>()
   for (const e of [...entries.value].reverse()) {
     for (const p of e.peptides ?? []) {
       if (p.compound && !seen.has(p.compound)) seen.set(p.compound, e.date)
     }
   }
-  return [...seen.entries()].map(([compound, lastDate]) => ({
+  return seen
+})
+
+// Brand names are how these get searched for ("primo", "anavar"), so the aka rides along in the
+// suffix — fuse matches on it, and it explains the hit when the label doesn't contain the term.
+function akaOf(compound: string) {
+  return dossiers.value[compound]?.aka?.toLowerCase() ?? ''
+}
+
+const compoundItems = computed(() =>
+  [...loggedCompounds.value.entries()].map(([compound, lastDate]) => ({
     label: compound.toLowerCase(),
-    suffix: `last ${formatDate(lastDate, 'monthDay').toLowerCase()}`,
+    suffix: [`last ${formatDate(lastDate, 'monthDay').toLowerCase()}`, akaOf(compound)].filter(Boolean).join(' · '),
     onSelect: () => go(`/journal/compound/${encodeURIComponent(compound)}`)
   }))
+)
+
+// Compounds that have a dossier but have never been dosed. /journal/compounds deliberately
+// leaves these out of its lists and points here instead ("never-used compounds hidden until
+// searched"), so they join the palette only once something is typed — otherwise the empty
+// state opens on ~60 rows of things Jim has never taken.
+const dossierItems = computed(() => {
+  if (searchTerm.value.trim().length < 2) return []
+  return Object.entries(dossiers.value)
+    .filter(([c]) => !loggedCompounds.value.has(c))
+    .map(([c, dossier]) => ({
+      label: c.toLowerCase(),
+      suffix: [akaOf(c), dossier.category.toLowerCase()].filter(Boolean).join(' · '),
+      onSelect: () => go(`/journal/compound/${encodeURIComponent(c)}`)
+    }))
 })
 
 const dateItems = computed(() => {
@@ -169,6 +206,7 @@ const groups = computed(() => {
   if (markerItems.value.length) list.push({ id: 'markers', label: 'MARKERS', items: markerItems.value })
   if (compoundItems.value.length) list.push({ id: 'compounds', label: 'COMPOUNDS', items: compoundItems.value })
   if (dateItems.value.length) list.push({ id: 'dates', label: 'DAYS', items: dateItems.value })
+  if (dossierItems.value.length) list.push({ id: 'dossiers', label: 'DOSSIERS · NEVER LOGGED', items: dossierItems.value })
   return list
 })
 </script>
