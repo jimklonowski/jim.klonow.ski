@@ -23,8 +23,8 @@
           :style="{ color: color(f) }"
         >{{ format(f.value) }}<span
           v-if="f.meta.unit"
-          class="text-[10px] text-muted"
-        > {{ f.meta.unit }}</span></span>
+          class="ml-1 text-[10px] text-muted"
+        >{{ f.meta.unit }}</span></span>
 
         <TuiRangeBar
           :value="f.value"
