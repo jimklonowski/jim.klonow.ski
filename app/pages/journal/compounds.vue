@@ -6,13 +6,13 @@
     >
       <template #actions>
         <NuxtLink
-          to="/journal/calculator"
+          to="/tools/calculator"
           class="text-[11px] text-accent hover:text-accent-hover"
         >calculator →</NuxtLink>
         <span class="text-ghost text-[11px]">·</span>
         <NuxtLink
           v-if="isOwner"
-          to="/journal/inventory"
+          to="/tools/inventory"
           class="text-[11px] text-accent hover:text-accent-hover"
         >vial inventory →</NuxtLink>
       </template>

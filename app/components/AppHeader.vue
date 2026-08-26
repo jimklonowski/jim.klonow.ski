@@ -70,18 +70,21 @@ const items = computed(() => [
   { label: 'Labs', to: '/labs' },
   { label: 'DEXA', to: '/labs/dexa' },
   { label: 'Journal', to: '/journal' },
-  { label: 'Calc', to: '/journal/calculator' },
+  // TOOLS points straight at the calculator — /tools has no hub page, the naked URL redirects
+  // there (see nuxt.config routeRules) — but stays lit on every /tools/* page via `match`.
+  { label: 'Tools', to: '/tools/calculator', match: '/tools' },
   // The AI chat spends tokens, so the page is owner-only (see shared/utils/access.ts) —
   // don't show guests a tab that bounces them to /labs.
   ...(isOwner.value ? [{ label: 'Ask', to: '/ask' }] : [])
 ])
 
-// Longest-match wins so /labs/dexa lights DEXA (not LABS) and /journal/calculator
-// lights CALC (not JOURNAL).
+// Longest-match wins so /labs/dexa lights DEXA (not LABS). An item's `match` prefix stands in
+// for its `to` so TOOLS lights on sibling pages of the calculator it links to.
 function isActive(item: { to: string }) {
   const path = route.path.replace(/\/+$/, '') || '/'
-  const matches = items.value.filter(i => path === i.to || (i.to !== '/' && path.startsWith(i.to + '/')))
-  const best = matches.sort((a, b) => b.to.length - a.to.length)[0]
+  const base = (i: { to: string, match?: string }) => i.match ?? i.to
+  const matches = items.value.filter(i => path === base(i) || (base(i) !== '/' && path.startsWith(base(i) + '/')))
+  const best = matches.sort((a, b) => base(b).length - base(a).length)[0]
   return best?.to === item.to
 }
 </script>

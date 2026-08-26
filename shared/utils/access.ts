@@ -11,9 +11,9 @@ export type Role = 'owner' | 'friend' | 'doctor'
 // (which spends Anthropic tokens — same policy as digest regeneration).
 const OWNER_PAGES = [
   /^\/labs\/upload$/,
-  /^\/labs\/sharing$/,
-  /^\/journal\/import$/,
-  /^\/journal\/inventory$/,
+  /^\/tools\/import$/,
+  /^\/tools\/inventory$/,
+  /^\/tools\/sharing$/,
   /^\/ask$/
 ]
 
@@ -32,7 +32,9 @@ const DOCTOR_PAGES = [
   /^\/journal\/compounds$/,
   /^\/journal\/workouts$/,
   /^\/journal\/calendar$/,
-  /^\/journal\/calculator$/,
+  // The calculator lived at /journal/calculator until the TOOLS section split (Aug 2026);
+  // the old path 301s to this one.
+  /^\/tools\/calculator$/,
   /^\/journal\/compound\//,
   /^\/journal\/supplements$/
 ]
