@@ -1,26 +1,10 @@
 <template>
   <div>
-    <!-- Breadcrumb title row -->
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-3.5 border-b border-line">
-      <span class="text-[11px] text-muted tracking-[0.06em] uppercase">
-        <NuxtLink
-          to="/labs"
-          class="hover:text-accent"
-        >labs</NuxtLink> /
-      </span>
-      <h1 class="num-display text-hi text-[24px] leading-none">
-        SHARING
-      </h1>
-      <p class="text-[11px] text-muted tracking-[0.06em] uppercase">
-        {{ countsMeta }}
-      </p>
-      <NuxtLink
-        to="/labs"
-        class="tui-btn ml-auto"
-      >
-        BLOODWORK →
-      </NuxtLink>
-    </div>
+    <ToolsHeader
+      section="SHARING"
+      :meta="countsMeta"
+    />
+    <ToolsNav />
 
     <!-- Access model note -->
     <div class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-dashed border-line-input bg-inset text-[12px] leading-[1.7] text-dim">
@@ -177,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ middleware: 'labs-auth' })
+definePageMeta({ middleware: 'journal-auth' })
 
 interface Invite {
   id: string
@@ -212,7 +196,11 @@ const copiedId = ref<string | null>(null)
 const toast = useToast()
 
 const { data, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
-const invites = computed(() => data.value ?? [])
+// Active links first, revoked sunk to the bottom — each group keeps the API's newest-first order.
+const invites = computed(() => {
+  const list = data.value ?? []
+  return [...list.filter(i => !i.revoked), ...list.filter(i => i.revoked)]
+})
 
 // Row meta and the title-row counts are assembled here — adjacent <template v-if> blocks in the
 // markup lose the spaces between them once Vue condenses whitespace.

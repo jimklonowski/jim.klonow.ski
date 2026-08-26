@@ -81,7 +81,7 @@
             <span
               v-if="i === 0"
               class="shrink-0"
-            >└ workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
+            >└ {{ workoutsAreToday ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
             <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
           </div>
           <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
@@ -160,7 +160,7 @@
         >dexa{{ latestDexa ? ` (${formatDate(latestDexa.date, 'monthDay').toLowerCase()})` : '' }} →</NuxtLink>
         <NuxtLink
           v-if="isOwner"
-          to="/labs/sharing"
+          to="/tools/sharing"
           class="text-accent hover:text-accent-hover"
         >sharing →</NuxtLink>
       </div>
@@ -244,6 +244,27 @@ function doseLabel(dose: PeptideEntry) {
   return `${dose.dose} ${unit}${dose.site ? ` · ${shortSite(dose.site)}` : ''}`
 }
 
+// Under the "LOGGED TODAY" header a bare clock time reads as today's, so sessions from an
+// earlier day get a "last workout" label and lead with their age.
+const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today)
+
+function workoutAge(w: typeof allWorkouts.value[number]): string | null {
+  if (w.date === today) return null
+  // start_time is "2026-08-24 17:37:44 -0500" — not ISO, so it's rebuilt before parsing;
+  // the recorded offset makes it an exact instant regardless of the viewer's zone.
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?) ([+-]\d{2}):?(\d{2})$/.exec(w.start_time ?? '')
+  const instant = m ? Date.parse(`${m[1]}T${m[2]}${m[3]}:${m[4]}`) : NaN
+  if (!Number.isNaN(instant)) {
+    const mins = Math.max(0, Math.floor((Date.now() - instant) / 60000))
+    // Dated yesterday but under an hour old happens right after midnight.
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`
+  }
+  const days = Math.round((Date.parse(today) - Date.parse(w.date)) / 86400000)
+  return `${Math.max(1, days)}d ago`
+}
+
 // Kept as separate parts, not one joined string, so each metric renders non-breaking —
 // otherwise this 390px column splits "18.9 min" across two lines.
 function workoutParts(w: typeof allWorkouts.value[number]) {
@@ -253,6 +274,7 @@ function workoutParts(w: typeof allWorkouts.value[number]) {
     ? `♥ ${w.avg_hr}${w.max_hr != null ? `/${w.max_hr}` : ''}`
     : w.max_hr != null ? `♥ max ${w.max_hr}` : null
   return [
+    workoutAge(w),
     time,
     w.duration_min != null ? `${w.duration_min.toFixed(1)} min` : null,
     w.calories != null ? `${w.calories} kcal` : null,

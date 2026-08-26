@@ -34,6 +34,14 @@ export default defineNuxtConfig({
 
   routeRules: {
     // '/': { prerender: true }
+    // The calculator, vial inventory, and Apple Health import moved out of /journal — and
+    // sharing out of /labs — into the TOOLS section (Aug 2026). Old bookmarks land on the new
+    // homes; the naked section URL resolves to the calculator while there's no /tools hub page.
+    '/journal/calculator': { redirect: { to: '/tools/calculator', statusCode: 301 } },
+    '/journal/inventory': { redirect: { to: '/tools/inventory', statusCode: 301 } },
+    '/journal/import': { redirect: { to: '/tools/import', statusCode: 301 } },
+    '/labs/sharing': { redirect: { to: '/tools/sharing', statusCode: 301 } },
+    '/tools': { redirect: { to: '/tools/calculator', statusCode: 302 } },
     // Rate limiting is off everywhere except the two credential endpoints below (the '/**'
     // rule disables the module's default global limiter, which would otherwise write to KV on
     // every request). Counters live in the RATE_LIMIT KV namespace so they survive Worker

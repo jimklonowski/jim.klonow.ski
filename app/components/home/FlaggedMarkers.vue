@@ -12,7 +12,7 @@
       <NuxtLink
         v-for="f in flagged"
         :key="f.key"
-        to="/labs"
+        :to="{ path: '/labs', query: { marker: f.key } }"
         class="grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[190px_120px_1fr_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2.5 bg-raised border-l-2 hover:bg-[#101a15] transition-colors"
         :style="{ borderLeftColor: color(f) }"
       >
