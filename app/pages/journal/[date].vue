@@ -521,7 +521,12 @@
           }"
         >
           <template #file="{ removeFile }">
-            <div class="flex items-center gap-4 w-full">
+            <!-- .stop: this slot renders inside the dropzone, whose own click handler opens
+                 the file picker — without it, UPLOAD/CANCEL/date clicks re-open the picker. -->
+            <div
+              class="flex items-center gap-4 w-full"
+              @click.stop
+            >
               <img
                 v-if="pendingPreviewUrl"
                 :src="pendingPreviewUrl"
@@ -706,7 +711,6 @@ const MEAL_SLOTS = [
   { key: 'dinner', label: 'Dinner', placeholder: 'Steak + veggies' }
 ] as const
 
-const nuxtApp = useNuxtApp()
 const route = useRoute()
 const toast = useToast()
 
@@ -970,20 +974,6 @@ async function save() {
       )
     }
     await $fetch('/api/journal/save', { method: 'POST', body: payload })
-
-    // Update shared cache immediately so index/calendar reflect the new entry
-    // without waiting for Nuxt Content's WASM SQLite to re-index the file
-    const cached = nuxtApp.payload.data['/journal']
-    if (Array.isArray(cached)) {
-      const idx = cached.findIndex((e: { date: string }) => e.date === payload.date)
-      if (idx >= 0) {
-        cached[idx] = payload
-      }
-      else {
-        cached.push(payload)
-        cached.sort((a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date))
-      }
-    }
 
     toast.add({ title: 'Entry saved', color: 'success', icon: 'i-lucide-check' })
     await refresh()

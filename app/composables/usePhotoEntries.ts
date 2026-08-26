@@ -14,7 +14,10 @@ export interface ProgressPhoto {
 export function usePhotoEntries() {
   const requestFetch = useRequestFetch()
   return useAsyncData('/journal/photos', () => requestFetch<ProgressPhoto[]>('/api/journal/photos/list'), {
-    getCachedData: (key, app) => {
+    // Nuxt 4 consults getCachedData on refresh() too (granularCachedData) — only serve
+    // the payload cache on initial load, or refreshPhotos() after an upload is a no-op.
+    getCachedData: (key, app, ctx) => {
+      if (ctx.cause !== 'initial') return undefined
       const d = app.payload.data[key]
       return d?.length ? d : undefined
     }
