@@ -1,14 +1,14 @@
 <template>
   <div>
-    <JournalHeader
+    <ToolsHeader
       section="CALCULATOR"
       meta="reconstitution · u-100 syringe units"
     >
       <template #actions>
         <span class="text-[11px] text-muted hidden sm:inline">{{ mixSummary }}</span>
       </template>
-    </JournalHeader>
-    <JournalNav />
+    </ToolsHeader>
+    <ToolsNav />
 
     <!-- Inputs: mix | dose -->
     <div class="grid gap-px bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] border-b border-line">

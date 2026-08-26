@@ -1,6 +1,6 @@
 <template>
   <div>
-    <JournalHeader
+    <ToolsHeader
       section="INVENTORY"
       meta="fridge stock &amp; active vial depletion"
     >
@@ -17,8 +17,8 @@
           + ADD STOCK
         </button>
       </template>
-    </JournalHeader>
-    <JournalNav />
+    </ToolsHeader>
+    <ToolsNav />
 
     <TuiDataState
       :error="error"
@@ -753,7 +753,7 @@ const activeMenu = (v: Vial) => [
 
 function calculatorLink(v: Vial) {
   return {
-    path: '/journal/calculator',
+    path: '/tools/calculator',
     query: { vialAmount: v.vial_amount, vialUnit: v.vial_unit, bacWaterMl: v.bac_water_ml ?? 2 }
   }
 }

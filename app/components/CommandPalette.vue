@@ -94,7 +94,7 @@ const jumpItems = computed(() => {
     { label: 'journal · workouts', suffix: 'session log', onSelect: () => go('/journal/workouts') },
     { label: 'calendar', suffix: '/journal/calendar', onSelect: () => go('/journal/calendar') },
     { label: 'supplements', suffix: '/journal/supplements', onSelect: () => go('/journal/supplements') },
-    { label: 'calculator', suffix: '/journal/calculator', onSelect: () => go('/journal/calculator') }
+    { label: 'tools · calculator', suffix: '/tools/calculator', onSelect: () => go('/tools/calculator') }
   ]
   if (isFullAccess.value) {
     items.push(
@@ -112,9 +112,9 @@ const jumpItems = computed(() => {
 const manageItems = computed(() => {
   if (!isOwner.value) return []
   return [
-    { label: 'sharing · invite links', suffix: 'share with friends + doctor', onSelect: () => go('/labs/sharing') },
-    { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/journal/import') },
-    { label: 'inventory · vials', suffix: '/journal/inventory', onSelect: () => go('/journal/inventory') }
+    { label: 'sharing · invite links', suffix: 'share with friends + doctor', onSelect: () => go('/tools/sharing') },
+    { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/tools/import') },
+    { label: 'inventory · vials', suffix: '/tools/inventory', onSelect: () => go('/tools/inventory') }
   ]
 })
 
@@ -145,7 +145,7 @@ const markerItems = computed(() => {
     return {
       label: meta.label.toLowerCase(),
       suffix: value != null ? `${value} ${meta.unit}${flag}` : meta.unit,
-      onSelect: () => go('/labs')
+      onSelect: () => go(`/labs?marker=${key}`)
     }
   })
 })

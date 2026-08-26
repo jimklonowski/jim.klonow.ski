@@ -10,7 +10,7 @@
         <JournalWhoopMenu v-if="isOwner" />
         <NuxtLink
           v-if="isOwner"
-          to="/journal/import"
+          to="/tools/import"
           class="tui-btn"
         >
           IMPORT
