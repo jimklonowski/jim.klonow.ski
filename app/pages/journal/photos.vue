@@ -69,7 +69,12 @@
           }"
         >
           <template #file="{ file, index, removeFile }">
-            <div class="flex flex-col w-full">
+            <!-- .stop: this slot renders inside the dropzone, whose own click handler opens
+                 the file picker — without it, the ✕/date/category clicks re-open the picker. -->
+            <div
+              class="flex flex-col w-full"
+              @click.stop
+            >
               <div class="flex items-center gap-2.5 w-full">
                 <img
                   :src="previewUrlFor(file)"
