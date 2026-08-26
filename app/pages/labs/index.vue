@@ -24,13 +24,6 @@
           :sources="allSources"
         />
         <NuxtLink
-          v-if="isOwner"
-          to="/labs/sharing"
-          class="tui-btn"
-        >
-          SHARING
-        </NuxtLink>
-        <NuxtLink
           to="/labs/dexa"
           class="tui-btn"
         >
@@ -128,6 +121,7 @@
           :key="key"
           :biomarker-key="key"
           :entries="entries"
+          :auto-open="key === linkedMarker"
         />
       </div>
       <p
@@ -329,7 +323,20 @@ const categories = computed(() =>
   }))
 )
 
-const activeCategory = ref<Category>('hormones')
+// Deep link from the homepage's flagged rows and the command palette: /labs?marker=alt
+// lands on the marker's category tab with its detail modal open. Reactive rather than
+// read-once because the palette can retarget the query while already on this page —
+// a query-only change doesn't remount the page.
+const route = useRoute()
+const linkedMarker = computed(() => {
+  const key = route.query.marker
+  return typeof key === 'string' && BIOMARKERS[key] ? key : null
+})
+
+const activeCategory = ref<Category>(linkedMarker.value ? BIOMARKERS[linkedMarker.value]!.category : 'hormones')
+watch(linkedMarker, (key) => {
+  if (key) activeCategory.value = BIOMARKERS[key]!.category
+})
 const activeMarkers = computed(() => byCategory(activeCategory.value))
 
 // --- AI summary ---

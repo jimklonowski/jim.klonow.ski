@@ -1,14 +1,14 @@
 <template>
   <div>
-    <JournalHeader
+    <ToolsHeader
       section="IMPORT"
       meta="apple health → journal vitals"
     >
       <template #actions>
         <span class="text-[11px] text-muted hidden md:inline">parsed in your browser · nothing leaves the page until you import</span>
       </template>
-    </JournalHeader>
-    <JournalNav />
+    </ToolsHeader>
+    <ToolsNav />
 
     <div class="px-4 sm:px-6 py-4 space-y-5">
       <!-- One-time XML import -->

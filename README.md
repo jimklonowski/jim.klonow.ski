@@ -20,10 +20,9 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | Route | Description |
 |---|---|
 | `/` | Overview dashboard — flagged markers, vitals, today's doses + the latest day's workouts, quick links (sign-in prompt when signed out) |
-| `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries |
+| `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries; `?marker=<key>` deep-links to a marker's tab + detail modal (used by the home page's flagged rows and the ⌘K palette) |
 | `/labs/dexa` | DEXA body composition scans |
 | `/labs/upload` | Upload a new lab PDF (parsed server-side into structured markers) — owner only |
-| `/labs/sharing` | Mint, list, and revoke share links — owner only |
 | `/labs/login` | Owner password sign-in |
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
 | `/journal` | Hub — vital tiles with sparklines, today's doses + workout, soda/Whoop strip, and cards into each spoke below |
@@ -35,14 +34,15 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/calendar` | Month view with compound-colored dots + protocol timeline (logged compounds, plus standing meds backfilled from the `STANDING_COMPOUNDS` constant) |
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
 | `/journal/compound/[name]` | Dosing history for a single compound |
-| `/journal/calculator` | Peptide reconstitution & syringe unit calculator |
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
-| `/journal/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
-| `/journal/inventory` | Peptide vial inventory and depletion tracking — owner only, reached from `/journal/compounds` |
+| `/tools/calculator` | Peptide reconstitution & syringe unit calculator |
+| `/tools/inventory` | Peptide vial inventory and depletion tracking — owner only |
+| `/tools/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
+| `/tools/sharing` | Mint, list, and revoke share links — owner only |
 | `/ask` | AI analysis console — streaming chat over the full tracked history (labs, DEXA, journal, Whoop, protocol) — owner only |
 | `/privacy` | Privacy notice |
 
-`/journal` is a hub-and-spoke section: the overview links into trends/compounds/workouts/entries, and every `/journal/*` page carries the same sub-nav (`app/components/journal/Nav.vue`), which drops tabs the current role can't open. Site-wide chrome lives in `app/layouts/default.vue` — header nav, status line, the digest panel, a route-change loading bar, and a ⌘K command palette that jumps to any marker, day, or compound — including never-logged compound dossiers, searchable by brand name ("primo", "cialis").
+`/journal` is a hub-and-spoke section: the overview links into trends/compounds/workouts/entries, and every `/journal/*` page carries the same sub-nav (`app/components/journal/Nav.vue`), which drops tabs the current role can't open. `/tools` works the same way (`app/components/tools/Nav.vue`); its pages lived under `/journal` and `/labs` until the TOOLS section split (Aug 2026), and the old URLs 301 to the new ones. Site-wide chrome lives in `app/layouts/default.vue` — header nav, status line, the digest panel, a route-change loading bar, and a ⌘K command palette that jumps to any marker, day, or compound — including never-logged compound dossiers, searchable by brand name ("primo", "cialis").
 
 ## Auth & sharing
 
@@ -52,7 +52,7 @@ Cookie sessions are HMAC-signed tokens (key: `LABS_SECRET`) carrying one of thre
 - **friend** — read-only mirror of the whole site.
 - **doctor** — clinical slice only: labs, DEXA, vitals/protocol trends, compounds, workouts. Daily entries, the `/journal/entries` ledger, notes, sodas, photos, and digests are blocked (notes/sodas are stripped server-side).
 
-Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/labs/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
+Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/tools/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
 
 Enforcement is layered: `server/middleware/auth.ts` verifies the cookie once per request and gates page navigation, `shared/utils/access.ts` holds the role→page policy shared with the client route middleware, and every API handler asserts its own requirement (`requireLabsAuth` / `requireOwner` / `requireRole` in `server/utils/auth.ts`).
 
@@ -63,7 +63,7 @@ The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token (fall
 - All entries (journal, labs, DEXA, health metrics, workouts, vials, digests, invites) live in **D1** — see `server/database/schema.sql`.
 - Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary.
 - **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/workout data on a schedule into `health_metrics` and `workouts`.
-- **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/journal/import`).
+- **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/tools/import`).
 - Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`server/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced via `DigestPanel.vue`.
 - The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events) and can be regenerated from the labs dashboard.
 - The **`/ask` console** (`server/api/ai/ask.post.ts`) streams answers to freeform questions over a per-request fact sheet built by `server/utils/askContext.ts` — every lab draw, every DEXA scan, all-time compound history, precomputed trends, and recent daily detail. Owner-only and KV rate-limited, since every question is an Anthropic call.

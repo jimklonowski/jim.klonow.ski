@@ -514,9 +514,9 @@ const syringeChart = computed(() => {
 
 const calculatorLink = computed(() => {
   const mix = currentMix.value
-  if (!mix) return '/journal/calculator'
+  if (!mix) return '/tools/calculator'
   return {
-    path: '/journal/calculator',
+    path: '/tools/calculator',
     query: {
       vialAmount: mix.vial_amount,
       vialUnit: mix.vial_unit,

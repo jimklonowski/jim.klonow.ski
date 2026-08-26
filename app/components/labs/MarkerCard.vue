@@ -136,6 +136,8 @@ import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 const props = defineProps<{
   biomarkerKey: string
   entries: Array<{ date: string, markers: Record<string, number | null> }>
+  /** Open the detail modal on mount — set when a ?marker= deep link targets this card. */
+  autoOpen?: boolean
 }>()
 
 const STATUS_COLORS = {
@@ -156,7 +158,15 @@ const STATUS_LABELS = {
 // "as designed" rather than as an unexplained flag.
 const EXPECTED_SUPPRESSED = new Set(['fsh', 'lh'])
 
+// Opened on mount rather than initialized true so SSR never renders the modal mid-hydration.
+// The watch covers a deep link retargeting an already-mounted card (palette → same tab).
 const open = ref(false)
+onMounted(() => {
+  if (props.autoOpen) open.value = true
+})
+watch(() => props.autoOpen, (v) => {
+  if (v) open.value = true
+})
 
 const meta = computed(() => (
   BIOMARKERS[props.biomarkerKey]

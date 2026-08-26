@@ -1,6 +1,6 @@
 // Distinguishes a day Jim actually journaled from a day that only has passively-collected
 // vitals. This matters because journal_entries holds both: the one-time Apple Health
-// export.xml import (app/pages/journal/import.vue) wrote a full blankEntry() per date back to
+// export.xml import (app/pages/tools/import.vue) wrote a full blankEntry() per date back to
 // 2020, and the Health Auto Export webhook keeps doing the same for new dates. Counting rows
 // therefore measured Apple Watch coverage, not logging — the status bar read "streak 655d /
 // entries 1,174" when the real figures were 142 and 193.
