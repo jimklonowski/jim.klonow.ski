@@ -13,6 +13,12 @@ export default defineNuxtConfig({
     'nuxt-security'
   ],
 
+  $production: {
+    security: {
+      removeLoggers: { consoleType: ['log', 'debug'] }
+    }
+  },
+
   devtools: { enabled: true },
 
   css: ['~/assets/css/main.css'],
@@ -80,6 +86,21 @@ export default defineNuxtConfig({
           tokensPerInterval: 20,
           interval: 300000, // owner-only chat, but each request spends Anthropic tokens — cap runaways
           ipHeader: 'cf-connecting-ip'
+        }
+      }
+    },
+    // Body-size raises over the global 2 MB / 8 MB defaults (see security.requestSizeLimiter).
+    '/api/journal/photos/upload': {
+      security: {
+        requestSizeLimiter: {
+          maxRequestSizeInBytes: 25000000 // full-res phone photos arrive as a raw binary body, not multipart
+        }
+      }
+    },
+    '/api/labs/process-pdf': {
+      security: {
+        requestSizeLimiter: {
+          maxUploadFileRequestInBytes: 20000000 // multipart lab-PDF uploads
         }
       }
     }
@@ -187,21 +208,42 @@ export default defineNuxtConfig({
     enabled: false
   },
 
-  // Rate limiting is the only feature enabled for now; everything else is off but listed here
-  // so future features (CSP headers, etc.) are a one-line flip. The KV storage driver must be
-  // declared on the global rateLimiter object — it's the only place the module reads it from —
-  // which is why global limiting is disabled via the '/**' route rule above rather than here.
+  // Deliberately OFF: xssValidator (regex input filter would false-positive on freeform journal
+  // text; Vue escaping + CSP cover XSS), corsHandler (same-origin API — sending no CORS headers
+  // is already the most restrictive state, and the Bearer-token Shortcuts flow is non-browser),
+  // allowedMethodsRestricter (nitro's .get.ts/.post.ts file routing already 405s wrong methods).
+  // The KV storage driver must be declared on the global rateLimiter object — it's the only place
+  // the module reads it from — which is why global limiting is disabled via the '/**' route rule
+  // above rather than here.
   security: {
-    headers: false,
+    headers: {
+      contentSecurityPolicy: {
+        // The module REPLACES arrays rather than merging, so 'self'/data: must be restated.
+        // blob: is for photo-upload previews (URL.createObjectURL in photos.vue / [date].vue);
+        // every other directive keeps module defaults — all assets on this site are self-hosted.
+        'img-src': ['\'self\'', 'data:', 'blob:']
+      }
+    },
     rateLimiter: {
       driver: { name: 'cloudflareKVBinding', options: { binding: 'RATE_LIMIT' } }
     },
-    requestSizeLimiter: false,
+    // 2 MB standard bodies / 8 MB multipart (the module defaults, restated because `true` isn't
+    // a valid value). Raised per-route above for the raw-binary photo upload and lab-PDF upload.
+    requestSizeLimiter: {
+      maxRequestSizeInBytes: 2000000,
+      maxUploadFileRequestInBytes: 8000000,
+      throwError: true
+    },
     xssValidator: false,
     corsHandler: false,
     allowedMethodsRestricter: false,
-    nonce: false,
-    sri: false,
+    nonce: true,
+    sri: true,
+    // Enabled for prod builds only via the $production block (top of config). `true` is a no-op on
+    // Vite 8 (it sets esbuild `drop`, which oxc transforms ignore — build prints a WARN), so the
+    // object form (unplugin-remove) is required — and that form has no dev-mode guard in the
+    // module, hence the env split. console.warn/error and all nitro-built server/api logging
+    // survive, so `wrangler tail` stays useful.
     removeLoggers: false,
     hidePoweredBy: true
   }
