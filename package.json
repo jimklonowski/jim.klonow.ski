@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.08.25e",
+  "version": "2026.08.26",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -36,7 +36,7 @@
     "@iconify-json/lucide": "^1.2.126",
     "@iconify-json/simple-icons": "^1.2.93",
     "@nuxt/eslint": "^1.17.0",
-    "eslint": "^10.9.0",
+    "eslint": "^10.9.1",
     "nitro-cloudflare-dev": "^0.2.2",
     "nuxt": "4.5.2",
     "nuxt-echarts": "^1.0.1",
