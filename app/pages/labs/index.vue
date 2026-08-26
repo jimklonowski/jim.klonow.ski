@@ -334,8 +334,24 @@ const linkedMarker = computed(() => {
 })
 
 const activeCategory = ref<Category>(linkedMarker.value ? BIOMARKERS[linkedMarker.value]!.category : 'hormones')
-watch(linkedMarker, (key) => {
-  if (key) activeCategory.value = BIOMARKERS[key]!.category
+
+// Once the deep link has landed (tab selected, modal opened), scrub ?marker= from the
+// URL so a refresh or copied link doesn't re-open the modal. On first mount the cards
+// have already opened by parent onMounted; on a palette retarget the card's autoOpen
+// watcher fires during the update flushed by nextTick, so clearing after it is safe.
+const router = useRouter()
+function clearMarkerQuery() {
+  if (!route.query.marker) return
+  const { marker: _, ...query } = route.query
+  router.replace({ query })
+}
+onMounted(clearMarkerQuery)
+
+watch(linkedMarker, async (key) => {
+  if (!key) return
+  activeCategory.value = BIOMARKERS[key]!.category
+  await nextTick()
+  clearMarkerQuery()
 })
 const activeMarkers = computed(() => byCategory(activeCategory.value))
 

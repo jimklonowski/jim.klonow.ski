@@ -57,11 +57,20 @@
           v-else
           class="text-[12.5px] leading-[1.75] text-dim digest-prose pl-4 border-l border-line-soft"
         >
-          <Markdown :value="m.content" />
-          <span
-            v-if="streaming && i === messages.length - 1"
-            class="inline-block w-2 h-3.5 bg-accent align-middle animate-pulse"
-          />
+          <p
+            v-if="streaming && i === messages.length - 1 && !m.content"
+            class="text-muted"
+          >
+            <span class="text-accent">{{ spinnerFrame }}</span>
+            thinking<span class="text-ghost">… {{ thinkingSeconds }}s</span>
+          </p>
+          <template v-else>
+            <Markdown :value="m.content" />
+            <span
+              v-if="streaming && i === messages.length - 1"
+              class="inline-block w-2 h-3.5 bg-accent align-middle animate-pulse"
+            />
+          </template>
         </div>
       </template>
       <div ref="bottomAnchor" />
@@ -119,6 +128,31 @@ const inputEl = ref<HTMLTextAreaElement | null>(null)
 const bottomAnchor = ref<HTMLElement | null>(null)
 const toast = useToast()
 
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+const spinnerFrame = ref(SPINNER_FRAMES[0])
+const thinkingSeconds = ref(0)
+let thinkingTimer: ReturnType<typeof setInterval> | undefined
+
+function startThinking() {
+  const startedAt = Date.now()
+  thinkingSeconds.value = 0
+  let frame = 0
+  thinkingTimer = setInterval(() => {
+    frame = (frame + 1) % SPINNER_FRAMES.length
+    spinnerFrame.value = SPINNER_FRAMES[frame]
+    thinkingSeconds.value = Math.floor((Date.now() - startedAt) / 1000)
+  }, 100)
+}
+
+function stopThinking() {
+  if (thinkingTimer) {
+    clearInterval(thinkingTimer)
+    thinkingTimer = undefined
+  }
+}
+
+onUnmounted(stopThinking)
+
 function autosize() {
   const el = inputEl.value
   if (!el) return
@@ -144,6 +178,7 @@ async function send(preset?: string) {
   const assistant = reactive<ChatMessage>({ role: 'assistant', content: '' })
   messages.value.push(assistant)
   streaming.value = true
+  startThinking()
   scrollToBottom()
 
   try {
@@ -166,6 +201,7 @@ async function send(preset?: string) {
       const { done, value } = await reader.read()
       if (done) break
       assistant.content += decoder.decode(value, { stream: true })
+      if (assistant.content) stopThinking()
       scrollToBottom()
     }
     if (!assistant.content.trim()) assistant.content = '*[no answer returned — try again]*'
@@ -177,6 +213,7 @@ async function send(preset?: string) {
     toast.add({ title: 'Ask failed', description: err instanceof Error ? err.message : 'Try again in a moment.', color: 'error' })
   }
   finally {
+    stopThinking()
     streaming.value = false
     scrollToBottom()
   }
