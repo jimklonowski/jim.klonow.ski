@@ -14,7 +14,7 @@
       </template>
       <template #actions>
         <NuxtLink
-          v-if="isOwner"
+          v-if="canEdit"
           :to="`/journal/${today}`"
           class="tui-btn tui-btn-accent"
         >
@@ -167,7 +167,7 @@ const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 const { data: labsData } = await useLabsEntries()
-const { role, isOwner } = await useAuth()
+const { role, canEdit } = await useAuth()
 
 onMounted(refresh)
 onMounted(refreshWorkouts)

@@ -1,5 +1,7 @@
 export default defineEventHandler(async (event) => {
-  requireOwner(event)
+  // owner + demo: the vial inventory is one of the showcase features, and for demo every
+  // query lands in the sandbox DB. friend/doctor never had this page.
+  requireRole(event, 'owner', 'demo')
 
   const db = getDb(event)
   const { results } = await db.prepare(

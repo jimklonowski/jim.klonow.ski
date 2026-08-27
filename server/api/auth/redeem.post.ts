@@ -17,7 +17,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Missing share token' })
   }
 
-  const db = getDb(event)
+  // getRealDb, not getDb: invites live only in the real database, and this must keep working
+  // for a visitor who currently holds a demo cookie (getDb would route them to the sandbox).
+  const db = getRealDb(event)
   const invite = await db
     .prepare('SELECT id, role, expires_at, max_uses, uses, revoked FROM invites WHERE id = ?1')
     .bind(token)

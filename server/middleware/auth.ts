@@ -15,9 +15,10 @@ export default defineEventHandler(async (event) => {
 
   let auth = readAuthCookie(event)
   // Guest sessions die with their invite: revoking (or deleting) the invite invalidates every
-  // cookie minted from it on the next request. Owner sessions never touch the DB here.
+  // cookie minted from it on the next request. Owner sessions never touch the DB here, and demo
+  // tokens never carry an invite id. getRealDb explicitly: invites only exist in the real DB.
   if (auth?.inviteId) {
-    const row = await getDb(event)
+    const row = await getRealDb(event)
       .prepare('SELECT revoked FROM invites WHERE id = ?1')
       .bind(auth.inviteId)
       .first<{ revoked: number }>()
