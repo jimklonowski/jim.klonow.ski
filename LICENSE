@@ -1,6 +1,21 @@
-MIT License
+This repository is dual-licensed: the source code is available under the MIT
+License, while site content is not licensed for reuse.
 
-Copyright (c) 2025 Nuxt UI Templates
+- "Code" means the application source code: TypeScript/JavaScript, Vue
+  components, configuration, build scripts, and styles.
+- "Content" means everything else: written copy and posts, photographs and
+  images, logos and branding, fonts and design assets in `public/`, and any
+  personal data (including health, lab, and journal data) displayed by or
+  associated with this site.
+
+--------------------------------------------------------------------------------
+CODE — MIT License
+--------------------------------------------------------------------------------
+
+Copyright (c) 2026 Jim Klonowski and Jim Klonowski LLC
+
+Portions of the code are derived from the Nuxt UI templates,
+Copyright (c) 2025 Nuxt UI Templates, also licensed under the MIT License.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +34,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+CONTENT — All Rights Reserved
+--------------------------------------------------------------------------------
+
+Copyright (c) 2026 Jim Klonowski and Jim Klonowski LLC
+
+All content is the property of Jim Klonowski and Jim Klonowski LLC and may
+not be reproduced,
+distributed, modified, or used in any way without prior written permission.
+The MIT License above does not apply to content.
