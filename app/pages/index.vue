@@ -202,6 +202,12 @@
       <HomeDigest
         :digests="digests"
         :is-owner="isOwner"
+        :rhr="latestRhr"
+        :sluggish="sluggish"
+        :recovery="latestRecovery"
+        :sodas-today="sodasToday"
+        :latest-draw-date="latestDraw?.date ?? null"
+        :flag-count="flagCounts.high + flagCounts.low"
         @refresh="refreshDigests"
       />
     </section>
@@ -214,7 +220,7 @@ import type { PeptideEntry } from '~/data/journal'
 const { role, isOwner } = await useAuth()
 const {
   hasSession, entries, healthMetrics, latestDraw, latestDexa,
-  allWorkouts, dosesToday, flagged, flagCounts,
+  allWorkouts, dosesToday, sodasToday, flagged, flagCounts,
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)
 
@@ -301,6 +307,28 @@ function series<T extends { date: string }>(list: T[], pick: (row: T) => number 
     .map(pick)
     .filter((v): v is number => v != null)
 }
+
+// --- TICKER inputs (design_handoff_ticker) ---
+
+/** Latest hand-logged resting HR — TICKER's live beat rate. */
+const latestRhr = computed(() =>
+  [...entries.value].reverse().find(e => e.rhr != null)?.rhr ?? null
+)
+
+const latestRecovery = computed(() =>
+  [...healthMetrics.value].reverse().find(m => m.recovery_score != null)?.recovery_score ?? null
+)
+
+/** Short-sleep state: entered by a <6h night, cleared only by a ≥7h one. */
+const sluggish = computed(() => {
+  let state = false
+  for (const m of healthMetrics.value) {
+    if (m.sleep_total_min == null) continue
+    if (m.sleep_total_min < 360) state = true
+    else if (m.sleep_total_min >= 420) state = false
+  }
+  return state
+})
 
 const trends = computed(() => [
   { label: 'WEIGHT lbs', values: series(entries.value, e => e.weight_lbs), decimals: 1 },
