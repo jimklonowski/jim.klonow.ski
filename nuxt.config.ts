@@ -89,6 +89,15 @@ export default defineNuxtConfig({
         }
       }
     },
+    '/demo': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 10,
+          interval: 300000, // demo sessions are free to mint, but don't let one IP spray cookies
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    },
     // Body-size raises over the global 2 MB / 8 MB defaults (see security.requestSizeLimiter).
     '/api/journal/photos/upload': {
       security: {
@@ -130,6 +139,9 @@ export default defineNuxtConfig({
     compressPublicAssets: true,
     experimental: { websocket: true, tasks: true },
     scheduledTasks: {
+      // Nightly demo-sandbox reset: discards visitor edits and re-anchors the synthetic
+      // persona's relative dates so the demo always ends "yesterday" (see server/tasks/demo).
+      '0 9 * * *': ['demo:reset'],
       '0 11 * * *': ['whoop:sync'],
       // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
       '0 14 * * *': ['digest:daily'],

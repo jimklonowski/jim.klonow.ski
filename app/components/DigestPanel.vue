@@ -97,6 +97,7 @@
 </template>
 
 <script setup lang="ts">
+import { isFullAccessRole } from '#shared/utils/access'
 import type { Digest } from '~/composables/useDigests'
 
 const route = useRoute()
@@ -104,11 +105,11 @@ const toast = useToast()
 const { role, isOwner } = await useAuth()
 
 // Available everywhere the shell renders (opened via ⌘K or the home digest links), except
-// the login page. Digests recap notes/sodas too, so the panel is owner+friend — the doctor
-// role doesn't get it.
+// the login page. Digests recap notes/sodas too, so the panel is owner/friend/demo — the
+// doctor role doesn't get it. Demo sees the pre-written sandbox digests (generate stays owner).
 const visible = computed(() =>
   route.path !== '/labs/login'
-  && (role.value === 'owner' || role.value === 'friend')
+  && isFullAccessRole(role.value)
 )
 
 // Shared state so the footer status bar / command palette can open the panel too.

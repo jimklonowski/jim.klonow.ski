@@ -1,9 +1,22 @@
 /// <reference path="../../worker-configuration.d.ts" />
 import type { H3Event } from 'h3'
+import type { AuthContext } from './auth'
 
 // nitro-cloudflare-dev types `context.cloudflare.env` as PlatformProxy["env"] (unknown) since it
 // isn't parameterized with our Env — cast through the generated global Env from worker-configuration.d.ts.
+//
+// Demo sessions are transparently routed to the sandbox database: every endpoint that reads or
+// writes through here works unchanged, but a demo cookie can never see or touch real data.
+// event.context.auth is set by server/middleware/auth.ts before any /api handler runs.
 export function getDb(event: H3Event): D1Database {
+  const env = event.context.cloudflare.env as unknown as Env
+  const auth = event.context.auth as AuthContext | null | undefined
+  return auth?.role === 'demo' ? env.DEMO_DB : env.DB
+}
+
+// Auth infrastructure (invite liveness, share-link redemption) must always hit the real DB —
+// invites only exist there, and a visitor holding a demo cookie can still open a share link.
+export function getRealDb(event: H3Event): D1Database {
   return (event.context.cloudflare.env as unknown as Env).DB
 }
 

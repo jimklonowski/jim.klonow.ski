@@ -11,7 +11,7 @@
         >calculator →</NuxtLink>
         <span class="text-ghost text-[11px]">·</span>
         <NuxtLink
-          v-if="isOwner"
+          v-if="canEdit"
           to="/tools/inventory"
           class="text-[11px] text-accent hover:text-accent-hover"
         >vial inventory →</NuxtLink>
@@ -187,7 +187,7 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
-const { isOwner } = await useAuth()
+const { canEdit } = await useAuth()
 
 onMounted(refresh)
 

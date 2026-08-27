@@ -41,7 +41,8 @@
       </template>
 
       <span class="sm:ml-auto shrink-0 text-ghost normal-case tracking-normal hidden sm:inline">
-        <template v-if="hasSession && latestMetrics">whoop ✓ apple-health ✓ · synced {{ formatDate(latestMetrics.date, 'monthDay').toLowerCase() }}</template>
+        <template v-if="role === 'demo'">demo data · fictional persona</template>
+        <template v-else-if="hasSession && latestMetrics">whoop ✓ apple-health ✓ · synced {{ formatDate(latestMetrics.date, 'monthDay').toLowerCase() }}</template>
         <template v-else-if="!hasSession">guest session · <NuxtLink
           to="/labs/login"
           class="text-faint hover:text-accent"

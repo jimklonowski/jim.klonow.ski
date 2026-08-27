@@ -14,7 +14,10 @@
     "deploy": "pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "sync:local": "node scripts/sync-local.mjs",
-    "sync:local:r2": "node scripts/sync-r2-local.mjs"
+    "sync:local:r2": "node scripts/sync-r2-local.mjs",
+    "demo:generate": "node scripts/demo/generate-demo-data.mjs",
+    "demo:seed:local": "node scripts/demo/seed-demo.mjs --local",
+    "demo:seed:remote": "node scripts/demo/seed-demo.mjs --remote"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",

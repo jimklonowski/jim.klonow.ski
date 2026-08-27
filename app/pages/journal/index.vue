@@ -108,7 +108,7 @@
           <JournalSodaTracker
             v-if="isFullAccess"
             compact
-            :readonly="!isOwner"
+            :readonly="!canEdit"
           />
 
           <section class="flex-1 bg-raised border border-line-soft px-4 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12.5px] text-dim">
@@ -164,7 +164,7 @@ function retryAll() {
   refreshHealth()
   refreshWorkouts()
 }
-const { role, isOwner } = await useAuth()
+const { role, isOwner, canEdit } = await useAuth()
 
 onMounted(refresh)
 onMounted(refreshHealth)
