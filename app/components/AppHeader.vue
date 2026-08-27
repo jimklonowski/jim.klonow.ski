@@ -38,7 +38,10 @@
 
       <!-- Nav: own row under the logo on mobile (`order-last` keeps the session dot up on
            the logo row), inline in the bar from md up. -->
-      <nav class="max-md:order-last w-full md:w-auto md:shrink-0 flex items-center gap-1 overflow-x-auto">
+      <nav
+        id="tour-nav"
+        class="max-md:order-last w-full md:w-auto md:shrink-0 flex items-center gap-1 overflow-x-auto"
+      >
         <NuxtLink
           v-for="item in items"
           :key="item.to"

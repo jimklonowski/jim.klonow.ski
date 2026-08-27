@@ -1,7 +1,7 @@
 // Insert a new supplement (no id) or update an existing one (id present). Discontinuing is
 // just an update that sets `stopped` — rows are kept so recent stops remain AI context.
 export default defineEventHandler(async (event) => {
-  requireOwner(event)
+  requireWriteAccess(event)
 
   const body = await readBody<Record<string, unknown>>(event)
   if (!body?.name || typeof body.name !== 'string' || !body.name.trim()) {

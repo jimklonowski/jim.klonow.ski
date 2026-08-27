@@ -60,6 +60,17 @@
             ✕ {{ error }}
           </p>
         </UForm>
+
+        <p class="mt-3.5 pt-3 border-t border-line-soft text-[11.5px] text-muted">
+          Just looking around?
+          <!-- Plain <a>: /demo is a nitro server route (mints the demo cookie, redirects home). -->
+          <a
+            href="/demo"
+            class="text-accent hover:text-accent-hover"
+          >
+            view the demo →
+          </a>
+        </p>
       </div>
 
       <p class="mt-2.5 text-[10.5px] text-ghost tracking-[0.1em] uppercase">

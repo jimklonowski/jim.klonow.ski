@@ -37,6 +37,7 @@
 </template>
 
 <script setup lang="ts">
+import { isFullAccessRole } from '#shared/utils/access'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { CompoundInfo } from '~/data/compoundInfo'
 
@@ -44,7 +45,7 @@ const open = useState('command-palette-open', () => false)
 const digestOpen = useState('digest-panel-open', () => false)
 const searchTerm = ref('')
 
-const { role, isOwner } = await useAuth()
+const { role, isOwner, canEdit } = await useAuth()
 const { entries, latestDraw } = useOverview(role)
 
 defineShortcuts({
@@ -79,7 +80,7 @@ const todayStr = localToday()
 
 // The doctor role gets a curated clinical view — no daily entries, photos, or AI digests.
 // See shared/utils/access.ts; offering those rows would just bounce them to /labs.
-const isFullAccess = computed(() => role.value === 'owner' || role.value === 'friend')
+const isFullAccess = computed(() => isFullAccessRole(role.value))
 
 // Journal sections are real routes since the hub-and-spoke split, so these are plain jumps
 // rather than the scroll-anchors they used to be.
@@ -110,12 +111,19 @@ const jumpItems = computed(() => {
 // once the owner list hit 15 entries — hence the explicit :fuse limit above as well. Suffixes
 // carry the words worth searching for ("invite", "share", "apple health").
 const manageItems = computed(() => {
-  if (!isOwner.value) return []
-  return [
-    { label: 'sharing · invite links', suffix: 'share with friends + doctor', onSelect: () => go('/tools/sharing') },
-    { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/tools/import') },
-    { label: 'inventory · vials', suffix: '/tools/inventory', onSelect: () => go('/tools/inventory') }
-  ]
+  const items = []
+  // The vial inventory is open to demo (edits land in the sandbox DB); sharing and import
+  // stay owner-only.
+  if (canEdit.value) {
+    items.push({ label: 'inventory · vials', suffix: '/tools/inventory', onSelect: () => go('/tools/inventory') })
+  }
+  if (isOwner.value) {
+    items.unshift(
+      { label: 'sharing · invite links', suffix: 'share with friends + doctor', onSelect: () => go('/tools/sharing') },
+      { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/tools/import') }
+    )
+  }
+  return items
 })
 
 const actionItems = computed(() => {

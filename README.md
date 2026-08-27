@@ -2,6 +2,8 @@
 
 Personal health tracking site. Bloodwork trends, body composition, and a daily peptide/TRT journal, with AI-generated recaps, Whoop sync, and role-based sharing — all in one place.
 
+**▶ [Try the live demo](https://jim.klonow.ski/demo)** — no sign-up. One click drops you into the full app as a fictional persona with ~20 months of synthetic data: browse everything, edit journal days, open vials. Demo edits land in a shared sandbox database that resets nightly; nothing you see or touch is real health data.
+
 ## Screenshots
 
 ![Overview dashboard — /](.github/screenshots/home.png)
@@ -73,17 +75,29 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 ## Auth & sharing
 
-Cookie sessions are HMAC-signed tokens (key: `LABS_SECRET`) carrying one of three roles:
+Cookie sessions are HMAC-signed tokens (key: `LABS_SECRET`) carrying one of four roles:
 
 - **owner** — logs in with `LABS_PASSWORD`; full read/write. Writes to lab data additionally require a 9-digit `LABS_UPLOAD_PIN` (second-factor cookie, 12h).
 - **friend** — read-only mirror of the whole site.
 - **doctor** — clinical slice only: labs, DEXA, vitals/protocol trends, compounds, workouts. Daily entries, the `/journal/entries` ledger, notes, sodas, photos, and digests are blocked (notes/sodas are stripped server-side).
+- **demo** — self-serve, credential-free 24h session minted by visiting [`/demo`](https://jim.klonow.ski/demo) (replaces whatever session cookie is present). Sees and edits only the synthetic sandbox — see **Demo mode** below. Blocked from the AI/upload/sharing surfaces.
 
 Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/tools/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
 
 Enforcement is layered: `server/middleware/auth.ts` verifies the cookie once per request and gates page navigation, `shared/utils/access.ts` holds the role→page policy shared with the client route middleware, and every API handler asserts its own requirement (`requireLabsAuth` / `requireOwner` / `requireRole` in `server/utils/auth.ts`).
 
 The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token (falls back to `LABS_SECRET` until set).
+
+## Demo mode
+
+Visiting **[/demo](https://jim.klonow.ski/demo)** mints a demo-role session and lands on the home dashboard, where a short guided tour (Nuxt UI's `useTour`) introduces the app. Everything a demo visitor reads or writes is transparently routed to a **second D1 database** (`DEMO_DB`) by the one-line role branch in `getDb()` (`server/utils/db.ts`) — every endpoint works unchanged, and a demo cookie can never see or touch real data. What demo gets:
+
+- A fully **synthetic persona**: ~20 months of journal vitals and doses, 9 lab draws with story arcs (ApoB 108→71, a TRT start with the expected LH/FSH suppression and hematocrit creep), 4 DEXA scans, daily sleep/recovery metrics, workouts, a supplement stack, and a vial inventory that lines up with the logged doses.
+- **Sandboxed writes** — journal days, sodas, supplements, and vials are editable (`requireWriteAccess` guard); demo visitors share the sandbox until it resets.
+- **Canned AI** — TICKER digests and lab summaries are pre-written into the seed; no live Anthropic calls, and `/ask`, uploads, imports, and sharing stay owner-only.
+- **Nightly reset** — the `demo:reset` task (09:00 UTC cron) wipes the sandbox and reseeds it from `demo/seed.json` in R2, re-anchoring every relative date so the data always ends "yesterday".
+
+The persona is generated deterministically by `scripts/demo/generate-demo-data.mjs` (committed seed: `scripts/demo/demo-seed.json`) and loaded with `pnpm demo:seed:local` / `pnpm demo:seed:remote`. Progress photos are neutral placeholder silhouettes under `demo/` keys in the photos bucket; the photo proxy refuses any non-`demo/` key to a demo session.
 
 ## Security
 
@@ -92,7 +106,7 @@ Hardening beyond auth is handled by [nuxt-security](https://nuxt-security.vercel
 - **Security headers** on every SSR response: a nonce-based CSP (`script-src 'strict-dynamic'`; `img-src` also allows `blob:` for photo-upload previews), HSTS, `frame-ancestors 'self'`, `X-Content-Type-Options: nosniff`, COOP/CORP, and a Permissions-Policy that disables camera/mic/geolocation. `Referrer-Policy: no-referrer` keeps share-link tokens out of outbound referrers. Everything on the site is self-hosted (fonts, scripts, images), so the CSP needs no third-party allowances.
 - **Subresource integrity** hashes on build assets; `console.log`/`console.debug` and `debugger` statements are stripped from production app builds (server/api logging is untouched, so `wrangler tail` keeps working).
 - **Request size limits**: 2 MB standard bodies / 8 MB multipart globally, raised per-route for the raw-binary photo upload (25 MB) and multipart lab-PDF upload (20 MB).
-- **Rate limiting** (KV-backed, per-IP via `cf-connecting-ip`) on the credential endpoints (`/api/labs/auth`, `/api/labs/upload-auth`), share-link redemption, and `/api/ai/ask`; disabled everywhere else so ordinary requests never touch KV.
+- **Rate limiting** (KV-backed, per-IP via `cf-connecting-ip`) on the credential endpoints (`/api/labs/auth`, `/api/labs/upload-auth`), share-link redemption, demo entry (`/demo`), and `/api/ai/ask`; disabled everywhere else so ordinary requests never touch KV.
 
 Deliberately not enabled — with reasoning in the config comments: `xssValidator` (false-positives on freeform journal text; Vue escaping + CSP cover XSS), `corsHandler` (same-origin API), `allowedMethodsRestricter` (nitro's file-based method routing already 405s), CSRF tokens (cookies are `httpOnly`/`secure`/`sameSite: lax`).
 
@@ -116,7 +130,12 @@ pnpm typecheck
 pnpm lint
 pnpm sync:local     # mirror prod -> local: D1 dump/import + R2 objects (stop dev server first)
 pnpm sync:local:r2  # top up local R2 objects only (PDFs/photos referenced by local D1)
+pnpm demo:generate    # regenerate the synthetic demo persona (scripts/demo/demo-seed.json)
+pnpm demo:seed:local  # wipe + reseed the local demo sandbox DB and R2 objects
+pnpm demo:seed:remote # same against the production DEMO_DB + buckets
 ```
+
+`pnpm sync:local` clears all local D1 state (the demo DB included) — re-apply `server/database/schema.sql` to `jim-klonow-ski-demo --local` and re-run `pnpm demo:seed:local` afterwards.
 
 ## Deploy
 

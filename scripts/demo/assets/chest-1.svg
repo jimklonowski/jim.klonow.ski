@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 300 400">
+<rect width="300" height="400" fill="#0b1210"/>
+<g fill="none" stroke="#22c55e" stroke-width="2" opacity="0.8">
+<circle cx="150" cy="70" r="26"/>
+<path d="M150 96 C 102 110, 102 130, 108 190 C 104 240, 104 280, 100 340 M150 96 C 198 110, 198 130, 192 190 C 196 240, 196 280, 200 340"/>
+</g>
+<text x="150" y="376" fill="#3f6f57" font-family="monospace" font-size="13" text-anchor="middle">DEMO PLACEHOLDER · CHEST 1/4</text>
+</svg>

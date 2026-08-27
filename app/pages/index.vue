@@ -9,12 +9,26 @@
     <p class="mt-2 text-[12.5px] text-muted">
       personal health terminal · bloodwork, body composition, protocol log
     </p>
-    <NuxtLink
-      to="/labs/login"
-      class="tui-btn tui-btn-accent mt-6"
-    >
-      ❯ sign in
-    </NuxtLink>
+    <div class="mt-6 flex items-center justify-center gap-2.5">
+      <NuxtLink
+        to="/labs/login"
+        class="tui-btn tui-btn-accent"
+      >
+        ❯ sign in
+      </NuxtLink>
+      <!-- Plain <a>: /demo is a nitro server route (mints the demo cookie, redirects),
+           so this must be a full page load, never SPA-routed. Link-checker rules for this
+           file are relaxed in eslint.config.mjs since /demo isn't a Vue route. -->
+      <a
+        href="/demo"
+        class="tui-btn"
+      >
+        view demo
+      </a>
+    </div>
+    <p class="mt-3 text-[11px] text-faint">
+      demo mode — a fictional persona with synthetic data · no sign-up
+    </p>
   </div>
 
   <TuiDataState
@@ -32,7 +46,10 @@
   >
     <!-- Panel dividers are the grid's own background showing through 1px gaps. -->
     <section class="bg-bg px-6 pt-4 pb-5">
+      <!-- tour ids sit on the compact components, not the sections — a full-height column
+           as the popover anchor pushes the tour popover to the viewport edge. -->
       <HomeVitals
+        id="tour-vitals"
         :entries="entries"
         :metrics="healthMetrics"
       />
@@ -100,7 +117,7 @@
           :to="`/journal/${today}`"
           class="tui-btn tui-btn-accent flex-1 justify-center"
         >
-          {{ isOwner ? '+ LOG TODAY' : 'TODAY' }}
+          {{ canEdit ? '+ LOG TODAY' : 'TODAY' }}
         </NuxtLink>
         <NuxtLink
           to="/journal/calendar"
@@ -127,6 +144,7 @@
 
     <section class="bg-bg px-6 pt-4 pb-5 min-w-0">
       <HomeFlaggedMarkers
+        id="tour-flagged"
         :flagged="flagged"
         :flag-counts="flagCounts"
         :draw-date="latestDraw?.date ?? null"
@@ -200,6 +218,7 @@
       class="bg-bg px-6 pt-4 pb-5 lg:max-h-[calc(100dvh-7.25rem)] lg:flex lg:flex-col lg:min-h-0"
     >
       <HomeDigest
+        id="tour-digest"
         :digests="digests"
         :is-owner="isOwner"
         :rhr="latestRhr"
@@ -215,9 +234,10 @@
 </template>
 
 <script setup lang="ts">
+import { isFullAccessRole } from '#shared/utils/access'
 import type { PeptideEntry } from '~/data/journal'
 
-const { role, isOwner } = await useAuth()
+const { role, isOwner, canEdit } = await useAuth()
 const {
   hasSession, entries, healthMetrics, latestDraw, latestDexa,
   allWorkouts, dosesToday, sodasToday, flagged, flagCounts,
@@ -227,9 +247,9 @@ const {
 const today = localToday()
 
 // The doctor role gets a curated clinical view: no daily entries, photos, or AI digests
-// (the digest endpoint is owner/friend-only and would 403), so those panels and links are
-// hidden rather than rendered broken. See shared/utils/access.ts.
-const isFullAccess = computed(() => role.value === 'owner' || role.value === 'friend')
+// (the digest endpoint would 403), so those panels and links are hidden rather than
+// rendered broken. See shared/utils/access.ts.
+const isFullAccess = computed(() => isFullAccessRole(role.value))
 
 // The digest composable is lazy (the slideover owns it); the home column needs it up front.
 const { data: digestData, execute: loadDigests, refresh: refreshDigests } = useDigests()
