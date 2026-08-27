@@ -4,26 +4,24 @@
        normal flow at the very bottom — nothing can render behind or past it. On mobile the
        page scrolls as usual and min-h-full just keeps the bar at the panel's foot. -->
   <div class="flex flex-col min-h-full lg:min-h-0 lg:flex-1">
-    <TuiHeader
-      label="AI DIGEST · WEEKLY"
-      :dashes="9"
-    >
-      <span class="text-[10.5px] text-muted">{{ weekly ? weeklyPeriod : '—' }}</span>
-    </TuiHeader>
-
-    <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
-      <div
-        v-if="weekly"
-        class="mt-3 text-[12.5px] leading-[1.75] text-dim digest-prose"
+    <!-- pr keeps the thin scrollbar from hugging the bubble's border. -->
+    <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+      <TickerDigestPanel
+        ref="weeklyPanel"
+        label="AI DIGEST · WEEKLY"
+        :meta="weekly ? weeklyPeriod : '—'"
       >
-        <Markdown :value="weeklyParts.prose" />
-      </div>
-      <p
-        v-else
-        class="mt-3 text-[12px] text-muted"
-      >
-        No weekly digest yet.
-      </p>
+        <Markdown
+          v-if="weekly"
+          :value="weeklyParts.prose"
+        />
+        <p
+          v-else
+          class="text-muted"
+        >
+          No weekly digest yet.
+        </p>
+      </TickerDigestPanel>
 
       <div
         v-if="weeklyParts.recommendations.length"
@@ -42,53 +40,67 @@
         </div>
       </div>
 
-      <TuiHeader
-        label="DAILY · TODAY"
+      <TickerDigestPanel
+        ref="dailyPanel"
+        label="AI DIGEST · DAILY"
+        :meta="daily ? formatDate(daily.period_end, 'monthDay').toUpperCase() : '—'"
         class="mt-4.5"
-      />
-      <div
-        v-if="daily"
-        class="mt-2.5 text-[12px] leading-[1.7] text-dim digest-prose"
       >
-        <Markdown :value="dailyParts.prose" />
-      </div>
-      <p
-        v-else
-        class="mt-2.5 text-[12px] text-muted"
-      >
-        No daily digest yet.
-      </p>
+        <Markdown
+          v-if="daily"
+          :value="dailyParts.prose"
+        />
+        <p
+          v-else
+          class="text-muted"
+        >
+          No daily digest yet.
+        </p>
+      </TickerDigestPanel>
     </div>
 
-    <div class="mt-auto pt-3 border-t border-line-soft flex flex-wrap items-baseline gap-3.5 text-[11.5px]">
-      <button
-        type="button"
-        class="text-accent hover:text-accent-hover cursor-pointer"
-        @click="digestOpen = true"
-      >
-        all digests →
-      </button>
-      <button
-        v-if="isOwner"
-        type="button"
-        class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
-        :disabled="generating"
-        @click="regenerate"
-      >
-        {{ generating ? 'generating…' : 'regenerate ⟳' }}
-      </button>
-      <span class="ml-auto text-muted">
-        daily: {{ daily ? relative(daily.period_end) : '—' }}
-        <span
-          v-if="daily"
-          class="text-accent"
-        >✓</span>
-        · weekly: {{ weekly ? relative(weekly.period_end) : '—' }}
-        <span
-          v-if="weekly"
-          class="text-accent"
-        >✓</span>
-      </span>
+    <!-- TICKER lives down here (Jim's call — no cutout in the bubbles), with the
+         actions and freshness stats to its right. The chevron on the divider above
+         the heart keeps the speech-bubble look without scrolling away. -->
+    <div class="ticker-footer relative mt-auto pt-3 border-t border-line-soft flex items-center gap-4">
+      <TickerCompanion
+        ref="companion"
+        :rhr="rhr"
+        :sluggish="sluggish"
+        @open="digestOpen = true"
+      />
+      <div class="flex-1 min-w-0 flex flex-col gap-1.5 text-[11.5px]">
+        <div class="flex flex-wrap items-baseline gap-3.5">
+          <button
+            type="button"
+            class="text-accent hover:text-accent-hover cursor-pointer"
+            @click="digestOpen = true"
+          >
+            all digests →
+          </button>
+          <button
+            v-if="isOwner"
+            type="button"
+            class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
+            :disabled="generating"
+            @click="regenerate"
+          >
+            {{ generating ? 'generating…' : 'regenerate ⟳' }}
+          </button>
+        </div>
+        <span class="text-muted">
+          daily: {{ daily ? relative(daily.period_end) : '—' }}
+          <span
+            v-if="daily"
+            class="text-accent"
+          >✓</span>
+          · weekly: {{ weekly ? relative(weekly.period_end) : '—' }}
+          <span
+            v-if="weekly"
+            class="text-accent"
+          >✓</span>
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -96,10 +108,28 @@
 <script setup lang="ts">
 import type { Digest } from '~/composables/useDigests'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   digests: Digest[]
   isOwner: boolean
-}>()
+  /** Latest resting HR — TICKER beats at this rate. */
+  rhr?: number | null
+  /** Short-sleep state (last night <6h, no ≥7h night since). */
+  sluggish?: boolean
+  /** Latest Whoop recovery %, for the >80 celebration. */
+  recovery?: number | null
+  /** Live count of sodas logged today, for the #3 flatline gag. */
+  sodasToday?: number
+  /** Latest lab draw with out-of-range markers, for the thump. */
+  latestDrawDate?: string | null
+  flagCount?: number
+}>(), {
+  rhr: null,
+  sluggish: false,
+  recovery: null,
+  sodasToday: 0,
+  latestDrawDate: null,
+  flagCount: 0
+})
 
 const emit = defineEmits<{ refresh: [] }>()
 
@@ -161,4 +191,74 @@ async function regenerate() {
     generating.value = false
   }
 }
+
+// --- TICKER event wiring (design_handoff_ticker screen 04) ------------------
+// One-shots are triggered here where the data lives; the companion itself
+// guarantees they return to idle ≤2s and never queue.
+
+const weeklyPanel = useTemplateRef('weeklyPanel')
+const dailyPanel = useTemplateRef('dailyPanel')
+const companion = useTemplateRef('companion')
+
+// DIGEST ARRIVES — a summary changed after load: type the bubble on, double-beat.
+watch(() => weekly.value?.summary, (val, old) => {
+  if (val && val !== old) {
+    weeklyPanel.value?.wipe()
+    companion.value?.trigger('digest')
+  }
+})
+watch(() => daily.value?.summary, (val, old) => {
+  if (val && val !== old) {
+    dailyPanel.value?.wipe()
+    companion.value?.trigger('digest')
+  }
+})
+
+// SODA #3 IN A DAY — the flatline gag, on the live shared soda count.
+watch(() => props.sodasToday, (n, o) => {
+  if (n >= 3 && (o ?? 0) < 3) companion.value?.trigger('flatline')
+})
+
+// Mount-time reactions, staggered so TICKER visibly "notices" after settling in.
+// A new lab flag outranks the recovery celebration; the one-shot lock drops
+// whichever comes second anyway.
+onMounted(() => {
+  setTimeout(() => {
+    if (props.flagCount > 0 && props.latestDrawDate && isRecent(props.latestDrawDate)
+      && localStorage.getItem('ticker:thumped') !== props.latestDrawDate) {
+      localStorage.setItem('ticker:thumped', props.latestDrawDate)
+      companion.value?.trigger('thump')
+      return
+    }
+    const today = localToday()
+    if (props.recovery != null && props.recovery > 80
+      && localStorage.getItem('ticker:celebrated') !== today) {
+      localStorage.setItem('ticker:celebrated', today)
+      companion.value?.trigger('celebrate')
+    }
+  }, 800)
+})
+
+function isRecent(date: string) {
+  return (Date.parse(localToday()) - Date.parse(date)) / 86400000 <= 7
+}
 </script>
+
+<style scoped>
+/* Speech tail hanging off the divider, pointing down at TICKER's heart (the tail
+   points at the speaker): a 10×10 square rotated 45° so its right+bottom borders
+   form the downward wedge. Bubble-colored fill + bubble border so it reads as the
+   digest bubble's own tail poking through the divider. */
+.ticker-footer::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 27px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-raised);
+  border-right: 1px solid var(--color-line-input);
+  border-bottom: 1px solid var(--color-line-input);
+  transform: rotate(45deg);
+}
+</style>
