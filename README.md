@@ -22,12 +22,10 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | ![Compounds](.github/screenshots/journal-compounds.png) | ![Workouts](.github/screenshots/journal-workouts.png) |
 | **`/journal/entries` — day-log ledger** | **`/journal/calendar` — month view + protocol timeline** |
 | ![Entries ledger](.github/screenshots/journal-entries.png) | ![Calendar](.github/screenshots/journal-calendar.png) |
-| **`/journal/supplements` — standing stack** | **`/journal/photos` — before/after compare** |
-| ![Supplements](.github/screenshots/journal-supplements.png) | ![Progress photos](.github/screenshots/journal-photos.jpg) |
-| **`/tools/calculator` — reconstitution & syringe units** | **`/tools/sharing` — role-based share links** |
-| ![Calculator](.github/screenshots/tools-calculator.png) | ![Sharing](.github/screenshots/tools-sharing.png) |
-| **`/tools/import` — Apple Health import + auto-sync** | |
-| ![Import](.github/screenshots/tools-import.png) | |
+| **`/journal/supplements` — standing stack** | **`/tools/calculator` — reconstitution & syringe units** |
+| ![Supplements](.github/screenshots/journal-supplements.png) | ![Calculator](.github/screenshots/tools-calculator.png) |
+| **`/tools/sharing` — role-based share links** | **`/tools/import` — Apple Health import + auto-sync** |
+| ![Sharing](.github/screenshots/tools-sharing.png) | ![Import](.github/screenshots/tools-import.png) |
 
 </details>
 
