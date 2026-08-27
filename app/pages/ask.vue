@@ -87,7 +87,7 @@
           ref="inputEl"
           v-model="draft"
           rows="1"
-          placeholder="ask about your data… (enter to send, shift+enter for a new line)"
+          placeholder="ask about your data…"
           class="flex-1 resize-none bg-inset border border-line-field px-3 py-2 text-[12.5px] text-body placeholder:text-ghost focus:outline-none focus:border-line-accent max-h-40"
           :disabled="streaming"
           @keydown.enter.exact.prevent="send()"
@@ -102,7 +102,7 @@
         </button>
       </form>
       <p class="mt-1.5 text-[10.5px] text-ghost">
-        answers are generated from your logged data · observations, not medical advice
+        answers are generated from your logged data · observations, not medical advice<span class="hidden sm:inline"> · enter to send, shift+enter for a new line</span>
       </p>
     </div>
   </div>
