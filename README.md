@@ -2,6 +2,35 @@
 
 Personal health tracking site. Bloodwork trends, body composition, and a daily peptide/TRT journal, with AI-generated recaps, Whoop sync, and role-based sharing — all in one place.
 
+## Screenshots
+
+![Overview dashboard — /](.github/screenshots/home.png)
+
+| `/labs` — bloodwork tracker | `/labs/dexa` — body composition |
+|---|---|
+| ![Bloodwork dashboard](.github/screenshots/labs.png) | ![DEXA body composition](.github/screenshots/dexa.png) |
+| **`/journal` — daily log hub** | **`/journal/trends` — vitals + Whoop** |
+| ![Journal overview](.github/screenshots/journal.png) | ![Vitals and Whoop trends](.github/screenshots/journal-trends.png) |
+| **`/ask` — AI analysis console** | |
+| ![Ask console](.github/screenshots/ask.png) | |
+
+<details>
+<summary><strong>More pages — journal spokes &amp; tools</strong></summary>
+
+| `/journal/compounds` — active protocol + timeline | `/journal/workouts` — Apple + Whoop session log |
+|---|---|
+| ![Compounds](.github/screenshots/journal-compounds.png) | ![Workouts](.github/screenshots/journal-workouts.png) |
+| **`/journal/entries` — day-log ledger** | **`/journal/calendar` — month view + protocol timeline** |
+| ![Entries ledger](.github/screenshots/journal-entries.png) | ![Calendar](.github/screenshots/journal-calendar.png) |
+| **`/journal/supplements` — standing stack** | **`/journal/photos` — before/after compare** |
+| ![Supplements](.github/screenshots/journal-supplements.png) | ![Progress photos](.github/screenshots/journal-photos.jpg) |
+| **`/tools/calculator` — reconstitution & syringe units** | **`/tools/sharing` — role-based share links** |
+| ![Calculator](.github/screenshots/tools-calculator.png) | ![Sharing](.github/screenshots/tools-sharing.png) |
+| **`/tools/import` — Apple Health import + auto-sync** | |
+| ![Import](.github/screenshots/tools-import.png) | |
+
+</details>
+
 ## Stack
 
 - **Nuxt 4** + Vue 3 + TypeScript
