@@ -17,7 +17,7 @@ const UPLOAD_COOKIE = 'labs-upload-auth'
 const SESSION_DAYS = 30
 const UPLOAD_SESSION_HOURS = 12
 
-const ROLES: readonly Role[] = ['owner', 'friend', 'doctor'] as const
+const ROLES: readonly Role[] = ['owner', 'friend', 'doctor', 'demo'] as const
 
 export interface AuthContext {
   role: Role
@@ -70,8 +70,7 @@ export function readAuthCookie(event: H3Event): AuthContext | null {
   return { role: payload.r as Role, inviteId: payload.i ?? null }
 }
 
-export function setAuthCookie(event: H3Event, role: Role, inviteId?: string) {
-  const maxAge = SESSION_DAYS * 86400
+export function setAuthCookie(event: H3Event, role: Role, inviteId?: string, maxAge = SESSION_DAYS * 86400) {
   const exp = Math.floor(Date.now() / 1000) + maxAge
   setCookie(event, AUTH_COOKIE, mintToken({ r: role, ...(inviteId ? { i: inviteId } : {}), exp }), {
     httpOnly: true,
@@ -103,6 +102,26 @@ export function requireLabsAuth(event: H3Event): AuthContext {
 export function requireOwner(event: H3Event): AuthContext {
   const auth = requireLabsAuth(event)
   if (auth.role !== 'owner') throw createError({ statusCode: 403, message: 'Owner access required' })
+  return auth
+}
+
+// Demo sessions are short-lived (the sandbox resets nightly anyway) and deliberately
+// overwrite whatever labs-auth cookie is present — visiting /demo from an owner/friend/doctor
+// session hands that session over to the sandbox until the next sign-in.
+const DEMO_SESSION_SECONDS = 86400
+
+export function startDemoSession(event: H3Event) {
+  setAuthCookie(event, 'demo', undefined, DEMO_SESSION_SECONDS)
+}
+
+// Writes that are safe to open to demo sessions (journal days, sodas, supplements, vials):
+// for the demo role, getDb() routes every statement into the sandbox DEMO_DB, so these
+// endpoints work unchanged. Everything else that writes stays requireOwner.
+export function requireWriteAccess(event: H3Event): AuthContext {
+  const auth = requireLabsAuth(event)
+  if (auth.role !== 'owner' && auth.role !== 'demo') {
+    throw createError({ statusCode: 403, message: 'Not available for this role' })
+  }
   return auth
 }
 

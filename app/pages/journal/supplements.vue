@@ -7,7 +7,7 @@
       <template #actions>
         <span class="text-[11px] text-muted hidden sm:inline">feeds AI digests as protocol context</span>
         <button
-          v-if="isOwner"
+          v-if="canEdit"
           type="button"
           class="tui-btn tui-btn-accent"
           @click="openAddModal"
@@ -27,7 +27,7 @@
       v-if="!supplements.length"
       class="px-4 sm:px-6 py-5 text-[12px] text-muted"
     >
-      Nothing tracked yet.{{ isOwner ? ' Use + ADD to record your daily stack.' : '' }}
+      Nothing tracked yet.{{ canEdit ? ' Use + ADD to record your daily stack.' : '' }}
     </p>
 
     <div class="px-4 sm:px-6 py-4 space-y-5">
@@ -82,7 +82,7 @@
                 v-if="s.dose"
                 class="text-[12.5px] text-muted"
               >{{ s.dose }}</span>
-              <template v-if="isOwner">
+              <template v-if="canEdit">
                 <button
                   type="button"
                   class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
@@ -237,7 +237,7 @@ import type { Supplement, SupplementCategory, SupplementStatus } from '~/data/jo
 definePageMeta({ middleware: 'journal-auth' })
 
 const toast = useToast()
-const { isOwner } = await useAuth()
+const { canEdit } = await useAuth()
 
 const { data, refresh, error } = await useSupplements()
 onMounted(() => refresh())

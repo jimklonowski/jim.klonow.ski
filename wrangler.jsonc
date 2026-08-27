@@ -19,6 +19,11 @@
       "binding": "DB",
       "database_name": "jim-klonow-ski-db",
       "database_id": "03e6065f-e6e1-4a3d-ad03-d70d675a0bf3"
+    },
+    {
+      "binding": "DEMO_DB",
+      "database_name": "jim-klonow-ski-demo",
+      "database_id": "9e257a44-de08-4422-888d-f4d92e81f720"
     }
   ],
   "r2_buckets": [
@@ -38,6 +43,6 @@
     }
   ],
   "triggers": {
-    "crons": ["0 11 * * *", "0 14 * * *", "0 15 * * 1"]
+    "crons": ["0 9 * * *", "0 11 * * *", "0 14 * * *", "0 15 * * 1"]
   }
 }

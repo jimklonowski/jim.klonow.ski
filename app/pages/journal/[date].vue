@@ -24,7 +24,7 @@
           CALENDAR
         </NuxtLink>
         <button
-          v-if="isOwner"
+          v-if="canEdit"
           type="button"
           class="tui-btn tui-btn-accent"
           :disabled="saving"
@@ -125,7 +125,7 @@
         >
           <span class="flex items-center gap-3 text-[11px]">
             <button
-              v-if="isOwner && prevEntry?.peptides?.length"
+              v-if="canEdit && prevEntry?.peptides?.length"
               type="button"
               class="text-accent hover:text-accent-hover cursor-pointer"
               @click="copyFromPrevious"
@@ -655,7 +655,7 @@
       </section>
 
       <div
-        v-if="isOwner"
+        v-if="canEdit"
         class="flex justify-end gap-2"
       >
         <NuxtLink
@@ -717,7 +717,7 @@ const toast = useToast()
 const dateParam = computed(() => route.params.date as string)
 
 const { data: allEntries, refresh } = await useJournalEntries()
-const { isOwner } = await useAuth()
+const { isOwner, canEdit } = await useAuth()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 

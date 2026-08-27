@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  requireOwner(event)
+  requireWriteAccess(event)
 
   const body = await readBody<Record<string, unknown>>(event)
   if (body?.id == null) {

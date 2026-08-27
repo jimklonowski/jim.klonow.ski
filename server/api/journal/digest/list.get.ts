@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  requireRole(event, 'owner', 'friend')
+  requireRole(event, 'owner', 'friend', 'demo')
 
   const db = getDb(event)
   const { results } = await db.prepare(
