@@ -1,6 +1,8 @@
 // Standing protocol context shared by the digest prompts and the labs AI-summary prompt.
 // The injectable schedule is a hand-maintained constant (it changes rarely and carries intent —
-// which weekdays — that the dose log can't express). The vitamin/supplement/skin stack lives in
+// which weekdays — that the dose log can't express). The same cadence exists in structured form
+// as PROTOCOL_RULES in app/data/journal.ts (adherence panel + calendar rings) — keep the two in
+// sync when the protocol changes. The vitamin/supplement/skin stack lives in
 // the `supplements` table and is rendered per-request by supplementContext(), so edits on
 // /journal/supplements flow into the AI prompts without a deploy.
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
