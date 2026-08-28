@@ -232,6 +232,30 @@
           </div>
         </div>
 
+        <!-- Modeled exposure (slow-release compounds only) -->
+        <div v-if="exposureChart.length >= 2">
+          <TuiHeader label="ESTIMATED LEVELS · MODELED">
+            <span class="text-[10.5px] text-muted">LAST {{ EXPOSURE_DAYS }}D · % OF PEAK</span>
+          </TuiHeader>
+          <div class="mt-2.5">
+            <ClientOnly>
+              <AreaChart
+                :data="exposureChart"
+                :categories="{ level: { name: '% of recent peak', color: compoundColor } }"
+                :height="150"
+                :mark-lines="exposureMarks"
+                area
+              />
+              <template #fallback>
+                <div class="h-38" />
+              </template>
+            </ClientOnly>
+          </div>
+          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+            Bateman superposition of your logged doses ({{ pkModelNote }}) — relative shape only, not measured serum levels.{{ exposureMarks.length ? ' Dashed guides mark lab draws.' : '' }}
+          </p>
+        </div>
+
         <!-- Recent doses -->
         <div v-if="recentDoses.length">
           <TuiHeader
@@ -326,6 +350,7 @@ import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcUnits, type MixUnit } from '~/utils/peptideCalc'
+import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -335,6 +360,7 @@ const compoundColor = computed(() => getCompoundColor(compoundName.value))
 const info = computed(() => getCompoundInfo(compoundName.value))
 
 const { data, refresh, error } = await useJournalEntries()
+const { data: labsData } = await useLabsEntries()
 onMounted(refresh)
 
 const entries = computed(() => data.value ?? [])
@@ -474,6 +500,42 @@ const doseSummary = computed(() => {
     ? `${last}${unit.value} steady`
     : `${steady}${unit.value} steady · ${last}${unit.value} last`
   return { start: `${first}${unit.value} start`, recent }
+})
+
+// --- Modeled exposure ---
+// Only compounds with multi-day kinetics get a curve (PK_MODELS); everything else clears in
+// hours and the dose chart above already tells the story.
+const EXPOSURE_DAYS = 120
+
+const pkModel = computed(() => PK_MODELS[compoundName.value])
+
+const exposureChart = computed(() => {
+  const model = pkModel.value
+  if (!model) return []
+  const from = localDaysAgo(EXPOSURE_DAYS - 1)
+  const doses = allDoses.value.map(p => ({ date: p.date, time: p.time, amount: p.dose }))
+  if (!doses.some(d => d.date >= from)) return []
+  const points = exposureSeries(doses, model, from, localToday())
+  const max = Math.max(...points.map(p => p.level))
+  if (max <= 0) return []
+  return points.map(p => ({
+    date: formatDate(p.date, 'monthDay'),
+    level: Math.round((p.level / max) * 1000) / 10
+  }))
+})
+
+const exposureMarks = computed(() => {
+  if (!pkModel.value) return []
+  const from = localDaysAgo(EXPOSURE_DAYS - 1)
+  return (labsData.value ?? [])
+    .filter(l => l.date >= from)
+    .map(l => formatDate(l.date, 'monthDay'))
+})
+
+const pkModelNote = computed(() => {
+  const model = pkModel.value
+  if (!model) return ''
+  return `release t½ ~${model.absorptionHalfLifeDays}d · elimination t½ ~${model.eliminationHalfLifeDays}d`
 })
 
 // --- Syringe units ---

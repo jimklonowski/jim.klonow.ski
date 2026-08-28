@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
+import { PK_MODELS, drawTiming, type PkDose } from '#shared/utils/pk'
 
 interface LabsRow {
   date: string
@@ -45,14 +46,22 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
   }))
   if (!journal.length) return []
 
-  // Unique dose dates per compound, ascending (rows are already sorted).
+  // Unique dose dates per compound, ascending (rows are already sorted). The PK-modeled
+  // esters also keep dose-level detail — drawTiming needs amounts and clock times, which
+  // the dose-DAY rollup throws away.
   const doseDates = new Map<string, string[]>()
+  const pkDoses = new Map<string, Array<PkDose & { unit?: string | null }>>()
   for (const row of journal) {
     for (const p of row.peptides ?? []) {
       if (!p.compound) continue
       const dates = doseDates.get(p.compound) ?? []
       if (dates.at(-1) !== row.date) dates.push(row.date)
       doseDates.set(p.compound, dates)
+      if (p.compound in PK_MODELS && p.dose != null) {
+        const list = pkDoses.get(p.compound) ?? []
+        list.push({ date: row.date, time: (p as { time?: string | null }).time, amount: p.dose, unit: p.unit })
+        pkDoses.set(p.compound, list)
+      }
     }
   }
 
@@ -77,6 +86,22 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
   }
   else {
     lines.push('Active protocol: no compounds logged in the 3 weeks up to this draw.')
+  }
+
+  // Where the draw landed on each slow-release compound's dosing curve — a draw a day or two
+  // after an injection reads near peak on the hormones that ester carries; one right before
+  // the next injection reads near trough. Same model as the exposure charts (shared/utils/pk).
+  const timing: string[] = []
+  for (const [compound, doses] of pkDoses) {
+    const t = drawTiming(doses, PK_MODELS[compound]!, date)
+    if (!t) continue
+    const unit = doses.find(d => d.date === t.lastDoseDate)?.unit
+    const amount = `${t.lastDoseAmount}${unit === 'iu' ? ' IU' : ` ${unit ?? 'mg'}`}`
+    timing.push(`- ${compound}: last dose ${amount} on ${t.lastDoseDate}, ${t.daysSinceLastDose} days before the draw; modeled exposure at draw ≈ ${t.pctOfRecentPeak}% of its recent peak (${t.phase}).`)
+  }
+  if (timing.length) {
+    lines.push('Draw timing vs slow-release injectables (Bateman-modeled from the dose log with typical ester/peptide half-lives — relative shape, NOT measured levels):')
+    lines.push(...timing)
   }
 
   // Starts are covered precisely per compound above; the change detector adds what those lines
@@ -180,6 +205,8 @@ Write 3-5 short paragraphs, in order of importance:
 2. Any values in the new draw outside their reference range.
 3. Notable trends across multiple draws (steady climbs or declines). Where the timing lines up with a protocol change above, say so plainly and explain the likely physiological mechanism in a sentence (e.g. testosterone stimulates erythropoiesis, so red cell production rises and draws down ferritin/iron stores) — frame it as the likely driver, not a certainty.
 4. For each marker that is out of range or trending in a concerning direction, give 2-3 concrete steps to improve it (specific dietary changes, supplementation with typical doses and timing, spacing interfering substances, blood donation where relevant, and when to retest to confirm the trend). Skip this for markers that are stable and in range.
+
+When a hormone-sensitive marker (total/free testosterone, estradiol, hematocrit) moved versus prior draws, weigh the draw-timing lines above before calling it a real change — near-peak vs near-trough sampling can explain an apparent shift on an unchanged protocol, and you should say so when it does.
 
 Be factual, specific, and concise. If everything is stable and in range, say so briefly — do not manufacture concerns. No greeting, no closing, no medical-advice disclaimers or "consult your doctor" boilerplate. Plain text only — no markdown, no headers, no bullet characters.`
 
