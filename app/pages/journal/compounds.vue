@@ -75,6 +75,86 @@
         </p>
       </section>
 
+      <!-- Modeled exposure for the slow-release injectables -->
+      <section v-if="exposureChart.data.length">
+        <TuiHeader
+          label="ESTIMATED LEVELS ── modeled"
+          :dashes="0"
+        >
+          <span class="text-[10px] text-muted normal-case">last {{ EXPOSURE_DAYS }}d · % of each compound's peak</span>
+        </TuiHeader>
+        <div class="mt-2.5">
+          <ClientOnly>
+            <AreaChart
+              :data="exposureChart.data"
+              :categories="exposureChart.categories"
+              :height="170"
+              :show-legend="Object.keys(exposureChart.categories).length > 1"
+              :mark-lines="exposureMarks"
+              area
+            />
+            <template #fallback>
+              <div class="h-42" />
+            </template>
+          </ClientOnly>
+        </div>
+        <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          Bateman-modeled from logged doses and typical ester/peptide half-lives — relative shape only, not measured serum levels. Dashed guides mark lab draws.
+        </p>
+      </section>
+
+      <!-- Planned vs logged, from the hand-maintained PROTOCOL_RULES cadence -->
+      <section v-if="adherence.length">
+        <TuiHeader
+          label="ADHERENCE ── planned vs logged"
+          :dashes="0"
+        >
+          <span class="text-[10px] text-muted normal-case">last {{ ADHERENCE_WEEKS }} wks</span>
+        </TuiHeader>
+        <div class="flex flex-col gap-1.5 mt-2.5">
+          <div
+            v-for="row in adherence"
+            :key="row.compound"
+            class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_150px_minmax(0,1fr)_50px_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-[12px]"
+          >
+            <NuxtLink
+              :to="`/journal/compound/${encodeURIComponent(row.compound)}`"
+              class="text-hi flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :style="{ background: getCompoundColor(row.compound) }"
+              />
+              <span class="truncate">{{ row.compound }}</span>
+            </NuxtLink>
+            <span class="text-dim text-right lg:text-left text-[11px]">{{ row.doseLabel }} · {{ row.cadence }}</span>
+
+            <span class="flex items-center gap-1 col-span-2 lg:col-span-1">
+              <span
+                v-for="w in row.weeks"
+                :key="w.weekStart"
+                class="h-2.5 flex-1 max-w-6"
+                :class="w.expected ? (w.partial ? 'outline outline-1 outline-line-accent -outline-offset-1' : '') : 'bg-inset opacity-40'"
+                :style="weekCellStyle(row.compound, w)"
+                :title="`wk of ${formatDate(w.weekStart, 'monthDay')} · ${w.actual}/${w.expected}`"
+              />
+            </span>
+
+            <span
+              class="text-right"
+              :class="pctClass(row.pct)"
+            >{{ row.pct != null ? `${row.pct}%` : '—' }}</span>
+            <span
+              class="text-right text-[10.5px] tracking-[0.06em]"
+              :class="STATUS_CLASSES[row.status.kind]"
+            >{{ row.status.label }}</span>
+          </div>
+        </div>
+        <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          Weeks score logged dose-days against the intended cadence, so a shot slid by a day still counts. As-needed compounds aren't scored.
+        </p>
+      </section>
+
       <!-- Full timeline gantt -->
       <section v-if="timelineRows.length">
         <TuiHeader :label="timelineLabel">
@@ -182,12 +262,14 @@
 <script setup lang="ts">
 import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
+import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
+import type { AdherenceWeek } from '~/utils/adherence'
 
 definePageMeta({ middleware: 'journal-auth' })
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
-const { canEdit } = await useAuth()
+const { canEdit, role } = await useAuth()
 
 onMounted(refresh)
 
@@ -292,6 +374,88 @@ const active = computed(() =>
       presence: presenceBar(u)
     }))
 )
+
+// --- modeled exposure ---
+const EXPOSURE_DAYS = 120
+
+// One normalized series per PK-modeled compound with a dose inside the window. Each line is
+// % of that compound's own window peak — hCG doses in IU and testosterone in mg can't share
+// an absolute axis, and the model is only trustworthy about shape anyway.
+const exposureSeriesRows = computed(() => {
+  const from = localDaysAgo(EXPOSURE_DAYS - 1)
+  const rows: Array<{ compound: string, points: Array<{ date: string, pct: number }> }> = []
+  for (const [compound, model] of Object.entries(PK_MODELS)) {
+    const doses = entries.value.flatMap(e =>
+      (e.peptides ?? [])
+        .filter(p => p.compound === compound)
+        .map(p => ({ date: e.date, time: p.time, amount: p.dose }))
+    )
+    if (!doses.some(d => d.date >= from)) continue
+    const points = exposureSeries(doses, model, from, today)
+    const max = Math.max(...points.map(p => p.level))
+    if (max <= 0) continue
+    rows.push({
+      compound,
+      points: points.map(p => ({ date: p.date, pct: Math.round((p.level / max) * 1000) / 10 }))
+    })
+  }
+  return rows
+})
+
+const exposureChart = computed(() => {
+  const rows = exposureSeriesRows.value
+  if (!rows.length) return { data: [], categories: {} as Record<string, { name: string, color: string }> }
+  const categories: Record<string, { name: string, color: string }> = {}
+  rows.forEach((row, i) => {
+    categories[`c${i}`] = { name: row.compound, color: getCompoundColor(row.compound) }
+  })
+  const data = rows[0]!.points.map((p, idx) => {
+    const point: Record<string, unknown> = { date: formatDate(p.date, 'monthDay') }
+    rows.forEach((row, i) => {
+      point[`c${i}`] = row.points[idx]?.pct
+    })
+    return point
+  })
+  return { data, categories }
+})
+
+const exposureMarks = computed(() => {
+  const from = localDaysAgo(EXPOSURE_DAYS - 1)
+  return (labsData.value ?? [])
+    .filter(l => l.date >= from && l.date <= today)
+    .map(l => formatDate(l.date, 'monthDay'))
+})
+
+// --- adherence ---
+const ADHERENCE_WEEKS = 8
+
+// The demo persona's dose dates re-anchor nightly and drift across weekdays by design, so
+// weekday-based scoring would read as constant failure there — real sessions only.
+const adherence = computed(() =>
+  role.value === 'demo' ? [] : computeAdherence(entries.value, today, ADHERENCE_WEEKS)
+)
+
+function weekCellStyle(compound: string, w: AdherenceWeek) {
+  if (!w.expected) return {}
+  return {
+    background: getCompoundColor(compound),
+    opacity: 0.2 + 0.8 * Math.min(w.actual / w.expected, 1)
+  }
+}
+
+function pctClass(pct: number | null): string {
+  if (pct == null) return 'text-muted'
+  if (pct >= 90) return 'text-accent'
+  if (pct >= 70) return 'text-dim'
+  return 'text-warn'
+}
+
+const STATUS_CLASSES: Record<string, string> = {
+  done: 'text-accent',
+  due: 'text-hi',
+  overdue: 'text-warn',
+  next: 'text-muted'
+}
 
 // --- timeline gantt ---
 const ZOOM_OPTS = ['week', 'month'] as const
