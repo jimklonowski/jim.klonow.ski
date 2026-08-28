@@ -46,6 +46,12 @@
         <p class="num-display text-[28px] leading-none mt-1.5">
           {{ avgDose }}<span class="text-[11px] text-muted"> {{ unit }}</span>
         </p>
+        <p
+          v-if="avgDoseEquiv"
+          class="text-[11px] text-muted mt-1"
+        >
+          {{ avgDoseEquiv }}
+        </p>
       </div>
       <div class="bg-bg px-4 sm:px-6 py-3.5">
         <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
@@ -349,7 +355,7 @@
 import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
-import { calcUnits, type MixUnit } from '~/utils/peptideCalc'
+import { calcUnits, convertUnitFor, iuEquivalentLabel, type MixUnit } from '~/utils/peptideCalc'
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 
 definePageMeta({ middleware: 'journal-auth' })
@@ -397,6 +403,11 @@ const avgDose = computed(() => {
   if (!doses.length) return 0
   return Math.round(doses.reduce((a, b) => a + b, 0) / doses.length * 10) / 10
 })
+
+// IU means little to intuition — say what it weighs where the factor is known (HGH, hCG).
+const avgDoseEquiv = computed(() =>
+  unit.value === 'iu' ? iuEquivalentLabel(compoundName.value, avgDose.value) : null
+)
 
 const daysAgo = computed(() => {
   const last = onDays.value.at(-1)?.date
@@ -554,10 +565,16 @@ const currentMix = computed(() => reconstitutions.value.at(-1) ?? null)
 const mixLine = computed(() => {
   const mix = currentMix.value
   if (!mix) return ''
-  const parts = [`${mix.vial_amount}${mix.vial_unit} vial + ${mix.bac_water_ml}mL BAC water`]
+  // When the vial is labeled in a different unit than the doses (HGH: mg vial, IU doses),
+  // spell out what the vial holds in dose units so the two scales connect.
+  const vialInDoseUnit = mix.vial_unit !== unit.value
+    ? convertUnitFor(compoundName.value, mix.vial_amount, mix.vial_unit as MixUnit, unit.value as MixUnit)
+    : null
+  const vialEquiv = vialInDoseUnit != null ? ` (≈ ${Math.round(vialInDoseUnit * 100) / 100} ${unit.value})` : ''
+  const parts = [`${mix.vial_amount}${mix.vial_unit} vial${vialEquiv} + ${mix.bac_water_ml}mL BAC water`]
   const perMl = mix.bac_water_ml ? Math.round((mix.vial_amount / mix.bac_water_ml) * 1000) / 1000 : null
   if (perMl != null) parts.push(`≈ ${perMl} ${mix.vial_unit}/mL`)
-  const units = calcUnits(1, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
+  const units = calcUnits(1, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)
   if (units) parts.push(`1 unit ≈ ${Math.round((1 / units) * 1000) / 1000} ${unit.value}`)
   return parts.join(' · ')
 })
@@ -568,7 +585,7 @@ const syringeChart = computed(() => {
   const doses = [...new Set(allDoses.value.map(p => p.dose))].sort((a, b) => a - b)
   return doses
     .map((dose) => {
-      const units = calcUnits(dose, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml)
+      const units = calcUnits(dose, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)
       return { dose: `${dose} ${unit.value}`, units: units != null ? Math.round(units * 10) / 10 : null }
     })
     .filter((d): d is { dose: string, units: number } => d.units != null)
@@ -584,7 +601,9 @@ const calculatorLink = computed(() => {
       vialUnit: mix.vial_unit,
       bacWaterMl: mix.bac_water_ml,
       dose: avgDose.value,
-      doseUnit: unit.value
+      doseUnit: unit.value,
+      // Lets the calculator bridge IU↔mass for this compound (HGH: mg vial, IU doses).
+      compound: compoundName.value
     }
   }
 })
