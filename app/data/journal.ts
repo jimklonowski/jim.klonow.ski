@@ -193,6 +193,36 @@ export const STANDING_COMPOUNDS: StandingCompound[] = [
   { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet' }
 ]
 
+export interface ProtocolRule {
+  compound: string
+  /** Display only — adherence checks whether a dose was logged, not the amount. */
+  doseLabel: string
+  /** Scheduled weekdays, 0=Sun … 6=Sat. All seven = daily. */
+  weekdays: number[]
+  /** First date this cadence applies; adherence and calendar rings start here. */
+  from: string
+  /** Set when a compound leaves the schedule; keep the row for history. */
+  to?: string | null
+}
+
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
+
+// The intended weekly cadence — hand-maintained like STANDING_COMPOUNDS and the server's
+// PROTOCOL_SCHEDULE prose (server/utils/protocol.ts); keep the three in sync when the
+// protocol changes. Drives the adherence panel on /journal/compounds and the calendar's
+// scheduled-dose rings (app/utils/adherence.ts). As-needed compounds (BPC-157) deliberately
+// have no rule — sporadic logging is the plan, not a lapse. `from` dates come from the dose
+// log's first day of each cadence. NOTE: this describes the real protocol only; the demo
+// persona's dose dates re-anchor nightly and drift across weekdays, so adherence UI is
+// hidden for demo sessions.
+export const PROTOCOL_RULES: ProtocolRule[] = [
+  { compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18' },
+  { compound: 'hCG', doseLabel: '250 IU', weekdays: [0, 2, 5], from: '2026-06-18' },
+  { compound: 'HGH', doseLabel: '2 IU', weekdays: EVERY_DAY, from: '2026-06-13' },
+  { compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01' },
+  { compound: 'Finasteride', doseLabel: '1 mg', weekdays: EVERY_DAY, from: '2026-07-29' }
+]
+
 export const KNOWN_COMPOUNDS = Object.values(COMPOUND_GROUPS).flat()
 
 export const COMPOUND_COLORS: Record<string, string> = {

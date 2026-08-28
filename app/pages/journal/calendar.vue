@@ -49,6 +49,13 @@
         {{ shortCompound(compound) }}
       </span>
       <span class="flex items-center gap-1 text-muted">⚗ recon</span>
+      <span
+        v-if="showSchedule"
+        class="flex items-center gap-1.5 text-muted"
+      >
+        <span class="w-1.5 h-1.5 rounded-full border border-line-accent" />
+        scheduled · not logged
+      </span>
     </div>
 
     <!-- Month grid -->
@@ -90,7 +97,7 @@
           </div>
 
           <div
-            v-if="cell.compounds.length || cell.marks"
+            v-if="cell.compounds.length || cell.scheduled.length || cell.marks"
             class="flex flex-wrap items-center gap-1 mt-1.5"
           >
             <span
@@ -99,6 +106,13 @@
               class="w-1.75 h-1.75 rounded-full shrink-0"
               :style="{ background: getCompoundColor(compound) }"
               :title="compound"
+            />
+            <span
+              v-for="compound in cell.scheduled"
+              :key="`s-${compound}`"
+              class="w-1.75 h-1.75 rounded-full shrink-0 border"
+              :style="{ borderColor: getCompoundColor(compound) }"
+              :title="`${compound} — scheduled, not logged`"
             />
             <span
               v-if="cell.marks"
@@ -219,6 +233,12 @@ const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
+const { role } = await useAuth()
+
+// Scheduled-dose rings come from PROTOCOL_RULES, which describes the real weekday cadence.
+// The demo persona's dose dates re-anchor nightly and drift across weekdays by design, so
+// the rings would flag misses that aren't real — hidden for demo sessions.
+const showSchedule = computed(() => role.value !== 'demo')
 
 onMounted(refresh)
 onMounted(refreshWorkouts)
@@ -289,6 +309,8 @@ interface CalendarCell {
   isDraw: boolean
   hasEntry: boolean
   compounds: string[]
+  /** Scheduled by PROTOCOL_RULES but not logged — a miss in the past, the plan ahead. */
+  scheduled: string[]
   /** Compact glyph run: extra doses, reconstitutions, photos, workouts. */
   marks: string
   weight: string | null
@@ -305,7 +327,7 @@ const calendarCells = computed((): CalendarCell[] => {
 
   const blank = (): CalendarCell => ({
     date: null, day: null, isToday: false, isFuture: false, isDraw: false,
-    hasEntry: false, compounds: [], marks: '', weight: null, title: ''
+    hasEntry: false, compounds: [], scheduled: [], marks: '', weight: null, title: ''
   })
 
   const cells: CalendarCell[] = Array.from({ length: firstDay }, blank)
@@ -315,6 +337,14 @@ const calendarCells = computed((): CalendarCell[] => {
     const entry = entryMap.value[dateStr]
     const workouts = workoutCountByDate.value[dateStr] ?? 0
     const photos = photoCountByDate.value[dateStr] ?? 0
+
+    // Rings for cadence days without a logged dose: a plan preview on future days, a visible
+    // miss on past ones. Days the compound WAS logged need no ring — the dot already shows.
+    const scheduled = showSchedule.value
+      ? scheduledFor(dateStr)
+          .map(r => r.compound)
+          .filter(c => !(entry?.compounds ?? []).includes(c))
+      : []
 
     const marks: string[] = []
     // Only show a ×N when there were more injections than distinct compounds, otherwise
@@ -326,6 +356,10 @@ const calendarCells = computed((): CalendarCell[] => {
 
     const titleParts: string[] = []
     if (entry?.compounds.length) titleParts.push(entry.compounds.join(', '))
+    if (scheduled.length) {
+      const tense = dateStr > todayDate ? 'scheduled' : dateStr === todayDate ? 'due' : 'not logged'
+      titleParts.push(`${tense}: ${scheduled.join(', ')}`)
+    }
     if (entry?.reconCount) titleParts.push(`${entry.reconCount} reconstitution${entry.reconCount > 1 ? 's' : ''}`)
     if (photos) titleParts.push(`${photos} photo${photos > 1 ? 's' : ''}`)
     if (workouts) titleParts.push(`${workouts} workout${workouts > 1 ? 's' : ''}`)
@@ -338,6 +372,7 @@ const calendarCells = computed((): CalendarCell[] => {
       isDraw: drawDates.value.has(dateStr),
       hasEntry: !!entry,
       compounds: entry?.compounds.slice(0, MAX_DOTS) ?? [],
+      scheduled: scheduled.slice(0, MAX_DOTS),
       marks: marks.join(' '),
       weight: entry?.weight != null ? `${entry.weight}` : null,
       title: titleParts.join(' · ')

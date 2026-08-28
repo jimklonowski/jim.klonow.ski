@@ -56,13 +56,13 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
 | `/journal` | Hub — vital tiles with sparklines, today's doses + workout, soda/Whoop strip, and cards into each spoke below |
 | `/journal/trends` | Every vitals + Whoop/Apple Watch chart under one shared range picker (30/60/90d/all, optional 7d smoothing) |
-| `/journal/compounds` | Active protocol and every tracked compound, linking out to the calculator and vial inventory |
+| `/journal/compounds` | Active protocol and every tracked compound — modeled exposure curves for the slow-release injectables (Bateman superposition of the dose log, lab draws overlaid) and a planned-vs-logged adherence panel — linking out to the calculator and vial inventory |
 | `/journal/workouts` | Session log merged from Apple Health + Whoop, with stat cells and type mix |
 | `/journal/entries` | Day-log ledger of every journal row — hidden from the doctor role |
 | `/journal/[date]` | Create or edit a day's entry (read-only for guests) |
-| `/journal/calendar` | Month view with compound-colored dots + protocol timeline (logged compounds, plus standing meds backfilled from the `STANDING_COMPOUNDS` constant) |
+| `/journal/calendar` | Month view with compound-colored dots, scheduled-dose rings (planned vs logged, from the hand-maintained `PROTOCOL_RULES` cadence) + protocol timeline (logged compounds, plus standing meds backfilled from the `STANDING_COMPOUNDS` constant) |
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
-| `/journal/compound/[name]` | Dosing history for a single compound |
+| `/journal/compound/[name]` | Dosing history for a single compound, with a modeled exposure curve for the slow-release ones |
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
 | `/tools/calculator` | Peptide reconstitution & syringe unit calculator |
 | `/tools/inventory` | Peptide vial inventory and depletion tracking — owner only |
@@ -117,7 +117,7 @@ Deliberately not enabled — with reasoning in the config comments: `xssValidato
 - **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/workout data on a schedule into `health_metrics` and `workouts`.
 - **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/tools/import`).
 - Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`server/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced via `DigestPanel.vue`.
-- The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events) and can be regenerated from the labs dashboard.
+- The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events + where the draw landed on each injectable's modeled exposure curve — `shared/utils/pk.ts`, so a near-peak vs near-trough draw isn't misread as a real change) and can be regenerated from the labs dashboard.
 - The **`/ask` console** (`server/api/ai/ask.post.ts`) streams answers to freeform questions over a per-request fact sheet built by `server/utils/askContext.ts` — every lab draw, every DEXA scan, all-time compound history, precomputed trends, and recent daily detail. Owner-only and KV rate-limited, since every question is an Anthropic call.
 - All three AI surfaces share standing protocol context from `server/utils/protocol.ts`: the intended dosing schedule (hand-maintained constant, including standing meds that never hit the dose log) plus the supplement stack rendered live from the `supplements` table, so edits on `/journal/supplements` reach the prompts without a deploy.
 
