@@ -267,7 +267,8 @@ const doseLines = computed(() => {
   const sites = new Map<string, string>()
   for (const d of doses) {
     const unit = d.unit === 'iu' ? 'iu' : d.unit
-    byTime.set(d.time, [...(byTime.get(d.time) ?? []), `${d.compound} ${d.dose}${unit}`])
+    const equiv = d.unit === 'iu' ? iuEquivalentLabel(d.compound, d.dose) : null
+    byTime.set(d.time, [...(byTime.get(d.time) ?? []), `${d.compound} ${d.dose}${unit}${equiv ? ` (${equiv})` : ''}`])
     if (d.site) sites.set(d.time, shortSite(d.site))
   }
   return [...byTime.entries()].map(([time, parts]) => {

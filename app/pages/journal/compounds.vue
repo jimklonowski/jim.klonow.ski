@@ -49,7 +49,10 @@
               <span class="truncate">{{ c.compound }}</span>
             </span>
             <span class="text-muted text-right lg:text-left">{{ c.daysUsed }}d</span>
-            <span class="text-dim col-span-2 lg:col-span-1">{{ c.doseLabel }}</span>
+            <span
+              class="text-dim col-span-2 lg:col-span-1"
+              :title="iuTitle(c.compound, c.doseLabel)"
+            >{{ c.doseLabel }}</span>
 
             <span class="h-1.25 bg-line-soft col-span-2 lg:col-span-1 relative">
               <span
@@ -127,14 +130,17 @@
               />
               <span class="truncate">{{ row.compound }}</span>
             </NuxtLink>
-            <span class="text-dim text-right lg:text-left text-[11px]">{{ row.doseLabel }} · {{ row.cadence }}</span>
+            <span
+              class="text-dim text-right lg:text-left text-[11px]"
+              :title="iuTitle(row.compound, row.doseLabel)"
+            >{{ row.doseLabel }} · {{ row.cadence }}</span>
 
             <span class="flex items-center gap-1 col-span-2 lg:col-span-1">
               <span
                 v-for="w in row.weeks"
                 :key="w.weekStart"
                 class="h-2.5 flex-1 max-w-6"
-                :class="w.expected ? (w.partial ? 'outline outline-1 outline-line-accent -outline-offset-1' : '') : 'bg-inset opacity-40'"
+                :class="w.expected ? (w.partial ? 'outline outline-line-accent -outline-offset-1' : '') : 'bg-inset opacity-40'"
                 :style="weekCellStyle(row.compound, w)"
                 :title="`wk of ${formatDate(w.weekStart, 'monthDay')} · ${w.actual}/${w.expected}`"
               />
@@ -260,10 +266,11 @@
 </template>
 
 <script setup lang="ts">
-import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS } from '~/data/journal'
+import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS, STANDING_COMPOUNDS } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 import type { AdherenceWeek } from '~/utils/adherence'
+import { iuEquivalentLabel } from '~/utils/peptideCalc'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -457,6 +464,12 @@ const STATUS_CLASSES: Record<string, string> = {
   next: 'text-muted'
 }
 
+/** Hover tooltip with the mass equivalence for IU dose labels ("2iu qd", "250 IU"). */
+function iuTitle(compound: string, label: string): string | undefined {
+  if (!label.toLowerCase().includes('iu')) return undefined
+  return iuEquivalentLabel(compound, parseFloat(label)) ?? undefined
+}
+
 // --- timeline gantt ---
 const ZOOM_OPTS = ['week', 'month'] as const
 const zoom = ref<'week' | 'month'>('month')
@@ -534,7 +547,7 @@ function toRuns(activeSlots: Set<string>, name: string) {
   return runs
 }
 
-const timelineRows = computed(() => {
+const loggedTimelineRows = computed(() => {
   const bySlot = new Map<string, Set<string>>()
   const firstUse = new Map<string, string>()
   for (const e of entries.value) {
@@ -556,10 +569,48 @@ const timelineRows = computed(() => {
     }))
 })
 
+// Standing meds (STANDING_COMPOUNDS) as backfilled rows, same treatment as the calendar
+// timeline: date ranges → bars clamped to the log window, since these never hit the dose log.
+const standingTimelineRows = computed(() => {
+  const all = slots.value
+  if (!all.length) return []
+  const unit = 100 / all.length
+  // `covered` is a set because adjacent ranges (a dose-form switch mid-week) can land their
+  // boundary in the same slot — counting per-range would tally that week twice.
+  const byName = new Map<string, { name: string, covered: Set<number>, runs: Array<{ left: number, width: number, title: string }> }>()
+  for (const s of STANDING_COMPOUNDS) {
+    const endDate = s.to != null && s.to < today ? s.to : today
+    const startKey = slotKey(s.from)
+    const endKey = slotKey(endDate)
+    if (endKey < all[0]!) continue // range ended before the log window
+    const startIdx = all.indexOf(startKey) >= 0 ? all.indexOf(startKey) : 0
+    const endIdx = all.indexOf(endKey) >= 0 ? all.indexOf(endKey) : all.length - 1
+    const row = byName.get(s.compound) ?? { name: s.compound, covered: new Set<number>(), runs: [] }
+    for (let i = startIdx; i <= endIdx; i++) row.covered.add(i)
+    row.runs.push({
+      left: startIdx * unit,
+      width: (endIdx - startIdx + 1) * unit,
+      title: `${s.compound} ${s.label} · ${formatDate(s.from)} → ${s.to ? formatDate(s.to) : 'now'}`
+    })
+    byName.set(s.compound, row)
+  }
+  return [...byName.values()].map(r => ({
+    name: r.name,
+    runs: r.runs,
+    span: `${r.covered.size}${zoom.value === 'week' ? 'w' : 'mo'}`
+  }))
+})
+
+/** Standing meds first (they predate the log), then logged compounds by first use. */
+const timelineRows = computed(() => [...standingTimelineRows.value, ...loggedTimelineRows.value])
+
+// The collapsed preview keeps the standing rows plus the first few logged ones, so adding a
+// standing med never pushes a logged compound out of the default view.
+const previewCount = computed(() => standingTimelineRows.value.length + TIMELINE_PREVIEW)
 const visibleTimelineRows = computed(() =>
-  showAllTimeline.value ? timelineRows.value : timelineRows.value.slice(0, TIMELINE_PREVIEW)
+  showAllTimeline.value ? timelineRows.value : timelineRows.value.slice(0, previewCount.value)
 )
-const hiddenTimelineCount = computed(() => timelineRows.value.length - TIMELINE_PREVIEW)
+const hiddenTimelineCount = computed(() => timelineRows.value.length - previewCount.value)
 
 const labMarks = computed(() => {
   const all = slots.value

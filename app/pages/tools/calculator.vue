@@ -162,6 +162,13 @@
       {{ blockedMessage }}
     </p>
 
+    <p
+      v-if="unitsNeeded != null && bridgeNote"
+      class="px-4 sm:px-6 py-2 border-b border-line text-[11px] text-faint"
+    >
+      {{ bridgeNote }}
+    </p>
+
     <!-- Reference table -->
     <section
       v-if="referenceTable.length"
@@ -219,7 +226,7 @@
 <script setup lang="ts">
 import { DOSE_UNITS } from '~/data/journal'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
-import { calcConcentration, calcUnits, calcDoseForUnits, type MixUnit } from '~/utils/peptideCalc'
+import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG, type MixUnit } from '~/utils/peptideCalc'
 
 definePageMeta({ middleware: 'journal-auth' })
 
@@ -243,6 +250,12 @@ const bacWaterMl = ref(queryNumber('bacWaterMl', 2))
 const dose = ref(queryNumber('dose', 250))
 const doseUnit = ref<MixUnit>(queryUnit('doseUnit', 'mcg'))
 
+// Compound context arrives from a dossier's "calculator →" link. For compounds with a known
+// IU↔mass factor (IU_PER_MG) it unlocks mixed-unit math — an HGH mix is labeled in mg but
+// dosed in IU. No UI input for it: organic visits just keep units matched.
+const compound = ref(typeof route.query.compound === 'string' ? route.query.compound : '')
+const bridgeFactor = computed(() => IU_PER_MG[compound.value] ?? null)
+
 const concentration = computed(() => calcConcentration(vialAmount.value, bacWaterMl.value))
 
 const mismatchedUnits = computed(() => {
@@ -251,8 +264,15 @@ const mismatchedUnits = computed(() => {
 })
 
 const unitsNeeded = computed(() =>
-  calcUnits(dose.value, doseUnit.value, vialAmount.value, vialUnit.value, bacWaterMl.value)
+  calcUnits(dose.value, doseUnit.value, vialAmount.value, vialUnit.value, bacWaterMl.value, compound.value || undefined)
 )
+
+const bridgeNote = computed(() => {
+  if (!bridgeFactor.value || !mismatchedUnits.value) return null
+  return compound.value === 'HGH'
+    ? 'IU ↔ mg converted via the WHO somatropin standard: 1 mg = 3 IU.'
+    : `IU ↔ mg converted via ≈ ${bridgeFactor.value.toLocaleString('en-US')} IU/mg for ${compound.value} — approximate, IU is a bioactivity unit.`
+})
 
 // Multi-part captions are assembled here, not as adjacent <template v-if> blocks — Vue's
 // whitespace condensing would run the pieces together.
@@ -268,7 +288,7 @@ const blockedMessage = computed(() =>
 const referenceTable = computed(() => {
   if (concentration.value == null) return []
   return [5, 10, 15, 20, 25, 30, 40, 50].map((units) => {
-    const doseValue = calcDoseForUnits(units, vialAmount.value, vialUnit.value, bacWaterMl.value, doseUnit.value)
+    const doseValue = calcDoseForUnits(units, vialAmount.value, vialUnit.value, bacWaterMl.value, doseUnit.value, compound.value || undefined)
     return {
       units,
       ml: round(units / 100, 2),
