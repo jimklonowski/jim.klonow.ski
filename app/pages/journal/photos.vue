@@ -228,10 +228,13 @@
           </UFormField>
         </div>
 
-        <!-- Drag-to-reveal before/after comparison, full quality (not the thumbnail) -->
+        <!-- Drag-to-reveal before/after comparison, full quality (not the thumbnail).
+             The viewer is square, so max-w in vh doubles as a height cap — keeps the whole
+             image on screen on desktop instead of a ~full-width square you have to scroll. -->
         <div class="mt-2.5">
           <PhotoCompareSlider
             v-if="beforePhoto && afterPhoto"
+            class="max-w-[65vh] mx-auto"
             :before-url="beforePhoto.url"
             :after-url="afterPhoto.url"
             :before-label="formatDate(beforePhoto.date)"
@@ -259,9 +262,10 @@
             </button>
           </PhotoCompareSlider>
 
+          <!-- Same 65vh-per-image cap as the slider: two square cells + the gap. -->
           <div
             v-else
-            class="grid grid-cols-2 gap-2.5"
+            class="grid grid-cols-2 gap-2.5 max-w-[calc(130vh+0.625rem)] mx-auto"
           >
             <div>
               <div
