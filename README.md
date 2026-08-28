@@ -64,7 +64,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
 | `/journal/compound/[name]` | Dosing history for a single compound, with a modeled exposure curve for the slow-release ones |
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
-| `/tools/calculator` | Peptide reconstitution & syringe unit calculator |
+| `/tools/calculator` | Peptide reconstitution & syringe unit calculator — bridges IU↔mg for HGH/hCG when opened from a compound page (IU doses display their mg equivalent app-wide via `IU_PER_MG` in `app/utils/peptideCalc.ts`) |
 | `/tools/inventory` | Peptide vial inventory and depletion tracking — owner only |
 | `/tools/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
 | `/tools/sharing` | Mint, list, and revoke share links — owner only |

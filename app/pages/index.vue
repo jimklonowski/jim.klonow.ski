@@ -267,7 +267,8 @@ const latestWorkouts = computed(() => {
 
 function doseLabel(dose: PeptideEntry) {
   const unit = dose.unit === 'iu' ? 'IU' : dose.unit
-  return `${dose.dose} ${unit}${dose.site ? ` · ${shortSite(dose.site)}` : ''}`
+  const equiv = dose.unit === 'iu' ? iuEquivalentLabel(dose.compound, dose.dose) : null
+  return `${dose.dose} ${unit}${equiv ? ` (${equiv})` : ''}${dose.site ? ` · ${shortSite(dose.site)}` : ''}`
 }
 
 // Under the "LOGGED TODAY" header a bare clock time reads as today's, so sessions from an
