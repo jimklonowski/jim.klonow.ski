@@ -1,4 +1,4 @@
-import { convertUnit, type MixUnit } from './peptideCalc'
+import { convertUnitFor, type MixUnit } from './peptideCalc'
 import { getCompoundInfo } from '~/data/compoundInfo'
 import type { JournalEntry, Vial } from '~/data/journal'
 
@@ -43,7 +43,8 @@ export function roundAmount(n: number): number {
 }
 
 // Sum of doses of this vial's compound logged on/after its opened_date, expressed in the vial's
-// unit. Doses in an incompatible unit (e.g. IU against an mg vial) are skipped.
+// unit. IU↔mass bridges through IU_PER_MG where the compound has a factor (HGH's mg vials
+// deplete from IU doses); doses in a unit that still can't convert are skipped.
 export function computeUsedAmount(vial: Vial, entries: JournalEntry[]): number {
   if (!vial.opened_date) return 0
   const vialUnit = vial.vial_unit as MixUnit
@@ -52,7 +53,7 @@ export function computeUsedAmount(vial: Vial, entries: JournalEntry[]): number {
     if (e.date < vial.opened_date) continue
     for (const p of e.peptides ?? []) {
       if (p.compound !== vial.compound) continue
-      const converted = convertUnit(p.dose, p.unit as MixUnit, vialUnit)
+      const converted = convertUnitFor(vial.compound, p.dose, p.unit as MixUnit, vialUnit)
       if (converted != null) total += converted
     }
   }
@@ -79,7 +80,7 @@ function typicalDailyAmount(compound: string, targetUnit: MixUnit): number | nul
   const mid = (lo + hi) / 2
   const unit = m[3]!.toLowerCase() as MixUnit
 
-  const perDose = convertUnit(mid, unit, targetUnit)
+  const perDose = convertUnitFor(compound, mid, unit, targetUnit)
   if (perDose == null) return null
   return perDose * parseFrequencyPerDay(info.dosing.frequency)
 }
@@ -111,7 +112,7 @@ export function estimateDailyRate(
     if (e.date < windowStart || e.date > today) continue
     for (const p of e.peptides ?? []) {
       if (p.compound !== vial.compound) continue
-      const converted = convertUnit(p.dose, p.unit as MixUnit, vialUnit)
+      const converted = convertUnitFor(vial.compound, p.dose, p.unit as MixUnit, vialUnit)
       if (converted != null) inWindow.push({ date: e.date, amount: converted })
     }
   }
