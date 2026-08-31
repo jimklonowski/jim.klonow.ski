@@ -14,7 +14,9 @@
 // (server/utils/protocol.ts) folds flagged ones into the AI prompts.
 
 import type { Cycle } from './cycles'
-import { cycleEnd, cycleStatusOn, shiftDays } from './cycles'
+// Explicit .ts extension: runtime values, and the plain-node test runner can't resolve the
+// import extensionless the way Vite does.
+import { cycleEnd, cycleStatusOn, shiftDays } from './cycles.ts'
 
 /** Structural shapes of journal_entries / health_metrics rows — the app types and raw D1 rows
  * both satisfy them. */
