@@ -693,7 +693,7 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, oppositeSite } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
@@ -869,9 +869,11 @@ const nextEntry = computed(() => {
   return allEntries.value.filter(e => e.date > dateParam.value)[0] ?? null
 })
 
+// Sides alternate day to day, so each copied dose lands on the mirror of the
+// previous entry's site (left_glute → right_glute); unsided routes copy as-is.
 function copyFromPrevious() {
   if (!prevEntry.value?.peptides?.length) return
-  form.peptides = prevEntry.value.peptides.map(p => ({ ...p }))
+  form.peptides = prevEntry.value.peptides.map(p => ({ ...p, site: oppositeSite(p.site) }))
 }
 
 // Pooled across all four meal slots (and all days) so an order typed for lunch once

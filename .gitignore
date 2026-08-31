@@ -30,3 +30,6 @@ logs
 
 # local mkcert TLS certs for the dev server (never commit — regenerate with: mkcert local.emkay.com)
 certs/
+
+# personal genome reports (never commit — repo is public; also served as static assets if left under public/)
+public/sequencing.com/
