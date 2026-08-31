@@ -3,9 +3,15 @@
 // calendar's rings, but the weekly score counts dose-DAYS against the week's expected count,
 // so a shot slid from Monday to Tuesday still scores — the plan is a cadence, not a contract
 // with the calendar.
+//
+// Planned cycles (the `cycles` table) layer on through effectiveRules(): their plan items
+// derive into the same rule shape, and where a cycle covers a compound the standing schedule
+// also carries, the standing rule is split around the cycle window so the cycle owns it.
 
 import type { JournalEntry, ProtocolRule } from '~/data/journal'
 import { PROTOCOL_RULES } from '~/data/journal'
+import type { Cycle } from '#shared/utils/cycles'
+import { cycleRules, diffDays, mergeRules } from '#shared/utils/cycles'
 
 const DAY_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -104,7 +110,10 @@ export function computeAdherence(
   entries: JournalEntry[],
   today: string,
   weeksBack = 8,
-  rules: ProtocolRule[] = PROTOCOL_RULES
+  rules: ProtocolRule[] = PROTOCOL_RULES,
+  // includeInactive keeps rules whose window is over (or hasn't started) — the cycle dossier
+  // scores a finished run, where "active today" would filter every rule out.
+  { includeInactive = false } = {}
 ): AdherenceRow[] {
   const doseDates = new Map<string, Set<string>>()
   for (const e of entries) {
@@ -120,7 +129,7 @@ export function computeAdherence(
   const weekStarts = Array.from({ length: weeksBack }, (_, i) => shiftDays(currentWeek, -7 * (weeksBack - 1 - i)))
 
   return rules
-    .filter(r => ruleActiveOn(r, today))
+    .filter(r => includeInactive || ruleActiveOn(r, today))
     .map((rule) => {
       const logged = doseDates.get(rule.compound) ?? new Set<string>()
       const weeks: AdherenceWeek[] = weekStarts.map((weekStart) => {
@@ -148,4 +157,32 @@ export function computeAdherence(
         status: statusOf(rule, logged, today)
       }
     })
+}
+
+/** The standing schedule with every planned cycle layered in (override semantics — see
+ * mergeRules). What the adherence panel and calendar rings should score against. */
+export function effectiveRules(cycles: Cycle[]): ProtocolRule[] {
+  if (!cycles.length) return PROTOCOL_RULES
+  return mergeRules(PROTOCOL_RULES, cycles)
+}
+
+export interface CycleAdherence {
+  rows: AdherenceRow[]
+  /** Hit/expected across every plan item, or null before anything was ever expected. */
+  pct: number | null
+}
+
+/** Planned-vs-logged for one cycle only — its own rules, scored from the cycle's first week
+ * through today, finished runs included. */
+export function cycleAdherence(entries: JournalEntry[], cycle: Cycle, today: string): CycleAdherence {
+  const rules = cycleRules(cycle)
+  const weeksBack = Math.max(1, Math.floor(diffDays(weekStartOf(cycle.start_date), weekStartOf(today)) / 7) + 1)
+  const rows = computeAdherence(entries, today, weeksBack, rules, { includeInactive: true })
+  const totals = rows.reduce(
+    (t, row) => row.weeks.reduce(
+      (u, w) => ({ exp: u.exp + w.expected, hit: u.hit + Math.min(w.actual, w.expected) }), t
+    ),
+    { exp: 0, hit: 0 }
+  )
+  return { rows, pct: totals.exp ? Math.round((totals.hit / totals.exp) * 100) : null }
 }

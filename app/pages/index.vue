@@ -140,6 +140,12 @@
           STACK
         </NuxtLink>
       </div>
+
+      <HomeCycle
+        :cycles="cycles"
+        :entries="entries"
+        :draws="draws"
+      />
     </section>
 
     <section class="bg-bg px-6 pt-4 pb-5 min-w-0">
@@ -239,10 +245,15 @@ import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
 const {
-  hasSession, entries, healthMetrics, latestDraw, latestDexa,
+  hasSession, entries, draws, healthMetrics, latestDraw, latestDexa,
   allWorkouts, dosesToday, sodasToday, flagged, flagCounts,
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)
+
+// Same conditional-composable rule as useOverview: the role is stable for the component's
+// lifetime (login is a hard navigation), so guests skip the fetch instead of 401ing.
+const cyclesData = hasSession ? useCycles() : null
+const cycles = computed(() => cyclesData?.data.value ?? [])
 
 const today = localToday()
 
