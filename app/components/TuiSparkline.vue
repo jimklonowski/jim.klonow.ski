@@ -7,6 +7,18 @@
     class="block"
     aria-hidden="true"
   >
+    <line
+      v-if="markX != null"
+      :x1="markX"
+      :x2="markX"
+      y1="0"
+      :y2="height"
+      stroke="currentColor"
+      stroke-width="1"
+      stroke-dasharray="2 2"
+      opacity="0.35"
+      vector-effect="non-scaling-stroke"
+    />
     <polyline
       v-if="points"
       :points="points"
@@ -27,10 +39,13 @@ const props = withDefaults(defineProps<{
   color?: string
   height?: number
   strokeWidth?: number
+  /** Index of a value to mark with a dashed vertical guide (a boundary, e.g. a cycle start). */
+  markIndex?: number | null
 }>(), {
   color: '#2ce8a4',
   height: 34,
-  strokeWidth: 1.5
+  strokeWidth: 1.5,
+  markIndex: null
 })
 
 const W = 120
@@ -48,5 +63,13 @@ const points = computed(() => {
   return vals
     .map((v, i) => `${(i / (vals.length - 1)) * W},${props.height - PAD - ((v - min) / range) * usable}`)
     .join(' ')
+})
+
+// The guide shares the polyline's index space, so it only makes sense when the caller's
+// values are already all finite (filtering would shift indices out from under it).
+const markX = computed(() => {
+  const n = props.values.length
+  if (props.markIndex == null || props.markIndex < 0 || props.markIndex >= n || n < 2) return null
+  return (props.markIndex / (n - 1)) * W
 })
 </script>
