@@ -145,6 +145,7 @@
         :cycles="cycles"
         :entries="entries"
         :draws="draws"
+        :health-metrics="healthMetrics"
       />
     </section>
 
