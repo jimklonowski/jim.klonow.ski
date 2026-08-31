@@ -4,8 +4,10 @@
        normal flow at the very bottom — nothing can render behind or past it. On mobile the
        page scrolls as usual and min-h-full just keeps the bar at the panel's foot. -->
   <div class="flex flex-col min-h-full lg:min-h-0 lg:flex-1">
-    <!-- pr keeps the thin scrollbar from hugging the bubble's border. -->
-    <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+    <!-- pr keeps the thin scrollbar from hugging the bubble's border. mb-2 is dead
+         space for the speech tail below: it pokes ~7px above the divider, and margin
+         (unlike padding) ends the scrollport early so text clips before sliding under it. -->
+    <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1 mb-2">
       <TickerDigestPanel
         ref="weeklyPanel"
         label="AI DIGEST · WEEKLY"
