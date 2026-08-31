@@ -50,6 +50,16 @@
           <span class="text-ghost shrink-0">├</span>
           <span class="text-muted truncate">{{ nextPhase }}</span>
         </div>
+        <div
+          v-if="vitalsLine"
+          class="flex gap-2.5"
+        >
+          <span class="text-ghost shrink-0">├</span>
+          <span
+            class="truncate"
+            :class="vitalsLine.class"
+          >{{ vitalsLine.text }}</span>
+        </div>
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">└</span>
           <span
@@ -139,12 +149,14 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/data/journal'
 import type { LabsEntry } from '~/composables/useLabsEntries'
+import type { HealthMetricsEntry } from '~/composables/useHealthMetricsEntries'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { Cycle } from '#shared/utils/cycles'
 import {
   GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
   diffDays, doseLabelOf, relevantCycle
 } from '#shared/utils/cycles'
+import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 
 // The one-glance cycle strip for the home dashboard's protocol column. Three states:
 // pre-flight for an upcoming cycle (baseline draw + gating markers), progress + due-status
@@ -154,6 +166,7 @@ const props = defineProps<{
   cycles: Cycle[]
   entries: JournalEntry[]
   draws: LabsEntry[]
+  healthMetrics: HealthMetricsEntry[]
 }>()
 
 const today = localToday()
@@ -204,6 +217,25 @@ const nextPhase = computed(() => {
 const checkpoints = computed(() =>
   cycle.value ? checkpointStates(cycle.value, props.draws.map(d => d.date), today) : []
 )
+
+/** The passive vitals watch, one line: flagged/watch shorthands, or a quiet "steady" so the
+ * monitoring itself is visible. Omitted entirely when no metric has enough data yet. */
+const vitalsLine = computed(() => {
+  if (!cycle.value || state.value !== 'active') return null
+  const signals = computeCycleSignals(cycle.value, today, props.entries, props.healthMetrics)
+  if (!signals.some(s => s.state === 'steady' || s.state === 'watch' || s.state === 'flagged')) return null
+  const act = activeSignals(signals)
+  if (!act.length) return { text: 'vitals steady vs pre-cycle baseline', class: 'text-muted' }
+  // Adverse moves own the line — an improvement doesn't belong inside a red warning. Only
+  // when nothing is wrong do the good-direction moves get their (accent) turn.
+  const adverse = act.filter(s => s.adverse)
+  const shown = adverse.length ? adverse : act
+  const parts = shown.slice(0, 3).map(signalShorthand)
+  return {
+    text: `${adverse.length ? '▲ ' : ''}${parts.join(' · ')}${shown.length > 3 ? ' · …' : ''}`,
+    class: adverse.some(s => s.state === 'flagged') ? 'text-danger' : adverse.length ? 'text-warn' : 'text-accent'
+  }
+})
 
 /** The single draw-status line for the current state: baseline before, next due during,
  * recovery after. */
