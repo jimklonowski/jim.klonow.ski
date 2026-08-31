@@ -181,7 +181,7 @@
               label="Dose"
               class="col-span-4 sm:col-span-2"
               :ui="FIELD_UI"
-              :help="doseHelp(peptide)"
+              :hint="doseHelp(peptide)"
             >
               <UInput
                 v-model.number="peptide.dose"
@@ -702,10 +702,10 @@ import exifr from 'exifr'
 definePageMeta({ middleware: 'journal-auth' })
 
 // Shared :ui overrides so every field on this long form reads the same.
-const FIELD_UI = { label: 'tui-label' }
+const FIELD_UI = { label: 'tui-label', hint: 'text-[10px] text-faint' }
 const SELECT_UI = { content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }
 
-/** Live "≈ 0.67 mg" hint under the dose field for IU compounds with a known mass factor. */
+/** Live "≈ 0.67 mg" hint beside the Dose label for IU compounds with a known mass factor. */
 function doseHelp(p: PeptideEntry): string | undefined {
   if (p.unit !== 'iu') return undefined
   return iuEquivalentLabel(p.compound, p.dose) ?? undefined
