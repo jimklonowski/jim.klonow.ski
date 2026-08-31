@@ -302,6 +302,13 @@ export function isInjectedSite(site: string): boolean {
   return !!site && !NON_INJECTED_SITES.has(site)
 }
 
+/** The mirror of a bilateral site (left_glute → right_glute); unsided sites pass through. */
+export function oppositeSite(site: string): string {
+  if (site.startsWith('left_')) return `right_${site.slice('left_'.length)}`
+  if (site.startsWith('right_')) return `left_${site.slice('right_'.length)}`
+  return site
+}
+
 export function blankEntry(date: string): JournalEntry {
   return {
     date,
