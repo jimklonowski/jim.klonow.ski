@@ -10,6 +10,7 @@
     "preview": "pnpm run build && wrangler dev",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
+    "test": "node --test \"tests/**/*.test.mjs\"",
     "typecheck": "nuxt typecheck",
     "deploy": "pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
