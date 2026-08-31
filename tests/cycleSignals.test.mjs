@@ -53,11 +53,19 @@ test('steady inside the noise floor, watch at 1x, flagged at 2x adverse', () => 
 
 test('weight rate escalates a small level delta — the water-retention tell', () => {
   const base = weightRows('2026-08-17', 28, () => 163)
-  // Flat first week of the window, then +0.4/day: window avg only ~+1.4 over baseline
-  // (steady by level) but the last-week-vs-prior-week rate is ~2.8 lbs/wk.
-  const ramp = weightRows('2026-09-29', 14, i => (i < 7 ? 163 : 163 + (i - 6) * 0.4))
-  const s = weightSignal(cycle(), '2026-10-12', [...base, ...ramp])
-  assert.ok(s.ratePerWeek >= 2.5, `rate ${s.ratePerWeek}`)
+
+  // A ramp only one week old: the week-avg-vs-week-avg rate reads about half the slope
+  // (the prior week was still flat), so 0.4 lbs/day one week in = ~1.6 lbs/wk → watch.
+  const oneWeek = weightRows('2026-09-29', 14, i => (i < 7 ? 163 : 163 + (i - 6) * 0.4))
+  const early = weightSignal(cycle(), '2026-10-12', [...base, ...oneWeek])
+  assert.equal(early.ratePerWeek, 1.6)
+  assert.equal(early.state, 'watch')
+
+  // Sustained across the full window, the same slope reads true (0.4/day → 2.8 lbs/wk)
+  // and flags even though the 14-day level average is barely past one noise threshold.
+  const sustained = weightRows('2026-09-29', 14, i => 163 + i * 0.4)
+  const s = weightSignal(cycle(), '2026-10-12', [...base, ...sustained])
+  assert.equal(s.ratePerWeek, 2.8)
   assert.equal(s.state, 'flagged')
 })
 
@@ -89,10 +97,10 @@ test('sparse windows produce no-data, never a false flag', () => {
 test('a finished cycle reads its last two weeks, not today', () => {
   const c = cycle({ actual_end: '2026-10-19' })
   const base = weightRows('2026-08-17', 28, () => 163)
-  const during = weightRows('2026-10-06', 14, () => 168) // last 14 days of the cycle
+  const during = weightRows('2026-10-06', 14, () => 166.5) // last 14 days of the cycle: +3.5 = 1.4x
   const after = weightRows('2026-10-20', 30, () => 180) // post-cycle rebound must NOT count
   const s = weightSignal(c, '2026-11-25', [...base, ...during, ...after])
-  assert.equal(s.current, 168)
+  assert.equal(s.current, 166.5)
   assert.equal(s.state, 'watch')
 })
 

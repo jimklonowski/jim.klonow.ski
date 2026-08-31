@@ -10,8 +10,16 @@
           class="text-[11px] text-warn tracking-[0.06em] uppercase"
         >▲ {{ expiringCount }} expiring</span>
         <button
+          v-if="isOwner"
           type="button"
           class="tui-btn tui-btn-accent"
+          @click="dumpOpen = true"
+        >
+          ✦ STOCK DUMP
+        </button>
+        <button
+          type="button"
+          class="tui-btn"
           @click="openAddModal"
         >
           + ADD STOCK
@@ -29,10 +37,17 @@
       v-if="!vials.length"
       class="px-4 sm:px-6 py-5 text-[12px] text-muted"
     >
-      No vials tracked yet. Use + ADD STOCK to log what's in your fridge.
+      Nothing tracked yet. Hit <span class="text-accent">✦ STOCK DUMP</span> and describe the fridge in one
+      sentence — it parses into rows, and the runway panel tells you whether the stockpile covers the next cycle.
     </p>
 
     <div class="px-4 sm:px-6 py-4 space-y-5">
+      <ToolsStockRunway
+        :vials="vials"
+        :entries="entries"
+        :today="today"
+      />
+
       <!-- Summary -->
       <div
         v-if="vials.length"
@@ -280,6 +295,11 @@
         {{ GENERAL_DISCLAIMER }}
       </p>
     </div>
+
+    <ToolsStockDump
+      v-model:open="dumpOpen"
+      @saved="refresh"
+    />
 
     <!-- Add / Edit modal -->
     <UModal
@@ -533,6 +553,10 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const toast = useToast()
 const today: string = new Date().toISOString().slice(0, 10)
+
+// Stock-dump parsing spends Anthropic tokens — owner-only, like digests and lab summaries.
+const { isOwner } = await useAuth()
+const dumpOpen = ref(false)
 
 const { data: vialsData, refresh, error } = await useVials()
 const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
