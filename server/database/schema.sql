@@ -150,6 +150,25 @@ CREATE TABLE IF NOT EXISTS supplements (
   created_at TEXT NOT NULL
 );
 
+-- Planned protocol cycles ("blasts"/"runs") — a named, dated phase layered on top of the
+-- standing schedule. The plan is stored relative to start_date (per-compound week numbers in
+-- the compounds JSON, shape shared/utils/cycles.ts:CyclePlanItem[]) so shifting the start is a
+-- one-field edit. actual_end is only set when a cycle ends off-plan (cut early on bad labs, or
+-- extended); status (upcoming/active/done) is always derived from the dates, never stored.
+-- Read by the adherence panel, calendar rings, home dashboard strip, and the AI prompt
+-- context (cycleContext in server/utils/protocol.ts).
+CREATE TABLE IF NOT EXISTS cycles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  goal TEXT,
+  start_date TEXT NOT NULL,
+  planned_weeks INTEGER NOT NULL,
+  actual_end TEXT,
+  compounds TEXT NOT NULL DEFAULT '[]',
+  notes TEXT,
+  created_at TEXT NOT NULL
+);
+
 -- Share invites: owner-minted links (/share/<id>) that grant read-only role sessions.
 -- Redemption is gated by expires_at/max_uses; setting revoked=1 (or deleting the row) also
 -- invalidates every session cookie minted from the invite — the auth middleware re-checks

@@ -6,6 +6,11 @@
 // the `supplements` table and is rendered per-request by supplementContext(), so edits on
 // /journal/supplements flow into the AI prompts without a deploy.
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
+import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
+import {
+  checkpointStates, cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf
+} from '#shared/utils/cycles'
+
 export const PROTOCOL_SCHEDULE = `Intended dosing schedule (the reference for adherence — journal dose logs should line up with this; call out deviations, don't re-announce matches):
 - Every day: HGH 2 IU + GHK-Cu 2 mg.
 - Every morning: Tadalafil 5 mg oral (daily-protocol Cialis, since ~June 2025 — 7 mg gummies until June 2, 2026, 5 mg tablets since). Taken for endothelial/BP support; it is deliberately NOT in the dose log, so never read its absence there as a missed dose. Its mild BP-lowering effect is standing context when interpreting blood-pressure trends.
@@ -42,6 +47,98 @@ function describe(s: SupplementRow, recentSince: string): string {
   if (s.started && s.started >= recentSince) out += ` (started ${s.started})`
   if (s.notes) out += ` — ${s.notes}`
   return out
+}
+
+// --- planned cycles ---
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function itemLine(item: CyclePlanItem, plannedWeeks: number): string {
+  const cadence = item.weekdays.length === 7
+    ? 'daily'
+    : [...item.weekdays].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DAY_NAMES[d]).join('+')
+  const to = item.toWeek ?? plannedWeeks
+  const span = item.fromWeek === 1 && to === plannedWeeks ? 'full run' : `weeks ${item.fromWeek}–${to}`
+  return `${item.compound} ${doseLabelOf(item)} ${cadence} (${span})`
+}
+
+const GATING_PROSE = 'the gating markers (lipids — especially HDL — ALT/AST, hematocrit/hemoglobin, ferritin/iron, blood pressure, estradiol)'
+
+// How far out an upcoming cycle is worth telling the AI about, and how long a finished one
+// stays relevant (recovery draws land ~4-6 weeks post-end; marker normalization takes longer).
+const UPCOMING_HORIZON_DAYS = 60
+const DONE_RELEVANCE_DAYS = 120
+
+// Planned cycles as they stood on `asOf`, rendered as prompt paragraphs — the counterpart of
+// supplementContext for the cycles table. asOf matters for the same reason: lab summaries can
+// regenerate for historical draws, and "day 34 of the cycle" must be day 34 as of THAT draw.
+// Returns '' when there's nothing relevant — including when the table doesn't exist yet, so
+// digest generation never dies on a missing migration.
+export async function cycleContext(db: D1Database, asOf: string): Promise<string> {
+  let rows: Array<Record<string, unknown>>
+  let drawDates: string[]
+  try {
+    const [cyclesRes, labsRes] = await Promise.all([
+      db.prepare('SELECT * FROM cycles ORDER BY start_date ASC').all(),
+      db.prepare('SELECT date FROM labs_entries ORDER BY date ASC').all()
+    ])
+    rows = (cyclesRes.results ?? []) as Array<Record<string, unknown>>
+    drawDates = ((labsRes.results ?? []) as Array<{ date: string }>).map(r => r.date)
+  }
+  catch {
+    return ''
+  }
+
+  const cycles: Cycle[] = rows.map(row => ({
+    id: row.id as number,
+    name: row.name as string,
+    goal: (row.goal as string | null) ?? null,
+    start_date: row.start_date as string,
+    planned_weeks: row.planned_weeks as number,
+    actual_end: (row.actual_end as string | null) ?? null,
+    compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
+    notes: (row.notes as string | null) ?? null
+  }))
+
+  const paragraphs: string[] = []
+  for (const cycle of cycles) {
+    const status = cycleStatusOn(cycle, asOf)
+    const end = cycleEnd(cycle)
+    const plan = cycle.compounds.map(i => itemLine(i, cycle.planned_weeks)).join('; ')
+    const goal = cycle.goal ? ` Goal: ${cycle.goal}.` : ''
+    const notes = cycle.notes ? ` Notes: ${cycle.notes}` : ''
+    const baseline = checkpointStates(cycle, drawDates, asOf).find(cp => cp.key === 'baseline')
+
+    if (status === 'active') {
+      const p = cycleProgress(cycle, asOf)
+      const baselineLine = baseline?.drawDate
+        ? `compare ${GATING_PROSE} against the pre-cycle baseline draw (${baseline.drawDate}) and quantify the shifts`
+        : `no pre-cycle baseline draw exists, so compare ${GATING_PROSE} against the most recent prior draws and say the baseline is soft`
+      paragraphs.push(
+        `PLANNED CYCLE — ACTIVE: "${cycle.name}", day ${p.day} of ${p.totalDays} (week ${p.week} of ${p.totalWeeks}; started ${cycle.start_date}, runs through ${end}${cycle.actual_end ? ', ended off-plan' : ''}).${goal} Plan: ${plan}. This layers on the standing schedule above — where the same compound appears in both, the cycle dose replaces the standing one for its window. Anchor interpretation to cycle timing: ${baselineLine}, and weigh whether each shift tracks the cycle's start before attributing it elsewhere.${notes}`
+      )
+    }
+    else if (status === 'upcoming' && diffDays(asOf, cycle.start_date) <= UPCOMING_HORIZON_DAYS) {
+      const inDays = diffDays(asOf, cycle.start_date)
+      const baselineLine = baseline?.drawDate
+        ? `The ${baseline.drawDate} draw (${diffDays(baseline.drawDate, cycle.start_date)} days pre-start) serves as the baseline.`
+        : 'No baseline draw yet — getting one before the start matters more than anything else about this plan; say so when labs come up.'
+      paragraphs.push(
+        `PLANNED CYCLE — UPCOMING: "${cycle.name}" starts ${cycle.start_date} (in ${inDays} days), ${cycle.planned_weeks} weeks planned.${goal} Plan: ${plan}. Nothing from this plan is active exposure yet. ${baselineLine}${notes}`
+      )
+    }
+    else if (status === 'done' && diffDays(end, asOf) <= DONE_RELEVANCE_DAYS) {
+      const weeksRan = Math.round(diffDays(cycle.start_date, end) / 7)
+      const recovery = checkpointStates(cycle, drawDates, asOf).find(cp => cp.key === 'recovery')
+      const recoveryLine = recovery?.drawDate
+        ? `A recovery draw exists (${recovery.drawDate}) — judge whether ${GATING_PROSE} actually returned toward the pre-cycle baseline${baseline?.drawDate ? ` (${baseline.drawDate})` : ''}.`
+        : `Expect ${GATING_PROSE} to drift back toward baseline; a recovery draw in the ${recovery?.windowFrom}–${recovery?.windowTo} window would confirm it.`
+      paragraphs.push(
+        `PLANNED CYCLE — RECENTLY COMPLETED: "${cycle.name}" ran ${cycle.start_date} → ${end} (${weeksRan} of ${cycle.planned_weeks} planned weeks${cycle.actual_end ? ', ended off-plan' : ''}). Plan was: ${plan}. ${recoveryLine}${notes}`
+      )
+    }
+  }
+  return paragraphs.join('\n\n')
 }
 
 // The supplement stack as it stood on `asOf` (YYYY-MM-DD), rendered as prompt paragraphs.
