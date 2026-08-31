@@ -6,6 +6,11 @@
     >
       <template #actions>
         <NuxtLink
+          to="/journal/cycles"
+          class="text-[11px] text-accent hover:text-accent-hover"
+        >cycles →</NuxtLink>
+        <span class="text-ghost text-[11px]">·</span>
+        <NuxtLink
           to="/tools/calculator"
           class="text-[11px] text-accent hover:text-accent-hover"
         >calculator →</NuxtLink>
@@ -276,6 +281,7 @@ definePageMeta({ middleware: 'journal-auth' })
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
+const { data: cyclesData } = await useCycles()
 const { canEdit, role } = await useAuth()
 
 onMounted(refresh)
@@ -437,9 +443,12 @@ const exposureMarks = computed(() => {
 const ADHERENCE_WEEKS = 8
 
 // The demo persona's dose dates re-anchor nightly and drift across weekdays by design, so
-// weekday-based scoring would read as constant failure there — real sessions only.
+// weekday-based scoring would read as constant failure there — real sessions only. Planned
+// cycles merge in through effectiveRules, overriding the standing cadence where they collide.
 const adherence = computed(() =>
-  role.value === 'demo' ? [] : computeAdherence(entries.value, today, ADHERENCE_WEEKS)
+  role.value === 'demo'
+    ? []
+    : computeAdherence(entries.value, today, ADHERENCE_WEEKS, effectiveRules(cyclesData.value ?? []))
 )
 
 function weekCellStyle(compound: string, w: AdherenceWeek) {

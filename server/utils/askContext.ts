@@ -157,14 +157,15 @@ const WEEKLY_WINDOW_WEEKS = 20
 
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone. */
 export async function buildAskContext(db: D1Database, today: string): Promise<string> {
-  const [journal, labs, dexa, healthRes, workoutsRes, supplements] = await Promise.all([
+  const [journal, labs, dexa, healthRes, workoutsRes, supplements, cyclesCtx] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
     db.prepare('SELECT date, recovery_score, strain, sleep_total_min FROM health_metrics ORDER BY date ASC').all(),
     // Full rows: parseWorkoutRow/mergeWorkouts need external_id and start_time for dedup.
     db.prepare('SELECT * FROM workouts ORDER BY date ASC').all(),
-    supplementContext(db, today)
+    supplementContext(db, today),
+    cycleContext(db, today)
   ])
   const health = (healthRes.results ?? []) as Array<Record<string, unknown>>
   const workouts = mergeWorkouts((workoutsRes.results ?? []).map(parseWorkoutRow)) as unknown as Array<Record<string, unknown>>
@@ -185,6 +186,7 @@ export async function buildAskContext(db: D1Database, today: string): Promise<st
   const sections = [
     `Today is ${today}.`,
     supplements,
+    cyclesCtx,
     `Lab draws (every draw on file; marker keys are snake_case, standard US lab units):\n${labs.join('\n') || 'none'}`,
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,
     `Compound history (all-time, from the dose log):\n${compoundLines(journal).join('\n') || 'none'}`,

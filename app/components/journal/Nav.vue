@@ -23,6 +23,7 @@ const ALL_TABS = [
   { label: 'Overview', to: '/journal' },
   { label: 'Trends', to: '/journal/trends' },
   { label: 'Compounds', to: '/journal/compounds' },
+  { label: 'Cycles', to: '/journal/cycles' },
   { label: 'Workouts', to: '/journal/workouts' },
   { label: 'Entries', to: '/journal/entries' },
   { label: 'Calendar', to: '/journal/calendar' },
@@ -46,7 +47,9 @@ function isActive(tab: { to: string }) {
     // The dossier pages live beneath /journal/compounds conceptually, not the hub.
     return false
   }
-  if (tab.to === '/journal/compounds') return path.startsWith('/journal/compound')
+  if (tab.to === '/journal/compounds') return path.startsWith('/journal/compound/')
+  // The dossier pages live at the singular /journal/cycle/<id>.
+  if (tab.to === '/journal/cycles') return path.startsWith('/journal/cycle/')
   return path.startsWith(tab.to + '/')
 }
 </script>

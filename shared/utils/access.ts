@@ -45,7 +45,10 @@ const DOCTOR_PAGES = [
   // the old path 301s to this one.
   /^\/tools\/calculator$/,
   /^\/journal\/compound\//,
-  /^\/journal\/supplements$/
+  /^\/journal\/supplements$/,
+  // Planned cycles are protocol context, same policy as the supplement stack.
+  /^\/journal\/cycles$/,
+  /^\/journal\/cycle\//
 ]
 
 export function canAccessPage(role: Role, path: string): boolean {

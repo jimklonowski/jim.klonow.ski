@@ -523,12 +523,16 @@ export async function generateDigest(
     }))
   }
 
-  // Standing supplement stack from the supplements table — regimen context the dose log
-  // doesn't carry (vitamins/meds are taken daily but not logged).
-  const supplements = await supplementContext(db, end)
+  // Standing supplement stack + planned cycles — regimen context the dose log doesn't carry
+  // (vitamins/meds are taken daily but not logged; a cycle's timing frames every trend on it).
+  const [supplements, cyclesCtx] = await Promise.all([
+    supplementContext(db, end),
+    cycleContext(db, end)
+  ])
+  const regimen = [supplements, cyclesCtx].filter(Boolean).join('\n\n')
 
   const facts = built.lines.join('\n')
-  const prompt = kind === 'weekly' ? weeklyPrompt(start, end, facts, supplements) : dailyPrompt(end, facts, supplements)
+  const prompt = kind === 'weekly' ? weeklyPrompt(start, end, facts, regimen) : dailyPrompt(end, facts, regimen)
   const summary = await callClaude(apiKey, prompt)
   await storeDigest(db, kind, start, end, summary, built.stats)
 

@@ -233,12 +233,15 @@ const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
+const { data: cyclesData } = await useCycles()
 const { role } = await useAuth()
 
-// Scheduled-dose rings come from PROTOCOL_RULES, which describes the real weekday cadence.
+// Scheduled-dose rings come from PROTOCOL_RULES plus any planned cycles (effectiveRules) —
+// so an upcoming cycle previews its rings on future days before a single dose is logged.
 // The demo persona's dose dates re-anchor nightly and drift across weekdays by design, so
 // the rings would flag misses that aren't real — hidden for demo sessions.
 const showSchedule = computed(() => role.value !== 'demo')
+const scheduleRules = computed(() => effectiveRules(cyclesData.value ?? []))
 
 onMounted(refresh)
 onMounted(refreshWorkouts)
@@ -341,7 +344,7 @@ const calendarCells = computed((): CalendarCell[] => {
     // Rings for cadence days without a logged dose: a plan preview on future days, a visible
     // miss on past ones. Days the compound WAS logged need no ring — the dot already shows.
     const scheduled = showSchedule.value
-      ? scheduledFor(dateStr)
+      ? scheduledFor(dateStr, scheduleRules.value)
           .map(r => r.compound)
           .filter(c => !(entry?.compounds ?? []).includes(c))
       : []
