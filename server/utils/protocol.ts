@@ -10,6 +10,8 @@ import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
 import {
   checkpointStates, cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf
 } from '#shared/utils/cycles'
+import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
+import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 
 export const PROTOCOL_SCHEDULE = `Intended dosing schedule (the reference for adherence — journal dose logs should line up with this; call out deviations, don't re-announce matches):
 - Every day: HGH 2 IU + GHK-Cu 2 mg.
@@ -100,6 +102,26 @@ export async function cycleContext(db: D1Database, asOf: string): Promise<string
     notes: (row.notes as string | null) ?? null
   }))
 
+  // Vitals rows for the passive signals watch — fetched once, and only when a cycle is
+  // actually active at asOf (the windows are small: earliest baseline start → asOf).
+  let journalRows: SignalJournalRow[] = []
+  let healthRows: SignalHealthRow[] = []
+  const activeCycles = cycles.filter(c => cycleStatusOn(c, asOf) === 'active')
+  if (activeCycles.length) {
+    try {
+      const from = shiftDays(activeCycles.map(c => c.start_date).sort()[0]!, -28)
+      const [jRes, hRes] = await Promise.all([
+        db.prepare('SELECT date, weight_lbs, bp_systolic, rhr, hrv FROM journal_entries WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC').bind(from, asOf).all(),
+        db.prepare('SELECT date, recovery_score, sleep_total_min FROM health_metrics WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC').bind(from, asOf).all()
+      ])
+      journalRows = (jRes.results ?? []) as unknown as SignalJournalRow[]
+      healthRows = (hRes.results ?? []) as unknown as SignalHealthRow[]
+    }
+    catch {
+      // Signals are an enrichment — a failed vitals query must not cost the whole context.
+    }
+  }
+
   const paragraphs: string[] = []
   for (const cycle of cycles) {
     const status = cycleStatusOn(cycle, asOf)
@@ -114,8 +136,25 @@ export async function cycleContext(db: D1Database, asOf: string): Promise<string
       const baselineLine = baseline?.drawDate
         ? `compare ${GATING_PROSE} against the pre-cycle baseline draw (${baseline.drawDate}) and quantify the shifts`
         : `no pre-cycle baseline draw exists, so compare ${GATING_PROSE} against the most recent prior draws and say the baseline is soft`
+
+      // The passive vitals watch, precomputed so the model narrates deterministic numbers:
+      // watch/flagged shorthands with the weight rate, steady metrics as one clause.
+      const signals = computeCycleSignals(cycle, asOf, journalRows, healthRows)
+      const measured = signals.filter(s => s.state === 'steady' || s.state === 'watch' || s.state === 'flagged')
+      const act = activeSignals(signals)
+      const signalsLine = !measured.length
+        ? ''
+        : act.length
+          ? ` Passive vitals watch (last 2 weeks vs the 4-week pre-start baseline, noise-thresholded): ${act.map((s) => {
+            const rate = s.key === 'weight' && s.ratePerWeek != null && Math.abs(s.ratePerWeek) >= 1
+              ? ` at ${s.ratePerWeek > 0 ? '+' : ''}${s.ratePerWeek} lbs/wk`
+              : ''
+            return `${s.state === 'flagged' ? 'FLAGGED' : 'watch'}: ${signalShorthand(s)}${rate}${s.adverse ? '' : ' (moving in the good direction)'}`
+          }).join('; ')}${measured.some(s => s.state === 'steady') ? `; steady: ${measured.filter(s => s.state === 'steady').map(s => s.label).join(', ')}` : ''}. Treat these as the objective side-effect watch — explain the likely mechanism behind flagged ones (e.g. fast weight gain on-cycle usually reads as water retention).`
+          : ` Passive vitals watch: all measured vitals (${measured.map(s => s.label).join(', ')}) are steady vs the pre-start baseline.`
+
       paragraphs.push(
-        `PLANNED CYCLE — ACTIVE: "${cycle.name}", day ${p.day} of ${p.totalDays} (week ${p.week} of ${p.totalWeeks}; started ${cycle.start_date}, runs through ${end}${cycle.actual_end ? ', ended off-plan' : ''}).${goal} Plan: ${plan}. This layers on the standing schedule above — where the same compound appears in both, the cycle dose replaces the standing one for its window. Anchor interpretation to cycle timing: ${baselineLine}, and weigh whether each shift tracks the cycle's start before attributing it elsewhere.${notes}`
+        `PLANNED CYCLE — ACTIVE: "${cycle.name}", day ${p.day} of ${p.totalDays} (week ${p.week} of ${p.totalWeeks}; started ${cycle.start_date}, runs through ${end}${cycle.actual_end ? ', ended off-plan' : ''}).${goal} Plan: ${plan}. This layers on the standing schedule above — where the same compound appears in both, the cycle dose replaces the standing one for its window. Anchor interpretation to cycle timing: ${baselineLine}, and weigh whether each shift tracks the cycle's start before attributing it elsewhere.${signalsLine}${notes}`
       )
     }
     else if (status === 'upcoming' && diffDays(asOf, cycle.start_date) <= UPCOMING_HORIZON_DAYS) {

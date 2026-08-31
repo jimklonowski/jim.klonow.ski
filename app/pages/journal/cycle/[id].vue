@@ -93,13 +93,13 @@
             Weight
           </p>
           <p class="num-display text-[28px] leading-none mt-1.5">
-            {{ weightDelta ?? '—' }}
+            {{ weightStat.value }}
           </p>
           <p
-            v-if="weightDelta"
+            v-if="weightStat.sub"
             class="text-[11px] text-muted mt-1"
           >
-            vs 2 wks pre-start
+            {{ weightStat.sub }}
           </p>
         </div>
       </div>
@@ -173,6 +173,51 @@
           </div>
           <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
             Faint line = the plan, solid = modeled from logged doses; divergence is deviation. Dashed guides mark the start and lab draws.{{ unmodeledNote }}
+          </p>
+        </section>
+
+        <!-- Passive vitals watch — the symptom tracker that needs no pressing. Each metric's
+             last-2-weeks average vs its 4-weeks-pre-start baseline, same noise thresholds as
+             the digest trend engine. -->
+        <section v-if="signalRows.length">
+          <TuiHeader
+            label="SIGNALS ── vitals vs pre-cycle baseline"
+            :dashes="0"
+          >
+            <span class="text-[10px] text-muted normal-case">{{ status === 'upcoming' ? 'baseline forming · 4 wks pre-start' : 'last 2 wks vs 4 wks pre-start' }}</span>
+          </TuiHeader>
+          <div class="flex flex-col gap-1.5 mt-2.5">
+            <div
+              v-for="s in signalRows"
+              :key="s.key"
+              class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_170px_minmax(0,1fr)_130px_100px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-[12px]"
+            >
+              <span class="text-hi">{{ s.label }}</span>
+              <span class="text-dim text-right lg:text-left text-[11px]">{{ s.reading }}</span>
+
+              <span class="col-span-2 lg:col-span-1 min-w-0">
+                <TuiSparkline
+                  v-if="s.spark.length > 1"
+                  :values="s.spark"
+                  :mark-index="s.sparkStartIdx"
+                  :color="s.sparkColor"
+                  :height="22"
+                  class="text-faint"
+                />
+              </span>
+
+              <span
+                class="text-right text-[11px]"
+                :class="s.deltaClass"
+              >{{ s.deltaText }}</span>
+              <span
+                class="text-right text-[10.5px] tracking-[0.06em]"
+                :class="s.chipClass"
+              >{{ s.chip }}</span>
+            </div>
+          </div>
+          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+            Derived from logged vitals and Whoop — nothing to enter. Noise thresholds match the digest trend engine; weight also watches rate of change, since fast gain reads as water retention long before the total looks alarming. The dashed guide marks the cycle start.
           </p>
         </section>
 
@@ -300,6 +345,8 @@ import {
   GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
   diffDays, doseLabelOf, plannedDoses, shiftDays
 } from '#shared/utils/cycles'
+import type { CycleSignal } from '#shared/utils/cycleSignals'
+import { computeCycleSignals } from '#shared/utils/cycleSignals'
 import type { AdherenceWeek } from '~/utils/adherence'
 
 definePageMeta({ middleware: 'journal-auth' })
@@ -311,6 +358,7 @@ const { isOwner } = await useAuth()
 const { data, refresh, error } = await useCycles()
 const { data: journalData } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
+const { data: healthData } = await useHealthMetricsEntries()
 onMounted(() => refresh())
 
 const cycleForm = useTemplateRef('cycleForm')
@@ -549,22 +597,74 @@ const nextCheckpointLabel = computed(() => {
   return `${next.label} · ${formatDate(next.windowFrom, 'monthDay')}–${formatDate(next.windowTo, 'monthDay')}`
 })
 
-// --- weight vs pre-start baseline ---
+// --- passive vitals watch (shared/utils/cycleSignals) ---
 
-const weightDelta = computed(() => {
-  if (!cycle.value || status.value === 'upcoming') return null
-  const start = cycle.value.start_date
-  const weights = (range: [string, string]) => entries.value
-    .filter(e => e.weight_lbs != null && e.date >= range[0] && e.date <= range[1])
-    .map(e => e.weight_lbs!)
-  const avg = (v: number[]) => v.length ? v.reduce((a, b) => a + b, 0) / v.length : null
+const signals = computed(() =>
+  cycle.value ? computeCycleSignals(cycle.value, today, entries.value, healthData.value ?? []) : []
+)
 
-  const before = avg(weights([shiftDays(start, -14), shiftDays(start, -1)]))
-  const recentEnd = status.value === 'done' ? endDate.value : today
-  const during = avg(weights([shiftDays(recentEnd, -13), recentEnd]))
-  if (before == null || during == null) return null
-  const delta = during - before
-  return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} lbs`
+/** "5h42m" for sleep, plain numbers elsewhere — minutes-as-a-number reads worse than it is. */
+function fmtSignalValue(s: CycleSignal, v: number): string {
+  if (s.key === 'sleep') return `${Math.floor(v / 60)}h${String(Math.round(v % 60)).padStart(2, '0')}m`
+  return v.toFixed(s.decimals)
+}
+
+const CHIP: Record<string, { text: string, cls: string }> = {
+  'flagged': { text: '⚠ FLAG', cls: 'text-danger' },
+  'watch-adverse': { text: 'WATCH', cls: 'text-warn' },
+  'watch-good': { text: 'IMPROVED', cls: 'text-accent' },
+  'steady': { text: 'STEADY', cls: 'text-muted' },
+  'baseline': { text: 'BASELINE', cls: 'text-dim' },
+  'no-data': { text: 'SPARSE', cls: 'text-ghost' }
+}
+
+const signalRows = computed(() => {
+  const rows = signals.value.map((s) => {
+    const chipKey = s.state === 'watch' ? (s.adverse ? 'watch-adverse' : 'watch-good') : s.state
+    const chip = CHIP[chipKey]!
+    const unit = s.key === 'sleep' ? '' : ` ${s.unit}`
+    const reading = s.baseline != null && s.current != null
+      ? `${fmtSignalValue(s, s.baseline)} → ${fmtSignalValue(s, s.current)}${unit}`
+      : s.baseline != null
+        ? `${fmtSignalValue(s, s.baseline)}${unit}`
+        : '—'
+    const rate = s.key === 'weight' && s.ratePerWeek != null && Math.abs(s.ratePerWeek) >= 1
+      ? ` · ${s.ratePerWeek > 0 ? '+' : ''}${s.ratePerWeek}/wk`
+      : ''
+    const deltaText = s.delta != null
+      ? `${s.delta > 0 ? '+' : ''}${s.key === 'sleep' ? `${s.delta}m` : `${s.delta}${unit}`}${rate}`
+      : '—'
+    return {
+      key: s.key,
+      label: s.label,
+      spark: s.spark,
+      sparkStartIdx: s.sparkStartIdx,
+      sparkColor: s.state === 'flagged' ? '#e86a5e' : s.state === 'watch' && s.adverse ? '#e8b34b' : '#2ce8a4',
+      reading,
+      deltaText,
+      deltaClass: chip.cls,
+      chip: chip.text,
+      chipClass: chip.cls
+    }
+  })
+  // A page of SPARSE rows says nothing — hide the section until any metric has a window.
+  return signals.value.some(s => s.state !== 'no-data') ? rows : []
+})
+
+const weightStat = computed(() => {
+  const w = signals.value.find(s => s.key === 'weight')
+  if (!w) return { value: '—', sub: null as string | null }
+  if (status.value === 'upcoming') {
+    return w.baseline != null
+      ? { value: `${w.baseline} lbs`, sub: 'pre-start baseline (4 wks)' }
+      : { value: '—', sub: null }
+  }
+  if (w.delta == null) return { value: '—', sub: null }
+  const rate = w.ratePerWeek != null && Math.abs(w.ratePerWeek) >= 1 ? ` · ${w.ratePerWeek > 0 ? '+' : ''}${w.ratePerWeek} lbs/wk` : ''
+  return {
+    value: `${w.delta > 0 ? '+' : ''}${w.delta} lbs`,
+    sub: `vs 4 wks pre-start${rate}`
+  }
 })
 
 // --- owner actions ---
