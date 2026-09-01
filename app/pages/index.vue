@@ -372,5 +372,5 @@ const trends = computed(() => [
   latest: t.values.length ? t.values.at(-1)!.toFixed(t.decimals) : '—'
 })))
 
-useSeoMeta({ title: 'jim.klonow.ski' })
+useSeoMeta({ title: 'Home' })
 </script>

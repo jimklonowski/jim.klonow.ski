@@ -472,4 +472,6 @@ function chartData(markerKey: string) {
     .filter(e => e.markers[markerKey] != null)
     .map(e => ({ date: formatDate(e.date, 'monthDay'), value: e.markers[markerKey] as number }))
 }
+
+useSeoMeta({ title: 'Labs' })
 </script>
