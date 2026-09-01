@@ -381,4 +381,6 @@ function openModal(key: string) {
   modalKey.value = key
   modalOpen.value = true
 }
+
+useSeoMeta({ title: 'Dexa' })
 </script>

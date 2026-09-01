@@ -38,14 +38,26 @@ useHead({
   }
 })
 
-const title = 'JCK - Health Dashboard'
-const description = 'James Christopher Klonowski'
+// Each page sets its own `useSeoMeta({ title, description })` with just the bare leaf name
+// ('Home', 'Journal · Trends'); this is the frame around them. In the template, %s is that
+// page title and %siteName is `site.name` from nuxt.config, so /journal/trends renders as
+// "Journal · Trends | jim.klonow.ski". Keeping the site name as a param rather than a literal
+// means it only has to be right in nuxt.config.
+//
+// og:title and og:description are deliberately NOT set here. @nuxtjs/seo registers unhead's
+// InferSeoMetaPlugin, which fills both per route — og:title from the *templated* title,
+// og:description from the page's description — but only when no one else has claimed those
+// tags. A static ogTitle used to sit here and claim them, which is why every share card read
+// "JCK - Health Dashboard" no matter which page was shared. twitter:description is likewise
+// left off so it falls back to og:description; hardcoding the site blurb there would be worse
+// than the fallback on every page but the homepage.
+const title = 'Health Dashboard'
+const description = 'Personal health terminal — bloodwork, body composition, training, and protocol tracking.'
 
 useSeoMeta({
+  titleTemplate: '%s | %siteName',
   title,
   description,
-  ogTitle: title,
-  ogDescription: description,
   ogImage: 'https://jim.klonow.ski/og.png',
   ogImageWidth: 1200,
   ogImageHeight: 630,

@@ -16,11 +16,12 @@ INSERT INTO supplements (name, dose, category, status, schedule, started, stoppe
   ('Psyllium husk',               '1.5 g (3 capsules)', 'supplement', 'active', 'mornings', NULL, NULL, NULL, 90, '2026-08-24T00:00:00.000Z'),
   ('Tadalafil (Cialis)',          '5 mg',               'supplement', 'active', 'daily',    NULL, NULL, NULL, 100, '2026-08-24T00:00:00.000Z'),
   ('Finasteride',                 '1 mg',               'supplement', 'active', 'daily',    NULL, NULL, 'Also logged in the journal dose log', 110, '2026-08-24T00:00:00.000Z'),
-  ('Allergy pill',                NULL,                 'supplement', 'active', 'daily',    NULL, NULL, NULL, 120, '2026-08-24T00:00:00.000Z'),
+  ('Xyzal (levocetirizine)',      '5 mg',               'supplement', 'active', 'daily',    '2026-09-01', NULL, 'Replaced the prior OTC allergy pill when that bottle ran out. Levocetirizine can be mildly sedating — worth weighing when sleep or HRV shifts', 120, '2026-08-24T00:00:00.000Z'),
 
   -- Recently discontinued (kept for lab-trend context)
   ('Turmeric',    NULL, 'supplement', 'stopped', 'daily', NULL, '2026-08-22', 'Taken for many months before stopping', 130, '2026-08-24T00:00:00.000Z'),
   ('Ashwagandha', NULL, 'supplement', 'stopped', 'daily', NULL, '2026-08-22', 'Taken for many months before stopping', 140, '2026-08-24T00:00:00.000Z'),
+  ('Allergy pill (OTC antihistamine)', NULL, 'supplement', 'stopped', 'daily', NULL, '2026-09-01', 'Daily for a long stretch; the 300-count bottle ran out and was replaced by Xyzal', 150, '2026-08-24T00:00:00.000Z'),
 
   -- On hand, not currently taking
   ('Anavar (oxandrolone)',                       '10 mg + 25 mg tablets', 'supplement', 'on_hand', 'daily', NULL, NULL, 'Weighing a lean-mass cycle (vs Primobolan)', 200, '2026-08-24T00:00:00.000Z'),
