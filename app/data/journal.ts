@@ -219,7 +219,9 @@ export const PROTOCOL_RULES: ProtocolRule[] = [
   { compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18' },
   { compound: 'hCG', doseLabel: '250 IU', weekdays: [0, 2, 5], from: '2026-06-18' },
   { compound: 'HGH', doseLabel: '2 IU', weekdays: EVERY_DAY, from: '2026-06-13' },
-  { compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01' },
+  // Discontinued 2026-09-01 (vial finished, not reconstituting another for now). `to` is
+  // inclusive, so the rings stop expecting a dose from 2026-09-02 on.
+  { compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01', to: '2026-09-01' },
   { compound: 'Finasteride', doseLabel: '1 mg', weekdays: EVERY_DAY, from: '2026-07-29' }
 ]
 

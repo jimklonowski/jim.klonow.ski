@@ -247,10 +247,19 @@ function isRecent(date: string) {
 </script>
 
 <style scoped>
-/* Speech tail hanging off the divider, pointing down at TICKER's heart (the tail
-   points at the speaker): a 10×10 square rotated 45° so its right+bottom borders
-   form the downward wedge. Bubble-colored fill + bubble border so it reads as the
-   digest bubble's own tail poking through the divider. */
+/* Notch in the divider, pointing down at TICKER's heart (the tail points at the speaker):
+   a 10×10 square rotated 45° so its right+bottom borders form the downward wedge, with the
+   other two edges left undrawn.
+
+   The fill is the page color, not the bubble color, and that is load-bearing twice over. The
+   diamond straddles the divider (top:-5px puts the two arm tips level with the line), so a
+   page-colored fill masks the divider across the notch's mouth — the line reads as dipping
+   down into the wedge and back up. A raised/bubble-colored fill instead left the diamond's
+   upper half visible as a lighter square floating above a line that ran straight through it.
+   Matching --color-line-soft to the divider (not the brighter --color-line-input) is the
+   other half: the wedge has to look like the same stroke, not a foreign object on top of it.
+   Both values are tied to what this sits on — bg-bg in index.vue — so re-home the footer and
+   these have to follow. */
 .ticker-footer::before {
   content: '';
   position: absolute;
@@ -258,9 +267,9 @@ function isRecent(date: string) {
   left: 27px;
   width: 10px;
   height: 10px;
-  background: var(--color-raised);
-  border-right: 1px solid var(--color-line-input);
-  border-bottom: 1px solid var(--color-line-input);
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-line-soft);
+  border-bottom: 1px solid var(--color-line-soft);
   transform: rotate(45deg);
 }
 </style>
