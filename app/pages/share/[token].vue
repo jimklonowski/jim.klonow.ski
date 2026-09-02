@@ -50,6 +50,8 @@
 </template>
 
 <script setup lang="ts">
+useSeoMeta({ title: 'Shared View' })
+
 // Public landing for owner-minted share links: exchanges the URL token for a role session
 // cookie, then hard-navigates so SSR renders the role's view from the first request.
 const route = useRoute()

@@ -700,6 +700,7 @@ import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
 import exifr from 'exifr'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: () => `Journal · ${dateParam.value}` })
 
 // Shared :ui overrides so every field on this long form reads the same.
 const FIELD_UI = { label: 'tui-label', hint: 'text-[10px] text-faint' }

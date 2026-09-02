@@ -550,6 +550,7 @@ import {
 } from '~/utils/vialInventory'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Tools · Inventory' })
 
 const toast = useToast()
 const today: string = new Date().toISOString().slice(0, 10)

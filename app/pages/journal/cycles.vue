@@ -123,6 +123,7 @@ import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
 import { cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf } from '#shared/utils/cycles'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Journal · Cycles' })
 
 const toast = useToast()
 const { isOwner } = await useAuth()
@@ -210,6 +211,4 @@ async function confirmDelete(c: Cycle) {
     toast.add({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
   }
 }
-
-useSeoMeta({ title: 'Journal · Cycles' })
 </script>
