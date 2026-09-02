@@ -285,6 +285,7 @@ import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 
 definePageMeta({ middleware: 'labs-auth' })
+useSeoMeta({ title: 'Labs' })
 
 const { data, refresh, error } = await useLabsEntries()
 const { isOwner } = await useAuth()
@@ -472,6 +473,4 @@ function chartData(markerKey: string) {
     .filter(e => e.markers[markerKey] != null)
     .map(e => ({ date: formatDate(e.date, 'monthDay'), value: e.markers[markerKey] as number }))
 }
-
-useSeoMeta({ title: 'Labs' })
 </script>
