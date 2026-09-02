@@ -162,6 +162,7 @@
 import { getCompoundColor } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Journal · Entries' })
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
@@ -270,6 +271,4 @@ const pageRows = computed(() =>
     }
   })
 )
-
-useSeoMeta({ title: 'Journal · Entries' })
 </script>
