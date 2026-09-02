@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: false })
+useSeoMeta({ title: () => 'Labs · Sign In' })
 
 const form = reactive({ password: '' })
 const loading = ref(false)
