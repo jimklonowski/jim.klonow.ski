@@ -153,6 +153,7 @@ import { CHART_ACCENT, CHART_DANGER, CHART_INDIGO, CHART_WARN } from '~/utils/ch
 import { KNOWN_COMPOUNDS } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Journal · Overview' })
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: healthData, refresh: refreshHealth, error: healthError } = await useHealthMetricsEntries()
@@ -367,5 +368,4 @@ const spokeCards = computed(() => {
   return cards
 })
 
-useSeoMeta({ title: 'Journal' })
 </script>

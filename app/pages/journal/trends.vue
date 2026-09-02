@@ -151,6 +151,7 @@ import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { CHART_ACCENT, CHART_DANGER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Journal · Trends' })
 
 const { data: journalData, refresh, error } = await useJournalEntries()
 const { data: healthData, refresh: refreshHealth, error: healthError } = await useHealthMetricsEntries()
