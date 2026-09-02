@@ -190,6 +190,7 @@ import { DEXA_OTHER_METRICS, DEXA_TOTAL_METRICS, REGION_LABELS, formatLbs } from
 import type { DexaEntry, DexaRegion } from '~/composables/useDexaEntries'
 
 definePageMeta({ middleware: 'labs-auth' })
+useSeoMeta({ title: () => 'Labs · DEXA' })
 
 const { data, refresh, error } = await useDexaEntries()
 const { isOwner } = await useAuth()
@@ -381,6 +382,4 @@ function openModal(key: string) {
   modalKey.value = key
   modalOpen.value = true
 }
-
-useSeoMeta({ title: 'Dexa' })
 </script>
