@@ -278,6 +278,7 @@ import type { AdherenceWeek } from '~/utils/adherence'
 import { iuEquivalentLabel } from '~/utils/peptideCalc'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Journal · Compounds' })
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()

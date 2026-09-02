@@ -357,6 +357,7 @@
 import { BIOMARKERS } from '~/data/biomarkers'
 
 definePageMeta({ middleware: 'labs-auth' })
+useSeoMeta({ title: () => 'Labs · Upload' })
 
 interface QualitativeResult {
   name: string

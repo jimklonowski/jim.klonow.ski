@@ -526,6 +526,7 @@ import exifr from 'exifr'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Journal · Photos' })
 
 const PHOTO_CATEGORIES = [
   { value: 'chest', label: 'Chest' },

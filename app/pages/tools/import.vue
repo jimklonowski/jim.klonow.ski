@@ -291,6 +291,7 @@
 import { blankEntry } from '~/data/journal'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Tools · Data Import' })
 
 const METRICS = ['Body Mass', 'Resting Heart Rate', 'Heart Rate Variability', 'Blood Pressure']
 

@@ -229,6 +229,7 @@ import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG, type MixUnit } from '~/utils/peptideCalc'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: 'Tools · Calculator' })
 
 const route = useRoute()
 
