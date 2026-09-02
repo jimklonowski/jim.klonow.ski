@@ -359,6 +359,7 @@ import { calcUnits, convertUnitFor, iuEquivalentLabel, type MixUnit } from '~/ut
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 
 definePageMeta({ middleware: 'journal-auth' })
+useSeoMeta({ title: () => compoundName.value })
 
 const route = useRoute()
 const compoundName = computed(() => decodeURIComponent(route.params.name as string))
@@ -609,6 +610,4 @@ const calculatorLink = computed(() => {
 })
 
 const recentDoses = computed(() => [...allDoses.value].reverse().slice(0, 20))
-
-useSeoMeta({ title: () => compoundName.value })
 </script>
