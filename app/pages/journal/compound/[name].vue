@@ -359,10 +359,12 @@ import { calcUnits, convertUnitFor, iuEquivalentLabel, type MixUnit } from '~/ut
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 
 definePageMeta({ middleware: 'journal-auth' })
-useSeoMeta({ title: () => compoundName.value })
 
 const route = useRoute()
 const compoundName = computed(() => decodeURIComponent(route.params.name as string))
+// Must come after compoundName: unhead resolves the getter synchronously during client setup,
+// so referencing it earlier threw a TDZ error that aborted hydration (page rendered but inert).
+useSeoMeta({ title: () => compoundName.value })
 const compoundColor = computed(() => getCompoundColor(compoundName.value))
 const info = computed(() => getCompoundInfo(compoundName.value))
 

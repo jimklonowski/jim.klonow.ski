@@ -6,7 +6,7 @@
         <span class="w-6 h-6 flex items-center justify-center bg-raised border border-accent text-accent text-[10px] leading-none">▲</span>
         <span class="num-display text-[15px] tracking-tight">jim.klonow.ski</span>
         <span class="ml-auto flex items-center gap-1.5 text-[10.5px] text-faint tracking-[0.12em] uppercase">
-          <span class="w-[7px] h-[7px] rounded-full bg-line-accent" />
+          <span class="w-1.75 h-1.75 rounded-full bg-line-accent" />
           no session
         </span>
       </div>
@@ -73,7 +73,7 @@
         </p>
       </div>
 
-      <p class="mt-2.5 text-[10.5px] text-ghost tracking-[0.1em] uppercase">
+      <p class="mt-2.5 text-[10.5px] text-ghost tracking-widest uppercase">
         session cookie · read-only share links issued on request
       </p>
     </div>

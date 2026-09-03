@@ -105,7 +105,7 @@
           :class="[i % 2 ? 'bg-inset' : 'bg-raised', invite.revoked ? 'opacity-60' : '']"
         >
           <span
-            class="shrink-0 px-1.5 py-0.5 border text-[10.5px] tracking-[0.1em] uppercase"
+            class="shrink-0 px-1.5 py-0.5 border text-[10.5px] tracking-widest uppercase"
             :class="roleChipClass(invite)"
           >{{ invite.role }}</span>
 
@@ -116,7 +116,7 @@
 
           <span
             v-if="invite.revoked"
-            class="text-[10.5px] tracking-[0.1em] uppercase text-danger"
+            class="text-[10.5px] tracking-widest uppercase text-danger"
           >✕ revoked</span>
 
           <span class="text-[11px] text-muted">{{ inviteMeta(invite) }}</span>

@@ -88,7 +88,7 @@
         class="bg-raised border border-line-soft px-3 py-2.5"
       >
         <div class="flex items-baseline gap-3 text-[10px] text-muted">
-          <span class="uppercase tracking-[0.1em]">Sleep stages</span>
+          <span class="uppercase tracking-widest">Sleep stages</span>
           <span class="text-faint">· min/night</span>
           <span class="ml-auto flex gap-2.5">
             <span
