@@ -80,7 +80,9 @@
       </div>
     </template>
 
-    <!-- UPCOMING: pre-flight — baseline draw + gating markers + the plan -->
+    <!-- UPCOMING: pre-flight — baseline draw + gating markers + the plan. A tentative start
+         (month/quarter) swaps the countdown for the period it's pencilled in for; there's no
+         day to count to. -->
     <template v-else-if="state === 'upcoming'">
       <div class="flex flex-col gap-1 mt-2.5 text-[12px]">
         <div class="flex gap-2.5">
@@ -88,8 +90,11 @@
           <NuxtLink
             :to="dossier"
             class="text-hi hover:text-accent"
-          >starts in {{ startsIn }}d</NuxtLink>
-          <span class="ml-auto shrink-0 text-muted">{{ formatDate(cycle.start_date, 'monthDay') }}</span>
+          >{{ tentativeStart ? `planned for ${tentativeStart}` : `starts in ${startsIn}d` }}</NuxtLink>
+          <span
+            class="ml-auto shrink-0 text-[10.5px] tracking-[0.06em]"
+            :class="tentativeStart ? 'text-dim' : 'text-muted'"
+          >{{ tentativeStart ? 'NO DATE SET' : formatDate(cycle.start_date, 'monthDay') }}</span>
         </div>
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">├</span>
@@ -153,8 +158,8 @@ import type { HealthMetricsEntry } from '~/composables/useHealthMetricsEntries'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { Cycle } from '#shared/utils/cycles'
 import {
-  GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
-  diffDays, doseLabelOf, relevantCycle
+  BASELINE_LOOKBACK_DAYS, GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress,
+  cycleStatusOn, diffDays, doseLabelOf, relevantCycle, tentativeStartLabel
 } from '#shared/utils/cycles'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 
@@ -162,6 +167,10 @@ import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/uti
 // pre-flight for an upcoming cycle (baseline draw + gating markers), progress + due-status
 // while active, and the recovery story for ~8 weeks after the end. Renders nothing when no
 // cycle is close enough to matter — most of the year this component is invisible.
+//
+// A cycle with a tentative start (month/quarter, no day picked) reads as pre-flight with the
+// countdown and baseline window replaced by what's actually known: the period it's pencilled
+// in for, and whether a fresh enough draw is in hand for whenever it begins.
 const props = defineProps<{
   cycles: Cycle[]
   entries: JournalEntry[]
@@ -177,6 +186,14 @@ const end = computed(() => cycle.value ? cycleEnd(cycle.value) : today)
 const progress = computed(() => cycle.value ? cycleProgress(cycle.value, today) : { day: 0, week: 0, totalDays: 1, totalWeeks: 0, pct: 0 })
 const startsIn = computed(() => cycle.value ? diffDays(today, cycle.value.start_date) : 0)
 const dossier = computed(() => `/journal/cycle/${cycle.value?.id}`)
+
+/** "Oct 2026"/"Q4 2026" when the start isn't a picked day yet, else null. */
+const tentativeStart = computed(() => cycle.value ? tentativeStartLabel(cycle.value) : null)
+
+/** Newest draw on file — the baseline candidate for a cycle with no dated window. */
+const latestDraw = computed(() =>
+  [...props.draws].sort((a, b) => a.date.localeCompare(b.date)).at(-1) ?? null
+)
 
 const STATUS_CLASSES: Record<string, string> = {
   done: 'text-accent',
@@ -242,6 +259,17 @@ const vitalsLine = computed(() => {
 const drawLine = computed(() => {
   const byKey = (k: string) => checkpoints.value.find(cp => cp.key === k)
   if (state.value === 'upcoming') {
+    // With no committed start there's no baseline window to sit inside, so the answerable
+    // question shifts from "did a draw land in the window?" to "is one fresh enough to still
+    // serve as baseline whenever this starts?".
+    if (tentativeStart.value) {
+      const last = latestDraw.value
+      if (!last) return { text: '⚠ no draw on file — get a baseline before you start', class: 'text-warn' }
+      const age = diffDays(last.date, today)
+      return age <= BASELINE_LOOKBACK_DAYS
+        ? { text: `baseline ready · ${formatDate(last.date, 'monthDay')} draw, ${age}d old`, class: 'text-muted' }
+        : { text: `⚠ last draw ${age}d ago — get a fresh baseline before you start`, class: 'text-warn' }
+    }
     const baseline = byKey('baseline')
     if (baseline?.drawDate) return { text: `baseline draw ✓ ${formatDate(baseline.drawDate, 'monthDay')}`, class: 'text-muted' }
     return { text: '⚠ no baseline draw yet — get one before the start', class: 'text-warn' }
@@ -256,8 +284,7 @@ const drawLine = computed(() => {
     }
   }
   const next = checkpoints.value.find(cp => cp.state === 'due' || cp.state === 'upcoming')
-  const lastDraw = [...props.draws].sort((a, b) => a.date.localeCompare(b.date)).at(-1)
-  const ago = lastDraw ? ` · last draw ${diffDays(lastDraw.date, today)}d ago` : ''
+  const ago = latestDraw.value ? ` · last draw ${diffDays(latestDraw.value.date, today)}d ago` : ''
   if (!next) return { text: `all checkpoints drawn${ago}`, class: 'text-muted' }
   return {
     text: `${next.label} ${next.state === 'due' ? 'due now' : `~${formatDate(next.windowFrom, 'monthDay')}`}${ago}`,

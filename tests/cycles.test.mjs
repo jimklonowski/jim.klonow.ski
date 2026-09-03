@@ -8,7 +8,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   checkpointStates, cycleEnd, cycleProgress, cycleRules, cycleStatusOn,
-  diffDays, itemWindow, mergeRules, plannedDoses, plannedEnd, relevantCycle, shiftDays
+  diffDays, isTentative, itemWindow, mergeRules, periodLabel, plannedDoses, plannedEnd,
+  relevantCycle, shiftDays, startAnchor, tentativeStartLabel
 } from '../shared/utils/cycles.ts'
 
 // 2026-09-14 is a Monday.
@@ -143,4 +144,78 @@ test('relevantCycle: active beats upcoming beats recently-done, ancient history 
   // A cycle that just ended stays relevant through its recovery window.
   const justEnded = run({ id: 4, actual_end: '2026-09-20' })
   assert.equal(relevantCycle([justEnded, oldDone], today).id, 4)
+})
+
+// --- tentative starts (start_precision 'month'/'quarter') ---
+
+test('startAnchor canonicalizes to the period start; day precision passes through', () => {
+  assert.equal(startAnchor('2026-10-14', 'day'), '2026-10-14')
+  assert.equal(startAnchor('2026-10-14', 'month'), '2026-10-01')
+  assert.equal(startAnchor('2026-10-14', 'quarter'), '2026-10-01')
+  assert.equal(startAnchor('2026-02-28', 'quarter'), '2026-01-01')
+  assert.equal(startAnchor('2026-09-03', 'quarter'), '2026-07-01')
+  assert.equal(startAnchor('2026-12-31', 'quarter'), '2026-10-01')
+})
+
+test('period labels read as the period, not a date', () => {
+  assert.equal(periodLabel('2026-10-01', 'month'), 'Oct 2026')
+  assert.equal(periodLabel('2026-10-01', 'quarter'), 'Q4 2026')
+  assert.equal(periodLabel('2026-01-01', 'quarter'), 'Q1 2026')
+  // A cycle with a picked day has no period label — callers format the date themselves.
+  assert.equal(tentativeStartLabel(run()), null)
+  assert.equal(tentativeStartLabel(run({ start_precision: 'month', start_date: '2026-10-01' })), 'Oct 2026')
+  // Absent precision (rows predating the migration) reads as a committed day.
+  assert.equal(isTentative(run()), false)
+  assert.equal(isTentative(run({ start_precision: 'day' })), false)
+  assert.equal(isTentative(run({ start_precision: 'quarter' })), true)
+})
+
+test('a tentative cycle never leaves upcoming, however far its anchor is in the past', () => {
+  const tentative = run({ start_precision: 'month', start_date: '2026-10-01' })
+  assert.equal(cycleStatusOn(tentative, '2026-09-03'), 'upcoming')
+  assert.equal(cycleStatusOn(tentative, '2026-10-05'), 'upcoming') // anchor passed
+  assert.equal(cycleStatusOn(tentative, '2028-01-01'), 'upcoming') // long past
+  // The same dates on a committed cycle do move it along.
+  const committed = run({ start_date: '2026-10-01' })
+  assert.equal(cycleStatusOn(committed, '2026-10-05'), 'active')
+  assert.equal(cycleStatusOn(committed, '2028-01-01'), 'done')
+})
+
+test('a tentative cycle derives no dated cadence and no checkpoints', () => {
+  const tentative = run({ start_precision: 'month', start_date: '2026-10-01' })
+  assert.deepEqual(cycleRules(tentative), [])
+  assert.deepEqual(checkpointStates(tentative, ['2026-09-30'], '2026-10-05'), [])
+  // Sanity: the identical plan with a committed start derives both.
+  const committed = run({ start_date: '2026-10-01' })
+  assert.equal(cycleRules(committed).length, 2)
+  assert.equal(checkpointStates(committed, [], '2026-10-05').length, 4)
+})
+
+test('plannedDoses stays whole for a tentative plan — stock coverage depends on the totals', () => {
+  const tentative = run({ start_precision: 'month', start_date: '2026-10-01' })
+  const committed = run({ start_date: '2026-10-01' })
+  // Same plan, same requirement: what to buy doesn't depend on having picked a day. Gating
+  // this would report a fully-stocked fridge for a run nothing has been bought for.
+  assert.deepEqual(
+    plannedDoses(tentative, 'Methenolone Enanthate'),
+    plannedDoses(committed, 'Methenolone Enanthate')
+  )
+  assert.ok(plannedDoses(tentative, 'Methenolone Enanthate').length > 0)
+})
+
+test('a tentative cycle neither overrides the standing schedule nor blocks a committed one', () => {
+  const standing = [{ compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-01-01', to: null }]
+  const tentative = run({
+    start_precision: 'month',
+    start_date: '2026-10-01',
+    compounds: [{ compound: 'Testosterone Cypionate', dose: 150, unit: 'mg', weekdays: [1, 4], fromWeek: 1, toWeek: null }]
+  })
+  // The standing rule survives whole — no window carved out of it, nothing added.
+  assert.deepEqual(mergeRules(standing, [tentative]), standing)
+
+  // A committed upcoming cycle outranks a tentative one anchored earlier.
+  const committed = run({ id: 2, start_date: '2026-11-15' })
+  assert.equal(relevantCycle([tentative, committed], '2026-09-03').id, 2)
+  // With only the tentative plan on file, it's still the one worth showing.
+  assert.equal(relevantCycle([tentative], '2026-09-03').id, 1)
 })
