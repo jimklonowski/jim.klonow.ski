@@ -43,15 +43,16 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 - **Cloudflare R2** — lab PDF and progress photo storage
 - **Cloudflare KV** — rate limiting
 - **nuxt-echarts** — trend charts
-- **Anthropic SDK** — server-side lab PDF parsing, protocol-aware lab summaries, daily/weekly health digests, and the `/ask` chat
+- **Anthropic SDK** — server-side lab PDF parsing, protocol-aware lab summaries, daily/weekly health digests, freeform stock-dump parsing into inventory rows (structured output), and the `/ask` chat
 - **Whoop API** — OAuth sync for recovery, sleep, and workout data
+- **@nuxtjs/seo** — per-page titles via a `%s | jim.klonow.ski` template (each page sets just its leaf name with `useSeoMeta`) and inferred OG/Twitter cards over a shared `public/og.png`
 
 ## Sections
 
 | Route | Description |
 |---|---|
-| `/` | Overview dashboard — flagged markers, vitals, today's doses + the latest day's workouts, quick links, and a cycle strip when one is planned/running/recently ended (sign-in prompt when signed out) |
-| `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries; `?marker=<key>` deep-links to a marker's tab + detail modal (used by the home page's flagged rows and the ⌘K palette) |
+| `/` | Overview dashboard — flagged markers, vitals, today's doses + the latest day's workouts, quick links, the latest daily and weekly AI digests (daily first) beside the TICKER companion, and a cycle strip when one is planned/running/recently ended — mid-cycle it carries a one-line passive vitals watch (sign-in prompt when signed out) |
+| `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries; `?marker=<key>` deep-links to a marker's tab + detail modal (used by the home page's flagged rows and the ⌘K palette). A sticky **time scrubber** at the foot of the page rewinds the whole dashboard to any earlier draw — cards, tab counts, AI summary, and echo findings all read as they did then, markers missing from that panel carry forward dimmed and dated, and a hollow ring on each range bar marks where the newest reading sits; `?asof=<date>` deep-links a rewound view |
 | `/labs/dexa` | DEXA body composition scans |
 | `/labs/upload` | Upload a new lab PDF (parsed server-side into structured markers) — owner only |
 | `/labs/login` | Owner password sign-in |
@@ -59,17 +60,17 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal` | Hub — vital tiles with sparklines, today's doses + workout, soda/Whoop strip, and cards into each spoke below |
 | `/journal/trends` | Every vitals + Whoop/Apple Watch chart under one shared range picker (30/60/90d/all, optional 7d smoothing) |
 | `/journal/compounds` | Active protocol and every tracked compound — modeled exposure curves for the slow-release injectables (Bateman superposition of the dose log, lab draws overlaid) and a planned-vs-logged adherence panel scoring the standing cadence plus any planned cycles — linking out to the calculator and vial inventory |
-| `/journal/cycles` | Cycle planner — named, dated protocol phases (e.g. "200 mg Primo weeks 1–16, Anavar weeks 12–16") stored week-relative to the start date, so shifting the start moves every phase; editing owner only |
-| `/journal/cycle/[id]` | Cycle dossier — plan bars by week, planned-vs-logged exposure overlay (the plan run through the same Bateman engine as the dose log), per-week adherence, derived lab checkpoints (baseline/mid/end/recovery windows) with gating-marker deltas vs the baseline draw, end-early/resume actions |
+| `/journal/cycles` | Cycle planner — named, dated protocol phases (e.g. "200 mg Primo weeks 1–16, Anavar weeks 12–16") stored week-relative to the start date, so shifting the start moves every phase. A start can also be pencilled in to a month or quarter (`start_precision`) — such a "not scheduled" cycle stays upcoming and derives nothing dated (no rings, adherence, or checkpoints) until a day is picked; editing owner only |
+| `/journal/cycle/[id]` | Cycle dossier — plan bars by week, planned-vs-logged exposure overlay (the plan run through the same Bateman engine as the dose log), per-week adherence, derived lab checkpoints (baseline/mid/end/recovery windows) with gating-marker deltas vs the baseline draw, end-early/resume actions, and a **passive side-effect watch** (`shared/utils/cycleSignals.ts`) — weight, systolic BP, RHR, HRV, recovery, and sleep over the last 2 weeks vs the 4 weeks pre-start, noise-thresholded with the digest trend engine's floors, weight also rate-checked as the water-retention tell — derived from data that collects itself, deliberately in place of any symptom tracker |
 | `/journal/workouts` | Session log merged from Apple Health + Whoop, with stat cells and type mix |
 | `/journal/entries` | Day-log ledger of every journal row — hidden from the doctor role |
-| `/journal/[date]` | Create or edit a day's entry (read-only for guests) |
+| `/journal/[date]` | Create or edit a day's entry (read-only for guests) — "copy from previous" mirrors each injection site (left glute → right glute) so sides rotate day to day |
 | `/journal/calendar` | Month view with compound-colored dots, scheduled-dose rings (planned vs logged, from the hand-maintained `PROTOCOL_RULES` cadence merged with any planned cycles — an upcoming cycle previews its rings on future days) + protocol timeline (logged compounds, plus standing meds backfilled from the `STANDING_COMPOUNDS` constant) |
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
 | `/journal/compound/[name]` | Dosing history for a single compound, with a modeled exposure curve for the slow-release ones |
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
 | `/tools/calculator` | Peptide reconstitution & syringe unit calculator — bridges IU↔mg for HGH/hCG when opened from a compound page (IU doses display their mg equivalent app-wide via `IU_PER_MG` in `app/utils/peptideCalc.ts`) |
-| `/tools/inventory` | Peptide vial inventory and depletion tracking — owner only |
+| `/tools/inventory` | Peptide vial inventory and depletion tracking — **✦ STOCK DUMP** has Claude parse a freeform "what's in the fridge" sentence into sealed-vial rows (structured output, corrected in a confirm table before saving), and a **runway panel** (`shared/utils/stockRunway.ts`) shows days-of-stock per compound at the logged pace plus whether the stockpile covers the remaining doses of the next planned cycle — owner only, plus the demo sandbox |
 | `/tools/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
 | `/tools/sharing` | Mint, list, and revoke share links — owner only |
 | `/ask` | AI analysis console — streaming chat over the full tracked history (labs, DEXA, journal, Whoop, protocol) — owner only |
@@ -120,10 +121,10 @@ Deliberately not enabled — with reasoning in the config comments: `xssValidato
 - Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary.
 - **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/workout data on a schedule into `health_metrics` and `workouts`.
 - **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/tools/import`).
-- Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`server/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced via `DigestPanel.vue`.
+- Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`server/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced on the home dashboard (`app/components/home/Digest.vue`, daily above weekly) and in the all-digests slide-over (`DigestPanel.vue`).
 - The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events + where the draw landed on each injectable's modeled exposure curve — `shared/utils/pk.ts`, so a near-peak vs near-trough draw isn't misread as a real change) and can be regenerated from the labs dashboard.
 - The **`/ask` console** (`server/api/ai/ask.post.ts`) streams answers to freeform questions over a per-request fact sheet built by `server/utils/askContext.ts` — every lab draw, every DEXA scan, all-time compound history, precomputed trends, and recent daily detail. Owner-only and KV rate-limited, since every question is an Anthropic call.
-- All three AI surfaces share standing protocol context from `server/utils/protocol.ts`: the intended dosing schedule (hand-maintained constant, including standing meds that never hit the dose log), the supplement stack rendered live from the `supplements` table (so edits on `/journal/supplements` reach the prompts without a deploy), and planned-cycle context from the `cycles` table — an upcoming cycle flags the need for a baseline draw, an active one tells the model which day/week the period falls on and to compare gating markers (HDL, ALT/AST, hematocrit, ferritin, estradiol) against the named baseline draw, and a recently ended one frames the recovery window. All of it as-of-date aware, since lab summaries can regenerate for historical draws.
+- All three AI surfaces share standing protocol context from `server/utils/protocol.ts`: the intended dosing schedule (hand-maintained constant, including standing meds that never hit the dose log), the supplement stack rendered live from the `supplements` table (so edits on `/journal/supplements` reach the prompts without a deploy), and planned-cycle context from the `cycles` table — an upcoming cycle flags the need for a baseline draw, an active one tells the model which day/week the period falls on and to compare gating markers (HDL, ALT/AST, hematocrit, ferritin, estradiol) against the named baseline draw and hands it the passive vitals watch precomputed (flagged/watch/steady per metric, so it narrates deterministic numbers rather than re-deriving them), a not-yet-scheduled one (month/quarter precision) is described as intent rather than a schedule — no start date to count toward, plus whether the latest draw is fresh enough to serve as its baseline — and a recently ended one frames the recovery window. All of it as-of-date aware, since lab summaries can regenerate for historical draws.
 
 ## Dev
 
@@ -132,7 +133,8 @@ pnpm install
 pnpm dev            # https://local.emkay.com:3000 (requires local TLS cert in certs/)
 pnpm typecheck
 pnpm lint
-pnpm test           # unit tests (node --test, no framework) — cycle date/window math
+pnpm test           # unit tests (node --test, no framework) over the framework-free shared/utils math:
+                    #   cycle dates/windows, passive cycle signals, stock runway, labs time-travel
 pnpm sync:local     # mirror prod -> local: D1 dump/import + R2 objects (stop dev server first)
 pnpm sync:local:r2  # top up local R2 objects only (PDFs/photos referenced by local D1)
 pnpm demo:generate    # regenerate the synthetic demo persona (scripts/demo/demo-seed.json)
@@ -149,7 +151,7 @@ pnpm deploy     # nuxt build + wrangler deploy
 pnpm preview    # local Wrangler Workers emulator
 ```
 
-Schema changes (new tables in `server/database/schema.sql`) must be applied to remote D1 before deploying:
+Schema changes (new tables in `server/database/schema.sql`, plus any one-time `ALTER TABLE` migrations noted at the bottom of that file — run those by hand, once) must be applied to remote D1 before deploying:
 
 ```bash
 npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/schema.sql
