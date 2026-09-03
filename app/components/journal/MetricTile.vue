@@ -6,7 +6,7 @@
     :class="to ? 'hover:bg-[#101a15] transition-colors' : ''"
   >
     <div class="flex items-baseline gap-2 text-[10px] text-muted">
-      <span class="uppercase tracking-[0.1em] truncate">{{ label }}</span>
+      <span class="uppercase tracking-widest truncate">{{ label }}</span>
       <span
         v-if="unit"
         class="text-faint shrink-0"

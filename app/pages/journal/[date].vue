@@ -163,19 +163,15 @@
               class="col-span-8 sm:col-span-4"
               :ui="FIELD_UI"
             >
-              <UInput
+              <UInputMenu
                 v-model="peptide.compound"
-                :list="`compounds-${i}`"
+                mode="autocomplete"
+                :items="KNOWN_COMPOUNDS"
+                open-on-click
                 placeholder="MOTS-C"
                 class="w-full"
+                :ui="SELECT_UI"
               />
-              <datalist :id="`compounds-${i}`">
-                <option
-                  v-for="c in KNOWN_COMPOUNDS"
-                  :key="c"
-                  :value="c"
-                />
-              </datalist>
             </UFormField>
             <UFormField
               label="Dose"
@@ -268,19 +264,15 @@
               class="col-span-6 sm:col-span-3"
               :ui="FIELD_UI"
             >
-              <UInput
+              <UInputMenu
                 v-model="r.compound"
-                :list="`recon-compounds-${i}`"
+                mode="autocomplete"
+                :items="KNOWN_COMPOUNDS"
+                open-on-click
                 placeholder="GHK-Cu"
                 class="w-full"
+                :ui="SELECT_UI"
               />
-              <datalist :id="`recon-compounds-${i}`">
-                <option
-                  v-for="c in KNOWN_COMPOUNDS"
-                  :key="c"
-                  :value="c"
-                />
-              </datalist>
             </UFormField>
             <UFormField
               label="Vial size"
@@ -366,21 +358,17 @@
               :label="slot.label"
               :ui="FIELD_UI"
             >
-              <UInput
+              <UInputMenu
                 v-model="form.food[slot.key]"
-                list="meal-history"
+                mode="autocomplete"
+                :items="mealHistory"
+                open-on-click
                 :placeholder="slot.placeholder"
                 class="w-full"
+                :ui="SELECT_UI"
               />
             </UFormField>
           </div>
-          <datalist id="meal-history">
-            <option
-              v-for="m in mealHistory"
-              :key="m"
-              :value="m"
-            />
-          </datalist>
         </section>
 
         <section>
@@ -422,11 +410,14 @@
                 class="col-span-4"
                 :ui="FIELD_UI"
               >
-                <UInput
+                <UInputMenu
                   v-model="soda.drink"
-                  list="soda-drinks"
+                  mode="autocomplete"
+                  :items="SODA_DRINKS"
+                  open-on-click
                   placeholder="Dr Pepper"
                   class="w-full"
+                  :ui="SELECT_UI"
                 />
               </UFormField>
               <UFormField
@@ -434,11 +425,14 @@
                 class="col-span-4"
                 :ui="FIELD_UI"
               >
-                <UInput
+                <UInputMenu
                   v-model="soda.size"
-                  list="soda-sizes"
+                  mode="autocomplete"
+                  :items="SODA_SIZES"
+                  open-on-click
                   placeholder="12oz can"
                   class="w-full"
+                  :ui="SELECT_UI"
                 />
               </UFormField>
               <div class="col-span-1 flex items-end pb-2">
@@ -459,21 +453,6 @@
           >
             No sodas logged.
           </p>
-
-          <datalist id="soda-drinks">
-            <option
-              v-for="d in SODA_DRINKS"
-              :key="d"
-              :value="d"
-            />
-          </datalist>
-          <datalist id="soda-sizes">
-            <option
-              v-for="s in SODA_SIZES"
-              :key="s"
-              :value="s"
-            />
-          </datalist>
         </section>
       </div>
 
@@ -700,10 +679,12 @@ import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
 import exifr from 'exifr'
 
 definePageMeta({ middleware: 'journal-auth' })
-useSeoMeta({ title: () => `Journal · ${dateParam.value}` })
 
 // Shared :ui overrides so every field on this long form reads the same.
 const FIELD_UI = { label: 'tui-label', hint: 'text-[10px] text-faint' }
+// Shared by the USelects and the autocomplete UInputMenus (compound / food / soda) so every
+// popover on the form matches. Autocomplete mode keeps whatever is typed as the value and only
+// suggests from `items`, so off-list compounds and freeform meals still work.
 const SELECT_UI = { content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }
 
 /** Live "≈ 0.67 mg" hint beside the Dose label for IU compounds with a known mass factor. */
@@ -723,6 +704,11 @@ const route = useRoute()
 const toast = useToast()
 
 const dateParam = computed(() => route.params.date as string)
+
+// Must come after dateParam: on the client unhead resolves the title getter synchronously
+// during setup, so declaring this above `dateParam` threw a TDZ ReferenceError that aborted
+// hydration and left the whole form inert (SSR markup only, no click handlers).
+useSeoMeta({ title: () => `Journal · ${dateParam.value}` })
 
 const { data: allEntries, refresh } = await useJournalEntries()
 const { isOwner, canEdit } = await useAuth()
@@ -878,7 +864,7 @@ function copyFromPrevious() {
 }
 
 // Pooled across all four meal slots (and all days) so an order typed for lunch once
-// autocompletes for dinner too - powers the datalist on each Food input.
+// autocompletes for dinner too - powers the suggestion menu on each Food input.
 const mealHistory = computed(() => {
   const counts: Record<string, number> = {}
   for (const e of allEntries.value ?? []) {

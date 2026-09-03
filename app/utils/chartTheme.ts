@@ -30,6 +30,14 @@ export const CHART_GRID = {
   containLabel: true
 } as const
 
+/**
+ * ECharts hard-codes `z-index: 9999999` on its HTML tooltip, which floats it over any sticky
+ * chrome on the page (the /labs time scrubber sits at z-10). `extraCssText` lands after that rule
+ * in the same style attribute, so it is the one place the z-index can be pulled back down.
+ * Every tooltip config's extraCssText should start with this.
+ */
+export const CHART_TOOLTIP_Z = 'z-index:1;'
+
 export const CHART_TOOLTIP = {
   trigger: 'axis' as const,
   backgroundColor: '#0d1310',
@@ -37,7 +45,7 @@ export const CHART_TOOLTIP = {
   borderWidth: 1,
   padding: [6, 10] as [number, number],
   textStyle: { ...CHART_TEXT, color: '#c7d4cd', fontSize: 11 },
-  extraCssText: 'border-radius:0;box-shadow:0 0 12px rgba(0,0,0,.5);'
+  extraCssText: `${CHART_TOOLTIP_Z}border-radius:0;box-shadow:0 0 12px rgba(0,0,0,.5);`
 }
 
 /** Point markers become noise past ~40 readings, so dense series render as a bare line. */

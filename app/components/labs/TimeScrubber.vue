@@ -5,7 +5,7 @@
   >
     <div class="flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-2 px-4 sm:px-6 py-2.5">
       <!-- Readout: which draw the page is showing -->
-      <div class="flex items-center justify-between gap-3 sm:w-[260px] lg:w-[350px] sm:shrink-0">
+      <div class="flex items-center justify-between gap-3 sm:w-65 lg:w-87.5 sm:shrink-0">
         <div class="min-w-0">
           <p class="tui-label whitespace-nowrap">
             {{ scrubbed ? `viewing draw ${viewedIndex + 1} of ${dates.length}` : `latest draw · ${dates.length} of ${dates.length}` }}
@@ -62,14 +62,14 @@
               >
                 <span
                   v-if="t.flagColor"
-                  class="absolute -left-[1.5px] top-1.5 w-[3px] h-[3px] rounded-full"
+                  class="absolute left-[-1.5px] top-1.5 w-0.75 h-0.75 rounded-full"
                   :style="{ background: t.flagColor }"
                 />
                 <span
                   class="absolute -left-px w-0.5 transition-[top,height,background-color] duration-200"
                   :class="t.active
                     ? 'top-3.5 h-4 bg-accent glow-dot'
-                    : t.reached ? 'top-[17px] h-2.5 bg-[#5d7a6d]' : 'top-[17px] h-2.5 bg-line-field'"
+                    : t.reached ? 'top-4.25 h-2.5 bg-[#5d7a6d]' : 'top-4.25 h-2.5 bg-line-field'"
                 />
               </div>
             </div>
@@ -89,7 +89,7 @@
             />
 
             <!-- Date labels: click to jump, hover for that draw's details -->
-            <div class="absolute left-0 right-0 top-[31px] pointer-events-none">
+            <div class="absolute left-0 right-0 top-7.75 pointer-events-none">
               <UTooltip
                 v-for="t in ticks"
                 :key="t.date"
@@ -97,7 +97,7 @@
                 :ui="TOOLTIP_UI"
               >
                 <template #content>
-                  <span class="flex flex-col gap-px text-[10.5px] leading-[1.5]">
+                  <span class="flex flex-col gap-px text-[10.5px] leading-normal">
                     <span class="num-display text-[13px]">{{ formatDateTerse(t.date) }}</span>
                     <span class="text-muted tracking-[0.06em] uppercase">{{ drawMeta(t.index) }}</span>
                   </span>
