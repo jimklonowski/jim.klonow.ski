@@ -152,7 +152,7 @@
         <p class="flex items-center gap-2 mt-2.5 text-[12.5px] text-dim">
           <span class="text-accent">❯</span>
           <span class="truncate">reading {{ filename }}</span>
-          <span class="w-[7px] h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
+          <span class="w-1.75 h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
         </p>
         <p class="mt-1.5 text-[11px] text-muted">
           Pulling biomarker values out of the report — this takes a few seconds.
