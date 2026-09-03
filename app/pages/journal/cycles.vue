@@ -49,7 +49,7 @@
               >{{ c.name }}</NuxtLink>
               <span
                 class="text-[10.5px] tracking-[0.06em] uppercase"
-                :class="STATUS_CLASSES[status(c)]"
+                :class="STATUS_CLASSES[statusKey(c)]"
               >{{ statusLabel(c) }}</span>
               <span
                 v-if="c.goal"
@@ -85,9 +85,16 @@
               </span>
             </div>
 
+            <!-- A tentative start has no end date to show — the span isn't known until a day
+                 is picked, so it states the period and the length instead. -->
             <div class="mt-1.5 text-[11.5px] text-muted">
-              {{ formatDate(c.start_date) }} → {{ formatDate(cycleEnd(c)) }}
-              · {{ c.planned_weeks }} wks{{ c.actual_end ? ' planned, ended off-plan' : '' }}
+              <template v-if="tentativeStartLabel(c)">
+                sometime in {{ tentativeStartLabel(c) }} · {{ c.planned_weeks }} wks planned · no date set
+              </template>
+              <template v-else>
+                {{ formatDate(c.start_date) }} → {{ formatDate(cycleEnd(c)) }}
+                · {{ c.planned_weeks }} wks{{ c.actual_end ? ' planned, ended off-plan' : '' }}
+              </template>
             </div>
 
             <div class="mt-2 flex flex-col gap-1">
@@ -120,7 +127,9 @@
 <script setup lang="ts">
 import { getCompoundColor } from '~/data/journal'
 import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
-import { cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf } from '#shared/utils/cycles'
+import {
+  cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf, isTentative, tentativeStartLabel
+} from '#shared/utils/cycles'
 
 definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Cycles' })
@@ -142,27 +151,40 @@ function status(c: Cycle) {
   return cycleStatusOn(c, today)
 }
 
+// Tentative cycles are all 'upcoming' by status but belong in their own bucket: they're plans
+// on file, not runs on the calendar, and mixing them into UPCOMING implies a schedule.
 const groups = computed(() => [
   { key: 'active', title: 'ACTIVE', items: cycles.value.filter(c => status(c) === 'active') },
-  { key: 'upcoming', title: 'UPCOMING', items: cycles.value.filter(c => status(c) === 'upcoming') },
+  { key: 'upcoming', title: 'UPCOMING', items: cycles.value.filter(c => status(c) === 'upcoming' && !isTentative(c)) },
+  { key: 'tentative', title: 'NOT SCHEDULED', items: cycles.value.filter(c => isTentative(c)) },
   { key: 'done', title: 'HISTORY', items: cycles.value.filter(c => status(c) === 'done') }
 ].filter(g => g.items.length))
 
 const meta = computed(() => {
   const active = cycles.value.filter(c => status(c) === 'active').length
-  const upcoming = cycles.value.filter(c => status(c) === 'upcoming').length
+  const upcoming = cycles.value.filter(c => status(c) === 'upcoming' && !isTentative(c)).length
+  const tentative = cycles.value.filter(c => isTentative(c)).length
   if (active) return `${active} active`
   if (upcoming) return `${upcoming} upcoming`
+  if (tentative) return `${tentative} unscheduled`
   return `${cycles.value.length} on file`
 })
 
 const STATUS_CLASSES: Record<string, string> = {
   active: 'text-accent',
   upcoming: 'text-hi',
+  tentative: 'text-dim',
   done: 'text-muted'
 }
 
+/** Keys STATUS_CLASSES — tentative cycles get their own tone, not the countdown's. */
+function statusKey(c: Cycle): string {
+  return isTentative(c) ? 'tentative' : status(c)
+}
+
 function statusLabel(c: Cycle): string {
+  const tentative = tentativeStartLabel(c)
+  if (tentative) return `${tentative.toUpperCase()} · NO DATE`
   const s = status(c)
   if (s === 'active') {
     const p = cycleProgress(c, today)

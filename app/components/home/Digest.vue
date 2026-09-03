@@ -8,10 +8,30 @@
          space for the speech tail below: it pokes ~7px above the divider, and margin
          (unlike padding) ends the scrollport early so text clips before sliding under it. -->
     <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1 mb-2">
+      <!-- Daily leads: it's the fresher read and short enough to stay above the fold, so the
+           long weekly recap (and its recommendations) never pushes today's note out of view. -->
+      <TickerDigestPanel
+        ref="dailyPanel"
+        label="AI DIGEST · DAILY"
+        :meta="daily ? formatDate(daily.period_end, 'monthDay').toUpperCase() : '—'"
+      >
+        <Markdown
+          v-if="daily"
+          :value="dailyParts.prose"
+        />
+        <p
+          v-else
+          class="text-muted"
+        >
+          No daily digest yet.
+        </p>
+      </TickerDigestPanel>
+
       <TickerDigestPanel
         ref="weeklyPanel"
         label="AI DIGEST · WEEKLY"
         :meta="weekly ? weeklyPeriod : '—'"
+        class="mt-4.5"
       >
         <Markdown
           v-if="weekly"
@@ -41,24 +61,6 @@
           </div>
         </div>
       </div>
-
-      <TickerDigestPanel
-        ref="dailyPanel"
-        label="AI DIGEST · DAILY"
-        :meta="daily ? formatDate(daily.period_end, 'monthDay').toUpperCase() : '—'"
-        class="mt-4.5"
-      >
-        <Markdown
-          v-if="daily"
-          :value="dailyParts.prose"
-        />
-        <p
-          v-else
-          class="text-muted"
-        >
-          No daily digest yet.
-        </p>
-      </TickerDigestPanel>
     </div>
 
     <!-- TICKER lives down here (Jim's call — no cutout in the bubbles), with the

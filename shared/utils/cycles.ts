@@ -9,6 +9,11 @@
 // cadences for the adherence panel and calendar rings, synthetic future doses for the PK
 // overlay, and lab-draw checkpoints.
 //
+// A start you haven't picked yet is a first-class state: start_precision 'month'/'quarter'
+// means the plan is on file for "sometime in Oct 2026" with start_date holding only an anchor.
+// Those cycles derive nothing dated (see isTentative) — the anchor is never mistaken for a
+// commitment — which is why start_date stays non-null and all the math below stays total.
+//
 // Shared (app + server) because the pages and the AI prompt context (cycleContext in
 // server/utils/protocol.ts) must agree on the same status/day/window math.
 
@@ -27,12 +32,24 @@ export interface CyclePlanItem {
   toWeek?: number | null
 }
 
+/**
+ * How much of a cycle's `start_date` is an actual commitment. 'day' is a picked start; 'month'
+ * and 'quarter' mean "sometime in Oct 2026" / "sometime in Q4 2026" — the plan is on file but
+ * not scheduled, so nothing dated may be derived from it (see isTentative).
+ */
+export type StartPrecision = 'day' | 'month' | 'quarter'
+
 export interface Cycle {
   id?: number
   name: string
   goal?: string | null
-  /** YYYY-MM-DD. Week 1 day 1. */
+  /**
+   * YYYY-MM-DD. Week 1 day 1 at 'day' precision; otherwise the first day of the target month
+   * or quarter, standing in as an anchor for a start that hasn't been picked yet.
+   */
   start_date: string
+  /** Absent on rows written before tentative starts existed — reads as 'day'. */
+  start_precision?: StartPrecision
   planned_weeks: number
   /** Set when the cycle is ended off-plan (early on bad labs, or extended); null = as planned. */
   actual_end?: string | null
@@ -57,7 +74,62 @@ export interface CycleRule {
  * Keys match app/data/biomarkers.ts. */
 export const GATING_MARKERS = ['hdl', 'ldl', 'alt', 'ast', 'hematocrit', 'ferritin', 'estradiol']
 
+/** How stale a draw may be and still read as a cycle's pre-start baseline. */
+export const BASELINE_LOOKBACK_DAYS = 45
+
 const DAY_MS = 86400000
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+export function startPrecisionOf(cycle: Cycle): StartPrecision {
+  return cycle.start_precision ?? 'day'
+}
+
+/**
+ * True when `start_date` is a placeholder for a month or quarter rather than a picked day.
+ *
+ * A tentative cycle is deliberately inert: it has no real timeline, so its cadence rules,
+ * planned doses, and checkpoint windows all come back empty, and it never leaves 'upcoming'.
+ * That keeps guessed dates from manufacturing calendar rings, adherence expectations, and
+ * lab-draw deadlines that nobody actually planned. Setting a day is what brings it to life.
+ */
+export function isTentative(cycle: Cycle): boolean {
+  return startPrecisionOf(cycle) !== 'day'
+}
+
+/** 1-4 for the quarter containing a 1-based month. */
+function quarterOf(month: number): number {
+  return Math.floor((month - 1) / 3) + 1
+}
+
+/**
+ * The canonical anchor for a precision: the first day of the month or quarter containing
+ * `date`. Storing only anchors means "Oct 2026" is one date, not whichever day was on screen
+ * when the precision was switched.
+ */
+export function startAnchor(date: string, precision: StartPrecision): string {
+  if (precision === 'day') return date
+  const [year, month] = date.split('-').map(Number) as [number, number]
+  const anchorMonth = precision === 'quarter' ? (quarterOf(month) - 1) * 3 + 1 : month
+  return `${year}-${String(anchorMonth).padStart(2, '0')}-01`
+}
+
+/** How an anchor date reads at a coarse precision: "Oct 2026", "Q4 2026". */
+export function periodLabel(anchor: string, precision: 'month' | 'quarter'): string {
+  const [year, month] = anchor.split('-').map(Number) as [number, number]
+  return precision === 'quarter'
+    ? `Q${quarterOf(month)} ${year}`
+    : `${MONTH_NAMES[month - 1]} ${year}`
+}
+
+/**
+ * How a tentative start reads — "Oct 2026", "Q4 2026" — or null at 'day' precision, so
+ * callers fall through to their own exact-date formatting (formatDate lives in the app layer).
+ */
+export function tentativeStartLabel(cycle: Cycle): string | null {
+  const precision = startPrecisionOf(cycle)
+  return precision === 'day' ? null : periodLabel(cycle.start_date, precision)
+}
 
 export function shiftDays(date: string, n: number): string {
   const d = new Date(date + 'T12:00:00')
@@ -81,6 +153,10 @@ export function cycleEnd(cycle: Cycle): string {
 }
 
 export function cycleStatusOn(cycle: Cycle, today: string): CycleStatus {
+  // A tentative cycle can't be under way or over — it has no committed start to have passed.
+  // It stays upcoming however long its placeholder month sits in the past, which is also the
+  // nudge: a plan you never scheduled keeps showing up as unstarted.
+  if (isTentative(cycle)) return 'upcoming'
   if (today < cycle.start_date) return 'upcoming'
   return today > cycleEnd(cycle) ? 'done' : 'active'
 }
@@ -122,6 +198,12 @@ export function itemWindow(cycle: Cycle, item: CyclePlanItem): { from: string, t
 
 /** The plan as dated cadence rules — the shape computeAdherence/scheduledFor consume. */
 export function cycleRules(cycle: Cycle): CycleRule[] {
+  // No committed start, no dated cadence. This is the single choke point every scoring
+  // consumer reaches through (mergeRules → effectiveRules → calendar rings, cycleAdherence),
+  // so returning nothing here is what keeps a tentative plan from putting rings on guessed
+  // weekdays, overriding the standing schedule, or being scored against days it never claimed.
+  if (isTentative(cycle)) return []
+
   const out: CycleRule[] = []
   for (const item of cycle.compounds) {
     const window = itemWindow(cycle, item)
@@ -182,6 +264,12 @@ export function mergeRules(standing: CycleRule[], cycles: Cycle[]): CycleRule[] 
 /** Every date a plan item calls for a dose of `compound`, as synthetic PkDose rows — the
  * planned exposure curve is just the real Bateman engine fed this instead of the dose log. */
 export function plannedDoses(cycle: Cycle, compound: string): PkDose[] {
+  // Deliberately NOT gated on isTentative, unlike cycleRules: the dose *count* here is
+  // week-relative and so is real for a tentative plan — it's what stock coverage sums to
+  // answer "is the fridge deep enough for this run?", the question you ask precisely while
+  // the date is still loose. Only the dates attached to each dose are provisional, so it's
+  // the one consumer that plots them on a real axis (the dossier's exposure overlay) that
+  // opts out, not this.
   const dates: PkDose[] = []
   for (const item of cycle.compounds) {
     if (item.compound !== compound) continue
@@ -210,11 +298,17 @@ export interface CycleCheckpoint {
 }
 
 export function cycleCheckpoints(cycle: Cycle): CycleCheckpoint[] {
+  // Every window is start-relative, so a tentative cycle has none to offer — a "mid-cycle
+  // draw due Nov 15" derived from a guessed October would be an invented deadline. The advice
+  // that survives ("have a fresh draw in hand when you pick a date") is presentation, not a
+  // dated checkpoint, and lives in the views.
+  if (isTentative(cycle)) return []
+
   const start = cycle.start_date
   const end = cycleEnd(cycle)
   const out: CycleCheckpoint[] = [
     // A draw a day or two into the run still reads as baseline for slow esters.
-    { key: 'baseline', label: 'baseline draw', windowFrom: shiftDays(start, -45), windowTo: shiftDays(start, 1) }
+    { key: 'baseline', label: 'baseline draw', windowFrom: shiftDays(start, -BASELINE_LOOKBACK_DAYS), windowTo: shiftDays(start, 1) }
   ]
   const mid = shiftDays(start, Math.floor((diffDays(start, end) + 1) / 2))
   // Short (or cut-short) cycles fold the mid check into the end one.
@@ -260,9 +354,12 @@ export function relevantCycle(cycles: Cycle[], today: string): Cycle | null {
     .sort((a, b) => b.start_date.localeCompare(a.start_date))
   if (active[0]) return active[0]
 
+  // A committed start outranks a tentative one, then soonest first: a run you've actually
+  // scheduled deserves the countdown even when a loose plan is anchored earlier.
   const upcoming = cycles
     .filter(c => cycleStatusOn(c, today) === 'upcoming')
-    .sort((a, b) => a.start_date.localeCompare(b.start_date))
+    .sort((a, b) =>
+      Number(isTentative(a)) - Number(isTentative(b)) || a.start_date.localeCompare(b.start_date))
   if (upcoming[0]) return upcoming[0]
 
   const recent = cycles

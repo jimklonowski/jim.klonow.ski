@@ -8,9 +8,19 @@
         <span
           v-if="cycle"
           class="text-[11px] tracking-[0.08em] uppercase border px-2 py-1"
-          :class="STATUS_CHIP[status]"
+          :class="STATUS_CHIP[chipKey]"
         >{{ statusLabel }}</span>
         <template v-if="isOwner && cycle">
+          <!-- Committing a date is what brings a tentative plan to life, so it gets the accent
+               button; the form opens straight in exact-date mode. -->
+          <button
+            v-if="tentativeStart"
+            type="button"
+            class="tui-btn tui-btn-accent"
+            @click="cycleForm?.open(cycle, { precision: 'day' })"
+          >
+            SET START DATE
+          </button>
           <button
             type="button"
             class="tui-btn"
@@ -60,13 +70,18 @@
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-b border-line">
         <div class="bg-bg px-4 sm:px-6 py-3.5">
           <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-            {{ status === 'upcoming' ? 'Starts' : status === 'active' ? 'Progress' : 'Ran' }}
+            {{ tentativeStart ? 'Planned' : status === 'upcoming' ? 'Starts' : status === 'active' ? 'Progress' : 'Ran' }}
           </p>
           <p class="num-display text-[28px] leading-none mt-1.5">
             {{ progressStat }}
           </p>
           <p class="text-[11px] text-muted mt-1">
-            {{ formatDate(cycle.start_date, 'monthDay') }} → {{ formatDate(endDate, 'monthDay') }}{{ cycle.actual_end ? ' · off-plan end' : '' }}
+            <template v-if="tentativeStart">
+              sometime in {{ tentativeStart }}
+            </template>
+            <template v-else>
+              {{ formatDate(cycle.start_date, 'monthDay') }} → {{ formatDate(endDate, 'monthDay') }}{{ cycle.actual_end ? ' · off-plan end' : '' }}
+            </template>
           </p>
         </div>
         <div class="bg-bg px-4 sm:px-6 py-3.5">
@@ -184,7 +199,9 @@
             label="SIGNALS ── vitals vs pre-cycle baseline"
             :dashes="0"
           >
-            <span class="text-[10px] text-muted normal-case">{{ status === 'upcoming' ? 'baseline forming · 4 wks pre-start' : 'last 2 wks vs 4 wks pre-start' }}</span>
+            <!-- "pre-target" rather than "pre-start" for a tentative cycle: the window is
+                 measured against an anchor month, not a date that's been committed to. -->
+            <span class="text-[10px] text-muted normal-case">{{ tentativeStart ? 'baseline forming · 4 wks pre-target' : status === 'upcoming' ? 'baseline forming · 4 wks pre-start' : 'last 2 wks vs 4 wks pre-start' }}</span>
           </TuiHeader>
           <div class="flex flex-col gap-1.5 mt-2.5">
             <div
@@ -270,13 +287,31 @@
           </div>
         </section>
 
-        <!-- Lab checkpoints, derived from the cycle dates -->
+        <!-- Lab checkpoints, derived from the cycle dates. A tentative start has none to
+             derive: every window is start-relative, and inventing them off a placeholder
+             month would put fake deadlines on the page. -->
         <section>
           <TuiHeader
             label="LAB CHECKPOINTS ── gating markers vs baseline"
             :dashes="0"
           />
-          <div class="flex flex-col gap-1.5 mt-2.5">
+          <div
+            v-if="tentativeStart"
+            class="mt-2.5 px-3 py-2.5 bg-inset border border-dashed border-line-input text-[11.5px] space-y-1"
+          >
+            <p :class="baselineAdvice.class">
+              {{ baselineAdvice.text }}
+            </p>
+            <p class="text-faint leading-[1.6]">
+              Dated windows — mid-cycle, end-of-cycle, recovery — appear once a start date is set.
+              Same for calendar rings, adherence scoring, and the planned-exposure overlay: they'd
+              all be derived from a guessed day until then.
+            </p>
+          </div>
+          <div
+            v-else
+            class="flex flex-col gap-1.5 mt-2.5"
+          >
             <div
               v-for="cp in checkpoints"
               :key="cp.key"
@@ -312,7 +347,10 @@
               </div>
             </div>
           </div>
-          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          <p
+            v-if="!tentativeStart"
+            class="mt-1.5 text-[11px] text-faint leading-[1.6]"
+          >
             Windows are derived from the cycle dates — nothing to schedule. Chips diff HDL/LDL, ALT/AST, hematocrit, ferritin, and estradiol against the baseline draw.
           </p>
         </section>
@@ -342,8 +380,8 @@ import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 import type { Cycle } from '#shared/utils/cycles'
 import {
-  GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
-  diffDays, doseLabelOf, plannedDoses, shiftDays
+  BASELINE_LOOKBACK_DAYS, GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress,
+  cycleStatusOn, diffDays, doseLabelOf, plannedDoses, shiftDays, tentativeStartLabel
 } from '#shared/utils/cycles'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
@@ -376,18 +414,28 @@ const totalWeeks = computed(() => progress.value?.totalWeeks ?? 0)
 const STATUS_CHIP: Record<string, string> = {
   active: 'text-accent border-line-accent',
   upcoming: 'text-hi border-line-soft',
+  tentative: 'text-dim border-line-soft',
   done: 'text-muted border-line-soft'
 }
 
+/** "Oct 2026"/"Q4 2026" while the start is only pencilled in, else null. */
+const tentativeStart = computed(() => cycle.value ? tentativeStartLabel(cycle.value) : null)
+
+const chipKey = computed(() => tentativeStart.value ? 'tentative' : status.value)
+
 const statusLabel = computed(() => {
   if (!cycle.value) return ''
+  if (tentativeStart.value) return `${tentativeStart.value.toUpperCase()} · NO DATE SET`
   if (status.value === 'active') return `DAY ${progress.value!.day}/${progress.value!.totalDays} · WK ${progress.value!.week} OF ${totalWeeks.value}`
   if (status.value === 'upcoming') return `STARTS IN ${diffDays(today, cycle.value.start_date)}D`
   return `DONE · ${progress.value!.totalDays}D`
 })
 
+// The headline stat cell. A tentative cycle has no countdown to show, so the length of the
+// plan is the one number that's actually settled.
 const progressStat = computed(() => {
   if (!cycle.value) return ''
+  if (tentativeStart.value) return `${cycle.value.planned_weeks} WKS`
   if (status.value === 'upcoming') return `${diffDays(today, cycle.value.start_date)}D`
   if (status.value === 'active') return `${progress.value!.pct}%`
   return `${totalWeeks.value} WKS`
@@ -465,6 +513,10 @@ const RUN_IN_DAYS = 14
 
 const overlayRows = computed(() => {
   if (!cycle.value) return []
+  // The x-axis here is real calendar dates, so a tentative start would draw peaks on days
+  // nobody committed to. plannedDoses itself stays honest for stock coverage (the totals are
+  // week-relative); it's this dated view that has to sit out until a day is picked.
+  if (tentativeStart.value) return []
   const from = shiftDays(cycle.value.start_date, -RUN_IN_DAYS)
   const to = endDate.value
   const actualCap = today < to ? today : to
@@ -592,9 +644,24 @@ function gatingChips(drawDate: string, baselineDate: string | null): GatingChip[
 }
 
 const nextCheckpointLabel = computed(() => {
+  if (tentativeStart.value) return 'baseline draw · before you start'
   const next = checkpoints.value.find(cp => cp.state === 'due' || cp.state === 'upcoming')
   if (!next) return '—'
   return `${next.label} · ${formatDate(next.windowFrom, 'monthDay')}–${formatDate(next.windowTo, 'monthDay')}`
+})
+
+/**
+ * With no committed start there is no dated checkpoint window, so the answerable question is
+ * whether a fresh enough draw is in hand to serve as baseline whenever the run begins.
+ * Mirrors the home strip's tentative draw line.
+ */
+const baselineAdvice = computed(() => {
+  const last = draws.value.at(-1) ?? null
+  if (!last) return { text: 'No draw on file — get a baseline before you start.', class: 'text-warn' }
+  const age = diffDays(last.date, today)
+  return age <= BASELINE_LOOKBACK_DAYS
+    ? { text: `The ${formatDate(last.date, 'monthDay')} draw is ${age}d old — it still works as a baseline if you start within ${BASELINE_LOOKBACK_DAYS}d of it.`, class: 'text-muted' }
+    : { text: `Last draw was ${age}d ago — get a fresh baseline before you start.`, class: 'text-warn' }
 })
 
 // --- passive vitals watch (shared/utils/cycleSignals) ---

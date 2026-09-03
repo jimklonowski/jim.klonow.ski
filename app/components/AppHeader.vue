@@ -22,7 +22,7 @@
       >
         <span class="text-accent text-[12px]">❯</span>
         <span class="text-muted text-[12px] truncate">jump to a marker, day, or compound…</span>
-        <span class="w-[7px] h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
+        <span class="w-1.75 h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
         <span class="ml-auto shrink-0 text-[10px] text-faint border border-line-input px-1.5 py-px">⌘K</span>
       </button>
 
@@ -55,7 +55,7 @@
 
       <!-- Session dot -->
       <span
-        class="w-[7px] h-[7px] rounded-full shrink-0"
+        class="w-1.75 h-1.75 rounded-full shrink-0"
         :class="role ? 'bg-accent glow-dot' : 'bg-line-accent'"
         :title="role ? `${role} session` : 'no session'"
       />

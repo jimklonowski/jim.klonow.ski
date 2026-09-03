@@ -5,16 +5,29 @@
       <h1 class="num-display text-hi text-[26px] leading-none">
         BLOODWORK
       </h1>
+      <span
+        v-if="timeTravelling"
+        class="text-[10.5px] tracking-[0.14em] uppercase text-accent bg-nav-active border border-line-accent px-2 py-px"
+      >◷ TIME TRAVEL</span>
       <p
         v-if="latest"
         class="text-[11px] text-muted tracking-[0.06em] uppercase"
       >
-        last draw <span class="text-hi font-medium">{{ formatDateTerse(latest.date) }}</span>
-        <template v-if="latest.fasting">
-          · fasting
+        <template v-if="timeTravelling">
+          viewing <span class="text-hi font-medium">{{ formatDateTerse(latest.date) }}</span>
+          · {{ drawsBack }} {{ drawsBack === 1 ? 'draw' : 'draws' }} back
+          <template v-if="latest.fasting">
+            · fasting
+          </template>
         </template>
-        <template v-if="pdfCount">
-          · {{ pdfCount }} source pdfs
+        <template v-else>
+          last draw <span class="text-hi font-medium">{{ formatDateTerse(latest.date) }}</span>
+          <template v-if="latest.fasting">
+            · fasting
+          </template>
+          <template v-if="pdfCount">
+            · {{ pdfCount }} source pdfs
+          </template>
         </template>
       </p>
 
@@ -120,7 +133,8 @@
           v-for="key in activeMarkers"
           :key="key"
           :biomarker-key="key"
-          :entries="entries"
+          :entries="visibleEntries"
+          :latest-value="timeTravelling ? newest?.markers[key] ?? null : null"
           :auto-open="key === linkedMarker"
         />
       </div>
@@ -212,9 +226,18 @@
           :label="BIOMARKERS[key]?.label ?? key"
           :unit="BIOMARKERS[key]?.unit"
           :data="chartData(key)"
+          :mark-lines="timeTravelling && latest ? [formatDate(latest.date, 'monthDay')] : []"
         />
       </div>
     </section>
+
+    <!-- Time travel: scrub the whole page back to an earlier draw. Sticky, so it stays in
+         reach while the cards scroll, and settles above the footer at the end. -->
+    <LabsTimeScrubber
+      v-if="entries.length >= 2"
+      v-model="viewedDate"
+      :entries="entries"
+    />
 
     <!-- Full echo findings -->
     <UModal
@@ -283,12 +306,15 @@
 <script setup lang="ts">
 import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
+import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
 
 definePageMeta({ middleware: 'labs-auth' })
 useSeoMeta({ title: 'Labs' })
 
 const { data, refresh, error } = await useLabsEntries()
 const { isOwner } = await useAuth()
+const route = useRoute()
+const router = useRouter()
 
 // Re-fetch on every mount so back-navigation doesn't show stale/empty data
 if (import.meta.client) {
@@ -296,7 +322,26 @@ if (import.meta.client) {
 }
 
 const entries = computed(() => data.value ?? [])
-const latest = computed(() => entries.value.at(-1) ?? null)
+
+// --- time travel ---
+// The scrubber at the bottom picks a draw, and everything above it is computed from the draws on
+// or before that date — so the cards, tab counts, summary and echo panel all read as they did
+// then. The viewed date lives in the URL (?asof=YYYY-MM-DD) so a scrubbed view survives a
+// refresh and can be linked to; the latest draw is the absence of the param.
+const drawDates = computed(() => entriesAsOf(entries.value, null).map(e => e.date))
+const viewedDate = computed<string | null>({
+  get: () => resolveAsOf(drawDates.value, route.query.asof),
+  set: (date) => {
+    const { asof: _, ...query } = route.query
+    router.replace({ query: date ? { ...query, asof: date } : query })
+  }
+})
+const timeTravelling = computed(() => viewedDate.value !== null)
+const visibleEntries = computed(() => entriesAsOf(entries.value, viewedDate.value))
+/** The draw being viewed — the newest one when not time-travelling. */
+const latest = computed(() => visibleEntries.value.at(-1) ?? null)
+const newest = computed(() => entriesAsOf(entries.value, null).at(-1) ?? null)
+const drawsBack = computed(() => latest.value ? drawDates.value.length - 1 - drawDates.value.indexOf(latest.value.date) : 0)
 
 // --- category tabs ---
 const CATEGORY_SHORT: Record<Category, string> = {
@@ -312,7 +357,7 @@ function byCategory(cat: Category) {
   return Object.entries(BIOMARKERS)
     .filter(([, m]) => m.category === cat)
     // Only markers this draw history actually has readings for — an empty card is noise.
-    .filter(([key]) => entries.value.some(e => e.markers[key] != null))
+    .filter(([key]) => visibleEntries.value.some(e => e.markers[key] != null))
     .map(([key]) => key)
 }
 
@@ -328,7 +373,6 @@ const categories = computed(() =>
 // lands on the marker's category tab with its detail modal open. Reactive rather than
 // read-once because the palette can retarget the query while already on this page —
 // a query-only change doesn't remount the page.
-const route = useRoute()
 const linkedMarker = computed(() => {
   const key = route.query.marker
   return typeof key === 'string' && BIOMARKERS[key] ? key : null
@@ -340,7 +384,6 @@ const activeCategory = ref<Category>(linkedMarker.value ? BIOMARKERS[linkedMarke
 // URL so a refresh or copied link doesn't re-open the modal. On first mount the cards
 // have already opened by parent onMounted; on a palette retarget the card's autoOpen
 // watcher fires during the update flushed by nextTick, so clearing after it is safe.
-const router = useRouter()
 function clearMarkerQuery() {
   if (!route.query.marker) return
   const { marker: _, ...query } = route.query
@@ -357,9 +400,9 @@ watch(linkedMarker, async (key) => {
 const activeMarkers = computed(() => byCategory(activeCategory.value))
 
 // --- AI summary ---
-// Most recent draw that has a generated summary — older draws predate the feature.
+// Most recent visible draw that has a generated summary — older draws predate the feature.
 const latestSummary = computed(() => {
-  const entry = [...entries.value].reverse().find(e => e.ai_summary)
+  const entry = [...visibleEntries.value].reverse().find(e => e.ai_summary)
   return entry ? { date: entry.date, text: entry.ai_summary as string } : null
 })
 
@@ -441,7 +484,7 @@ function isEcho(item: { name: string, category?: string }) {
 }
 
 const allQualitativeResults = computed(() =>
-  [...entries.value]
+  [...visibleEntries.value]
     .sort((a, b) => b.date.localeCompare(a.date))
     .flatMap(e => (e.qualitative ?? []).map(q => ({ ...q, date: e.date })))
 )

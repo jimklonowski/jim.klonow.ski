@@ -22,7 +22,10 @@
     </div>
 
     <div class="flex items-baseline gap-1.5 mt-2">
-      <span class="num-display text-[26px] leading-none">{{ displayValue }}</span>
+      <span
+        class="num-display text-[26px] leading-none"
+        :class="carried ? 'text-dim' : ''"
+      ><TuiRollingNumber :value="displayValue" /></span>
       <span
         v-if="meta.unit"
         class="text-[10.5px] text-muted"
@@ -34,13 +37,18 @@
       :value="current"
       :meta="meta"
       :height="5"
+      :ghost="latestValue"
       class="mt-3"
     />
 
     <div class="flex items-baseline justify-between gap-2 mt-2 text-[10.5px]">
       <span class="text-muted truncate">{{ rangeCaption }}</span>
       <span
-        v-if="deltaText"
+        v-if="carried && carriedFrom"
+        class="shrink-0 text-faint"
+      >as of {{ formatDate(carriedFrom, 'monthDay') }}</span>
+      <span
+        v-else-if="deltaText"
         class="shrink-0"
         :class="deltaClass"
       >{{ deltaText }}</span>
@@ -138,6 +146,12 @@ const props = defineProps<{
   entries: Array<{ date: string, markers: Record<string, number | null> }>
   /** Open the detail modal on mount — set when a ?marker= deep link targets this card. */
   autoOpen?: boolean
+  /**
+   * This marker's value on the newest draw, when `entries` has been cut off at an older one by
+   * the time scrubber. Drawn as a hollow ring on the range bar so you can see where you've come
+   * from. Leave unset when the card is showing the present.
+   */
+  latestValue?: number | null
 }>()
 
 const STATUS_COLORS = {
@@ -179,6 +193,12 @@ const current = computed(() => withValue.value.at(-1)?.markers[props.biomarkerKe
 const prev = computed(() =>
   withValue.value.length >= 2 ? (withValue.value.at(-2)?.markers[props.biomarkerKey] ?? null) : null
 )
+
+// The newest entry passed in is the draw being viewed. A marker that wasn't on that panel still
+// shows its most recent reading, but as carried forward — dimmed, dated, and without a delta
+// that would otherwise compare two draws neither of which is the one on screen.
+const carriedFrom = computed(() => withValue.value.at(-1)?.date ?? null)
+const carried = computed(() => current.value != null && carriedFrom.value !== sorted.value.at(-1)?.date)
 
 const hasRange = computed(() => meta.value.refMin !== undefined || meta.value.refMax !== undefined)
 

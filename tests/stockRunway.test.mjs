@@ -67,3 +67,17 @@ test('an early actual_end shrinks the need', () => {
 test('a finished cycle has no coverage rows', () => {
   assert.deepEqual(cycleCoverage(run(), '2027-02-01', stock({})), [])
 })
+
+test('a tentative cycle needs its whole plan, whenever you ask', () => {
+  const tentative = run({ start_precision: 'month', start_date: '2026-10-01' })
+  const whole = asOf => cycleCoverage(tentative, asOf, stock({}))
+    .find(r => r.compound === 'Methenolone Enanthate').needed
+
+  // Stocking for an unscheduled run is the whole point of asking, so the requirement is the
+  // full plan — before the anchor month, inside it, and long after it slid by without a start.
+  assert.equal(whole('2026-09-01'), 6400)
+  assert.equal(whole('2026-10-15'), 6400)
+  assert.equal(whole('2027-06-01'), 6400)
+  // A committed cycle still discounts what's behind it, and still retires when it's over.
+  assert.equal(cycleCoverage(run({ start_date: '2026-10-01' }), '2027-06-01', stock({})).length, 0)
+})
