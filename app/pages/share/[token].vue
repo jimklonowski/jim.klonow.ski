@@ -11,7 +11,7 @@
 
         <div class="flex items-start gap-2.5 mt-3">
           <span
-            class="mt-1.5 w-[7px] h-[7px] rounded-full shrink-0"
+            class="mt-1.5 w-1.75 h-1.75 rounded-full shrink-0"
             :class="view.dotClass"
           />
           <div class="min-w-0">
@@ -26,14 +26,14 @@
 
         <p
           v-if="state === 'working'"
-          class="flex items-center gap-2 mt-3 text-[11px] text-faint tracking-[0.1em] uppercase"
+          class="flex items-center gap-2 mt-3 text-[11px] text-faint tracking-widest uppercase"
         >
-          <span class="w-[7px] h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
+          <span class="w-1.75 h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
           exchanging token
         </p>
         <p
           v-else-if="state === 'error'"
-          class="mt-3 text-[11px] text-faint tracking-[0.1em] uppercase"
+          class="mt-3 text-[11px] text-faint tracking-widest uppercase"
         >
           <NuxtLink
             to="/"
@@ -42,7 +42,7 @@
         </p>
       </div>
 
-      <p class="mt-2.5 text-[10.5px] text-ghost tracking-[0.1em] uppercase">
+      <p class="mt-2.5 text-[10.5px] text-ghost tracking-widest uppercase">
         read-only share link · single redemption per session
       </p>
     </div>

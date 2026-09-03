@@ -25,7 +25,7 @@
     <!-- Value marker -->
     <div
       v-if="dotStyle"
-      class="absolute rounded-full -translate-x-1/2 transition-[left,background-color] duration-[420ms] ease-[cubic-bezier(0.22,0.8,0.2,1)] motion-reduce:transition-none"
+      class="absolute rounded-full -translate-x-1/2 transition-[left,background-color] duration-420 ease-[cubic-bezier(0.22,0.8,0.2,1)] motion-reduce:transition-none"
       :style="dotStyle"
     />
   </div>

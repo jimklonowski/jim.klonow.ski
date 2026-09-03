@@ -8,7 +8,7 @@
         :key="row.label"
         class="flex items-baseline gap-2"
       >
-        <span class="w-[74px] shrink-0 text-[11px] text-muted">{{ row.label }}</span>
+        <span class="w-18.5 shrink-0 text-[11px] text-muted">{{ row.label }}</span>
         <span
           class="num-display text-[21px] leading-none"
           :class="row.accentValue ? 'text-accent' : 'text-hi'"

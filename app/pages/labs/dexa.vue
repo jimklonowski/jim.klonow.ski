@@ -86,8 +86,8 @@
             class="flex items-center gap-3"
             :class="row.spaced ? 'mt-1' : ''"
           >
-            <span class="w-[92px] sm:w-[150px] shrink-0 text-right text-dim">{{ row.label }}</span>
-            <div class="relative flex-1 min-w-[40px] h-3 bg-raised">
+            <span class="w-23 sm:w-37.5 shrink-0 text-right text-dim">{{ row.label }}</span>
+            <div class="relative flex-1 min-w-10 h-3 bg-raised">
               <div
                 class="absolute inset-y-0 left-0 bg-warn"
                 :style="{ width: row.fatWidth }"
@@ -97,8 +97,8 @@
                 :style="{ left: row.fatWidth, width: row.leanWidth }"
               />
             </div>
-            <span class="w-[48px] shrink-0 text-hi">{{ row.pct }}</span>
-            <span class="w-[128px] sm:w-[180px] shrink-0 text-muted">{{ row.detail }}</span>
+            <span class="w-12 shrink-0 text-hi">{{ row.pct }}</span>
+            <span class="w-32 sm:w-45 shrink-0 text-muted">{{ row.detail }}</span>
           </div>
         </div>
 

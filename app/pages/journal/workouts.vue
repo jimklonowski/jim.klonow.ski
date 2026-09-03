@@ -25,7 +25,7 @@
         :key="cell.label"
         class="bg-bg px-4 py-2.5"
       >
-        <p class="text-[9.5px] text-faint uppercase tracking-[0.1em]">
+        <p class="text-[9.5px] text-faint uppercase tracking-widest">
           {{ cell.label }}
         </p>
         <p class="num-display text-[21px] leading-none mt-1">
@@ -40,7 +40,7 @@
       </div>
 
       <div class="bg-bg px-4 py-2.5 col-span-2 lg:col-span-1">
-        <p class="text-[9.5px] text-faint uppercase tracking-[0.1em]">
+        <p class="text-[9.5px] text-faint uppercase tracking-widest">
           Type mix · 90d
         </p>
         <div
