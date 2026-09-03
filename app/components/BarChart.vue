@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { CHART_AXIS, CHART_GRID, CHART_TEXT } from '~/utils/chartTheme'
+import { CHART_AXIS, CHART_GRID, CHART_TEXT, CHART_TOOLTIP_Z } from '~/utils/chartTheme'
 
 export interface BarTooltipPoint {
   seriesName?: string
@@ -88,7 +88,7 @@ const option = computed<ECOption>(() => ({
     padding: 0,
     borderWidth: 0,
     backgroundColor: 'transparent',
-    extraCssText: 'box-shadow: none;'
+    extraCssText: `${CHART_TOOLTIP_Z}box-shadow:none;`
   },
   legend: {
     show: props.showLegend,
