@@ -16,10 +16,16 @@
       class="absolute h-full bg-[#1e3a2e]"
       :style="optimalStyle"
     />
+    <!-- Where the newest reading sits, while an older draw is being viewed -->
+    <div
+      v-if="ghostStyle"
+      class="absolute rounded-full -translate-x-1/2 border-[1.5px] border-[#5d7a6d] bg-raised"
+      :style="ghostStyle"
+    />
     <!-- Value marker -->
     <div
       v-if="dotStyle"
-      class="absolute rounded-full -translate-x-1/2"
+      class="absolute rounded-full -translate-x-1/2 transition-[left,background-color] duration-[420ms] ease-[cubic-bezier(0.22,0.8,0.2,1)] motion-reduce:transition-none"
       :style="dotStyle"
     />
   </div>
@@ -36,9 +42,15 @@ const props = withDefaults(defineProps<{
   height?: number
   /** Dot diameter in px. */
   dotSize?: number
+  /**
+   * The newest reading, drawn as a hollow ring when the bar is showing an older one (the labs
+   * time scrubber) so the eye keeps its bearings. Omitted or equal to `value`: no ring.
+   */
+  ghost?: number | null
 }>(), {
   height: 4,
-  dotSize: 8
+  dotSize: 8,
+  ghost: null
 })
 
 const STATUS_COLORS = {
@@ -93,6 +105,16 @@ const dotStyle = computed(() => {
     width: `${props.dotSize}px`,
     height: `${props.dotSize}px`,
     background: STATUS_COLORS[status]
+  }
+})
+
+const ghostStyle = computed(() => {
+  if (props.ghost == null || props.ghost === props.value) return null
+  return {
+    left: `${toPercent(props.ghost)}%`,
+    top: `${(props.height - props.dotSize) / 2}px`,
+    width: `${props.dotSize}px`,
+    height: `${props.dotSize}px`
   }
 })
 </script>

@@ -44,8 +44,12 @@
       ? 'lg:grid-cols-[390px_minmax(480px,1fr)_400px]'
       : 'lg:grid-cols-[390px_minmax(480px,1fr)]'"
   >
-    <!-- Panel dividers are the grid's own background showing through 1px gaps. -->
-    <section class="bg-bg px-6 pt-4 pb-5">
+    <!-- Panel dividers are the grid's own background showing through 1px gaps.
+         Every section needs min-w-0: stacked to one auto column on mobile, the track's
+         automatic minimum is its widest item's min-content width, so a long unbreakable
+         row (a cycle plan line, say) widens the grid past the viewport and the page
+         scrolls sideways under a header that stayed put. -->
+    <section class="bg-bg px-6 pt-4 pb-5 min-w-0">
       <!-- tour ids sit on the compact components, not the sections — a full-height column
            as the popover anchor pushes the tour popover to the viewport edge. -->
       <HomeVitals
@@ -222,7 +226,7 @@
     -->
     <section
       v-if="isFullAccess"
-      class="bg-bg px-6 pt-4 pb-5 lg:max-h-[calc(100dvh-7.25rem)] lg:flex lg:flex-col lg:min-h-0"
+      class="bg-bg px-6 pt-4 pb-5 min-w-0 lg:max-h-[calc(100dvh-7.25rem)] lg:flex lg:flex-col lg:min-h-0"
     >
       <HomeDigest
         id="tour-digest"

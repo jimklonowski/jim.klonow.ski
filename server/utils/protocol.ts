@@ -6,9 +6,10 @@
 // the `supplements` table and is rendered per-request by supplementContext(), so edits on
 // /journal/supplements flow into the AI prompts without a deploy.
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
-import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
+import type { Cycle, CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
 import {
-  checkpointStates, cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf
+  BASELINE_LOOKBACK_DAYS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
+  diffDays, doseLabelOf, isTentative, tentativeStartLabel
 } from '#shared/utils/cycles'
 import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
@@ -72,6 +73,10 @@ const GATING_PROSE = 'the gating markers (lipids — especially HDL — ALT/AST,
 // stays relevant (recovery draws land ~4-6 weeks post-end; marker normalization takes longer).
 const UPCOMING_HORIZON_DAYS = 60
 const DONE_RELEVANCE_DAYS = 120
+// Tentative plans get a wider, symmetric window: planning talk runs further ahead than a
+// committed start, and an anchor month that has come and gone without the run starting is
+// itself worth knowing ("that October plan never happened").
+const TENTATIVE_HORIZON_DAYS = 120
 
 // Planned cycles as they stood on `asOf`, rendered as prompt paragraphs — the counterpart of
 // supplementContext for the cycles table. asOf matters for the same reason: lab summaries can
@@ -98,6 +103,7 @@ export async function cycleContext(db: D1Database, asOf: string): Promise<string
     name: row.name as string,
     goal: (row.goal as string | null) ?? null,
     start_date: row.start_date as string,
+    start_precision: (row.start_precision as StartPrecision | undefined) ?? 'day',
     planned_weeks: row.planned_weeks as number,
     actual_end: (row.actual_end as string | null) ?? null,
     compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
@@ -157,6 +163,18 @@ export async function cycleContext(db: D1Database, asOf: string): Promise<string
 
       paragraphs.push(
         `PLANNED CYCLE — ACTIVE: "${cycle.name}", day ${p.day} of ${p.totalDays} (week ${p.week} of ${p.totalWeeks}; started ${cycle.start_date}, runs through ${end}${cycle.actual_end ? ', ended off-plan' : ''}).${goal} Plan: ${plan}. This layers on the standing schedule above — where the same compound appears in both, the cycle dose replaces the standing one for its window. Anchor interpretation to cycle timing: ${baselineLine}, and weigh whether each shift tracks the cycle's start before attributing it elsewhere.${signalsLine}${notes}`
+      )
+    }
+    // No committed start: intent on file, not a schedule. Said explicitly, because the model
+    // would otherwise read the anchor date as a start and count days to it.
+    else if (isTentative(cycle) && Math.abs(diffDays(asOf, cycle.start_date)) <= TENTATIVE_HORIZON_DAYS) {
+      const lastDraw = drawDates.at(-1) ?? null
+      const drawAge = lastDraw ? diffDays(lastDraw, asOf) : null
+      const baselineLine = drawAge != null && drawAge <= BASELINE_LOOKBACK_DAYS
+        ? `The ${lastDraw} draw is recent enough (${drawAge} days old) to serve as the pre-cycle baseline if the run starts soon.`
+        : `No draw is recent enough to serve as a baseline (${lastDraw ? `latest is ${lastDraw}, ${drawAge} days old` : 'none on file'}) — getting one before the run starts matters more than anything else about this plan; say so when labs come up.`
+      paragraphs.push(
+        `PLANNED CYCLE — NOT SCHEDULED: "${cycle.name}", pencilled in for ${tentativeStartLabel(cycle)}, ${cycle.planned_weeks} weeks planned.${goal} Plan: ${plan}. No start date is committed — treat this as intent, not a schedule: do not state or imply a start date, do not count days to it, and treat none of it as active or upcoming exposure. ${baselineLine}${notes}`
       )
     }
     else if (status === 'upcoming' && diffDays(asOf, cycle.start_date) <= UPCOMING_HORIZON_DAYS) {
