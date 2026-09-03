@@ -4,7 +4,7 @@
 
 // Explicit .ts extension: this import carries runtime values, and the plain-node test runner
 // (type stripping, no bundler) can't resolve it extensionless the way Vite does.
-import { plannedDoses, cycleStatusOn, type Cycle, type CyclePlanItem } from './cycles.ts'
+import { plannedDoses, cycleStatusOn, isTentative, type Cycle, type CyclePlanItem } from './cycles.ts'
 
 export interface CycleCoverage {
   compound: string
@@ -23,6 +23,10 @@ export interface CycleCoverage {
  * mid-cycle the question is "can I finish?", not "could I have started?". A compound's unit
  * comes from its first plan item; plans that mix units for one compound aren't supported
  * (the form never produces them).
+ *
+ * A tentative cycle (no committed start) counts its whole plan instead: nothing has been
+ * taken, so no dose is genuinely "behind" — and once such a plan's anchor month slid into the
+ * past, an asOf filter would quietly zero the requirement and report a full fridge.
  */
 export function cycleCoverage(
   cycle: Cycle,
@@ -30,13 +34,14 @@ export function cycleCoverage(
   getOnHand: (compound: string, unit: CyclePlanItem['unit']) => number | null
 ): CycleCoverage[] {
   if (cycleStatusOn(cycle, asOf) === 'done') return []
+  const wholePlan = isTentative(cycle)
   const unitByCompound = new Map<string, CyclePlanItem['unit']>()
   for (const item of cycle.compounds) {
     if (!unitByCompound.has(item.compound)) unitByCompound.set(item.compound, item.unit)
   }
   return [...unitByCompound.entries()].map(([compound, unit]) => {
     const needed = plannedDoses(cycle, compound)
-      .filter(d => d.date >= asOf)
+      .filter(d => wholePlan || d.date >= asOf)
       .reduce((s, d) => s + d.amount, 0)
     const onHand = getOnHand(compound, unit)
     const short = Math.max(0, needed - (onHand ?? 0))

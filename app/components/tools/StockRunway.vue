@@ -9,8 +9,12 @@
         :label="`CYCLE RUNWAY · ${cycle.name.toUpperCase()}`"
         :dashes="5"
       >
+        <!-- A tentative cycle covers its whole plan (nothing is behind a start that hasn't
+             happened), so it says the period rather than a start date. -->
         <span class="text-[10.5px] text-muted normal-case">
-          {{ cycleStatus === 'upcoming' ? `starts ${formatDate(cycle.start_date, 'monthDay')}` : 'doses still ahead of today' }}
+          {{ tentativeStart
+            ? `whole plan · ${tentativeStart}`
+            : cycleStatus === 'upcoming' ? `starts ${formatDate(cycle.start_date, 'monthDay')}` : 'doses still ahead of today' }}
         </span>
       </TuiHeader>
 
@@ -94,7 +98,7 @@ import { getCompoundColor } from '~/data/journal'
 import type { Vial, JournalEntry } from '~/data/journal'
 import { computeRemaining, estimateDailyRate } from '~/utils/vialInventory'
 import { convertUnitFor, type MixUnit } from '~/utils/peptideCalc'
-import { relevantCycle, cycleStatusOn, shiftDays } from '#shared/utils/cycles'
+import { relevantCycle, cycleStatusOn, shiftDays, tentativeStartLabel } from '#shared/utils/cycles'
 import { cycleCoverage, type CycleCoverage } from '#shared/utils/stockRunway'
 
 const props = defineProps<{
@@ -133,6 +137,7 @@ const cycle = computed(() => {
 })
 
 const cycleStatus = computed(() => cycle.value ? cycleStatusOn(cycle.value, props.today) : null)
+const tentativeStart = computed(() => cycle.value ? tentativeStartLabel(cycle.value) : null)
 
 function onHandIn(compound: string, unit: MixUnit): number | null {
   const stock = stockByCompound.value.get(compound)

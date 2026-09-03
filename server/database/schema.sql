@@ -157,11 +157,18 @@ CREATE TABLE IF NOT EXISTS supplements (
 -- extended); status (upcoming/active/done) is always derived from the dates, never stored.
 -- Read by the adherence panel, calendar rings, home dashboard strip, and the AI prompt
 -- context (cycleContext in server/utils/protocol.ts).
+--
+-- start_precision records how much of start_date is a commitment: 'day' is a picked start,
+-- while 'month'/'quarter' mean "sometime in Oct 2026" / "sometime in Q4 2026" and store only
+-- the first day of that month/quarter as an anchor. Tentative cycles stay 'upcoming' and
+-- derive nothing dated — no rings, no adherence, no checkpoint windows (shared/utils/cycles.ts
+-- :isTentative) — so a guessed date can't invent expectations.
 CREATE TABLE IF NOT EXISTS cycles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   goal TEXT,
   start_date TEXT NOT NULL,
+  start_precision TEXT NOT NULL DEFAULT 'day',  -- 'day' | 'month' | 'quarter'; see below
   planned_weeks INTEGER NOT NULL,
   actual_end TEXT,
   compounds TEXT NOT NULL DEFAULT '[]',
@@ -230,3 +237,8 @@ CREATE TABLE IF NOT EXISTS invites (
 --   ('Xyzal (levocetirizine)', '5 mg', 'supplement', 'active', 'daily', '2026-09-01', NULL,
 --    'Replaced the prior OTC allergy pill when that bottle ran out. Levocetirizine can be mildly sedating — worth weighing when sleep or HRV shifts',
 --    120, '2026-09-01T00:00:00.000Z');
+
+-- One-time migration, do not re-run after it lands on an environment:
+-- Tentative cycle starts (2026-09-03). Existing rows all have real picked dates, so the
+-- 'day' default backfills them correctly and nothing changes for them.
+-- ALTER TABLE cycles ADD COLUMN start_precision TEXT NOT NULL DEFAULT 'day';

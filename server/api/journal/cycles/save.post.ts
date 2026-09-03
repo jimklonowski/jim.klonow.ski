@@ -1,7 +1,9 @@
-import type { CyclePlanItem } from '#shared/utils/cycles'
+import type { CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
+import { startAnchor } from '#shared/utils/cycles'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const UNITS = new Set(['mg', 'mcg', 'iu'])
+const PRECISIONS = new Set<StartPrecision>(['day', 'month', 'quarter'])
 
 // The plan drives adherence scoring, calendar rings, and AI prompt context, so a malformed
 // item would quietly poison all three — validate the whole shape and 400 loudly instead.
@@ -42,8 +44,17 @@ export default defineEventHandler(async (event) => {
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   if (!name) throw createError({ statusCode: 400, message: 'Missing name field' })
 
-  const startDate = body.start_date as string
-  if (!DATE_RE.test(startDate ?? '')) throw createError({ statusCode: 400, message: 'Bad start_date' })
+  const rawStart = body.start_date as string
+  if (!DATE_RE.test(rawStart ?? '')) throw createError({ statusCode: 400, message: 'Bad start_date' })
+
+  // Absent precision means an older client (or the dossier's END TODAY round-trip, which posts
+  // the cycle back as-is) — 'day' keeps those saves behaving exactly as before.
+  const precision = (body.start_precision ?? 'day') as StartPrecision
+  if (!PRECISIONS.has(precision)) throw createError({ statusCode: 400, message: 'Bad start_precision' })
+
+  // Re-derive rather than trust: a month/quarter start is stored only as its anchor, so a
+  // stray day-of-month can't survive to be read back as a commitment.
+  const startDate = startAnchor(rawStart, precision)
 
   const weeks = Number(body.planned_weeks)
   if (!Number.isInteger(weeks) || weeks < 1 || weeks > 52) {
@@ -53,6 +64,11 @@ export default defineEventHandler(async (event) => {
   const actualEnd = body.actual_end == null || body.actual_end === '' ? null : body.actual_end as string
   if (actualEnd != null && (!DATE_RE.test(actualEnd) || actualEnd < startDate)) {
     throw createError({ statusCode: 400, message: 'Bad actual_end' })
+  }
+  // A cycle with no committed start can't have ended: it never began, and cycleStatusOn keeps
+  // it 'upcoming' regardless, so an actual_end here would be silently inert.
+  if (actualEnd != null && precision !== 'day') {
+    throw createError({ statusCode: 400, message: 'Set a start date before ending a cycle' })
   }
 
   const compounds = JSON.stringify(parseItems(body.compounds, weeks))
@@ -64,17 +80,17 @@ export default defineEventHandler(async (event) => {
   if (body.id != null) {
     await db.prepare(`
       UPDATE cycles SET
-        name = ?2, goal = ?3, start_date = ?4, planned_weeks = ?5, actual_end = ?6,
-        compounds = ?7, notes = ?8
+        name = ?2, goal = ?3, start_date = ?4, start_precision = ?5, planned_weeks = ?6,
+        actual_end = ?7, compounds = ?8, notes = ?9
       WHERE id = ?1
-    `).bind(body.id, name, goal, startDate, weeks, actualEnd, compounds, notes).run()
+    `).bind(body.id, name, goal, startDate, precision, weeks, actualEnd, compounds, notes).run()
     return { ok: true, id: body.id }
   }
 
   const result = await db.prepare(`
-    INSERT INTO cycles (name, goal, start_date, planned_weeks, actual_end, compounds, notes, created_at)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-  `).bind(name, goal, startDate, weeks, actualEnd, compounds, notes, new Date().toISOString()).run()
+    INSERT INTO cycles (name, goal, start_date, start_precision, planned_weeks, actual_end, compounds, notes, created_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+  `).bind(name, goal, startDate, precision, weeks, actualEnd, compounds, notes, new Date().toISOString()).run()
 
   return { ok: true, id: result.meta.last_row_id }
 })
