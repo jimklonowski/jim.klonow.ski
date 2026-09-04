@@ -2,7 +2,7 @@
   <div>
     <ToolsHeader
       section="INVENTORY"
-      meta="fridge stock &amp; active vial depletion"
+      meta="sealed stock &amp; active depletion"
     >
       <template #actions>
         <span
@@ -37,8 +37,8 @@
       v-if="!vials.length"
       class="px-4 sm:px-6 py-5 text-[12px] text-muted"
     >
-      Nothing tracked yet. Hit <span class="text-accent">✦ STOCK DUMP</span> and describe the fridge in one
-      sentence — it parses into rows, and the runway panel tells you whether the stockpile covers the next cycle.
+      Nothing tracked yet. Hit <span class="text-accent">✦ STOCK DUMP</span> and describe everything on hand — vials and
+      pill bottles — in one sentence. It parses into rows, and the runway panel tells you whether the stockpile covers the next cycle.
     </p>
 
     <div class="px-4 sm:px-6 py-4 space-y-5">
@@ -61,7 +61,7 @@
         <StatTile
           label="Sealed"
           :value="sealedCount"
-          unit="vials"
+          :unit="sealedNoun"
         />
         <StatTile
           label="Next to run out"
@@ -72,15 +72,15 @@
         <StatTile
           label="Expiring soon"
           :value="expiringCount"
-          unit="vials"
+          :unit="expiringNoun"
           :subtext="expiringCount ? 'check the dates below' : 'nothing in the window'"
         />
       </div>
 
-      <!-- Active vials -->
+      <!-- Active stock -->
       <section v-if="activeProjections.length">
         <TuiHeader
-          :label="`ACTIVE VIALS · ${activeVials.length}`"
+          :label="`ACTIVE ${activeNoun.toUpperCase()} · ${activeVials.length}`"
           :dashes="7"
         >
           <span class="text-[10.5px] text-muted normal-case">depletion projected from logged doses</span>
@@ -116,19 +116,19 @@
                 <button
                   type="button"
                   class="shrink-0 px-1 text-[14px] leading-none text-faint hover:text-accent cursor-pointer"
-                  aria-label="Vial actions"
+                  :aria-label="`${vial.compound} actions`"
                 >
                   ⋯
                 </button>
               </UDropdownMenu>
             </div>
 
-            <!-- depletion bar -->
+            <!-- depletion bar: a bottle counts down in tabs, a vial in its labeled unit -->
             <div class="mt-2.5">
               <div class="flex items-baseline justify-between gap-2">
                 <span class="text-[12px]">
-                  <span class="num-display text-[16px]">{{ roundAmount(proj.remaining) }}</span>
-                  <span class="text-muted"> / {{ vial.vial_amount }} {{ vial.vial_unit }}</span>
+                  <span class="num-display text-[16px]">{{ remainingValue(vial, proj) }}</span>
+                  <span class="text-muted"> / {{ remainingOf(vial) }}</span>
                 </span>
                 <span class="text-[11px] text-muted">{{ Math.round(proj.pct * 100) }}%</span>
               </div>
@@ -169,7 +169,7 @@
       <!-- Sealed stock -->
       <section v-if="sealedGroups.length">
         <TuiHeader
-          :label="`SEALED STOCK · FRIDGE · ${sealedCount}`"
+          :label="`SEALED STOCK · ${sealedCount}`"
           :dashes="3"
         >
           <span class="text-[10.5px] text-muted normal-case">open one to start tracking it</span>
@@ -186,7 +186,7 @@
                 :style="{ background: getCompoundColor(group.compound) }"
               />
               <span class="text-[12.5px] text-hi">{{ group.compound }}</span>
-              <span class="text-[11px] text-muted">{{ group.totalVials }} vial{{ group.totalVials === 1 ? '' : 's' }}</span>
+              <span class="text-[11px] text-muted">{{ group.total }} {{ group.noun }}</span>
             </div>
 
             <div class="mt-1.5 border border-line-soft">
@@ -197,7 +197,7 @@
                 :class="i % 2 ? 'bg-inset' : ''"
               >
                 <span class="num-display text-[13px] shrink-0">{{ row.vial.quantity }}×</span>
-                <span class="text-[12px] text-body shrink-0">{{ row.vial.vial_amount }}{{ row.vial.vial_unit }}</span>
+                <span class="text-[12px] text-body shrink-0">{{ describeContents(row.vial) }}</span>
                 <span
                   v-if="row.vial.supplier"
                   class="text-[11.5px] text-muted truncate"
@@ -221,17 +221,17 @@
                     type="button"
                     class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
                     @click="openReconstituteModal(row.vial)"
-                  >⚗ open</button>
+                  >{{ isPillForm(row.vial.form) ? '▸ open' : '⚗ open' }}</button>
                   <button
                     type="button"
                     class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                    :aria-label="`Edit ${row.vial.compound} vial`"
+                    :aria-label="`Edit ${row.vial.compound} ${containerNoun(row.vial.form)}`"
                     @click="openEditModal(row.vial)"
                   >edit</button>
                   <button
                     type="button"
                     class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                    :aria-label="`Delete ${row.vial.compound} vial`"
+                    :aria-label="`Delete ${row.vial.compound} ${containerNoun(row.vial.form)}`"
                     @click="confirmDelete(row.vial)"
                   >✕</button>
                 </span>
@@ -277,13 +277,13 @@
               <button
                 type="button"
                 class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                :aria-label="`Reactivate ${vial.compound} vial`"
+                :aria-label="`Reactivate ${vial.compound} ${containerNoun(vial.form)}`"
                 @click="reactivate(vial)"
               >↻ reactivate</button>
               <button
                 type="button"
                 class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                :aria-label="`Delete ${vial.compound} vial`"
+                :aria-label="`Delete ${vial.compound} ${containerNoun(vial.form)}`"
                 @click="confirmDelete(vial)"
               >✕</button>
             </span>
@@ -304,7 +304,7 @@
     <!-- Add / Edit modal -->
     <UModal
       v-model:open="formModalOpen"
-      :title="form.id ? 'Edit Vial' : 'Add Stock'"
+      :title="formTitle"
       :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
@@ -329,7 +329,40 @@
             </datalist>
           </UFormField>
 
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField
+              label="Form"
+              :ui="{ label: 'tui-label' }"
+            >
+              <USelect
+                v-model="form.form"
+                :items="VIAL_FORMS"
+                value-key="value"
+                label-key="label"
+                class="w-full"
+                @update:model-value="formTouched = true"
+              />
+            </UFormField>
+            <UFormField
+              :label="quantityLabel"
+              :ui="{ label: 'tui-label' }"
+            >
+              <UInput
+                v-model.number="form.quantity"
+                type="number"
+                min="1"
+                step="1"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+
+          <!-- What one container holds. A vial is entered as its total; a pill bottle in label
+               terms (strength × count), which becomes the bottle total on save. -->
+          <div
+            v-if="!isPill"
+            class="grid grid-cols-2 gap-3"
+          >
             <UFormField
               label="Vial size"
               required
@@ -355,18 +388,56 @@
                 class="w-full"
               />
             </UFormField>
-            <UFormField
-              :label="form.status === 'sealed' ? 'Quantity' : 'Qty'"
-              :ui="{ label: 'tui-label' }"
-            >
-              <UInput
-                v-model.number="form.quantity"
-                type="number"
-                min="1"
-                step="1"
-                class="w-full"
-              />
-            </UFormField>
+          </div>
+          <div
+            v-else
+            class="space-y-1.5"
+          >
+            <div class="grid grid-cols-3 gap-3">
+              <UFormField
+                :label="`Per ${pillWord}`"
+                required
+                :ui="{ label: 'tui-label' }"
+              >
+                <UInput
+                  :model-value="pill.strength ?? undefined"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="25"
+                  class="w-full"
+                  @update:model-value="setPillStrength"
+                />
+              </UFormField>
+              <UFormField
+                label="Unit"
+                :ui="{ label: 'tui-label' }"
+              >
+                <USelect
+                  v-model="form.vial_unit"
+                  :items="DOSE_UNITS"
+                  value-key="value"
+                  label-key="label"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                :label="`${cap(pillNoun(form.form, 2))} / bottle`"
+                required
+                :ui="{ label: 'tui-label' }"
+              >
+                <UInput
+                  v-model.number="pill.count"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <p class="text-[11px] text-muted leading-[1.6]">
+              {{ pillHint }}
+            </p>
           </div>
 
           <UFormField
@@ -405,7 +476,7 @@
             </UFormField>
           </div>
 
-          <!-- active-only fields -->
+          <!-- active-only fields (BAC water is a reconstitution detail — vials only) -->
           <div
             v-if="form.status === 'active'"
             class="grid grid-cols-2 gap-3"
@@ -422,6 +493,7 @@
               />
             </UFormField>
             <UFormField
+              v-if="!isPill"
               label="BAC water (mL)"
               :ui="{ label: 'tui-label' }"
             >
@@ -458,7 +530,7 @@
             </button>
             <UButton
               :loading="saving"
-              :disabled="!form.compound || !form.vial_amount"
+              :disabled="!canSave"
               @click="saveVial"
             >
               Save
@@ -468,10 +540,10 @@
       </template>
     </UModal>
 
-    <!-- Open / reconstitute modal -->
+    <!-- Open modal: reconstitute a vial, or just start a pill bottle -->
     <UModal
       v-model:open="openModalOpen"
-      title="Open Vial"
+      :title="openTitle"
       :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
@@ -480,8 +552,8 @@
           class="space-y-4"
         >
           <p class="text-[12.5px] leading-[1.7] text-dim">
-            Reconstitute one <span class="text-hi">{{ openTarget.vial_amount }}{{ openTarget.vial_unit }} {{ openTarget.compound }}</span>
-            {{ openSourceText }}
+            {{ openLeadText }} <span class="text-hi">{{ openHighlight }}</span>
+            {{ openTailText }}
           </p>
           <p
             v-if="reconstituteHint"
@@ -502,6 +574,7 @@
               />
             </UFormField>
             <UFormField
+              v-if="!openIsPill"
               label="BAC water (mL)"
               :ui="{ label: 'tui-label' }"
             >
@@ -529,10 +602,10 @@
             </button>
             <UButton
               :loading="opening"
-              icon="i-lucide-flask-conical"
+              :icon="openIsPill ? 'i-lucide-pill' : 'i-lucide-flask-conical'"
               @click="doOpen"
             >
-              Open vial
+              Open {{ containerNoun(openTarget.form) }}
             </UButton>
           </div>
         </div>
@@ -546,8 +619,12 @@ import { getCompoundColor, KNOWN_COMPOUNDS, DOSE_UNITS, blankVial } from '~/data
 import type { Vial } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import {
-  projectVial, roundAmount, isExpiringSoon, isExpired, type VialProjection
+  projectVial, roundAmount, isExpiringSoon, isExpired, defaultVialForm, type VialProjection
 } from '~/utils/vialInventory'
+import {
+  VIAL_FORMS, isPillForm, containerNoun, pillNoun, pillStrength, pillTotal, pillsFromAmount,
+  describeContents, stockNoun
+} from '#shared/utils/vialForm'
 
 definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Tools · Inventory' })
@@ -574,6 +651,12 @@ const finishedVials = computed(() => vials.value.filter(v => v.status === 'finis
 const showFinished = ref(false)
 
 const sealedCount = computed(() => sealedVials.value.reduce((s, v) => s + (v.quantity ?? 1), 0))
+
+// Wording follows what's actually on the shelf: all vials → "vials", all pill bottles →
+// "bottles", a mix → a neutral word.
+const sealedNoun = computed(() => stockNoun(sealedVials.value))
+const activeNoun = computed(() => stockNoun(activeVials.value, 'stock'))
+const expiringNoun = computed(() => stockNoun(vials.value.filter(v => v.status !== 'finished')))
 
 const activeProjections = computed(() =>
   activeVials.value
@@ -610,12 +693,16 @@ const sealedGroups = computed(() => {
     map.set(v.compound, list)
   }
   return [...map.entries()]
-    .map(([compound, batches]) => ({
-      compound,
-      // Expiry state is resolved here so the dense rows stay free of branching markup.
-      batches: batches.map(vial => ({ vial, ...expiryTagFields(vial) })),
-      totalVials: batches.reduce((s, b) => s + (b.quantity ?? 1), 0)
-    }))
+    .map(([compound, batches]) => {
+      const total = batches.reduce((s, b) => s + (b.quantity ?? 1), 0)
+      return {
+        compound,
+        // Expiry state is resolved here so the dense rows stay free of branching markup.
+        batches: batches.map(vial => ({ vial, ...expiryTagFields(vial) })),
+        total,
+        noun: groupNoun(batches, total)
+      }
+    })
     .sort((a, b) => a.compound.localeCompare(b.compound))
 })
 
@@ -624,13 +711,31 @@ function expiryTagFields(v: Vial) {
   return { expiryText: text, expiryColor: color }
 }
 
+// "3 vials" / "1 bottle" — or "units" when one compound is stocked both ways (oral + injectable).
+function groupNoun(batches: Vial[], total: number): string {
+  const mixed = new Set(batches.map(b => isPillForm(b.form))).size > 1
+  if (mixed) return total === 1 ? 'unit' : 'units'
+  return containerNoun(batches[0]?.form, total)
+}
+
 // --- display helpers ---
 // Multi-part row strings are assembled here rather than as adjacent template blocks, which
 // would lose the separating spaces to Vue's whitespace condensing.
 function vialSpec(v: Vial): string {
-  let spec = `${v.vial_amount}${v.vial_unit}`
+  let spec = describeContents(v)
   if (v.bac_water_ml) spec += ` + ${v.bac_water_ml}mL`
   return v.supplier ? `${spec} · ${v.supplier}` : spec
+}
+
+// Active-row readout: a bottle counts down in tabs, a vial in its labeled unit.
+function remainingValue(v: Vial, proj: VialProjection): number {
+  return pillsFromAmount(v, proj.remaining) ?? roundAmount(proj.remaining)
+}
+
+function remainingOf(v: Vial): string {
+  return pillStrength(v) != null
+    ? `${v.unit_count} ${pillNoun(v.form, v.unit_count ?? 0)}`
+    : `${v.vial_amount} ${v.vial_unit}`
 }
 
 function daysSinceOpened(v: Vial) {
@@ -650,7 +755,10 @@ function runOutText(proj: VialProjection): string {
 
 function rateText(v: Vial, proj: VialProjection): string {
   if (!proj.dailyAmount) return ''
-  return `${roundAmount(proj.dailyAmount)} ${v.vial_unit}/d${proj.basis === 'typical' ? '*' : ''}`
+  const star = proj.basis === 'typical' ? '*' : ''
+  const pills = pillsFromAmount(v, proj.dailyAmount)
+  if (pills != null) return `${pills} ${pillNoun(v.form, pills === 1 ? 1 : 2)}/d${star}`
+  return `${roundAmount(proj.dailyAmount)} ${v.vial_unit}/d${star}`
 }
 
 function openedText(v: Vial, proj: VialProjection): string {
@@ -660,7 +768,7 @@ function openedText(v: Vial, proj: VialProjection): string {
 }
 
 function finishedMeta(v: Vial): string {
-  const spec = `${v.vial_amount}${v.vial_unit}`
+  const spec = describeContents(v)
   return v.opened_date ? `${spec} · opened ${formatDate(v.opened_date, 'monthDay')}` : spec
 }
 
@@ -683,28 +791,84 @@ function rateTitle(proj: VialProjection) {
     : 'Based on your logged doses over the last 4 weeks'
 }
 
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 // --- add / edit ---
 const formModalOpen = ref(false)
 const saving = ref(false)
 const form = reactive<Vial>(blankVial())
+// Pill bottles are entered in label terms (strength × count) and stored as the bottle total in
+// vial_amount, so the depletion/runway math never has to know about tablets.
+const pill = reactive<{ strength: number | null, count: number }>({ strength: null, count: 100 })
+// Once the form is picked by hand, the compound-based suggestion stops overriding it.
+const formTouched = ref(false)
+
+const isPill = computed(() => isPillForm(form.form))
+const pillWord = computed(() => pillNoun(form.form))
+const pillTotalAmount = computed(() =>
+  pill.strength && pill.count > 0 ? pillTotal(pill.strength, pill.count) : null
+)
+const pillHint = computed(() =>
+  pillTotalAmount.value == null
+    ? `Strength printed on the label, per ${pillWord.value} — the bottle total is worked out from it.`
+    : `= ${pillTotalAmount.value} ${form.vial_unit} per bottle · logged doses count it down one ${pillWord.value} at a time`
+)
+const quantityLabel = computed(() =>
+  form.status === 'sealed' ? `${cap(containerNoun(form.form, 2))} on hand` : 'Qty'
+)
+const formTitle = computed(() => (form.id ? `Edit ${cap(containerNoun(form.form))}` : 'Add Stock'))
+const canSave = computed(() =>
+  !!form.compound && (isPill.value ? pillTotalAmount.value != null : form.vial_amount > 0)
+)
+
+// New stock: suggest the form from what the compound is (anavar → tablets) until set by hand.
+watch(() => form.compound, (compound) => {
+  if (form.id || formTouched.value) return
+  form.form = defaultVialForm(compound)
+})
+
+function setPillStrength(value: unknown) {
+  pill.strength = typeof value === 'number' && Number.isFinite(value) ? value : null
+}
 
 function openAddModal() {
   Object.assign(form, blankVial())
   delete form.id
+  Object.assign(pill, { strength: null, count: 100 })
+  formTouched.value = false
   formModalOpen.value = true
 }
 function openEditModal(v: Vial) {
   Object.assign(form, { ...blankVial(), ...v })
+  Object.assign(pill, { strength: pillStrength(v) ?? v.vial_amount, count: v.unit_count ?? 1 })
+  formTouched.value = true
   formModalOpen.value = true
+}
+
+// What gets saved: a bottle's vial_amount is recomputed from the label terms.
+function formPayload(): Vial {
+  if (!isPill.value) return { ...form, unit_count: null }
+  return {
+    ...form,
+    unit_count: pill.count,
+    vial_amount: pillTotal(pill.strength ?? 0, pill.count),
+    bac_water_ml: null
+  }
 }
 
 async function saveVial() {
   saving.value = true
   try {
-    await $fetch('/api/journal/vials/save', { method: 'POST', body: { ...form } })
+    await $fetch('/api/journal/vials/save', { method: 'POST', body: formPayload() })
     await refresh()
     formModalOpen.value = false
-    toast.add({ title: form.id ? 'Vial updated' : 'Stock added', color: 'success', icon: 'i-lucide-check' })
+    toast.add({
+      title: form.id ? `${cap(containerNoun(form.form))} updated` : 'Stock added',
+      color: 'success',
+      icon: 'i-lucide-check'
+    })
   }
   catch (err) {
     toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
@@ -720,13 +884,30 @@ const opening = ref(false)
 const openTarget = ref<Vial | null>(null)
 const openForm = reactive<{ opened_date: string, bac_water_ml: number | null }>({ opened_date: today, bac_water_ml: 2 })
 
+const openIsPill = computed(() => isPillForm(openTarget.value?.form))
+const openTitle = computed(() => `Open ${cap(containerNoun(openTarget.value?.form))}`)
+
 const reconstituteHint = computed(() =>
-  openTarget.value ? getCompoundInfo(openTarget.value.compound)?.reconstitution?.instructions ?? '' : ''
+  openTarget.value && !openIsPill.value
+    ? getCompoundInfo(openTarget.value.compound)?.reconstitution?.instructions ?? ''
+    : ''
 )
 
-const openSourceText = computed(() =>
-  openTarget.value?.supplier ? `vial from ${openTarget.value.supplier}.` : 'vial.'
-)
+// "Reconstitute one 10mg BPC-157 vial from X." / "Start one Oxandrolone bottle (100 × 25mg tabs) from X."
+const openLeadText = computed(() => (openIsPill.value ? 'Start one' : 'Reconstitute one'))
+
+const openHighlight = computed(() => {
+  const target = openTarget.value
+  if (!target) return ''
+  return openIsPill.value ? target.compound : `${target.vial_amount}${target.vial_unit} ${target.compound}`
+})
+
+const openTailText = computed(() => {
+  const target = openTarget.value
+  if (!target) return ''
+  const container = openIsPill.value ? `bottle (${describeContents(target)})` : 'vial'
+  return target.supplier ? `${container} from ${target.supplier}.` : `${container}.`
+})
 
 const openOutcomeText = computed(() => {
   const target = openTarget.value
@@ -734,7 +915,8 @@ const openOutcomeText = computed(() => {
   const remaining = (target.quantity ?? 1) > 1
     ? `${(target.quantity ?? 1) - 1} will remain sealed.`
     : 'This was your last sealed one.'
-  return `Marks it active. Remaining amount then tracks automatically from doses of ${target.compound} you log on/after this date. ${remaining}`
+  const tracks = openIsPill.value ? `Remaining ${pillNoun(target.form, 2)} then track` : 'Remaining amount then tracks'
+  return `Marks it active. ${tracks} automatically from doses of ${target.compound} you log on/after this date. ${remaining}`
 })
 
 function openReconstituteModal(v: Vial) {
@@ -750,11 +932,20 @@ async function doOpen() {
   try {
     await $fetch('/api/journal/vials/open', {
       method: 'POST',
-      body: { id: openTarget.value.id, opened_date: openForm.opened_date, bac_water_ml: openForm.bac_water_ml }
+      body: {
+        id: openTarget.value.id,
+        opened_date: openForm.opened_date,
+        bac_water_ml: openIsPill.value ? null : openForm.bac_water_ml
+      }
     })
     await refresh()
     openModalOpen.value = false
-    toast.add({ title: 'Vial opened', description: `${openTarget.value.compound} is now active`, color: 'success', icon: 'i-lucide-flask-conical' })
+    toast.add({
+      title: `${cap(containerNoun(openTarget.value.form))} opened`,
+      description: `${openTarget.value.compound} is now active`,
+      color: 'success',
+      icon: openIsPill.value ? 'i-lucide-pill' : 'i-lucide-flask-conical'
+    })
   }
   catch (err) {
     toast.add({ title: 'Open failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
@@ -768,7 +959,8 @@ async function doOpen() {
 const activeMenu = (v: Vial) => [
   [
     { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => openEditModal(v) },
-    { label: 'Open in calculator', icon: 'i-lucide-calculator', to: calculatorLink(v) }
+    // The calculator is a reconstitution tool — nothing to work out for a pill bottle.
+    ...(isPillForm(v.form) ? [] : [{ label: 'Open in calculator', icon: 'i-lucide-calculator', to: calculatorLink(v) }])
   ],
   [
     { label: 'Mark finished', icon: 'i-lucide-check-check', onSelect: () => setStatus(v, 'finished') },
@@ -799,7 +991,7 @@ function reactivate(v: Vial) {
 }
 
 async function confirmDelete(v: Vial) {
-  if (!confirm(`Delete this ${v.compound} vial? This can't be undone.`)) return
+  if (!confirm(`Delete this ${v.compound} ${containerNoun(v.form)}? This can't be undone.`)) return
   try {
     await $fetch('/api/journal/vials/delete', { method: 'POST', body: { id: v.id } })
     await refresh()

@@ -67,10 +67,14 @@ CREATE TABLE IF NOT EXISTS whoop_tokens (
   expires_at INTEGER NOT NULL
 );
 
--- Vial inventory: sealed fridge stock (lyophilized) and active reconstituted vials.
--- A sealed batch has quantity = number of identical vials on hand; opening one decrements
--- the batch and spawns an active row (quantity 1) with opened_date + bac_water_ml set.
--- Active-vial remaining mg is derived at read time from journal_entries.peptides doses
+-- Stock inventory: sealed containers and the active (opened) ones. `form` says what a container
+-- is — 'vial' (lyophilized powder, oil, pen) or a pill bottle ('tablet' | 'capsule'). vial_amount
+-- is ALWAYS the total content of one container: for a bottle that is unit_count × per-pill
+-- strength (100 × 25 mg tabs → 2500 mg), so the depletion/runway math stays form-agnostic and
+-- the UI translates back to label terms (shared/utils/vialForm.ts).
+-- A sealed batch has quantity = number of identical containers on hand; opening one decrements
+-- the batch and spawns an active row (quantity 1) with opened_date (+ bac_water_ml for vials).
+-- Active remaining amount is derived at read time from journal_entries.peptides doses
 -- of the same compound logged on/after opened_date (see app/utils/vialInventory.ts).
 CREATE TABLE IF NOT EXISTS vials (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,6 +82,8 @@ CREATE TABLE IF NOT EXISTS vials (
   supplier TEXT,
   vial_amount REAL NOT NULL,
   vial_unit TEXT NOT NULL DEFAULT 'mg',
+  form TEXT NOT NULL DEFAULT 'vial', -- 'vial' | 'tablet' | 'capsule'
+  unit_count INTEGER,                -- tablets/capsules per bottle; NULL for vials
   quantity INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'sealed', -- 'sealed' | 'active' | 'finished'
   opened_date TEXT,
@@ -242,3 +248,10 @@ CREATE TABLE IF NOT EXISTS invites (
 -- Tentative cycle starts (2026-09-03). Existing rows all have real picked dates, so the
 -- 'day' default backfills them correctly and nothing changes for them.
 -- ALTER TABLE cycles ADD COLUMN start_precision TEXT NOT NULL DEFAULT 'day';
+
+-- One-time migration, do not re-run after it lands on an environment.
+-- Pill bottles in the inventory (2026-09-04). Every existing row is a vial, which is what the
+-- 'vial' default backfills. Run it against the demo DB too (jim-klonow-ski-demo, remote and
+-- local) — its nightly reset re-inserts the seed into the existing table, it doesn't recreate it:
+-- ALTER TABLE vials ADD COLUMN form TEXT NOT NULL DEFAULT 'vial';
+-- ALTER TABLE vials ADD COLUMN unit_count INTEGER;

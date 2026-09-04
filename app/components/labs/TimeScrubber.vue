@@ -1,6 +1,6 @@
 <template>
   <div
-    class="sticky bottom-0 z-10 bg-status border-t transition-colors"
+    class="sticky bottom-0 z-10 bg-status border-t transition-colors select-none"
     :class="scrubbed ? 'border-line-accent' : 'border-line'"
   >
     <div class="flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-2 px-4 sm:px-6 py-2.5">
@@ -39,7 +39,7 @@
           class="tui-btn px-2.5 sm:hidden disabled:opacity-40 disabled:cursor-default"
           :disabled="viewedIndex === 0"
           aria-label="Previous draw"
-          @click="go(viewedIndex - 1)"
+          v-on="prevStep"
         >
           ◂
         </button>
@@ -124,7 +124,7 @@
           class="tui-btn px-2.5 sm:hidden disabled:opacity-40 disabled:cursor-default"
           :disabled="!scrubbed"
           aria-label="Next draw"
-          @click="go(viewedIndex + 1)"
+          v-on="nextStep"
         >
           ▸
         </button>
@@ -136,7 +136,7 @@
           type="button"
           class="tui-btn disabled:opacity-40 disabled:cursor-default"
           :disabled="viewedIndex === 0"
-          @click="go(viewedIndex - 1)"
+          v-on="prevStep"
         >
           ◂ PREV
         </button>
@@ -144,7 +144,7 @@
           type="button"
           class="tui-btn disabled:opacity-40 disabled:cursor-default"
           :disabled="!scrubbed"
-          @click="go(viewedIndex + 1)"
+          v-on="nextStep"
         >
           NEXT ▸
         </button>
@@ -277,6 +277,62 @@ function onKeydown(e: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+// Press-and-hold on a step button auto-advances, like a held arrow key. A tap still steps once on
+// release, so a touch that turns into a scroll never steps; holding past a beat starts repeating
+// until you let go or the rail runs out. The click that lands when a hold is released is the end
+// of the press, not a fresh step, so it's swallowed — except keyboard activation (detail 0),
+// which never comes from a hold.
+const HOLD_DELAY_MS = 400
+const HOLD_STEP_MS = 200
+let holdTimer: ReturnType<typeof setTimeout> | undefined
+let holdRepeat: ReturnType<typeof setInterval> | undefined
+let held = false
+
+function stopHold() {
+  clearTimeout(holdTimer)
+  clearInterval(holdRepeat)
+  holdTimer = holdRepeat = undefined
+  window.removeEventListener('pointerup', stopHold)
+  window.removeEventListener('pointercancel', stopHold)
+}
+
+function stepHandlers(dir: -1 | 1) {
+  const step = () => {
+    const next = viewedIndex.value + dir
+    if (next < 0 || next > last.value) return false
+    go(next)
+    return true
+  }
+  return {
+    pointerdown(e: PointerEvent) {
+      if (e.button !== 0) return
+      held = false
+      stopHold()
+      // Listen on the window: the button may drift out from under the finger, or disable itself
+      // when the hold reaches the end of the rail, and either way the release must still land.
+      window.addEventListener('pointerup', stopHold)
+      window.addEventListener('pointercancel', stopHold)
+      holdTimer = setTimeout(() => {
+        held = true
+        if (!step()) return stopHold()
+        holdRepeat = setInterval(() => {
+          if (!step()) stopHold()
+        }, HOLD_STEP_MS)
+      }, HOLD_DELAY_MS)
+    },
+    click(e: MouseEvent) {
+      if (held && e.detail !== 0) {
+        held = false
+        return
+      }
+      step()
+    }
+  }
+}
+const prevStep = stepHandlers(-1)
+const nextStep = stepHandlers(1)
+onBeforeUnmount(stopHold)
 
 // Nuxt UI's slider restyled as the rail. The thumb stays transparent — the active tick draws the
 // playhead — but keeps its hit area and shows an outline when focused from the keyboard.
