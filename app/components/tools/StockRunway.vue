@@ -98,6 +98,7 @@ import { getCompoundColor } from '~/data/journal'
 import type { Vial, JournalEntry } from '~/data/journal'
 import { computeRemaining, estimateDailyRate } from '~/utils/vialInventory'
 import { convertUnitFor, type MixUnit } from '~/utils/peptideCalc'
+import { containerNoun } from '#shared/utils/vialForm'
 import { relevantCycle, cycleStatusOn, shiftDays, tentativeStartLabel } from '#shared/utils/cycles'
 import { cycleCoverage, type CycleCoverage } from '#shared/utils/stockRunway'
 
@@ -149,15 +150,18 @@ const coverageRows = computed(() =>
   cycle.value ? cycleCoverage(cycle.value, props.today, onHandIn) : []
 )
 
-// The most common sealed vial size, for "SHORT ≈ N vials" hints.
-function typicalVialSize(compound: string): number | null {
-  const counts = new Map<number, number>()
+// The most common sealed container (size + form) for "SHORT ≈ N vials/bottles" hints. A
+// bottle's size is its whole-bottle total, so the shortfall comes out in bottles, not tabs.
+function typicalContainer(compound: string): { size: number, form: Vial['form'] } | null {
+  const counts = new Map<string, { size: number, form: Vial['form'], n: number }>()
   for (const v of props.vials) {
     if (v.compound !== compound || v.status !== 'sealed') continue
-    counts.set(v.vial_amount, (counts.get(v.vial_amount) ?? 0) + (v.quantity ?? 1))
+    const key = `${v.form}:${v.vial_amount}`
+    const entry = counts.get(key) ?? { size: v.vial_amount, form: v.form, n: 0 }
+    entry.n += v.quantity ?? 1
+    counts.set(key, entry)
   }
-  const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
-  return best?.[0] ?? null
+  return [...counts.values()].sort((a, b) => b.n - a.n)[0] ?? null
 }
 
 function unitLabel(unit: MixUnit): string {
@@ -168,9 +172,10 @@ function verdictText(row: CycleCoverage): string {
   if (row.needed <= 0) return 'done'
   if (row.onHand == null) return 'not stocked'
   if (row.short <= 0) return 'ready ✓'
-  const size = typicalVialSize(row.compound)
-  const vialsShort = size ? ` (≈ ${Math.ceil(row.short / size)} vials)` : ''
-  return `short ${fmtAmount(row.short)} ${unitLabel(row.unit)}${vialsShort}`
+  const typical = typicalContainer(row.compound)
+  const n = typical ? Math.ceil(row.short / typical.size) : 0
+  const containersShort = typical ? ` (≈ ${n} ${containerNoun(typical.form, n)})` : ''
+  return `short ${fmtAmount(row.short)} ${unitLabel(row.unit)}${containersShort}`
 }
 
 function verdictClass(row: CycleCoverage): string {

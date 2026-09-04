@@ -1,6 +1,19 @@
 import { convertUnitFor, type MixUnit } from './peptideCalc'
 import { getCompoundInfo } from '~/data/compoundInfo'
 import type { JournalEntry, Vial } from '~/data/journal'
+import type { VialForm } from '#shared/utils/vialForm'
+
+// Starting point for the add-stock form's Form picker: compoundInfo knows which compounds are
+// orals (an "(Oral)" category or an "Oral…" timing note), and a capsule mention wins over
+// tablet. A suggestion only — the user can flip it (liquid orals, injectable stanozolol).
+export function defaultVialForm(compound: string): VialForm {
+  const info = getCompoundInfo(compound)
+  if (!info) return 'vial'
+  const timing = info.dosing.timing?.toLowerCase() ?? ''
+  if (timing.includes('capsule')) return 'capsule'
+  if (/\boral\b/i.test(info.category) || timing.startsWith('oral')) return 'tablet'
+  return 'vial'
+}
 
 // How far back to look when estimating a compound's daily consumption rate, and the minimum
 // number of distinct dosing days needed before we trust logged history over the typical-dose
