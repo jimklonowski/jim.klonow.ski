@@ -1,6 +1,9 @@
-// Open (reconstitute) one vial from a sealed batch: decrement the batch quantity by one and
-// spawn a new active vial (quantity 1) carrying over the batch's compound/supplier/size, with
-// opened_date + bac_water_ml recorded. Runs as a D1 batch so both writes land together.
+import { normalizeForm, isPillForm } from '#shared/utils/vialForm'
+
+// Open one container from a sealed batch: decrement the batch quantity by one and spawn a new
+// active row (quantity 1) carrying over the batch's compound/supplier/size/form, with
+// opened_date recorded — plus bac_water_ml when it's a vial being reconstituted (a pill bottle
+// just gets started, so BAC water is dropped). Runs as a D1 batch so both writes land together.
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
@@ -9,7 +12,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Missing vial id' })
   }
   const openedDate = (body.opened_date as string) || new Date().toISOString().slice(0, 10)
-  const bacWaterMl = (body.bac_water_ml as number | null) ?? null
 
   const db = getDb(event)
   const row = await db.prepare('SELECT * FROM vials WHERE id = ?1').bind(body.id).first()
@@ -19,6 +21,8 @@ export default defineEventHandler(async (event) => {
   if (row.status !== 'sealed') {
     throw createError({ statusCode: 400, message: 'Only sealed vials can be opened' })
   }
+  const form = normalizeForm(row.form)
+  const bacWaterMl = isPillForm(form) ? null : ((body.bac_water_ml as number | null) ?? null)
   const remainingQty = ((row.quantity as number | null) ?? 1) - 1
 
   const batchStatement = remainingQty > 0
@@ -27,8 +31,8 @@ export default defineEventHandler(async (event) => {
 
   const insertActive = db.prepare(`
     INSERT INTO vials
-      (compound, supplier, vial_amount, vial_unit, quantity, status, opened_date, bac_water_ml, lot, expiry, cost, notes, created_at)
-    VALUES (?1, ?2, ?3, ?4, 1, 'active', ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+      (compound, supplier, vial_amount, vial_unit, quantity, status, opened_date, bac_water_ml, lot, expiry, cost, notes, form, unit_count, created_at)
+    VALUES (?1, ?2, ?3, ?4, 1, 'active', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
   `).bind(
     row.compound,
     row.supplier ?? null,
@@ -40,6 +44,8 @@ export default defineEventHandler(async (event) => {
     row.expiry ?? null,
     row.cost ?? null,
     row.notes ?? null,
+    form,
+    (row.unit_count as number | null) ?? null,
     new Date().toISOString()
   )
 

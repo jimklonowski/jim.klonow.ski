@@ -1,6 +1,7 @@
 /// <reference path="../../worker-configuration.d.ts" />
 import type { H3Event } from 'h3'
 import type { AuthContext } from './auth'
+import { normalizeForm } from '#shared/utils/vialForm'
 
 // nitro-cloudflare-dev types `context.cloudflare.env` as PlatformProxy["env"] (unknown) since it
 // isn't parameterized with our Env — cast through the generated global Env from worker-configuration.d.ts.
@@ -150,6 +151,9 @@ export function parseVialRow(row: Record<string, unknown>) {
     supplier: (row.supplier as string | null) ?? null,
     vial_amount: row.vial_amount as number,
     vial_unit: (row.vial_unit as string) || 'mg',
+    // Both undefined until the form/unit_count migration lands — every pre-existing row is a vial.
+    form: normalizeForm(row.form),
+    unit_count: (row.unit_count as number | null) ?? null,
     quantity: (row.quantity as number | null) ?? 1,
     status: (row.status as string) || 'sealed',
     opened_date: (row.opened_date as string | null) ?? null,

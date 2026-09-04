@@ -56,12 +56,12 @@
             v-for="(row, i) in rows"
             :key="i"
             class="border border-line-soft px-3 py-2.5 space-y-2"
-            :class="row.vial_amount > 0 ? '' : 'border-warn'"
+            :class="row.amount > 0 ? '' : 'border-warn'"
           >
             <div class="grid grid-cols-12 gap-2 items-end">
               <UFormField
                 label="Compound"
-                class="col-span-12 sm:col-span-5"
+                class="col-span-12 sm:col-span-4"
                 :ui="FIELD_UI"
               >
                 <UInput
@@ -71,12 +71,25 @@
                 />
               </UFormField>
               <UFormField
-                :label="row.vial_amount > 0 ? 'Per unit' : 'Per unit — needs a size'"
-                class="col-span-4 sm:col-span-3"
+                label="Form"
+                class="col-span-4 sm:col-span-2"
+                :ui="FIELD_UI"
+              >
+                <USelect
+                  v-model="row.form"
+                  :items="VIAL_FORMS"
+                  value-key="value"
+                  label-key="label"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                :label="amountLabel(row)"
+                class="col-span-4 sm:col-span-2"
                 :ui="FIELD_UI"
               >
                 <UInput
-                  v-model.number="row.vial_amount"
+                  v-model.number="row.amount"
                   type="number"
                   min="0"
                   step="0.1"
@@ -118,12 +131,37 @@
                 ✕
               </button>
             </div>
-            <UInput
-              v-model="row.notes"
-              placeholder="notes"
-              size="sm"
-              class="w-full"
-            />
+            <!-- Pill bottles get their count beside the notes, and the total the DB will store is
+                 spelled out so "25 mg" reads unmistakably as per tab, not per bottle. -->
+            <div class="flex items-end gap-2">
+              <UFormField
+                v-if="isPillForm(row.form)"
+                :label="`${cap(pillNoun(row.form, 2))} / bottle`"
+                class="w-28 shrink-0"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model.number="row.unit_count"
+                  type="number"
+                  min="1"
+                  step="1"
+                  size="sm"
+                  class="w-full"
+                />
+              </UFormField>
+              <UInput
+                v-model="row.notes"
+                placeholder="notes"
+                size="sm"
+                class="flex-1 min-w-0"
+              />
+            </div>
+            <p
+              v-if="isPillForm(row.form) && rowValid(row)"
+              class="text-[11px] text-muted"
+            >
+              = {{ pillTotal(row.amount, row.unit_count) }} {{ row.vial_unit }} per bottle
+            </p>
             <p
               v-if="row.assumption"
               class="text-[11px] text-warn leading-[1.6]"
@@ -173,11 +211,28 @@
 
 <script setup lang="ts">
 import { KNOWN_COMPOUNDS, DOSE_UNITS } from '~/data/journal'
+import { VIAL_FORMS, isPillForm, pillNoun, pillStrength, pillTotal, type VialForm } from '#shared/utils/vialForm'
 
-interface DumpRow {
+// What /api/journal/vials/parse returns — DB terms, vial_amount is the whole-container total.
+interface ParsedRow {
   compound: string
+  form: VialForm
   vial_amount: number
   vial_unit: 'mg' | 'mcg' | 'iu'
+  unit_count: number | null
+  quantity: number
+  notes: string
+  assumption: string
+}
+
+// What the confirm table edits — label terms: `amount` is per vial, or per tab/cap for a pill
+// bottle, and the bottle total is recomputed on save.
+interface DumpRow {
+  compound: string
+  form: VialForm
+  amount: number
+  vial_unit: 'mg' | 'mcg' | 'iu'
+  unit_count: number
   quantity: number
   notes: string
   assumption: string
@@ -194,9 +249,32 @@ const parsing = ref(false)
 const saving = ref(false)
 const rows = ref<DumpRow[]>([])
 
-const allValid = computed(() =>
-  rows.value.length > 0 && rows.value.every(r => r.compound.trim() && r.vial_amount > 0 && r.quantity >= 1)
-)
+function toDumpRow(v: ParsedRow): DumpRow {
+  return {
+    compound: v.compound,
+    form: v.form,
+    amount: pillStrength(v) ?? v.vial_amount,
+    vial_unit: v.vial_unit,
+    unit_count: v.unit_count ?? 100,
+    quantity: v.quantity,
+    notes: v.notes,
+    assumption: v.assumption
+  }
+}
+
+function rowValid(r: DumpRow): boolean {
+  return !!r.compound.trim() && r.amount > 0 && r.quantity >= 1 && (!isPillForm(r.form) || r.unit_count >= 1)
+}
+
+const allValid = computed(() => rows.value.length > 0 && rows.value.every(rowValid))
+
+function amountLabel(r: DumpRow): string {
+  return isPillForm(r.form) ? `Per ${pillNoun(r.form)}` : 'Per vial'
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
 
 function backToText() {
   rows.value = []
@@ -205,11 +283,11 @@ function backToText() {
 async function parse() {
   parsing.value = true
   try {
-    const result = await $fetch<{ vials: DumpRow[] }>('/api/journal/vials/parse', {
+    const result = await $fetch<{ vials: ParsedRow[] }>('/api/journal/vials/parse', {
       method: 'POST',
       body: { text: text.value }
     })
-    rows.value = result.vials
+    rows.value = result.vials.map(toDumpRow)
     if (!rows.value.length) {
       toast.add({ title: 'Nothing recognized', description: 'Try naming compounds and sizes', color: 'warning' })
     }
@@ -226,11 +304,14 @@ async function saveAll() {
   saving.value = true
   try {
     for (const row of rows.value) {
+      const pill = isPillForm(row.form)
       await $fetch('/api/journal/vials/save', {
         method: 'POST',
         body: {
           compound: row.compound.trim(),
-          vial_amount: row.vial_amount,
+          form: row.form,
+          vial_amount: pill ? pillTotal(row.amount, row.unit_count) : row.amount,
+          unit_count: pill ? row.unit_count : null,
           vial_unit: row.vial_unit,
           quantity: row.quantity,
           status: 'sealed',
