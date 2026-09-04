@@ -1,3 +1,5 @@
+import type { VialForm } from '#shared/utils/vialForm'
+
 export interface PeptideEntry {
   time: string
   compound: string
@@ -26,8 +28,14 @@ export interface Vial {
   id?: number
   compound: string
   supplier?: string | null
+  /** Total content of ONE container — a pill bottle's unit_count × strength, never the per-pill dose. */
   vial_amount: number
   vial_unit: 'mg' | 'mcg' | 'iu'
+  /** vial (powder/oil/pen) or a pill bottle (tablet/capsule); see shared/utils/vialForm.ts. */
+  form: VialForm
+  /** Tablets/capsules per bottle; null for vials. */
+  unit_count?: number | null
+  /** Identical containers on hand (sealed batches); always 1 once opened. */
   quantity: number
   status: VialStatus
   opened_date?: string | null
@@ -45,6 +53,8 @@ export function blankVial(compound = ''): Vial {
     supplier: '',
     vial_amount: 10,
     vial_unit: 'mg',
+    form: 'vial',
+    unit_count: null,
     quantity: 1,
     status: 'sealed',
     opened_date: null,
