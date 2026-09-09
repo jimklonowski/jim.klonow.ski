@@ -13,6 +13,8 @@ import {
 } from '#shared/utils/cycles'
 import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
+import type { Vaccination } from '#shared/utils/vaccines'
+import { VACCINE_EFFECT_DAYS, recentVaccinations, vaccineCoverage, vaccineFamily } from '#shared/utils/vaccines'
 
 export const PROTOCOL_SCHEDULE = `Intended dosing schedule (the reference for adherence — journal dose logs should line up with this; call out deviations, don't re-announce matches):
 - Every day: HGH 2 IU.
@@ -22,6 +24,54 @@ export const PROTOCOL_SCHEDULE = `Intended dosing schedule (the reference for ad
 - Testosterone Cypionate, HGH, and hCG are the only injectables currently running.
 - BPC-157 is as-needed only (for soreness/tightness), so sporadic logging is expected, not a lapse.
 - GHK-Cu 2 mg daily ran until 2026-09-01 and is now discontinued — the vial finished and another is not being reconstituted for the time being. Its absence from the dose log is deliberate, never a missed dose.`
+
+// --- dated one-off events ---
+
+// Things the data streams can't explain on their own — travel, a draw-day deviation, an
+// illness. Hand-maintained like PROTOCOL_SCHEDULE, but each entry is dated and ages out of the
+// prompts by itself (eventContext), so the list only ever grows; never prune an entry to "fix"
+// a prompt. Each note says how to READ the data around it, not just what happened — the model
+// sees the same dose log and vitals and would otherwise narrate the gap as a lapse.
+export interface ProtocolEvent {
+  /** First day, YYYY-MM-DD. */
+  from: string
+  /** Last day, inclusive. Omit for a single-day event. */
+  to?: string
+  /** Days after `to` the note keeps appearing in prompts; defaults to EVENT_RELEVANCE_DAYS. */
+  relevanceDays?: number
+  /** Pronoun-free prose. */
+  note: string
+}
+
+// Three weeks: long enough that a draw the week after a disruption still sees it, short enough
+// that a weekend of missed doses isn't still being explained in October.
+const EVENT_RELEVANCE_DAYS = 21
+
+export const PROTOCOL_EVENTS: ProtocolEvent[] = [
+  {
+    from: '2026-09-05',
+    to: '2026-09-07',
+    note: 'Labor Day weekend travel, Sat 2026-09-05 through Mon 2026-09-07. The trip — not a protocol change — disrupted dosing: HGH was missed on 09-06 and 09-07, the Sunday hCG dose (09-06) was skipped, and the Monday testosterone injection went in around 12:45 on 09-07 instead of the usual ~04:15 slot (it is logged at its actual time). Read the gap as travel, never as a stop, a taper, or an adherence trend, and mention it once rather than as a recurring headline. Modeled HGH exposure sits a little under steady state for a few days afterwards, so IGF-1 on a draw within the following week may read somewhat below its usual level.'
+  },
+  {
+    from: '2026-09-09',
+    // The draw itself is only news for a couple of days. The labs summary for this date always
+    // sees the note regardless, because that prompt's asOf IS the draw date.
+    relevanceDays: 3,
+    note: 'Bloodwork was drawn 2026-09-09 at about 07:50. The morning oral stack — finasteride and iron included — was deliberately held until after the draw, so none of that day\'s orals were on board in the sample; this matters most for serum iron, which a same-morning iron dose would inflate, and marginally for DHT. COVID-19, influenza, and tetanus vaccines followed at about 08:30 — after the blood was taken, so they cannot have influenced this draw\'s results (see the vaccination context for the days after).'
+  }
+]
+
+// The dated notes in force on `asOf`: begun by then and not yet past their relevance window.
+// Pure and synchronous — nothing here comes from the database.
+export function eventContext(asOf: string, events: ProtocolEvent[] = PROTOCOL_EVENTS): string {
+  const active = events.filter((e) => {
+    const last = e.to ?? e.from
+    return e.from <= asOf && diffDays(last, asOf) <= (e.relevanceDays ?? EVENT_RELEVANCE_DAYS)
+  })
+  if (!active.length) return ''
+  return `Dated notes — one-off context the data streams can't explain on their own (travel, draw-day deviations). Use these before speculating about anomalies in the same window, and don't re-headline them once the window has passed:\n${active.map(e => `- ${e.note}`).join('\n')}`
+}
 
 // How long a stopped supplement (or a fresh start) stays worth mentioning — matches the
 // ~4-month protocol lookback the labs summary and digest trends already use.
@@ -243,5 +293,59 @@ export async function supplementContext(db: D1Database, asOf: string): Promise<s
   if (onHand.length) {
     paragraphs.push(`On hand but NOT currently being taken (do not treat as active exposure; relevant to pending decisions like the anabolic question): ${onHand.map(s => describe(s, recentSince)).join('; ')}.`)
   }
+  return paragraphs.join('\n\n')
+}
+
+// --- vaccinations ---
+
+// Vaccinations as they bear on `asOf`. Shots within VACCINE_EFFECT_DAYS get the acute-response
+// caveat (vitals for a few days, acute-phase blood markers for a couple of weeks); scope 'all'
+// (the ask-the-data chat) adds the whole immunization record with next-due dates, so "when was
+// my last tetanus shot?" has an answer. Same asOf / try-catch contract as supplementContext.
+export async function vaccineContext(db: D1Database, asOf: string, scope: 'recent' | 'all' = 'recent'): Promise<string> {
+  let rows: Vaccination[]
+  try {
+    const { results } = await db.prepare(
+      'SELECT date, vaccine, product, notes FROM vaccinations WHERE date <= ?1 ORDER BY date ASC'
+    ).bind(asOf).all()
+    rows = (results ?? []) as unknown as Vaccination[]
+  }
+  catch {
+    return ''
+  }
+  if (!rows.length) return ''
+
+  const paragraphs: string[] = []
+
+  const recent = recentVaccinations(rows, asOf)
+  if (recent.length) {
+    const byDate = new Map<string, Vaccination[]>()
+    for (const r of recent) byDate.set(r.date, [...(byDate.get(r.date) ?? []), r])
+    const entries = [...byDate].map(([date, list]) => {
+      const ago = diffDays(date, asOf)
+      const when = ago === 0 ? 'the same day' : `${ago} day${ago === 1 ? '' : 's'} earlier`
+      const shots = list.map(r => r.product ? `${r.vaccine} (${r.product})` : r.vaccine).join(', ')
+      // Three shots from one visit usually share one note — say it once.
+      const notes = [...new Set(list.map(r => r.notes?.trim()).filter(Boolean))]
+      return `${date} (${when}): ${shots}${notes.length ? ` — ${notes.join('; ')}` : ''}`
+    })
+    paragraphs.push(`Recent vaccinations (within ${VACCINE_EFFECT_DAYS} days of ${asOf}): ${entries.join('; ')}. A vaccine triggers a deliberate, short-lived immune response: for one to three days afterwards expect lower HRV, a higher resting heart rate, dented recovery and sleep scores, and possibly soreness or a low-grade fever — attribute vitals in that window to the shots before anything in the protocol, and say so plainly. On bloodwork drawn within about two weeks of a shot, acute-phase markers can read transiently high — white blood cells, CRP, ESR, and ferritin (so a ferritin bump here is not evidence of iron repletion) — weigh recency before calling such a shift a trend. A vaccination dated the same day as a draw only bears on that draw if it preceded the blood collection; the notes say which.`)
+  }
+
+  if (scope === 'all') {
+    const datesByFamily = new Map<string, string[]>()
+    for (const r of rows) {
+      const key = vaccineFamily(r)
+      datesByFamily.set(key, [...(datesByFamily.get(key) ?? []), r.product ? `${r.date} (${r.product})` : r.date])
+    }
+    const lines = vaccineCoverage(rows, asOf).map((c) => {
+      const due = c.nextDue
+        ? c.status === 'overdue' ? `booster overdue since ${c.nextDue}` : `next booster due ~${c.nextDue}`
+        : 'no routine booster interval'
+      return `- ${c.label}: ${(datesByFamily.get(c.family) ?? []).join(', ')} — ${due}`
+    })
+    paragraphs.push(`Immunization record (every dose on file, oldest first per vaccine; a vaccine with no entry has no recorded date, which is not the same as never having had it):\n${lines.join('\n')}`)
+  }
+
   return paragraphs.join('\n\n')
 }

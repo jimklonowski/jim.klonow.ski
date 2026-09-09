@@ -28,7 +28,8 @@ const ALL_TABS = [
   { label: 'Entries', to: '/journal/entries' },
   { label: 'Calendar', to: '/journal/calendar' },
   { label: 'Photos', to: '/journal/photos' },
-  { label: 'Supps', to: '/journal/supplements' }
+  { label: 'Supps', to: '/journal/supplements' },
+  { label: 'Vaccines', to: '/journal/vaccines' }
 ]
 
 const route = useRoute()

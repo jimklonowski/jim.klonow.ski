@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS dexa_entries (
   symmetry TEXT
 );
 
+-- recovery_score / strain / sleep_performance_pct arrived as ALTERs (footer) but belong in the
+-- CREATE too, or a from-scratch DB (the local demo sandbox after `pnpm sync:local`) is missing
+-- columns the Whoop sync and demo seed write to.
 CREATE TABLE IF NOT EXISTS health_metrics (
   date TEXT PRIMARY KEY,
   vo2_max REAL,
@@ -43,7 +46,10 @@ CREATE TABLE IF NOT EXISTS health_metrics (
   sleep_rem_min INTEGER,
   sleep_deep_min INTEGER,
   sleep_core_min INTEGER,
-  sleep_awake_min INTEGER
+  sleep_awake_min INTEGER,
+  recovery_score REAL,
+  strain REAL,
+  sleep_performance_pct REAL
 );
 
 CREATE TABLE IF NOT EXISTS workouts (
@@ -197,6 +203,31 @@ CREATE TABLE IF NOT EXISTS invites (
   revoked INTEGER NOT NULL DEFAULT 0
 );
 
+-- Vaccination log: one row per dose. Exists because "when was your last tetanus shot?" had no
+-- answer (2026-09-09). /journal/vaccines groups rows into per-family coverage with next-due
+-- dates (shared/utils/vaccines.ts); recent shots feed the AI digest and lab-summary prompts as
+-- an acute-response caveat (vaccineContext in server/utils/protocol.ts). vaccine is freeform,
+-- usually a KNOWN_VACCINES name via autocomplete; product is the brand/formulation.
+CREATE TABLE IF NOT EXISTS vaccinations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,
+  vaccine TEXT NOT NULL,
+  product TEXT,
+  notes TEXT,       -- shown to the AI too, e.g. "given after the 07:50 blood draw"
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_vaccinations_date ON vaccinations(date);
+
+-- Standing personal facts that are looked up, not trended — blood type first (2026-09-09).
+-- Key/value so the next fact (height, allergies, …) is a one-line addition to PROFILE_FIELDS in
+-- shared/utils/profile.ts with no migration. Rendered on the /journal/vaccines card and read
+-- by the ask-the-data prompt. A cleared value deletes the row rather than storing ''.
+CREATE TABLE IF NOT EXISTS profile (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 -- One-time migration, do not re-run after it lands on an environment:
 -- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
 
@@ -255,3 +286,10 @@ CREATE TABLE IF NOT EXISTS invites (
 -- local) — its nightly reset re-inserts the seed into the existing table, it doesn't recreate it:
 -- ALTER TABLE vials ADD COLUMN form TEXT NOT NULL DEFAULT 'vial';
 -- ALTER TABLE vials ADD COLUMN unit_count INTEGER;
+
+-- One-time migration (2026-09-09): the vaccinations and profile tables above are created by
+-- running this file (CREATE TABLE IF NOT EXISTS); the three shots that prompted the log are a
+-- separate one-time seed — plain INSERTs, equivalent to adding them by hand on /journal/vaccines,
+-- so do one or the other:
+-- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/schema.sql
+-- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/seed-vaccinations.sql
