@@ -191,11 +191,15 @@ export default defineEventHandler(async (event) => {
   // checkpoint (compare gating markers against the pre-cycle baseline), an upcoming one makes
   // it the baseline itself.
   const cycleBlock = await cycleContext(db, date)
+  // Shots and dated one-off notes as of the draw date — the difference between "IGF-1 dipped"
+  // and "IGF-1 dipped two days after a travel weekend without HGH".
+  const vaccineBlock = await vaccineContext(db, date)
+  const eventBlock = eventContext(date)
 
   const prompt = `You are writing a trend summary for a personal bloodwork dashboard. The reader is the person whose labs these are — address them as "you". They track their own biomarkers closely and understand them well. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH, and hCG — currently the only injectables they are running, with ancillary peptides rotating around that core (GHK-Cu, the last standing one, was discontinued 2026-09-01) — and they are weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals — so markers that gate that decision (lipids, especially HDL; liver enzymes; hematocrit/hemoglobin; iron/ferritin; blood pressure proxies) deserve extra attention when present. They are not currently taking an aromatase inhibitor but keep Anastrozole on hand from their TRT clinic for symptomatic use; estradiol has been climbing and may read over 100 pg/mL on new draws. Treat elevated estradiol as a known, watched issue: quantify the trend against prior draws, name the specific symptoms and risks worth monitoring at that level, and frame the on-hand Anastrozole as the discussion point for symptom-driven use — not something to start reflexively.
 
 ${PROTOCOL_SCHEDULE}
-${supplementBlock ? `\n${supplementBlock}\n` : ''}${cycleBlock ? `\n${cycleBlock}\n` : ''}
+${supplementBlock ? `\n${supplementBlock}\n` : ''}${cycleBlock ? `\n${cycleBlock}\n` : ''}${vaccineBlock ? `\n${vaccineBlock}\n` : ''}${eventBlock ? `\n${eventBlock}\n` : ''}
 The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
 
 New draw: ${date} (${target.fasting ? 'fasting' : 'non-fasting'})

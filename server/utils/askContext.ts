@@ -3,6 +3,7 @@
 // summarize one period), this favors breadth — every lab draw, every DEXA scan, the whole
 // dose history in aggregate — with full daily detail only for the recent window, so arbitrary
 // questions can be answered without shipping 1,200 journal rows into the prompt.
+import { profileLabel } from '#shared/utils/profile'
 
 interface Dose { compound: string, dose: number, unit: string }
 
@@ -152,12 +153,24 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
     })
 }
 
+/** Wallet-card facts (blood type, …) — looked up, never trended. '' when none, or no table yet. */
+async function profileLine(db: D1Database): Promise<string> {
+  try {
+    const { results } = await db.prepare('SELECT key, value FROM profile').all<{ key: string, value: string }>()
+    const rows = results ?? []
+    return rows.length ? `Personal facts on file: ${rows.map(r => `${profileLabel(r.key)} ${r.value}`).join('; ')}.` : ''
+  }
+  catch {
+    return ''
+  }
+}
+
 const DAILY_WINDOW_DAYS = 35
 const WEEKLY_WINDOW_WEEKS = 20
 
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone. */
 export async function buildAskContext(db: D1Database, today: string): Promise<string> {
-  const [journal, labs, dexa, healthRes, workoutsRes, supplements, cyclesCtx] = await Promise.all([
+  const [journal, labs, dexa, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
@@ -165,7 +178,10 @@ export async function buildAskContext(db: D1Database, today: string): Promise<st
     // Full rows: parseWorkoutRow/mergeWorkouts need external_id and start_time for dedup.
     db.prepare('SELECT * FROM workouts ORDER BY date ASC').all(),
     supplementContext(db, today),
-    cycleContext(db, today)
+    cycleContext(db, today),
+    // Whole immunization record, not just recent shots — "when was my last tetanus?" lives here.
+    vaccineContext(db, today, 'all'),
+    profileLine(db)
   ])
   const health = (healthRes.results ?? []) as Array<Record<string, unknown>>
   const workouts = mergeWorkouts((workoutsRes.results ?? []).map(parseWorkoutRow)) as unknown as Array<Record<string, unknown>>
@@ -185,8 +201,11 @@ export async function buildAskContext(db: D1Database, today: string): Promise<st
 
   const sections = [
     `Today is ${today}.`,
+    profile,
     supplements,
     cyclesCtx,
+    vaccines,
+    eventContext(today),
     `Lab draws (every draw on file; marker keys are snake_case, standard US lab units):\n${labs.join('\n') || 'none'}`,
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,
     `Compound history (all-time, from the dose log):\n${compoundLines(journal).join('\n') || 'none'}`,

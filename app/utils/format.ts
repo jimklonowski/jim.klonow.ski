@@ -7,6 +7,7 @@ import { formatSite } from '~/data/journal'
 const DATE_STYLES = {
   short: { month: 'short', day: 'numeric', year: 'numeric' },
   monthDay: { month: 'short', day: 'numeric' },
+  monthYear: { month: 'short', year: 'numeric' },
   long: { month: 'long', day: 'numeric', year: 'numeric' },
   weekday: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
 } as const satisfies Record<string, Intl.DateTimeFormatOptions>
