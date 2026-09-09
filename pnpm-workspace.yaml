@@ -21,7 +21,6 @@ minimumReleaseAgeExclude:
 # page with a header/link on hard reload ("Cannot destructure property 'href' of undefined").
 overrides:
   tslib: 2.8.1
-  vue: 3.5.41
   '@vue/shared': 3.5.41
   '@vue/reactivity': 3.5.41
   '@vue/runtime-core': 3.5.41
