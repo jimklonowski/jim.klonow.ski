@@ -523,13 +523,15 @@ export async function generateDigest(
     }))
   }
 
-  // Standing supplement stack + planned cycles — regimen context the dose log doesn't carry
-  // (vitamins/meds are taken daily but not logged; a cycle's timing frames every trend on it).
-  const [supplements, cyclesCtx] = await Promise.all([
+  // Standing supplement stack + planned cycles + recent shots + dated notes — context the dose
+  // log doesn't carry (vitamins/meds are taken daily but not logged; a cycle's timing frames
+  // every trend on it; a vaccine or a travel weekend explains a bad-looking few days).
+  const [supplements, cyclesCtx, vaccines] = await Promise.all([
     supplementContext(db, end),
-    cycleContext(db, end)
+    cycleContext(db, end),
+    vaccineContext(db, end)
   ])
-  const regimen = [supplements, cyclesCtx].filter(Boolean).join('\n\n')
+  const regimen = [supplements, cyclesCtx, vaccines, eventContext(end)].filter(Boolean).join('\n\n')
 
   const facts = built.lines.join('\n')
   const prompt = kind === 'weekly' ? weeklyPrompt(start, end, facts, regimen) : dailyPrompt(end, facts, regimen)

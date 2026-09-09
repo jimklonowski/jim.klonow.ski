@@ -46,6 +46,8 @@ const DOCTOR_PAGES = [
   /^\/tools\/calculator$/,
   /^\/journal\/compound\//,
   /^\/journal\/supplements$/,
+  // An immunization record is exactly what a clinician asks for.
+  /^\/journal\/vaccines$/,
   // Planned cycles are protocol context, same policy as the supplement stack.
   /^\/journal\/cycles$/,
   /^\/journal\/cycle\//

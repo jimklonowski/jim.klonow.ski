@@ -95,6 +95,7 @@ const jumpItems = computed(() => {
     { label: 'journal · workouts', suffix: 'session log', onSelect: () => go('/journal/workouts') },
     { label: 'calendar', suffix: '/journal/calendar', onSelect: () => go('/journal/calendar') },
     { label: 'supplements', suffix: '/journal/supplements', onSelect: () => go('/journal/supplements') },
+    { label: 'vaccines', suffix: 'immunization record', onSelect: () => go('/journal/vaccines') },
     { label: 'tools · calculator', suffix: '/tools/calculator', onSelect: () => go('/tools/calculator') }
   ]
   if (isFullAccess.value) {
