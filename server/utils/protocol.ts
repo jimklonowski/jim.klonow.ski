@@ -1,16 +1,19 @@
 // Standing protocol context shared by the digest prompts and the labs AI-summary prompt.
 // The injectable schedule is a hand-maintained constant (it changes rarely and carries intent —
 // which weekdays — that the dose log can't express). The same cadence exists in structured form
-// as PROTOCOL_RULES in app/data/journal.ts (adherence panel + calendar rings) — keep the two in
-// sync when the protocol changes. The vitamin/supplement/skin stack lives in
-// the `supplements` table and is rendered per-request by supplementContext(), so edits on
-// /journal/supplements flow into the AI prompts without a deploy.
+// as PROTOCOL_RULES in shared/utils/protocolRules.ts (adherence panel + calendar rings, and the
+// digest's precomputed schedule check below) — keep the two in sync when the protocol changes.
+// The vitamin/supplement/skin stack lives in the `supplements` table and is rendered
+// per-request by supplementContext(), so edits on /journal/supplements flow into the AI
+// prompts without a deploy.
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
 import type { Cycle, CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
   diffDays, doseLabelOf, isTentative, tentativeStartLabel
 } from '#shared/utils/cycles'
+import type { ProtocolRule, ScheduleTally } from '#shared/utils/protocolRules'
+import { nextDueDay, ruleActiveOn, tallySchedule, weekdayOf } from '#shared/utils/protocolRules'
 import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 import type { Vaccination } from '#shared/utils/vaccines'
@@ -108,13 +111,23 @@ function describe(s: SupplementRow, recentSince: string): string {
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+/** 'daily' or 'Mon+Thu' — Monday-first, since that's how a week reads. */
+function cadenceOf(weekdays: number[]): string {
+  if (weekdays.length === 7) return 'daily'
+  return [...weekdays].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DAY_NAMES[d]).join('+')
+}
+
+/** "Wed Sep 9" — every date the digest prompts show carries its weekday, because the schedule
+ * is expressed in weekdays and the model should never have to derive one from a date. */
+export function fmtDay(d: string): string {
+  const monthDay = new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return `${DAY_NAMES[weekdayOf(d)]} ${monthDay}`
+}
+
 function itemLine(item: CyclePlanItem, plannedWeeks: number): string {
-  const cadence = item.weekdays.length === 7
-    ? 'daily'
-    : [...item.weekdays].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DAY_NAMES[d]).join('+')
   const to = item.toWeek ?? plannedWeeks
   const span = item.fromWeek === 1 && to === plannedWeeks ? 'full run' : `weeks ${item.fromWeek}–${to}`
-  return `${item.compound} ${doseLabelOf(item)} ${cadence} (${span})`
+  return `${item.compound} ${doseLabelOf(item)} ${cadenceOf(item.weekdays)} (${span})`
 }
 
 const GATING_PROSE = 'the gating markers (lipids — especially HDL — ALT/AST, hematocrit/hemoglobin, ferritin/iron, blood pressure, estradiol)'
@@ -128,27 +141,18 @@ const DONE_RELEVANCE_DAYS = 120
 // itself worth knowing ("that October plan never happened").
 const TENTATIVE_HORIZON_DAYS = 120
 
-// Planned cycles as they stood on `asOf`, rendered as prompt paragraphs — the counterpart of
-// supplementContext for the cycles table. asOf matters for the same reason: lab summaries can
-// regenerate for historical draws, and "day 34 of the cycle" must be day 34 as of THAT draw.
-// Returns '' when there's nothing relevant — including when the table doesn't exist yet, so
-// digest generation never dies on a missing migration.
-export async function cycleContext(db: D1Database, asOf: string): Promise<string> {
+// Every planned cycle on file, oldest start first. Empty when the table doesn't exist yet, so
+// nothing built on it (cycleContext, the digest's schedule check) dies on a missing migration.
+export async function loadCycles(db: D1Database): Promise<Cycle[]> {
   let rows: Array<Record<string, unknown>>
-  let drawDates: string[]
   try {
-    const [cyclesRes, labsRes] = await Promise.all([
-      db.prepare('SELECT * FROM cycles ORDER BY start_date ASC').all(),
-      db.prepare('SELECT date FROM labs_entries ORDER BY date ASC').all()
-    ])
-    rows = (cyclesRes.results ?? []) as Array<Record<string, unknown>>
-    drawDates = ((labsRes.results ?? []) as Array<{ date: string }>).map(r => r.date)
+    const { results } = await db.prepare('SELECT * FROM cycles ORDER BY start_date ASC').all()
+    rows = (results ?? []) as Array<Record<string, unknown>>
   }
   catch {
-    return ''
+    return []
   }
-
-  const cycles: Cycle[] = rows.map(row => ({
+  return rows.map(row => ({
     id: row.id as number,
     name: row.name as string,
     goal: (row.goal as string | null) ?? null,
@@ -159,6 +163,28 @@ export async function cycleContext(db: D1Database, asOf: string): Promise<string
     compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
     notes: (row.notes as string | null) ?? null
   }))
+}
+
+// Planned cycles as they stood on `asOf`, rendered as prompt paragraphs — the counterpart of
+// supplementContext for the cycles table. asOf matters for the same reason: lab summaries can
+// regenerate for historical draws, and "day 34 of the cycle" must be day 34 as of THAT draw.
+// Returns '' when there's nothing relevant. Callers that already hold the cycles (the digest
+// loads them for its schedule check) pass them in to skip the second read.
+export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cycle[]): Promise<string> {
+  let cycles: Cycle[]
+  let drawDates: string[]
+  try {
+    const [loaded, labsRes] = await Promise.all([
+      preloaded ?? loadCycles(db),
+      db.prepare('SELECT date FROM labs_entries ORDER BY date ASC').all()
+    ])
+    cycles = loaded
+    drawDates = ((labsRes.results ?? []) as Array<{ date: string }>).map(r => r.date)
+  }
+  catch {
+    return ''
+  }
+  if (!cycles.length) return ''
 
   // Vitals rows for the passive signals watch — fetched once, and only when a cycle is
   // actually active at asOf (the windows are small: earliest baseline start → asOf).
@@ -248,6 +274,90 @@ export async function cycleContext(db: D1Database, asOf: string): Promise<string
     }
   }
   return paragraphs.join('\n\n')
+}
+
+// --- schedule check (planned vs logged) ---
+
+// The digest prompts used to hand the model "Recap for Sep 9" plus a weekday-based schedule and
+// let it work out that Sep 9 was a Wednesday. It guessed. These lines resolve the weekday math
+// deterministically — what was due, what was logged, what was missed, what is still open — so
+// the model narrates numbers instead of computing them, the same way the trend and cycle-signal
+// context already works.
+
+/** "Sun Sep 6, Mon Sep 7 and Tue Sep 8" */
+function listDays(dates: string[]): string {
+  const days = dates.map(fmtDay)
+  return days.length <= 1 ? days.join('') : `${days.slice(0, -1).join(', ')} and ${days.at(-1)}`
+}
+
+function dailyScheduleLine(date: string, tallies: ScheduleTally[], today: string): string {
+  const open = date >= today
+  const due = tallies.filter(t => t.hit.length || t.missed.length || t.pending)
+  const logged = due.filter(t => t.hit.length)
+  const unlogged = due.filter(t => !t.hit.length)
+  const notDue = tallies.filter(t => !due.includes(t) && ruleActiveOn(t.rule, date))
+  const off = tallies.filter(t => t.offSchedule.length)
+  const names = (list: ScheduleTally[]) => list.map(t => t.rule.compound).join(', ')
+
+  const parts = [
+    `Schedule check for ${fmtDay(date)}, against the intended schedule above with any planned cycle layered in — due today: ${due.length ? due.map(t => `${t.rule.compound} ${t.rule.doseLabel} (${cadenceOf(t.rule.weekdays)})`).join(', ') : 'nothing'}.`
+  ]
+  if (logged.length) parts.push(`Logged: ${names(logged)}.`)
+  if (unlogged.length) {
+    parts.push(open
+      ? `Not yet logged: ${names(unlogged)} — this recap is being written while the day is still under way (Chicago time), so treat that as open, not missed.`
+      : `Missed (due, never logged): ${names(unlogged)}.`)
+  }
+  if (notDue.length) {
+    parts.push(`Not due today: ${notDue.map((t) => {
+      const next = nextDueDay(t.rule, date)
+      return `${t.rule.compound} (${cadenceOf(t.rule.weekdays)}${next ? `; next ${fmtDay(next)}` : ''})`
+    }).join(', ')}.`)
+  }
+  if (off.length) parts.push(`Off-schedule today: ${names(off)} — not one of its days, so an extra or a slid dose.`)
+  return parts.join(' ')
+}
+
+function weeklyScheduleLines(start: string, end: string, tallies: ScheduleTally[], today: string): string {
+  const rows = tallies.filter(t => t.hit.length || t.missed.length || t.pending || t.offSchedule.length)
+  if (!rows.length) return ''
+  const open = end >= today
+  const lines = rows.map((t) => {
+    const dueDates = [...t.hit, ...t.missed].sort()
+    const daily = t.rule.weekdays.length === 7
+    const window = t.rule.to != null && t.rule.to < end
+      ? `, schedule ended ${fmtDay(t.rule.to)}`
+      : t.rule.from > start ? `, schedule began ${fmtDay(t.rule.from)}` : ''
+    let line = `- ${t.rule.compound} ${t.rule.doseLabel} (${cadenceOf(t.rule.weekdays)}${window}): `
+    line += dueDates.length
+      ? `${daily ? `${dueDates.length} days due` : `due ${listDays(dueDates)}`} — ${t.hit.length} logged`
+      : 'nothing due'
+    if (t.missed.length) line += `; missed ${listDays(t.missed)}`
+    if (t.pending) line += `; due today (${fmtDay(t.pending)}), not yet logged`
+    if (t.offSchedule.length) line += `; off-schedule dose${t.offSchedule.length > 1 ? 's' : ''} ${listDays(t.offSchedule)}`
+    return line + '.'
+  })
+  const header = `Schedule check for ${fmtDay(start)} – ${fmtDay(end)}, against the intended schedule above with any planned cycle layered in (a missed day followed within a day or two by an off-schedule dose is a slid dose, not a lapse${open ? '; the week is still under way, so days after today are not counted and today only counts once logged' : ''}):`
+  return [header, ...lines].join('\n')
+}
+
+// Planned-vs-logged for the digest period as prompt fact lines: one sentence for a single day,
+// a header plus one line per compound for a week. `rules` is the effective schedule (standing
+// rules with any planned cycle merged in); `doseDates` maps compound → logged dates; `today` is
+// the home-timezone date, so a same-day regenerate reads "not yet logged" rather than "missed".
+// Pure and synchronous. Returns '' when no rule is in force in the window.
+export function scheduleContext(
+  rules: ProtocolRule[],
+  start: string,
+  end: string,
+  doseDates: Map<string, Set<string>>,
+  today: string
+): string {
+  const tallies = tallySchedule(rules, start, end, doseDates, today)
+  if (!tallies.length) return ''
+  return start === end
+    ? dailyScheduleLine(start, tallies, today)
+    : weeklyScheduleLines(start, end, tallies, today)
 }
 
 // The supplement stack as it stood on `asOf` (YYYY-MM-DD), rendered as prompt paragraphs.

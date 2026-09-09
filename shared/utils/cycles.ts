@@ -18,6 +18,7 @@
 // server/utils/protocol.ts) must agree on the same status/day/window math.
 
 import type { PkDose } from './pk'
+import type { ProtocolRule } from './protocolRules'
 
 export interface CyclePlanItem {
   /** Must match a KNOWN_COMPOUNDS name — that's what links colors, PK models, and dose logs. */
@@ -60,15 +61,9 @@ export interface Cycle {
 
 export type CycleStatus = 'upcoming' | 'active' | 'done'
 
-/** Structurally identical to app/data/journal.ts's ProtocolRule, redeclared here because
- * shared code can't import from the app dir. TS structural typing makes them interchangeable. */
-export interface CycleRule {
-  compound: string
-  doseLabel: string
-  weekdays: number[]
-  from: string
-  to?: string | null
-}
+/** A cycle's cadence in the same shape as the standing PROTOCOL_RULES, so adherence scoring,
+ * the calendar rings, and the digest's schedule check consume both without caring which is which. */
+export type CycleRule = ProtocolRule
 
 /** The markers that gate anabolic decisions — the ones cycle views diff against baseline.
  * Keys match app/data/biomarkers.ts. */

@@ -1,4 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { mergeRules } from '#shared/utils/cycles'
+import type { ProtocolRule } from '#shared/utils/protocolRules'
+import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
+import { localToday } from '#shared/utils/time'
 
 // Personal-health digest generation. Gathers vitals / sleep / recovery / doses / workouts for a
 // period from D1, has Claude write a short plain-text recap, and upserts it into the digests table.
@@ -33,8 +37,25 @@ function avg(nums: number[]): number | null {
   return vals.reduce((a, b) => a + b, 0) / vals.length
 }
 
-function fmtDate(d: string): string {
-  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+// Prompt headers: "Wednesday, Sep 9, 2026". The weekday is the point — the dosing schedule is
+// written in weekdays, and the model was guessing which one "Sep 9" was. Fact lines use
+// fmtDay() from protocol.ts ("Wed Sep 9") for the same reason.
+function fmtDateFull(d: string): string {
+  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+}
+
+// compound → the dates it was logged, the shape tallySchedule scores against.
+function doseDatesOf(entries: JournalRow[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>()
+  for (const e of entries) {
+    for (const p of e.peptides ?? []) {
+      if (!p.compound) continue
+      let set = map.get(p.compound)
+      if (!set) map.set(p.compound, set = new Set())
+      set.add(e.date)
+    }
+  }
+  return map
 }
 
 interface SodaEntry { time?: string, drink?: string, size?: string }
@@ -162,7 +183,7 @@ function noteLines(entries: JournalRow[]): string[] {
     .filter(e => e.notes?.trim())
     .map((e) => {
       const flat = e.notes!.trim().replace(/\s*\n+\s*/g, ' / ')
-      return `${fmtDate(e.date)}: "${flat.length > 280 ? flat.slice(0, 277) + '...' : flat}"`
+      return `${fmtDay(e.date)}: "${flat.length > 280 ? flat.slice(0, 277) + '...' : flat}"`
     })
 }
 
@@ -184,7 +205,9 @@ function tallyDoses(entries: JournalRow[]) {
 
 // --- Daily ---
 
-async function buildDaily(db: D1Database, date: string) {
+// `rules` is the effective dosing schedule (standing + planned cycles) and `today` the
+// home-timezone date, both for the schedule check — see scheduleContext in protocol.ts.
+async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], today: string) {
   const [journal, health, workouts, prev, baseJournal, baseHealth, labDates] = await Promise.all([
     journalInRange(db, date, date),
     healthInRange(db, date, date),
@@ -199,7 +222,7 @@ async function buildDaily(db: D1Database, date: string) {
 
   const lines: string[] = []
   if (entry?.weight_lbs != null) {
-    const delta = prev?.weight_lbs != null ? ` (${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${round(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDate(prev.date)})` : ''
+    const delta = prev?.weight_lbs != null ? ` (${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${round(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDay(prev.date)})` : ''
     lines.push(`Weight: ${entry.weight_lbs} lbs${delta}`)
   }
   if (entry?.bp_systolic != null && entry?.bp_diastolic != null) lines.push(`Blood pressure: ${entry.bp_systolic}/${entry.bp_diastolic}`)
@@ -246,6 +269,11 @@ async function buildDaily(db: D1Database, date: string) {
   // Baseline is context, not data — decide whether the day is worth summarizing first.
   const hasData = lines.length > 1 || doses.length > 0 || workouts.length > 0
 
+  // Planned vs logged, with the weekday already resolved — pushed after the hasData decision
+  // because it says something even on an empty day.
+  const schedule = scheduleContext(rules, date, date, doseDatesOf(journal), today)
+  if (schedule) lines.push(schedule)
+
   const base: string[] = []
   const bWeight = avg(baseJournal.map(e => e.weight_lbs!))
   if (bWeight != null) base.push(`avg weight ${round(bWeight)} lbs`)
@@ -264,7 +292,7 @@ async function buildDaily(db: D1Database, date: string) {
 
 // --- Weekly ---
 
-async function buildWeekly(db: D1Database, start: string, end: string) {
+async function buildWeekly(db: D1Database, start: string, end: string, rules: ProtocolRule[], today: string) {
   const prevStart = addDays(start, -7)
   const prevEnd = addDays(start, -1)
   const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates] = await Promise.all([
@@ -328,6 +356,10 @@ async function buildWeekly(db: D1Database, start: string, end: string) {
   }
   else lines.push('Compounds used: none logged')
 
+  // Planned vs logged per compound, dates already resolved to weekdays.
+  const schedule = scheduleContext(rules, start, end, doseDatesOf(journal), today)
+  if (schedule) lines.push(schedule)
+
   if (workouts.length) {
     const totalMin = workouts.reduce((s, w) => s + (w.duration_min ?? 0), 0)
     const totalCal = workouts.reduce((s, w) => s + (w.calories ?? 0), 0)
@@ -341,7 +373,7 @@ async function buildWeekly(db: D1Database, start: string, end: string) {
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your notes this week — ${notes.join('; ')}`)
 
-  if (labDates.length) lines.push(`Labs drawn ${labDates.map(fmtDate).join(', ')} — results are on the labs page.`)
+  if (labDates.length) lines.push(`Labs drawn ${labDates.map(fmtDay).join(', ')} — results are on the labs page.`)
 
   // Previous-week baseline so "better/worse than a typical week" is grounded in numbers.
   const base: string[] = []
@@ -362,7 +394,7 @@ async function buildWeekly(db: D1Database, start: string, end: string) {
   const pSodas = sodaSummary(prevJournal)
   base.push(`${pSodas.count} soda${pSodas.count === 1 ? '' : 's'}`)
   if (prevJournal.length || prevHealth.length || prevWorkouts.length) {
-    lines.push(`Previous week (${fmtDate(prevStart)} – ${fmtDate(prevEnd)}), for comparison: ${base.join(', ')}`)
+    lines.push(`Previous week (${fmtDay(prevStart)} – ${fmtDay(prevEnd)}), for comparison: ${base.join(', ')}`)
   }
 
   const stats = {
@@ -414,10 +446,10 @@ function dailyPrompt(date: string, facts: string, supplements: string): string {
 
 ${TICKER_VOICE}
 
-Recap for ${fmtDate(date)}:
+Recap for ${fmtDateFull(date)}:
 ${facts}
 
-Write 2-4 sentences highlighting what stands out about the day — notable vitals against the prior-7-day baseline, recovery/sleep quality, whether we trained, and protocol adherence measured against the intended schedule above (a day with no testosterone or hCG logged may simply not be one of its scheduled days). If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "I've been averaging X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Each change carries its age: prefer trends tied to the ongoing core protocol over ones anchored to an ancillary peptide stopped weeks ago, which by now rate a clause, not a headline. Be factual and specific. If it was an unremarkable day, say so briefly — a quiet day is a good day for a heart.
+Write 2-4 sentences highlighting what stands out about the day — notable vitals against the prior-7-day baseline, recovery/sleep quality, whether we trained, and protocol adherence as resolved by the "Schedule check" line: it already knows the weekday and states what was due, logged, missed, not due, or not yet logged, so take it as given rather than working out the weekday yourself. A compound listed as not due today is not a miss; one listed as not yet logged on a day still under way is open, not missed. If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "I've been averaging X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Each change carries its age: prefer trends tied to the ongoing core protocol over ones anchored to an ancillary peptide stopped weeks ago, which by now rate a clause, not a headline. Be factual and specific. If it was an unremarkable day, say so briefly — a quiet day is a good day for a heart.
 
 ${STYLE_RULES}`
 }
@@ -427,10 +459,10 @@ function weeklyPrompt(start: string, end: string, facts: string, supplements: st
 
 ${TICKER_VOICE}
 
-Week of ${fmtDate(start)} – ${fmtDate(end)}:
+Week of ${fmtDateFull(start)} – ${fmtDateFull(end)}:
 ${facts}
 
-Write about 5 sentences, in order of importance: overall trends this week against the previous week (weight, recovery, sleep, HRV/RHR, blood pressure), training volume, and protocol adherence measured against the intended schedule above (e.g. testosterone on 2 of 7 days is full adherence, not a thin log; flag misses or extras, not matches). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "my resting rate has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Each change carries its age: a finding anchored to the ongoing core protocol outranks one anchored to an ancillary peptide stopped weeks ago, which by now rates a clause, not a headline. Call out anything notably better or worse than the previous week. Be factual and specific.
+Write about 5 sentences, in order of importance: overall trends this week against the previous week (weight, recovery, sleep, HRV/RHR, blood pressure), training volume, and protocol adherence as resolved by the "Schedule check" lines: they already know which dates each compound was due and list the misses, slides, and off-schedule doses, so take them as given rather than working out weekdays yourself (testosterone logged on both of its due days is full adherence, not a thin log; flag what they list as missed or off-schedule, not matches). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "my resting rate has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Each change carries its age: a finding anchored to the ongoing core protocol outranks one anchored to an ancillary peptide stopped weeks ago, which by now rates a clause, not a headline. Call out anything notably better or worse than the previous week. Be factual and specific.
 
 ${STYLE_RULES}`
 }
@@ -496,7 +528,16 @@ export async function generateDigest(
   const end = endDate ?? addDays(new Date().toISOString().slice(0, 10), -1)
   const start = kind === 'weekly' ? addDays(end, -6) : end
 
-  const built = kind === 'weekly' ? await buildWeekly(db, start, end) : await buildDaily(db, end)
+  // The effective dosing schedule — standing rules with any planned cycle merged in — and the
+  // home-timezone "today", so the schedule check knows whether the period is still under way
+  // (a same-day regenerate from the dashboard) or closed (the crons run for yesterday).
+  const cycles = await loadCycles(db)
+  const rules = mergeRules(PROTOCOL_RULES, cycles)
+  const today = localToday()
+
+  const built = kind === 'weekly'
+    ? await buildWeekly(db, start, end, rules, today)
+    : await buildDaily(db, end, rules, today)
   if (!built.hasData) {
     return { ok: true, skipped: true, type: kind, period_start: start, period_end: end }
   }
@@ -528,7 +569,7 @@ export async function generateDigest(
   // every trend on it; a vaccine or a travel weekend explains a bad-looking few days).
   const [supplements, cyclesCtx, vaccines] = await Promise.all([
     supplementContext(db, end),
-    cycleContext(db, end),
+    cycleContext(db, end, cycles),
     vaccineContext(db, end)
   ])
   const regimen = [supplements, cyclesCtx, vaccines, eventContext(end)].filter(Boolean).join('\n\n')
