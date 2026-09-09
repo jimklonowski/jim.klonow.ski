@@ -8,16 +8,16 @@
 // derive into the same rule shape, and where a cycle covers a compound the standing schedule
 // also carries, the standing rule is split around the cycle window so the cycle owns it.
 
-import type { JournalEntry, ProtocolRule } from '~/data/journal'
-import { PROTOCOL_RULES } from '~/data/journal'
+import type { JournalEntry } from '~/data/journal'
 import type { Cycle } from '#shared/utils/cycles'
 import { cycleRules, diffDays, mergeRules } from '#shared/utils/cycles'
+import type { ProtocolRule } from '#shared/utils/protocolRules'
+import { PROTOCOL_RULES, ruleActiveOn, weekdayOf } from '#shared/utils/protocolRules'
+
+// The rule set itself, plus scheduledFor() for the calendar rings, live in
+// shared/utils/protocolRules.ts so the server's digest prompts score against the same cadence.
 
 const DAY_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-
-function weekdayOf(date: string): number {
-  return new Date(date + 'T12:00:00').getDay()
-}
 
 function shiftDays(date: string, n: number): string {
   const d = new Date(date + 'T12:00:00')
@@ -28,16 +28,6 @@ function shiftDays(date: string, n: number): string {
 /** Sunday that starts the week containing `date` — matches the calendar grid. */
 function weekStartOf(date: string): string {
   return shiftDays(date, -weekdayOf(date))
-}
-
-function ruleActiveOn(rule: ProtocolRule, date: string): boolean {
-  return date >= rule.from && (rule.to == null || date <= rule.to)
-}
-
-/** Rules whose cadence calls for a dose on this date. */
-export function scheduledFor(date: string, rules: ProtocolRule[] = PROTOCOL_RULES): ProtocolRule[] {
-  const wd = weekdayOf(date)
-  return rules.filter(r => ruleActiveOn(r, date) && r.weekdays.includes(wd))
 }
 
 /** "DAILY" / "MON+THU" — Monday-first, since that's how a week reads. */
