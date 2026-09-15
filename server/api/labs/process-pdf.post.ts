@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
 
 // Builds "[YYYY-MM-DD]-[Description].pdf" from an arbitrary uploaded filename, stripping any
 // date-like text already in it first so re-running extraction never doubles up the date.
@@ -26,9 +27,11 @@ Structure:
 
 Rules:
 - date: specimen collection date in YYYY-MM-DD format
-- fasting: true if report says FASTING:YES, false otherwise
+- fasting: true if the report indicates a fasting specimen in ANY wording — Quest prints "FASTING: YES", other labs (e.g. CHW) print "Fasting", "Fasting: Y", "Patient fasting", or a fasting note beside glucose/lipids. false if it says FASTING: NO / non-fasting, or carries no fasting information at all
 - For values like "<10", use the number 10
 - For values like ">X", use X
+- Units: convert to the unit the site stores. ABSOLUTE NEUTROPHILS/LYMPHOCYTES/MONOCYTES/EOSINOPHILS/BASOPHILS are stored in cells/uL — if the report gives them in K/uL, x10E3/uL, x10^3/uL or thousand/uL, multiply by 1000 (1.6 K/uL → 1600). WHITE BLOOD CELL COUNT and PLATELET COUNT are stored in K/uL; RED BLOOD CELL COUNT in M/uL
+- Lab names vary between labs ("Neutrophils Absolute", "Neut Abs" and "ANC" are all ABSOLUTE NEUTROPHILS) — match by meaning, not exact wording, but never invent a marker the report doesn't contain
 - Only include markers actually present in the report
 - markers is ONLY for numeric results matching one of the exact key names below
 - qualitative is for any test result that is NOT a plain number — genetic/mutation analyses, antibody positive/negative, presence/absence findings, or any other categorical result. Use the report's own test name for "name" and its exact reported result (e.g. "Negative", "Heterozygous", "Detected") for "result". Omit qualitative entirely if there are no such results.
@@ -97,7 +100,16 @@ MONOCYTES % → monocytes_pct
 EOSINOPHILS % → eosinophils_pct
 BASOPHILS % → basophils_pct
 HS CRP → hs_crp
-HOMOCYSTEINE → homocysteine`
+HOMOCYSTEINE → homocysteine
+URIC ACID → uric_acid
+PHOSPHORUS → phosphorus
+BUN/CREATININE RATIO → bun_creatinine_ratio
+BILIRUBIN, DIRECT → bilirubin_direct
+GGT → ggt
+LDH → ldh
+PSA → psa
+VITAMIN B12 → vitamin_b12
+FOLATE (FOLIC ACID) → folate`
 
 const DEXA_EXTRACTION_PROMPT = `Extract all data from this DEXA/DXA body composition scan report and return ONLY valid JSON — no markdown, no explanation.
 
@@ -218,6 +230,12 @@ export default defineEventHandler(async (event) => {
   }
   catch {
     throw createError({ statusCode: 500, message: `Could not parse extraction result: ${text.slice(0, 200)}` })
+  }
+
+  // Belt and braces on the prompt's unit rule: CHW prints the WBC differential in K/uL and the site
+  // stores cells/uL. Normalizing here means the /labs/upload preview shows exactly what gets saved.
+  if (reportType === 'bloodwork' && extracted.markers && typeof extracted.markers === 'object') {
+    extracted.markers = normalizeAbsDifferential(extracted.markers as Record<string, unknown>)
   }
 
   // Store the PDF in R2 — sources hold bare object keys; list endpoints turn them into proxy URLs.

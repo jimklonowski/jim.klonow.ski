@@ -200,7 +200,7 @@ export default defineEventHandler(async (event) => {
 
 ${PROTOCOL_SCHEDULE}
 ${supplementBlock ? `\n${supplementBlock}\n` : ''}${cycleBlock ? `\n${cycleBlock}\n` : ''}${vaccineBlock ? `\n${vaccineBlock}\n` : ''}${eventBlock ? `\n${eventBlock}\n` : ''}
-The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
+The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT and roughly halve PSA once 6–12 months in, so double an on-treatment PSA before comparing it with pre-treatment draws; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
 
 New draw: ${date} (${target.fasting ? 'fasting' : 'non-fasting'})
 Draws included for comparison: ${draws.map(d => `${d.date}${d.fasting ? ' (fasting)' : ' (non-fasting)'}`).join(', ')}
