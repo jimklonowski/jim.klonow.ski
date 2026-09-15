@@ -32,8 +32,10 @@ const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 
 export const PROTOCOL_RULES: ProtocolRule[] = [
   { compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18' },
-  { compound: 'hCG', doseLabel: '250 IU', weekdays: [0, 2, 5], from: '2026-06-18' },
-  { compound: 'HGH', doseLabel: '2 IU', weekdays: EVERY_DAY, from: '2026-06-13' },
+  // 300 IU since 2026-09-08 (250 IU before that); doseLabel is display-only so the row keeps its from.
+  { compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18' },
+  // 2.5 IU since 2026-09-03 (2 IU before, 2.25 IU on 09-02/03 while stepping up).
+  { compound: 'HGH', doseLabel: '2.5 IU', weekdays: EVERY_DAY, from: '2026-06-13' },
   // Discontinued 2026-09-01 (vial finished, not reconstituting another for now). `to` is
   // inclusive, so the rings stop expecting a dose from 2026-09-02 on.
   { compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01', to: '2026-09-01' },
