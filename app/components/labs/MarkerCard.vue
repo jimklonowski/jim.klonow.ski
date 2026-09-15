@@ -13,7 +13,12 @@
           class="w-3 h-3 shrink-0 text-faint"
           title="Computed from other markers"
         />
-        <span class="truncate">{{ meta.label }}</span>
+        <span class="truncate">{{ meta.label }}{{ caveatCompound ? '*' : '' }}</span>
+        <span
+          v-if="caveatCompound"
+          class="shrink-0 text-[9.5px] leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
+          :title="`Taken while on ${caveatCompound} — see the note inside`"
+        >on {{ caveatCompound }}</span>
       </span>
       <span
         class="text-[11px] shrink-0"
@@ -70,6 +75,13 @@
         </p>
 
         <p
+          v-if="showCaveat"
+          class="text-[11.5px] leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
+        >
+          * {{ caveat!.note }}
+        </p>
+
+        <p
           v-if="meta.computed"
           class="text-[11px] text-faint"
         >
@@ -117,7 +129,10 @@
             >
               <span class="text-muted">{{ row.dateLabel }}</span>
               <span class="flex items-baseline gap-2">
-                <span class="text-hi">{{ row.value }}</span>
+                <span class="text-hi">{{ row.value }}<span
+                  v-if="row.flagged"
+                  class="text-warn"
+                >*</span></span>
                 <span class="text-[10.5px] text-muted">{{ meta.unit }}</span>
                 <span
                   class="text-[10.5px] w-9 text-right"
@@ -140,6 +155,7 @@
 
 <script setup lang="ts">
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
+import { MARKER_CAVEATS, caveatCompoundOn } from '~/data/markerCaveats'
 
 const props = defineProps<{
   biomarkerKey: string
@@ -201,6 +217,13 @@ const carriedFrom = computed(() => withValue.value.at(-1)?.date ?? null)
 const carried = computed(() => current.value != null && carriedFrom.value !== sorted.value.at(-1)?.date)
 
 const hasRange = computed(() => meta.value.refMin !== undefined || meta.value.refMax !== undefined)
+
+// Medication caveat (PSA on finasteride): decided per reading off the protocol dates, so the
+// badge follows the reading actually on screen and pre-treatment history stays unstarred.
+const caveat = computed(() => MARKER_CAVEATS[props.biomarkerKey])
+const caveatCompound = computed(() =>
+  carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value) : null
+)
 
 const displayValue = computed(() => {
   const v = current.value
@@ -272,8 +295,13 @@ const history = computed(() =>
       dateLabel: formatDate(e.date),
       value: num(value),
       color: STATUS_COLORS[s],
-      label: STATUS_LABELS[s]
+      label: STATUS_LABELS[s],
+      flagged: caveatCompoundOn(props.biomarkerKey, e.date) != null
     }
   })
+)
+
+const showCaveat = computed(() =>
+  !!caveat.value && (caveatCompound.value != null || history.value.some(r => r.flagged))
 )
 </script>
