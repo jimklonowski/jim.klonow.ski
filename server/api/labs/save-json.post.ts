@@ -1,3 +1,5 @@
+import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
+
 interface SavePayload {
   date: string
   _type?: string
@@ -55,7 +57,9 @@ export default defineEventHandler(async (event) => {
 
   const newSources = (data.sources ?? []) as string[]
   const mergedSources = [...new Set([...existingSources, ...newSources])]
-  const mergedMarkers = { ...existingMarkers, ...(data.markers as Record<string, number> ?? {}) }
+  // Same K/uL → cells/uL guard as process-pdf, so a hand-edited JSON save can't reintroduce the mix.
+  const newMarkers = normalizeAbsDifferential((data.markers as Record<string, number> | undefined) ?? {})
+  const mergedMarkers = { ...existingMarkers, ...newMarkers }
   // Tag each qualitative result with its report type so the dashboard can split echo
   // findings from genetic/other qualitative results without guessing from the name.
   const newQualitative = ((data.qualitative ?? []) as { name: string, result: string }[])
