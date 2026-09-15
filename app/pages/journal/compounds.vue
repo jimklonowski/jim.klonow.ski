@@ -274,6 +274,7 @@
 import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS, STANDING_COMPOUNDS } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
+import { ruleActiveOn } from '#shared/utils/protocolRules'
 import type { AdherenceWeek } from '~/utils/adherence'
 import { iuEquivalentLabel } from '~/utils/peptideCalc'
 
@@ -290,8 +291,18 @@ onMounted(refresh)
 const entries = computed(() => data.value ?? [])
 const today = localToday()
 
-/** A compound counts as "active protocol" if it was dosed inside this window. */
-const ACTIVE_WINDOW = 21
+/**
+ * A compound counts as "active protocol" if it was dosed inside this window. Two weeks: long
+ * enough that a twice-weekly compound has several doses to read a cadence from, short enough
+ * that something stopped a fortnight ago has left the list (was 21d, which kept BPC-157 around).
+ */
+const ACTIVE_WINDOW = 14
+
+// The standing schedule with planned cycles layered in (override semantics — see mergeRules):
+// the intent both the dose shorthand and the adherence panel read. Empty for the demo persona,
+// whose dose dates re-anchor nightly and drift across weekdays by design, so weekday-based
+// scoring would read as constant failure there.
+const scheduleRules = computed(() => role.value === 'demo' ? [] : effectiveRules(cyclesData.value ?? []))
 
 interface Usage {
   compound: string
@@ -326,31 +337,45 @@ function daysAgo(date: string) {
 }
 
 /**
- * Dose shorthand: the modal dose plus a cadence read off how often it was taken across the
- * active window — qd (daily), eod (every other day), or Nx/wk.
+ * Dose shorthand: the current dose plus a cadence — qd (daily), eod (every other day), or Nx/wk.
  *
- * The mode is taken over the active window only, not the whole history: a twice-weekly compound
- * would otherwise need 20+ doses at a new amount before it outvoted the old one (T cyp still read
- * "100mg" three weeks after the drop to 75 mg in Aug 2026). Ties go to the most recent dose.
+ * Dose: the last three logged doses when they agree (a change held for three doses is deliberate —
+ * hCG 250 → 300 IU shows after one week instead of once it outvotes the old amount), otherwise the
+ * mode over the active window with ties to the most recent dose.
+ *
+ * Cadence: the schedule rule's intent when one is active, so a daily compound with a travel gap
+ * still reads "qd" rather than the "6×/wk" its logged days round to. Observed cadence only for
+ * compounds without a rule (as-needed BPC-157, the demo persona).
  */
 function doseShorthand(u: Usage): string {
-  const inWindow = u.doses.filter(d => daysAgo(d.date) <= ACTIVE_WINDOW)
-  const recent = inWindow.length ? inWindow : u.doses.slice(-40)
-  const counts = new Map<string, { n: number, lastIdx: number }>()
-  recent.forEach((d, i) => {
-    const key = `${d.dose}${d.unit}`
-    const c = counts.get(key) ?? { n: 0, lastIdx: -1 }
-    c.n++
-    c.lastIdx = i
-    counts.set(key, c)
-  })
-  const dose = [...counts.entries()]
-    .sort((a, b) => b[1].n - a[1].n || b[1].lastIdx - a[1].lastIdx)[0]?.[0] ?? '—'
+  const key = (d: Usage['doses'][number]) => `${d.dose}${d.unit}`
+  const lastThree = u.doses.slice(-3)
+  let dose: string
+  if (lastThree.length === 3 && lastThree.every(d => key(d) === key(lastThree[0]!))) {
+    dose = key(lastThree[0]!)
+  }
+  else {
+    const inWindow = u.doses.filter(d => daysAgo(d.date) <= ACTIVE_WINDOW)
+    const recent = inWindow.length ? inWindow : u.doses.slice(-40)
+    const counts = new Map<string, { n: number, lastIdx: number }>()
+    recent.forEach((d, i) => {
+      const c = counts.get(key(d)) ?? { n: 0, lastIdx: -1 }
+      c.n++
+      c.lastIdx = i
+      counts.set(key(d), c)
+    })
+    dose = [...counts.entries()]
+      .sort((a, b) => b[1].n - a[1].n || b[1].lastIdx - a[1].lastIdx)[0]?.[0] ?? '—'
+  }
+
+  const rule = scheduleRules.value.find(r => r.compound === u.compound && ruleActiveOn(r, today))
+  if (rule) return rule.weekdays.length === 7 ? `${dose} qd` : `${dose} ${rule.weekdays.length}×/wk`
 
   const windowDates = u.dates.filter(d => daysAgo(d) <= ACTIVE_WINDOW)
   if (windowDates.length < 2) return dose
-  const perWeek = (windowDates.length / ACTIVE_WINDOW) * 7
-  if (perWeek >= 6.5) return `${dose} qd`
+  // The window is inclusive on both ends, so it spans ACTIVE_WINDOW + 1 days.
+  const perWeek = (windowDates.length / (ACTIVE_WINDOW + 1)) * 7
+  if (perWeek >= 6) return `${dose} qd`
   if (perWeek >= 3 && perWeek <= 4) return `${dose} eod`
   return `${dose} ${Math.round(perWeek)}×/wk`
 }
@@ -452,13 +477,9 @@ const exposureMarks = computed(() => {
 // --- adherence ---
 const ADHERENCE_WEEKS = 8
 
-// The demo persona's dose dates re-anchor nightly and drift across weekdays by design, so
-// weekday-based scoring would read as constant failure there — real sessions only. Planned
-// cycles merge in through effectiveRules, overriding the standing cadence where they collide.
+// scheduleRules is already empty for the demo persona, which makes this [] there.
 const adherence = computed(() =>
-  role.value === 'demo'
-    ? []
-    : computeAdherence(entries.value, today, ADHERENCE_WEEKS, effectiveRules(cyclesData.value ?? []))
+  computeAdherence(entries.value, today, ADHERENCE_WEEKS, scheduleRules.value)
 )
 
 function weekCellStyle(compound: string, w: AdherenceWeek) {
