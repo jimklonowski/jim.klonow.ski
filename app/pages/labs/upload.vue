@@ -197,11 +197,27 @@
           <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
             {{ cell.label }}
           </p>
+          <button
+            v-if="cell.onClick"
+            type="button"
+            class="num-display text-[24px] leading-none mt-1.5 whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
+            :title="cell.hint"
+            @click="cell.onClick"
+          >
+            {{ cell.value }} <span class="text-[13px] text-muted align-middle">⇄</span>
+          </button>
           <p
+            v-else
             class="num-display text-[24px] leading-none mt-1.5 whitespace-nowrap"
             :class="cell.accent ? 'text-accent' : ''"
           >
             {{ cell.value }}
+          </p>
+          <p
+            v-if="cell.hint"
+            class="mt-1.5 text-[10.5px] text-muted"
+          >
+            {{ cell.hint }}
           </p>
         </div>
       </div>
@@ -461,16 +477,33 @@ const statusMeta = computed(() => {
   return `awaiting ${dropZoneLabel.value} pdf`
 })
 
-const resultCells = computed(() => {
+interface ResultCell {
+  label: string
+  value: string
+  accent: boolean
+  hint?: string
+  onClick?: () => void
+}
+
+const resultCells = computed<ResultCell[]>(() => {
   const res = result.value
   if (!res) return []
+  // Not every lab prints a fasting line (Quest does, CHW doesn't), so the extractor can miss it —
+  // for bloodwork the cell doubles as a toggle so it's correctable before saving.
+  const fastingCell: ResultCell = reportType.value === 'bloodwork'
+    ? { label: 'fasting', value: res.fasting ? 'YES' : 'NO', accent: false, hint: 'click to flip', onClick: toggleFasting }
+    : { label: 'fasting', value: res.fasting ? 'YES' : 'NO', accent: false }
   return [
     { label: 'draw date', value: formatDateTerse(res.date), accent: false },
     { label: 'markers found', value: `${markerEntries.value.length}`, accent: true },
-    { label: 'fasting', value: res.fasting ? 'YES' : 'NO', accent: false },
+    fastingCell,
     { label: 'report', value: REPORT_LABELS[reportType.value].toUpperCase(), accent: false }
   ]
 })
+
+function toggleFasting() {
+  if (result.value) result.value.fasting = !result.value.fasting
+}
 
 const saveMessage = computed(() => {
   const res = saveResult.value

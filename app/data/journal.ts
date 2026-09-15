@@ -107,7 +107,8 @@ export interface JournalEntry {
 }
 
 export const SODA_DRINKS = [
-  'Dr Pepper', 'Coke', 'Diet Coke', 'Coke Zero', 'Sprite', 'Mountain Dew', 'Root Beer', 'Mr Pibb'
+  'Dr Pepper', 'Coke', 'Cherry Coke', 'Diet Coke', 'Coke Zero', 'Sprite', 'Mountain Dew', 'Root Beer', 'Mr Pibb',
+  'Orange Fanta', 'Orange Crush'
 ]
 
 export const SODA_SIZES = [

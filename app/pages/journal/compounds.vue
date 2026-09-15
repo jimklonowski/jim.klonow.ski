@@ -297,7 +297,7 @@ interface Usage {
   compound: string
   daysUsed: number
   dates: string[]
-  doses: PeptideEntry[]
+  doses: (PeptideEntry & { date: string })[]
 }
 
 const usage = computed(() => {
@@ -310,7 +310,7 @@ const usage = computed(() => {
         u.dates.push(e.date)
         u.daysUsed++
       }
-      u.doses.push(p)
+      u.doses.push({ ...p, date: e.date })
       map.set(p.compound, u)
     }
   }
@@ -328,15 +328,24 @@ function daysAgo(date: string) {
 /**
  * Dose shorthand: the modal dose plus a cadence read off how often it was taken across the
  * active window — qd (daily), eod (every other day), or Nx/wk.
+ *
+ * The mode is taken over the active window only, not the whole history: a twice-weekly compound
+ * would otherwise need 20+ doses at a new amount before it outvoted the old one (T cyp still read
+ * "100mg" three weeks after the drop to 75 mg in Aug 2026). Ties go to the most recent dose.
  */
 function doseShorthand(u: Usage): string {
-  const recent = u.doses.filter((_, i) => u.doses.length - i <= 40)
-  const counts = new Map<string, number>()
-  for (const d of recent) {
-    const unit = d.unit === 'iu' ? 'iu' : d.unit
-    counts.set(`${d.dose}${unit}`, (counts.get(`${d.dose}${unit}`) ?? 0) + 1)
-  }
-  const dose = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'
+  const inWindow = u.doses.filter(d => daysAgo(d.date) <= ACTIVE_WINDOW)
+  const recent = inWindow.length ? inWindow : u.doses.slice(-40)
+  const counts = new Map<string, { n: number, lastIdx: number }>()
+  recent.forEach((d, i) => {
+    const key = `${d.dose}${d.unit}`
+    const c = counts.get(key) ?? { n: 0, lastIdx: -1 }
+    c.n++
+    c.lastIdx = i
+    counts.set(key, c)
+  })
+  const dose = [...counts.entries()]
+    .sort((a, b) => b[1].n - a[1].n || b[1].lastIdx - a[1].lastIdx)[0]?.[0] ?? '—'
 
   const windowDates = u.dates.filter(d => daysAgo(d) <= ACTIVE_WINDOW)
   if (windowDates.length < 2) return dose
