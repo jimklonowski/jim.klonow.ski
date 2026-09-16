@@ -145,7 +145,7 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
   // Soda habit tapers from ~0.8/day to ~0.2/day across the story.
   const sodas = []
   const sodaRate = 0.8 - (t / TOTAL_DAYS) * 0.6
-  if (chance(sodaRate)) sodas.push({ time: pick(['12:40', '14:15', '15:30', '19:05']), drink: pick(['Dr Pepper', 'Coke Zero', 'Root Beer', 'Diet Coke']), size: pick(['12oz can', 'Mini can', '20oz bottle']) })
+  if (chance(sodaRate)) sodas.push({ time: pick(['12:40', '14:15', '15:30', '19:05']), drink: pick(['Dr Pepper', 'Coke Zero', 'Root Beer', 'Diet Coke']), size: pick(['12oz can', '7.5oz mini can', '20oz bottle']) })
   if (chance(sodaRate * 0.25)) sodas.push({ time: '20:30', drink: pick(['Coke', 'Sprite']), size: '12oz can' })
 
   let notes = ''
