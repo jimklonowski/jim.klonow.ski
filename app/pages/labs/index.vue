@@ -66,7 +66,7 @@
       class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-line-input bg-inset"
     >
       <div class="flex items-baseline gap-3">
-        <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ AI SUMMARY</span>
+        <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ LATEST DRAW AI SUMMARY</span>
         <span
           v-if="latestSummary"
           class="text-[10.5px] text-muted tracking-[0.06em] uppercase"

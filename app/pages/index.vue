@@ -199,10 +199,12 @@
         class="mt-5"
       />
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-2.5">
-        <div
+        <NuxtLink
           v-for="t in trends"
           :key="t.label"
-          class="bg-raised border border-line-soft px-3 py-2.5"
+          to="/journal/trends"
+          :aria-label="`${t.label} — open 90-day trends`"
+          class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-[#101a15] hover:border-line-input transition-colors"
         >
           <div class="flex justify-between text-[10.5px] text-muted">
             <span>{{ t.label }}</span>
@@ -212,7 +214,7 @@
             :values="t.values"
             class="mt-1.5"
           />
-        </div>
+        </NuxtLink>
       </div>
     </section>
 
