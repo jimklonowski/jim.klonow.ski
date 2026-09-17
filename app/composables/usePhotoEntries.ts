@@ -1,7 +1,9 @@
+import type { PhotoCategory } from '#shared/utils/photoCategories'
+
 export interface ProgressPhoto {
   id: number
   date: string
-  category: 'chest' | 'left_bicep' | 'right_bicep' | 'face' | 'hairline'
+  category: PhotoCategory
   url: string
   thumbUrl: string | null
   taken_at: string | null

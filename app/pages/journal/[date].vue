@@ -676,6 +676,8 @@ import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, 
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
+import type { PhotoCategory } from '#shared/utils/photoCategories'
+import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 import exifr from 'exifr'
 
 definePageMeta({ middleware: 'journal-auth' })
@@ -737,20 +739,7 @@ function workoutMeta(w: WorkoutEntry) {
   ].filter(Boolean).join(' · ')
 }
 
-// --- Progress Photos ---
-
-const PHOTO_CATEGORIES = [
-  { value: 'chest', label: 'Chest' },
-  { value: 'left_bicep', label: 'Left Bicep' },
-  { value: 'right_bicep', label: 'Right Bicep' },
-  { value: 'face', label: 'Face' },
-  { value: 'hairline', label: 'Hairline' }
-] as const
-type PhotoCategory = typeof PHOTO_CATEGORIES[number]['value']
-
-function photoCategoryLabel(category: string) {
-  return PHOTO_CATEGORIES.find(c => c.value === category)?.label ?? category
-}
+// --- Progress Photos --- (categories: shared/utils/photoCategories.ts)
 
 const dayPhotos = computed(() => (photosData.value ?? []).filter(p => p.date === dateParam.value))
 function photosFor(category: PhotoCategory) {
