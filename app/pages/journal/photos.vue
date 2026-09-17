@@ -153,7 +153,8 @@
 
     <!-- Category selector -->
     <div class="px-4 sm:px-6 pt-4">
-      <div class="grid grid-cols-3 sm:grid-cols-5 gap-px bg-line border border-line">
+      <!-- Six buckets: 3×2 up to md, one row above. sm would squeeze "RIGHT BICEP n" into ~106px. -->
+      <div class="grid grid-cols-3 md:grid-cols-6 gap-px bg-line border border-line">
         <button
           v-for="c in PHOTO_CATEGORIES"
           :key="c.value"
@@ -523,23 +524,12 @@
 
 <script setup lang="ts">
 import exifr from 'exifr'
+import type { PhotoCategory } from '#shared/utils/photoCategories'
+import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 
 definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Photos' })
-
-const PHOTO_CATEGORIES = [
-  { value: 'chest', label: 'Chest' },
-  { value: 'left_bicep', label: 'Left Bicep' },
-  { value: 'right_bicep', label: 'Right Bicep' },
-  { value: 'face', label: 'Face' },
-  { value: 'hairline', label: 'Hairline' }
-] as const
-type PhotoCategory = typeof PHOTO_CATEGORIES[number]['value']
-
-function photoCategoryLabel(value: string) {
-  return PHOTO_CATEGORIES.find(c => c.value === value)?.label ?? value
-}
 
 const { data: photosData, refresh, error } = await usePhotoEntries()
 const { isOwner } = await useAuth()

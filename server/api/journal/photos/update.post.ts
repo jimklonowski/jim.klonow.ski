@@ -1,4 +1,4 @@
-const CATEGORIES = ['chest', 'left_bicep', 'right_bicep', 'face', 'hairline'] as const
+import { isPhotoCategory } from '#shared/utils/photoCategories'
 
 export default defineEventHandler(async (event) => {
   requireOwner(event)
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
     addSet('date', body.date)
   }
   if (body.category !== undefined) {
-    if (!CATEGORIES.includes(body.category as typeof CATEGORIES[number])) {
+    if (!isPhotoCategory(body.category)) {
       throw createError({ statusCode: 400, message: 'Invalid category' })
     }
     addSet('category', body.category)
