@@ -129,7 +129,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, perio
 CREATE TABLE IF NOT EXISTS progress_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL,
-  category TEXT NOT NULL, -- 'chest' | 'left_bicep' | 'right_bicep' | 'face' | 'hairline'
+  category TEXT NOT NULL, -- PHOTO_CATEGORIES values, shared/utils/photoCategories.ts ('chest' | ... | 'hairline' | 'crown')
   r2_key TEXT NOT NULL,
   thumb_r2_key TEXT,
   taken_at TEXT,

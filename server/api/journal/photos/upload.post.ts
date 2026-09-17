@@ -1,4 +1,4 @@
-const CATEGORIES = ['chest', 'left_bicep', 'right_bicep', 'face', 'hairline'] as const
+import { isPhotoCategory } from '#shared/utils/photoCategories'
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -16,8 +16,8 @@ export default defineEventHandler(async (event) => {
   // multi-MB photo and was itself enough to trip Workers' tight per-request CPU time limit even
   // after removing the redundant server-side EXIF parse below.
   const query = getQuery(event)
-  const category = typeof query.category === 'string' ? query.category : ''
-  if (!CATEGORIES.includes(category as typeof CATEGORIES[number])) {
+  const category = query.category
+  if (!isPhotoCategory(category)) {
     throw createError({ statusCode: 400, message: 'Invalid or missing category' })
   }
 
