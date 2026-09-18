@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.09.17",
+  "version": "2026.09.18",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -37,18 +37,20 @@
   },
   "devDependencies": {
     "@comark/nuxt": "0.7.0",
-    "@iconify-json/lucide": "^1.2.132",
+    "@iconify-json/lucide": "^1.2.133",
     "@iconify-json/simple-icons": "^1.2.96",
     "@nuxt/eslint": "^1.17.0",
+    "echarts": "^6.1.0",
     "eslint": "^10.10.0",
     "nitro-cloudflare-dev": "^0.2.2",
     "nuxt": "4.5.2",
-    "nuxt-echarts": "^1.0.1",
+    "nuxt-echarts": "^1.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vue": "3.5.42",
+    "vue": "3.5.43",
+    "vue-echarts": "^8.3.0",
     "vue-tsc": "^3.3.11",
-    "wrangler": "^4.132.0"
+    "wrangler": "^4.133.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
