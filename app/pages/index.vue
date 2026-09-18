@@ -289,31 +289,41 @@ function doseLabel(dose: PeptideEntry) {
   return `${dose.dose} ${unit}${equiv ? ` (${equiv})` : ''}${dose.site ? ` · ${shortSite(dose.site)}` : ''}`
 }
 
-// Under the "LOGGED TODAY" header a bare clock time reads as today's, so sessions from an
-// earlier day get a "last workout" label and lead with their age.
+// Sessions from an earlier day get a "last workout" label so they can't read as today's.
 const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today)
 
+// Every session leads with its age — "1h ago" answers what a clock time makes the reader work
+// out. Ticks once a minute so the label stays right while the page sits open (the PWA comes
+// back from the background hours later). VueUse 15 dropped useNow's `interval` for a
+// scheduler, and its default is per animation frame — far too often for a minute-grained
+// label. useIntervalFn starts no timer on the server.
+const now = useNow({ scheduler: cb => useIntervalFn(cb, 60_000) })
+
 function workoutAge(w: typeof allWorkouts.value[number]): string | null {
-  if (w.date === today) return null
   // start_time is "2026-08-24 17:37:44 -0500" — not ISO, so it's rebuilt before parsing;
   // the recorded offset makes it an exact instant regardless of the viewer's zone.
   const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?) ([+-]\d{2}):?(\d{2})$/.exec(w.start_time ?? '')
   const instant = m ? Date.parse(`${m[1]}T${m[2]}${m[3]}:${m[4]}`) : NaN
   if (!Number.isNaN(instant)) {
-    const mins = Math.max(0, Math.floor((Date.now() - instant) / 60000))
+    const mins = Math.max(0, Math.floor((now.value.getTime() - instant) / 60000))
+    if (mins < 1) return 'just now'
     // Dated yesterday but under an hour old happens right after midnight.
     if (mins < 60) return `${mins}m ago`
     const hours = Math.floor(mins / 60)
     return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`
   }
+  // No usable start time: whole days from the entry date, and nothing for today's — under
+  // the "LOGGED TODAY" header "today" would only restate the heading.
   const days = Math.round((Date.parse(today) - Date.parse(w.date)) / 86400000)
-  return `${Math.max(1, days)}d ago`
+  return days < 1 ? null : `${days}d ago`
 }
 
 // Kept as separate parts, not one joined string, so each metric renders non-breaking —
 // otherwise this 390px column splits "18.9 min" across two lines.
 function workoutParts(w: typeof allWorkouts.value[number]) {
-  const time = workoutTime(w.start_time)
+  // Today's sessions are placed by their age alone; an older day's keep the clock time after
+  // it, since "2d ago" doesn't say whether that was a morning or an evening session.
+  const time = w.date === today ? null : workoutTime(w.start_time)
   // "♥ 119/141" = avg/max; whichever is missing drops out rather than showing a dash.
   const hr = w.avg_hr != null
     ? `♥ ${w.avg_hr}${w.max_hr != null ? `/${w.max_hr}` : ''}`
