@@ -78,9 +78,13 @@
       No doses of {{ compoundName }} logged yet.
     </p>
 
-    <!-- Main split -->
+    <!-- Main split. Both sections need min-w-0: stacked to one auto column below lg, the
+         track's minimum is its widest item's min-content width, and an echarts svg keeps
+         explicit pixel dimensions — after a landscape→portrait rotation it held the grid at
+         landscape width, so the charts never saw the resize that would have shrunk them and
+         Safari zoomed the page out around a header that stayed put (same fix as index.vue). -->
     <div class="grid gap-px bg-line lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-      <section class="bg-bg px-4 sm:px-6 py-4 space-y-4">
+      <section class="bg-bg px-4 sm:px-6 py-4 space-y-4 min-w-0">
         <!-- Vitals on vs off -->
         <div v-if="hasVitalsData">
           <TuiHeader
@@ -213,8 +217,9 @@
         </div>
       </section>
 
-      <section class="bg-bg px-4 sm:px-6 py-4 space-y-4">
-        <!-- Daily dose step chart -->
+      <section class="bg-bg px-4 sm:px-6 py-4 space-y-4 min-w-0">
+        <!-- Daily dose step chart. Shares its x-axis and gutters with the modeled curve below,
+             so the dates line up between the two. -->
         <div v-if="doseChart.length >= 2">
           <TuiHeader :label="`DAILY DOSE · ${unit.toUpperCase()}`">
             <span class="text-[10.5px] text-muted">{{ doseRangeLabel }}</span>
@@ -225,6 +230,9 @@
                 :data="doseChart"
                 :categories="{ dose: { name: `Dose (${unit})`, color: compoundColor } }"
                 :height="150"
+                :mark-lines="exposureMarks"
+                point-key="dosed"
+                fixed-gutter
                 step
               />
               <template #fallback>
@@ -241,7 +249,7 @@
         <!-- Modeled exposure (slow-release compounds only) -->
         <div v-if="exposureChart.length >= 2">
           <TuiHeader label="ESTIMATED LEVELS · MODELED">
-            <span class="text-[10.5px] text-muted">LAST {{ EXPOSURE_DAYS }}D · % OF PEAK</span>
+            <span class="text-[10.5px] text-muted">% OF PEAK</span>
           </TuiHeader>
           <div class="mt-2.5">
             <ClientOnly>
@@ -250,6 +258,7 @@
                 :categories="{ level: { name: '% of recent peak', color: compoundColor } }"
                 :height="150"
                 :mark-lines="exposureMarks"
+                fixed-gutter
                 area
               />
               <template #fallback>
@@ -485,24 +494,76 @@ const vitalsRows = computed(() =>
   })
 )
 
-// --- Dose chart ---
-const doseChart = computed(() =>
-  onDays.value.map((e) => {
-    const total = dosesOf(e).reduce((sum, p) => sum + p.dose, 0)
-    return { date: formatDate(e.date, 'monthDay'), dose: Math.round(total * 10) / 10 }
-  })
+// --- Shared chart window ---
+// Only compounds with multi-day kinetics get a modeled curve (PK_MODELS); everything else clears
+// in hours and the dose chart alone tells the story. When the curve shows, the two charts stack,
+// so they plot the same calendar days over the same window — one point per dosing day over the
+// full history above one point per day over the last 120 put "Sep 7" in two different places.
+// The window runs from the first dose, capped at EXPOSURE_DAYS, through today.
+const EXPOSURE_DAYS = 120
+
+const pkModel = computed(() => PK_MODELS[compoundName.value])
+
+/** Total logged on each dosing day, oldest first — the source for the step chart and its captions. */
+const dailyTotals = computed(() =>
+  onDays.value.map(e => ({
+    date: e.date,
+    dose: Math.round(dosesOf(e).reduce((sum, p) => sum + p.dose, 0) * 10) / 10
+  }))
 )
 
-const doseRangeLabel = computed(() => {
-  const first = onDays.value[0]?.date
-  const last = onDays.value.at(-1)?.date
-  if (!first || !last) return ''
-  return `${formatDate(first, 'monthDay').toUpperCase()} → ${formatDate(last, 'monthDay').toUpperCase()}`
+const chartWindow = computed(() => {
+  if (!pkModel.value) return null
+  const floor = localDaysAgo(EXPOSURE_DAYS - 1)
+  const first = dailyTotals.value[0]?.date
+  // Nothing left to model once the last dose fell out of the window.
+  if (!first || !dailyTotals.value.some(d => d.date >= floor)) return null
+  return { from: first > floor ? first : floor, to: localToday() }
 })
 
-/** Captions under the step chart: where the dose started, and where it sits now. */
+/** Every calendar day in [from, to], as YYYY-MM-DD — the same walk exposureSeries takes. */
+function eachDay(from: string, to: string): string[] {
+  const out: string[] = []
+  const cur = new Date(from + 'T12:00:00')
+  const end = new Date(to + 'T12:00:00')
+  while (cur <= end) {
+    out.push(cur.toLocaleDateString('en-CA'))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return out
+}
+
+// --- Dose chart ---
+// `dosed` flags the actual dosing days: those get point markers, the held days between don't.
+const doseChart = computed(() => {
+  const win = chartWindow.value
+  if (!win) {
+    return dailyTotals.value.map(d => ({ date: formatDate(d.date, 'monthDay'), dose: d.dose, dosed: true }))
+  }
+  // Daily grid to match the curve below. The step holds the last dose across the days between
+  // injections, and forward from the latest one to today. A window clipped at 120 days opens
+  // on whatever dose was current then.
+  const byDay = new Map(dailyTotals.value.map(d => [d.date, d.dose]))
+  let held = dailyTotals.value.filter(d => d.date < win.from).at(-1)?.dose ?? 0
+  return eachDay(win.from, win.to).map((date) => {
+    const dose = byDay.get(date)
+    if (dose != null) held = dose
+    return { date: formatDate(date, 'monthDay'), dose: held, dosed: dose != null }
+  })
+})
+
+/** The chart's own span: the shared window when the curve shows, first → last dose otherwise. */
+const doseRangeLabel = computed(() => {
+  const first = doseChart.value[0]?.date
+  const last = doseChart.value.at(-1)?.date
+  if (!first || !last) return ''
+  return `${first.toUpperCase()} → ${last.toUpperCase()}`
+})
+
+/** Captions under the step chart: where the dose started, and where it sits now. Read off the
+ * dosing days, not the daily grid, so a long hold doesn't outvote the doses actually given. */
 const doseSummary = computed(() => {
-  const doses = doseChart.value.map(d => d.dose)
+  const doses = dailyTotals.value.map(d => d.dose)
   if (!doses.length) return { start: '', recent: '' }
   const first = doses[0]!
   const last = doses.at(-1)!
@@ -517,19 +578,13 @@ const doseSummary = computed(() => {
 })
 
 // --- Modeled exposure ---
-// Only compounds with multi-day kinetics get a curve (PK_MODELS); everything else clears in
-// hours and the dose chart above already tells the story.
-const EXPOSURE_DAYS = 120
-
-const pkModel = computed(() => PK_MODELS[compoundName.value])
-
 const exposureChart = computed(() => {
   const model = pkModel.value
-  if (!model) return []
-  const from = localDaysAgo(EXPOSURE_DAYS - 1)
+  const win = chartWindow.value
+  if (!model || !win) return []
+  // The full dose history: doses before the window still contribute their tails.
   const doses = allDoses.value.map(p => ({ date: p.date, time: p.time, amount: p.dose }))
-  if (!doses.some(d => d.date >= from)) return []
-  const points = exposureSeries(doses, model, from, localToday())
+  const points = exposureSeries(doses, model, win.from, win.to)
   const max = Math.max(...points.map(p => p.level))
   if (max <= 0) return []
   return points.map(p => ({
@@ -538,11 +593,12 @@ const exposureChart = computed(() => {
   }))
 })
 
+/** Lab draws inside the shared window — dashed guides on both stacked charts. */
 const exposureMarks = computed(() => {
-  if (!pkModel.value) return []
-  const from = localDaysAgo(EXPOSURE_DAYS - 1)
+  const win = chartWindow.value
+  if (!win) return []
   return (labsData.value ?? [])
-    .filter(l => l.date >= from)
+    .filter(l => l.date >= win.from && l.date <= win.to)
     .map(l => formatDate(l.date, 'monthDay'))
 })
 
