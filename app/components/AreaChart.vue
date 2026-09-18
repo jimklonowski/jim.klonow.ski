@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { CHART_AXIS, CHART_GRID, CHART_TEXT, CHART_TOOLTIP, seriesSymbol } from '~/utils/chartTheme'
+import { CHART_AXIS, CHART_GRID, CHART_GRID_FIXED, CHART_TEXT, CHART_TOOLTIP, seriesSymbol } from '~/utils/chartTheme'
 
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
@@ -23,6 +23,12 @@ const props = withDefaults(defineProps<{
   step?: boolean
   /** Drop both axes and grid lines: the line alone, for dense metric tiles. Tooltips stay. */
   bare?: boolean
+  /** Row field flagging the rows that get a point marker — the dosing days of a daily step
+   * chart, say. Other rows draw none, and the density rule counts only the flagged rows. */
+  pointKey?: string
+  /** Fixed axis gutters instead of measured ones, so charts stacked on one x-axis stay flush
+   * however wide their y-labels are. */
+  fixedGutter?: boolean
 }>(), {
   xAxisKey: 'date',
   height: 160,
@@ -30,12 +36,20 @@ const props = withDefaults(defineProps<{
   area: false,
   markLines: () => [],
   step: false,
-  bare: false
+  bare: false,
+  pointKey: undefined,
+  fixedGutter: false
 })
 
 const option = computed<ECOption>(() => {
   const categories = Object.entries(props.categories)
   const labels = props.data.map(d => d[props.xAxisKey] as string)
+  const pointKey = props.pointKey
+  const symbol = seriesSymbol(pointKey ? props.data.filter(d => d[pointKey]).length : props.data.length)
+  // Per-row symbols only when the density rule allows points at all: an item-level 'circle'
+  // would override a series-level 'none'.
+  const flagRows = pointKey != null && symbol.symbol !== 'none'
+  const gridBase = props.fixedGutter ? CHART_GRID_FIXED : CHART_GRID
 
   return {
     backgroundColor: 'transparent',
@@ -43,7 +57,7 @@ const option = computed<ECOption>(() => {
     color: categories.map(([, c]) => c.color),
     grid: props.bare
       ? { top: 4, left: 2, right: 2, bottom: 2, containLabel: false }
-      : { ...CHART_GRID, top: props.showLegend ? 26 : 8 },
+      : { ...gridBase, top: props.showLegend ? 26 : 8 },
     tooltip: CHART_TOOLTIP,
     legend: {
       show: props.showLegend,
@@ -75,10 +89,14 @@ const option = computed<ECOption>(() => {
     series: categories.map(([key, meta], i) => ({
       type: 'line',
       name: meta.name,
-      data: props.data.map(d => d[key] as number),
+      data: flagRows
+        ? props.data.map(d => ({ value: d[key] as number, symbol: d[pointKey] ? 'circle' : 'none' }))
+        : props.data.map(d => d[key] as number),
       smooth: false,
       ...(props.step ? { step: 'end' as const } : {}),
-      ...seriesSymbol(props.data.length),
+      ...symbol,
+      // A crowded category axis thins symbols to the labelled ticks; every flagged row must show.
+      ...(flagRows ? { showAllSymbol: true } : {}),
       lineStyle: { width: 1.5, color: meta.color },
       itemStyle: { color: meta.color },
       ...(props.area
