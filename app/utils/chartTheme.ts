@@ -31,6 +31,21 @@ export const CHART_GRID = {
 } as const
 
 /**
+ * Margins for charts stacked on one x-axis (the dose step over the modeled curve on a compound
+ * page). `containLabel` measures each chart's own y-labels, so a "1000" axis above a "100" axis
+ * drifts the plots apart by a character. These are sized for four-character y-labels and a
+ * "Sep 18" end label at the 10px mono face — what containLabel lands on for "100" today, so
+ * nothing moves for the common case and the two plots stay flush in every case.
+ */
+export const CHART_GRID_FIXED = {
+  top: 8,
+  left: 34,
+  right: 26,
+  bottom: 24,
+  containLabel: false
+} as const
+
+/**
  * ECharts hard-codes `z-index: 9999999` on its HTML tooltip, which floats it over any sticky
  * chrome on the page (the /labs time scrubber sits at z-10). `extraCssText` lands after that rule
  * in the same style attribute, so it is the one place the z-index can be pulled back down.

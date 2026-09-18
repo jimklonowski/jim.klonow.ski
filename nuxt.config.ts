@@ -164,7 +164,10 @@ export default defineNuxtConfig({
   echarts: {
     renderer: 'svg',
     charts: ['LineChart', 'BarChart'],
-    components: ['GridComponent', 'TooltipComponent', 'LegendComponent'],
+    // Every component an option touches has to be listed: echarts drops the rest without a
+    // word (a series' markLine is not a top-level key, so it never gets the "used but not
+    // imported" dev warning). The lab-draw guides were invisible until MarkLine joined.
+    components: ['GridComponent', 'TooltipComponent', 'LegendComponent', 'MarkLineComponent'],
     features: ['LabelLayout']
   },
 
