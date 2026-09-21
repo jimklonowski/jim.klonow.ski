@@ -13,13 +13,12 @@ export function useTrendRange() {
   const days = useState('journal-trend-days', () => 90)
   const smooth = useState('journal-trend-smooth', () => false)
 
-  /** Inclusive lower bound as YYYY-MM-DD, or null when showing all history. */
-  const cutoff = computed(() => {
-    if (!days.value) return null
-    const d = new Date()
-    d.setDate(d.getDate() - days.value)
-    return d.toLocaleDateString('en-CA')
-  })
+  /**
+   * Inclusive lower bound as YYYY-MM-DD, or null when showing all history. Home-timezone
+   * arithmetic (shared/utils/time.ts): the runtime-local version put the SSR boundary a day
+   * later than the client's every evening, so the charts changed shape on hydration.
+   */
+  const cutoff = computed(() => days.value ? localDaysAgo(days.value) : null)
 
   function inRange<T extends { date: string }>(rows: T[]): T[] {
     const from = cutoff.value

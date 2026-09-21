@@ -204,7 +204,7 @@ const drawDates = computed(() => new Set((labsData.value ?? []).map(l => l.date)
 
 // Logged days only, here and in the strip below: the ledger lists every row (vitals-only ones
 // included), but "logged" has to mean hand-entered or the strip is solid green for any day the
-// watch synced. See app/utils/journalLog.ts.
+// watch synced. See shared/utils/journalLog.ts.
 const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
 const streak = computed(() => loggedStreak(entries.value, today))
 

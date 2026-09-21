@@ -21,6 +21,7 @@
           >›</button>
         </span>
         <NuxtLink
+          v-if="canEdit"
           :to="`/journal/${todayDate}`"
           class="tui-btn tui-btn-accent"
         >
@@ -68,19 +69,22 @@
         {{ d }}
       </div>
 
+      <!-- Days are buttons only for roles that can open /journal/<date>; the doctor's view has
+           no daily entries (shared/utils/access.ts), so its cells are plain read-only tiles
+           instead of taps that bounce to /labs. -->
       <component
-        :is="cell.date ? 'button' : 'div'"
+        :is="cell.date && canOpenDays ? 'button' : 'div'"
         v-for="(cell, i) in calendarCells"
         :key="i"
-        :type="cell.date ? 'button' : undefined"
+        :type="cell.date && canOpenDays ? 'button' : undefined"
         class="bg-bg px-2 py-2 min-h-22 text-left align-top"
         :class="[
-          cell.date ? 'cursor-pointer hover:bg-[#101a15] transition-colors' : '',
+          cell.date && canOpenDays ? 'cursor-pointer hover:bg-[#101a15] transition-colors' : '',
           cell.isToday ? 'outline outline-accent -outline-offset-1' : '',
           cell.isFuture ? 'opacity-40' : ''
         ]"
         :title="cell.title || undefined"
-        @click="cell.date && navigateTo(`/journal/${cell.date}`)"
+        @click="cell.date && canOpenDays && navigateTo(`/journal/${cell.date}`)"
       >
         <template v-if="cell.date">
           <div class="flex items-baseline gap-1.5">
@@ -235,7 +239,11 @@ const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntrie
 const { data: labsData } = await useLabsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 const { data: cyclesData } = await useCycles()
-const { role } = await useAuth()
+const { role, canEdit } = await useAuth()
+
+// Daily entries are a full-access surface (owner / friend / demo); the doctor is bounced from
+// /journal/<date> by the route policy, so the grid must not offer the jump in the first place.
+const canOpenDays = computed(() => isFullAccessRole(role.value))
 
 // Scheduled-dose rings come from PROTOCOL_RULES plus any planned cycles (effectiveRules) —
 // so an upcoming cycle previews its rings on future days before a single dose is logged.

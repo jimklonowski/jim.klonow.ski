@@ -1,4 +1,5 @@
 import { isPhotoCategory } from '#shared/utils/photoCategories'
+import { localToday } from '#shared/utils/time'
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -34,7 +35,7 @@ export default defineEventHandler(async (event) => {
   const hasValidSuppliedDate = !!suppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
 
   const taken_at = hasValidSuppliedDate ? suppliedDate! : await extractPhotoDate(data)
-  const date = taken_at ?? new Date().toISOString().slice(0, 10)
+  const date = taken_at ?? localToday()
 
   const ext = EXT_BY_MIME[contentType] ?? 'jpg'
   const r2Key = `${date}-${category}-${Date.now()}.${ext}`

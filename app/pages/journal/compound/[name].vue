@@ -295,15 +295,22 @@
               </tr>
             </thead>
             <tbody>
+              <!-- The date is a real link (keyboard / middle-click work) and only for roles that
+                   can open the day; the doctor sees the dose history without a dead-end jump. -->
               <tr
                 v-for="(inj, i) in recentDoses"
                 :key="`${inj.date}-${inj.time}-${i}`"
-                class="cursor-pointer hover:bg-[#101a15] transition-colors"
-                :class="i % 2 ? 'bg-inset' : ''"
-                @click="navigateTo(`/journal/${inj.date}`)"
+                :class="[i % 2 ? 'bg-inset' : '', canOpenDays ? 'hover:bg-[#101a15] transition-colors' : '']"
               >
                 <td class="py-1.5 text-body">
-                  {{ inj.date }}
+                  <NuxtLink
+                    v-if="canOpenDays"
+                    :to="`/journal/${inj.date}`"
+                    class="hover:text-accent"
+                  >{{ inj.date }}</NuxtLink>
+                  <template v-else>
+                    {{ inj.date }}
+                  </template>
                 </td>
                 <td class="py-1.5 text-muted">
                   {{ inj.time || '—' }}
@@ -370,6 +377,9 @@ import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 definePageMeta({ middleware: 'journal-auth' })
 
 const route = useRoute()
+const { role } = await useAuth()
+// Dose rows link to /journal/<date> only for roles allowed there (shared/utils/access.ts).
+const canOpenDays = computed(() => isFullAccessRole(role.value))
 const compoundName = computed(() => decodeURIComponent(route.params.name as string))
 // Must come after compoundName: unhead resolves the getter synchronously during client setup,
 // so referencing it earlier threw a TDZ error that aborted hydration (page rendered but inert).

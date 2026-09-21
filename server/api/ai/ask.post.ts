@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { checkAskHistory } from '#shared/utils/askHistory'
+import { localToday } from '#shared/utils/time'
 import { READER_CONTEXT } from '../../utils/digest'
 
 // Ask-the-data chat: answers freeform questions over the full tracked history (labs, DEXA,
@@ -35,7 +36,7 @@ export default defineEventHandler(async (event) => {
   // The client sends its local date so "this week" means Jim's week, not UTC's.
   const today = typeof body?.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.today)
     ? body.today
-    : new Date().toISOString().slice(0, 10)
+    : localToday()
 
   const context = await buildAskContext(getDb(event), today)
 

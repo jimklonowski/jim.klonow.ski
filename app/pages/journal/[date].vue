@@ -27,7 +27,7 @@
           v-if="canEdit"
           type="button"
           class="tui-btn tui-btn-accent"
-          :disabled="saving"
+          :disabled="saving || !canSave"
           @click="save"
         >
           {{ saving ? 'SAVING…' : '✓ SAVE' }}
@@ -40,407 +40,204 @@
     </JournalHeader>
     <JournalNav />
 
+    <!-- A failed list fetch must never present a blank "new entry" whose save would overwrite
+         the real row (journal/save is a full-column upsert) — surface it and hold Save. -->
+    <TuiDataState
+      :error="entriesError"
+      @retry="refresh"
+    />
+
     <div class="px-4 sm:px-6 py-4 space-y-5">
-      <!-- Date & vitals -->
-      <section>
-        <TuiHeader
-          label="DATE · VITALS"
-          :dashes="12"
-        />
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-2.5">
-          <UFormField
-            label="Date"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model="form.date"
-              type="date"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="Weight (lbs)"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model.number="form.weight_lbs"
-              type="number"
-              step="0.1"
-              placeholder="155.0"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="BP Sys"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model.number="form.bp_systolic"
-              type="number"
-              placeholder="120"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="BP Dia"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model.number="form.bp_diastolic"
-              type="number"
-              placeholder="80"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="RHR (bpm)"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model.number="form.rhr"
-              type="number"
-              placeholder="50"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="HRV (ms)"
-            :ui="FIELD_UI"
-          >
-            <UInput
-              v-model.number="form.hrv"
-              type="number"
-              placeholder="44"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-      </section>
-
-      <!-- Peptides -->
-      <section>
-        <TuiHeader
-          label="PROTOCOL · DOSES"
-          :dashes="10"
-        >
-          <span class="flex items-center gap-3 text-[11px]">
-            <button
-              v-if="canEdit && prevEntry?.peptides?.length"
-              type="button"
-              class="text-accent hover:text-accent-hover cursor-pointer"
-              @click="copyFromPrevious"
-            >copy prev</button>
-            <button
-              type="button"
-              class="text-accent hover:text-accent-hover cursor-pointer"
-              @click="addPeptide"
-            >+ add</button>
-          </span>
-        </TuiHeader>
-
-        <div
-          v-if="form.peptides.length"
-          class="space-y-2 mt-2.5"
-        >
-          <div
-            v-for="(peptide, i) in form.peptides"
-            :key="i"
-            class="grid grid-cols-12 gap-2 items-end"
-          >
+      <!-- Every editable control sits inside one fieldset: a disabled fieldset disables all of
+           its descendant inputs, selects and buttons at once, so a read-only role (friend) can't
+           change a value the hidden Save button would never have sent. min-w-0 undoes the UA's
+           min-inline-size: min-content, which would otherwise break the grids inside. -->
+      <fieldset
+        :disabled="!canEdit"
+        class="min-w-0 space-y-5"
+      >
+        <!-- Date & vitals -->
+        <section>
+          <TuiHeader
+            label="DATE · VITALS"
+            :dashes="12"
+          />
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-2.5">
             <UFormField
-              label="Time"
-              class="col-span-4 sm:col-span-2"
+              label="Date"
               :ui="FIELD_UI"
             >
               <UInput
-                v-model="peptide.time"
-                type="time"
+                v-model="form.date"
+                type="date"
                 class="w-full"
               />
             </UFormField>
             <UFormField
-              label="Compound"
-              class="col-span-8 sm:col-span-4"
+              label="Weight (lbs)"
               :ui="FIELD_UI"
-            >
-              <UInputMenu
-                v-model="peptide.compound"
-                mode="autocomplete"
-                :items="KNOWN_COMPOUNDS"
-                open-on-click
-                placeholder="MOTS-C"
-                class="w-full"
-                :ui="SELECT_UI"
-              />
-            </UFormField>
-            <UFormField
-              label="Dose"
-              class="col-span-4 sm:col-span-2"
-              :ui="FIELD_UI"
-              :hint="doseHelp(peptide)"
             >
               <UInput
-                v-model.number="peptide.dose"
+                v-model.number="form.weight_lbs"
                 type="number"
                 step="0.1"
-                placeholder="2.5"
+                placeholder="155.0"
                 class="w-full"
               />
             </UFormField>
             <UFormField
-              label="Unit"
-              class="col-span-3 sm:col-span-1"
-              :ui="FIELD_UI"
-            >
-              <USelect
-                v-model="peptide.unit"
-                :items="DOSE_UNITS"
-                value-key="value"
-                label-key="label"
-                class="w-full"
-                :ui="SELECT_UI"
-              />
-            </UFormField>
-            <UFormField
-              label="Site"
-              class="col-span-4 sm:col-span-2"
-              :ui="FIELD_UI"
-            >
-              <USelect
-                v-model="peptide.site"
-                :items="INJECTION_SITES"
-                value-key="value"
-                label-key="label"
-                class="w-full"
-                :ui="SELECT_UI"
-              />
-            </UFormField>
-            <div class="col-span-1 flex items-end pb-2">
-              <button
-                type="button"
-                class="text-[12px] text-faint hover:text-danger cursor-pointer"
-                :aria-label="`Remove dose ${i + 1}`"
-                @click="removePeptide(i)"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        </div>
-        <p
-          v-else
-          class="mt-2.5 text-[12px] text-muted"
-        >
-          No doses logged. Use + add to record injections.
-        </p>
-      </section>
-
-      <!-- Reconstitutions -->
-      <section>
-        <TuiHeader
-          label="VIAL RECONSTITUTIONS"
-          :dashes="6"
-        >
-          <button
-            type="button"
-            class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
-            @click="addReconstitution"
-          >
-            ⚗ add
-          </button>
-        </TuiHeader>
-
-        <div
-          v-if="form.reconstitutions.length"
-          class="space-y-2 mt-2.5"
-        >
-          <div
-            v-for="(r, i) in form.reconstitutions"
-            :key="i"
-            class="grid grid-cols-12 gap-2 items-end"
-          >
-            <UFormField
-              label="Compound"
-              class="col-span-6 sm:col-span-3"
-              :ui="FIELD_UI"
-            >
-              <UInputMenu
-                v-model="r.compound"
-                mode="autocomplete"
-                :items="KNOWN_COMPOUNDS"
-                open-on-click
-                placeholder="GHK-Cu"
-                class="w-full"
-                :ui="SELECT_UI"
-              />
-            </UFormField>
-            <UFormField
-              label="Vial size"
-              class="col-span-3 sm:col-span-2"
+              label="BP Sys"
               :ui="FIELD_UI"
             >
               <UInput
-                v-model.number="r.vial_amount"
+                v-model.number="form.bp_systolic"
+                type="number"
+                placeholder="120"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="BP Dia"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="form.bp_diastolic"
+                type="number"
+                placeholder="80"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="RHR (bpm)"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="form.rhr"
                 type="number"
                 placeholder="50"
                 class="w-full"
               />
             </UFormField>
             <UFormField
-              label="Unit"
-              class="col-span-2 sm:col-span-1"
-              :ui="FIELD_UI"
-            >
-              <USelect
-                v-model="r.vial_unit"
-                :items="DOSE_UNITS"
-                value-key="value"
-                label-key="label"
-                class="w-full"
-                :ui="SELECT_UI"
-              />
-            </UFormField>
-            <UFormField
-              label="Supplier"
-              class="col-span-6 sm:col-span-3"
+              label="HRV (ms)"
               :ui="FIELD_UI"
             >
               <UInput
-                v-model="r.supplier"
-                placeholder="EZ Peptides"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField
-              label="BAC water (mL)"
-              class="col-span-5 sm:col-span-2"
-              :ui="FIELD_UI"
-            >
-              <UInput
-                v-model.number="r.bac_water_ml"
+                v-model.number="form.hrv"
                 type="number"
-                step="0.5"
-                placeholder="2"
+                placeholder="44"
                 class="w-full"
-              />
-            </UFormField>
-            <div class="col-span-1 flex items-end pb-2">
-              <button
-                type="button"
-                class="text-[12px] text-faint hover:text-danger cursor-pointer"
-                :aria-label="`Remove reconstitution ${i + 1}`"
-                @click="removeReconstitution(i)"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        </div>
-        <p
-          v-else
-          class="mt-2.5 text-[12px] text-muted"
-        >
-          No reconstitutions today.
-        </p>
-      </section>
-
-      <!-- Food + sodas -->
-      <div class="grid gap-5 lg:grid-cols-2">
-        <section>
-          <TuiHeader
-            label="FOOD"
-            :dashes="20"
-          />
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
-            <UFormField
-              v-for="slot in MEAL_SLOTS"
-              :key="slot.key"
-              :label="slot.label"
-              :ui="FIELD_UI"
-            >
-              <UInputMenu
-                v-model="form.food[slot.key]"
-                mode="autocomplete"
-                :items="mealHistory"
-                open-on-click
-                :placeholder="slot.placeholder"
-                class="w-full"
-                :ui="SELECT_UI"
               />
             </UFormField>
           </div>
         </section>
 
+        <!-- Peptides -->
         <section>
           <TuiHeader
-            label="SODA"
-            :dashes="20"
+            label="PROTOCOL · DOSES"
+            :dashes="10"
           >
-            <button
-              type="button"
-              class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
-              @click="addSoda"
-            >
-              + add
-            </button>
+            <span class="flex items-center gap-3 text-[11px]">
+              <button
+                v-if="canEdit && prevEntry?.peptides?.length"
+                type="button"
+                class="text-accent hover:text-accent-hover cursor-pointer"
+                @click="copyFromPrevious"
+              >copy prev</button>
+              <button
+                v-if="canEdit"
+                type="button"
+                class="text-accent hover:text-accent-hover cursor-pointer"
+                @click="addPeptide"
+              >+ add</button>
+            </span>
           </TuiHeader>
 
           <div
-            v-if="form.sodas.length"
+            v-if="form.peptides.length"
             class="space-y-2 mt-2.5"
           >
             <div
-              v-for="(soda, i) in form.sodas"
+              v-for="(peptide, i) in form.peptides"
               :key="i"
               class="grid grid-cols-12 gap-2 items-end"
             >
               <UFormField
                 label="Time"
-                class="col-span-3"
+                class="col-span-4 sm:col-span-2"
                 :ui="FIELD_UI"
               >
                 <UInput
-                  v-model="soda.time"
+                  v-model="peptide.time"
                   type="time"
                   class="w-full"
                 />
               </UFormField>
               <UFormField
-                label="Drink"
-                class="col-span-4"
+                label="Compound"
+                class="col-span-8 sm:col-span-4"
                 :ui="FIELD_UI"
               >
                 <UInputMenu
-                  v-model="soda.drink"
+                  v-model="peptide.compound"
                   mode="autocomplete"
-                  :items="SODA_DRINKS"
+                  :items="KNOWN_COMPOUNDS"
                   open-on-click
-                  placeholder="Dr Pepper"
+                  placeholder="MOTS-C"
                   class="w-full"
                   :ui="SELECT_UI"
                 />
               </UFormField>
               <UFormField
-                label="Size"
-                class="col-span-4"
+                label="Dose"
+                class="col-span-4 sm:col-span-2"
+                :ui="FIELD_UI"
+                :hint="doseHelp(peptide)"
+              >
+                <UInput
+                  v-model.number="peptide.dose"
+                  type="number"
+                  step="0.1"
+                  placeholder="2.5"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Unit"
+                class="col-span-3 sm:col-span-1"
                 :ui="FIELD_UI"
               >
-                <UInputMenu
-                  v-model="soda.size"
-                  mode="autocomplete"
-                  :items="SODA_SIZES"
-                  open-on-click
-                  placeholder="12oz can"
+                <USelect
+                  v-model="peptide.unit"
+                  :items="DOSE_UNITS"
+                  value-key="value"
+                  label-key="label"
+                  class="w-full"
+                  :ui="SELECT_UI"
+                />
+              </UFormField>
+              <UFormField
+                label="Site"
+                class="col-span-4 sm:col-span-2"
+                :ui="FIELD_UI"
+              >
+                <USelect
+                  v-model="peptide.site"
+                  :items="INJECTION_SITES"
+                  value-key="value"
+                  label-key="label"
                   class="w-full"
                   :ui="SELECT_UI"
                 />
               </UFormField>
               <div class="col-span-1 flex items-end pb-2">
                 <button
+                  v-if="canEdit"
                   type="button"
                   class="text-[12px] text-faint hover:text-danger cursor-pointer"
-                  :aria-label="`Remove soda ${i + 1}`"
-                  @click="removeSoda(i)"
+                  :aria-label="`Remove dose ${i + 1}`"
+                  @click="removePeptide(i)"
                 >
                   ✕
                 </button>
@@ -451,10 +248,237 @@
             v-else
             class="mt-2.5 text-[12px] text-muted"
           >
-            No sodas logged.
+            No doses logged.<template v-if="canEdit">
+              Use + add to record injections.
+            </template>
           </p>
         </section>
-      </div>
+
+        <!-- Reconstitutions -->
+        <section>
+          <TuiHeader
+            label="VIAL RECONSTITUTIONS"
+            :dashes="6"
+          >
+            <button
+              v-if="canEdit"
+              type="button"
+              class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+              @click="addReconstitution"
+            >
+              ⚗ add
+            </button>
+          </TuiHeader>
+
+          <div
+            v-if="form.reconstitutions.length"
+            class="space-y-2 mt-2.5"
+          >
+            <div
+              v-for="(r, i) in form.reconstitutions"
+              :key="i"
+              class="grid grid-cols-12 gap-2 items-end"
+            >
+              <UFormField
+                label="Compound"
+                class="col-span-6 sm:col-span-3"
+                :ui="FIELD_UI"
+              >
+                <UInputMenu
+                  v-model="r.compound"
+                  mode="autocomplete"
+                  :items="KNOWN_COMPOUNDS"
+                  open-on-click
+                  placeholder="GHK-Cu"
+                  class="w-full"
+                  :ui="SELECT_UI"
+                />
+              </UFormField>
+              <UFormField
+                label="Vial size"
+                class="col-span-3 sm:col-span-2"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model.number="r.vial_amount"
+                  type="number"
+                  placeholder="50"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="Unit"
+                class="col-span-2 sm:col-span-1"
+                :ui="FIELD_UI"
+              >
+                <USelect
+                  v-model="r.vial_unit"
+                  :items="DOSE_UNITS"
+                  value-key="value"
+                  label-key="label"
+                  class="w-full"
+                  :ui="SELECT_UI"
+                />
+              </UFormField>
+              <UFormField
+                label="Supplier"
+                class="col-span-6 sm:col-span-3"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model="r.supplier"
+                  placeholder="EZ Peptides"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField
+                label="BAC water (mL)"
+                class="col-span-5 sm:col-span-2"
+                :ui="FIELD_UI"
+              >
+                <UInput
+                  v-model.number="r.bac_water_ml"
+                  type="number"
+                  step="0.5"
+                  placeholder="2"
+                  class="w-full"
+                />
+              </UFormField>
+              <div class="col-span-1 flex items-end pb-2">
+                <button
+                  v-if="canEdit"
+                  type="button"
+                  class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                  :aria-label="`Remove reconstitution ${i + 1}`"
+                  @click="removeReconstitution(i)"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+          <p
+            v-else
+            class="mt-2.5 text-[12px] text-muted"
+          >
+            No reconstitutions today.
+          </p>
+        </section>
+
+        <!-- Food + sodas -->
+        <div class="grid gap-5 lg:grid-cols-2">
+          <section>
+            <TuiHeader
+              label="FOOD"
+              :dashes="20"
+            />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
+              <UFormField
+                v-for="slot in MEAL_SLOTS"
+                :key="slot.key"
+                :label="slot.label"
+                :ui="FIELD_UI"
+              >
+                <UInputMenu
+                  v-model="form.food[slot.key]"
+                  mode="autocomplete"
+                  :items="mealHistory"
+                  open-on-click
+                  :placeholder="slot.placeholder"
+                  class="w-full"
+                  :ui="SELECT_UI"
+                />
+              </UFormField>
+            </div>
+          </section>
+
+          <section>
+            <TuiHeader
+              label="SODA"
+              :dashes="20"
+            >
+              <button
+                v-if="canEdit"
+                type="button"
+                class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+                @click="addSoda"
+              >
+                + add
+              </button>
+            </TuiHeader>
+
+            <div
+              v-if="form.sodas.length"
+              class="space-y-2 mt-2.5"
+            >
+              <div
+                v-for="(soda, i) in form.sodas"
+                :key="i"
+                class="grid grid-cols-12 gap-2 items-end"
+              >
+                <UFormField
+                  label="Time"
+                  class="col-span-3"
+                  :ui="FIELD_UI"
+                >
+                  <UInput
+                    v-model="soda.time"
+                    type="time"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Drink"
+                  class="col-span-4"
+                  :ui="FIELD_UI"
+                >
+                  <UInputMenu
+                    v-model="soda.drink"
+                    mode="autocomplete"
+                    :items="SODA_DRINKS"
+                    open-on-click
+                    placeholder="Dr Pepper"
+                    class="w-full"
+                    :ui="SELECT_UI"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Size"
+                  class="col-span-4"
+                  :ui="FIELD_UI"
+                >
+                  <UInputMenu
+                    v-model="soda.size"
+                    mode="autocomplete"
+                    :items="SODA_SIZES"
+                    open-on-click
+                    placeholder="12oz can"
+                    class="w-full"
+                    :ui="SELECT_UI"
+                  />
+                </UFormField>
+                <div class="col-span-1 flex items-end pb-2">
+                  <button
+                    v-if="canEdit"
+                    type="button"
+                    class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                    :aria-label="`Remove soda ${i + 1}`"
+                    @click="removeSoda(i)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p
+              v-else
+              class="mt-2.5 text-[12px] text-muted"
+            >
+              No sodas logged.
+            </p>
+          </section>
+        </div>
+      </fieldset>
 
       <!-- Progress photos -->
       <section>
@@ -628,6 +652,7 @@
         />
         <UTextarea
           v-model="form.notes"
+          :disabled="!canEdit"
           placeholder="Any observations, how you felt, etc."
           :rows="3"
           class="w-full mt-2.5"
@@ -647,7 +672,7 @@
         <button
           type="button"
           class="tui-btn tui-btn-accent"
-          :disabled="saving"
+          :disabled="saving || !canSave"
           @click="save"
         >
           {{ saving ? 'SAVING…' : '✓ SAVE ENTRY' }}
@@ -707,12 +732,18 @@ const toast = useToast()
 
 const dateParam = computed(() => route.params.date as string)
 
+// /journal/not-a-date used to open a blank form whose save inserted a garbage-dated row
+// (journal/save checks only that `date` is a string). A real calendar day or nothing.
+if (!isIsoDate(dateParam.value)) {
+  throw createError({ statusCode: 404, statusMessage: 'Not a journal date' })
+}
+
 // Must come after dateParam: on the client unhead resolves the title getter synchronously
 // during setup, so declaring this above `dateParam` threw a TDZ ReferenceError that aborted
 // hydration and left the whole form inert (SSR markup only, no click handlers).
 useSeoMeta({ title: () => `Journal · ${dateParam.value}` })
 
-const { data: allEntries, refresh } = await useJournalEntries()
+const { data: allEntries, error: entriesError, refresh } = await useJournalEntries()
 const { isOwner, canEdit } = await useAuth()
 const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
@@ -833,7 +864,12 @@ const existingEntry = computed(() =>
   allEntries.value?.find(e => e.date === dateParam.value) ?? null
 )
 
-const isNew = computed(() => !existingEntry.value)
+// "New" only once the list has actually loaded — a failed fetch is unknown, not empty.
+const isNew = computed(() => allEntries.value != null && !existingEntry.value)
+
+// Saving needs the list: without it we can't tell a genuinely new day from a row we simply
+// failed to load, and journal/save would overwrite that row with the blank form.
+const canSave = computed(() => !entriesError.value && allEntries.value != null)
 
 const prevEntry = computed(() => {
   if (!allEntries.value?.length) return null
@@ -881,9 +917,17 @@ const form = reactive<{
   notes: string
 }>(buildForm())
 
+// Snapshot of the form as last built from the server row. The mounted revalidation (and any
+// refresh triggered elsewhere) replaces the list a few hundred ms after the page renders, which
+// gives `existingEntry` a new identity — rebuilding unconditionally wiped whatever had been
+// typed in that window. Rebuild only while the form still matches what it was built from.
+let builtSnapshot = JSON.stringify(form)
+
 watch(existingEntry, () => {
+  if (JSON.stringify(form) !== builtSnapshot) return
   Object.assign(form, buildForm())
-}, { immediate: false })
+  builtSnapshot = JSON.stringify(form)
+})
 
 function buildForm() {
   const entry = existingEntry.value
@@ -940,7 +984,7 @@ function removeReconstitution(i: number) {
 }
 
 function addSoda() {
-  form.sodas.push(blankSoda(new Date().toTimeString().slice(0, 5)))
+  form.sodas.push(blankSoda(localTimeNow()))
 }
 
 function removeSoda(i: number) {
@@ -961,6 +1005,8 @@ async function save() {
     await $fetch('/api/journal/save', { method: 'POST', body: payload })
 
     toast.add({ title: 'Entry saved', color: 'success', icon: 'i-lucide-check' })
+    // What was just saved is now the baseline, so the refresh below may rebuild from the row.
+    builtSnapshot = JSON.stringify(form)
     // The shell's streak / logged / soda figures come from the scalar summary, not this list.
     await Promise.all([refresh(), refreshNuxtData('overview')])
   }

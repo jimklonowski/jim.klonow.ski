@@ -1,4 +1,5 @@
 import { normalizeForm, isPillForm } from '#shared/utils/vialForm'
+import { localToday } from '#shared/utils/time'
 
 // Open one container from a sealed batch: decrement the batch quantity by one and spawn a new
 // active row (quantity 1) carrying over the batch's compound/supplier/size/form, with
@@ -11,7 +12,7 @@ export default defineEventHandler(async (event) => {
   if (body?.id == null) {
     throw createError({ statusCode: 400, message: 'Missing vial id' })
   }
-  const openedDate = (body.opened_date as string) || new Date().toISOString().slice(0, 10)
+  const openedDate = (body.opened_date as string) || localToday()
 
   const db = getDb(event)
   const row = await db.prepare('SELECT * FROM vials WHERE id = ?1').bind(body.id).first()
