@@ -77,7 +77,7 @@
                 </button>
               </div>
               <span class="text-muted truncate">
-                {{ statusText.toLowerCase() || 'error' }} · {{ path }}
+                {{ reason }} · {{ path }}
               </span>
             </div>
           </div>
@@ -119,6 +119,10 @@ const path = (() => {
     return raw
   }
 })()
+
+// Nuxt's unmatched-route error spells the path into its own status text ("Page not found:
+// /x"), which would print it twice beside the path column — drop a trailing path there.
+const reason = statusText.replace(/:\s*\/\S*$/, '').toLowerCase() || 'error'
 
 const stack = import.meta.dev && status !== 404
   ? [err.message, err.stack].filter(Boolean).join('\n')
