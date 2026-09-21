@@ -540,7 +540,9 @@ export async function generateDigest(
   kind: DigestKind,
   endDate?: string
 ): Promise<DigestResult> {
-  const end = endDate ?? addDays(new Date().toISOString().slice(0, 10), -1)
+  // Home-timezone yesterday: the crons fire mid-morning Central where UTC agrees, but an
+  // on-demand regenerate after 7pm used to pick a period ending on the wrong day.
+  const end = endDate ?? addDays(localToday(), -1)
   const start = kind === 'weekly' ? addDays(end, -6) : end
 
   // The effective dosing schedule — standing rules with any planned cycle merged in — and the

@@ -191,18 +191,17 @@ const toast = useToast()
 const { data } = await useJournalEntries()
 const entries = computed(() => data.value ?? [])
 
-// Local date/time (not toISOString, which shifts to UTC) so a late-night tap logs against the
-// correct calendar day and displays the actual clock time it happened.
-function localDateStr(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+// Home-timezone date/time (shared/utils/time.ts), not the runtime's clock zone: a late-night
+// tap logs against the Chicago calendar day whether the phone is travelling or the SSR pass is
+// running in a UTC Worker, and the 30-day strip's boundaries match between the two.
+function localDateStr() {
+  return localToday()
 }
-function localTimeStr(d = new Date()) {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+function localTimeStr() {
+  return localTimeNow()
 }
 function shiftDays(delta: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + delta)
-  return localDateStr(d)
+  return localDaysAgo(-delta)
 }
 
 const todaySodas = computed<SodaEntry[]>(() => {
