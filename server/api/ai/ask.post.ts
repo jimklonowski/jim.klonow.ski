@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { checkAskHistory } from '#shared/utils/askHistory'
 import { READER_CONTEXT } from '../../utils/digest'
 
 // Ask-the-data chat: answers freeform questions over the full tracked history (labs, DEXA,
@@ -6,8 +7,6 @@ import { READER_CONTEXT } from '../../utils/digest'
 // to spend Anthropic tokens. Streams plain-text deltas; the client renders them as they land.
 
 const MODEL = 'claude-sonnet-5'
-const MAX_TURNS = 20
-const MAX_CONTENT_CHARS = 4000
 
 const SYSTEM_RULES = `You are the analysis console on a personal health dashboard, answering the owner's questions about his own data. ${READER_CONTEXT}
 
@@ -19,27 +18,6 @@ Ground rules:
 - Formatting: light Markdown — **bold** the numbers that matter, short bullet lists where they read better than prose. No headings, no tables. Keep answers tight; this is a terminal, not an essay.
 - No greeting, no closing, no medical-advice disclaimers.`
 
-interface ChatMessage { role: 'user' | 'assistant', content: string }
-
-function validate(body: unknown): ChatMessage[] {
-  const messages = (body as { messages?: unknown })?.messages
-  if (!Array.isArray(messages) || !messages.length) {
-    throw createError({ statusCode: 400, message: 'messages[] required' })
-  }
-  if (messages.length > MAX_TURNS) {
-    throw createError({ statusCode: 400, message: `Conversation too long — start a fresh one (max ${MAX_TURNS} turns sent)` })
-  }
-  return messages.map((m: { role?: unknown, content?: unknown }) => {
-    if ((m?.role !== 'user' && m?.role !== 'assistant') || typeof m?.content !== 'string' || !m.content.trim()) {
-      throw createError({ statusCode: 400, message: 'each message needs role user|assistant and non-empty content' })
-    }
-    if (m.content.length > MAX_CONTENT_CHARS) {
-      throw createError({ statusCode: 400, message: `message too long (max ${MAX_CONTENT_CHARS} chars)` })
-    }
-    return { role: m.role, content: m.content }
-  })
-}
-
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
@@ -49,7 +27,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const messages = validate(body)
+  // Shape, length, and turn-order rules live in shared/utils/askHistory.ts alongside the trim
+  // the page applies before sending, so a history the page produces is one this accepts.
+  const history = checkAskHistory(body?.messages)
+  if (!history.ok) throw createError({ statusCode: 400, message: history.problem })
+  const messages: Anthropic.MessageParam[] = history.messages
   // The client sends its local date so "this week" means Jim's week, not UTC's.
   const today = typeof body?.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.today)
     ? body.today
@@ -61,7 +43,13 @@ export default defineEventHandler(async (event) => {
   const stream = anthropic.messages.stream({
     model: MODEL,
     max_tokens: 8192,
-    system: `${SYSTEM_RULES}\n\n--- FACT SHEET ---\n${context}`,
+    // The rules + fact sheet are byte-identical on every turn of a same-day conversation: the
+    // sheet is rebuilt from D1 per request, but every query is ORDER BY'd and `today` is pinned
+    // by the client, so only `messages` varies. The cache marker makes turns 2..N read the
+    // sheet at ~10% of input price instead of re-paying for it (5-minute TTL, refreshed by each
+    // hit — a question more than five minutes after the last answer re-warms it at 1.25×).
+    // Usage is logged below; cache_read should be non-zero from the second turn on.
+    system: [{ type: 'text', text: `${SYSTEM_RULES}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
     messages
   })
 
@@ -80,6 +68,8 @@ export default defineEventHandler(async (event) => {
           }
         }
         const final = await stream.finalMessage()
+        const u = final.usage
+        console.info(`[ask] ${MODEL} turns=${messages.length} in=${u.input_tokens} cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0} out=${u.output_tokens} stop=${final.stop_reason}`)
         if (final.stop_reason === 'max_tokens') {
           controller.enqueue(encoder.encode('\n\n*[answer truncated — ask a narrower question]*'))
         }

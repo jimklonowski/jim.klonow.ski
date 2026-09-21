@@ -186,8 +186,10 @@ async function send(preset?: string) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        // The assistant placeholder just pushed is stripped; empty content would 400.
-        messages: messages.value.filter(m => m.content).slice(-20),
+        // Drops the empty assistant placeholder just pushed and caps the history at a user
+        // turn — a bare slice(-N) opened on an assistant turn after ten exchanges and the API
+        // rejected every request until "clear" (shared/utils/askHistory.ts).
+        messages: trimAskHistory(messages.value),
         today: localToday()
       })
     })
@@ -207,8 +209,11 @@ async function send(preset?: string) {
     if (!assistant.content.trim()) assistant.content = '*[no answer returned — try again]*'
   }
   catch (err) {
-    // Drop the empty placeholder and put the question back in the box so a retry is one keypress.
-    messages.value = messages.value.filter(m => m !== assistant)
+    // Drop the failed exchange — placeholder and the question it answered — and put the
+    // question back in the box so a retry is one keypress. Leaving the question in the
+    // transcript would send it twice (two consecutive user turns) on that retry.
+    const question_ = messages.value[messages.value.indexOf(assistant) - 1]
+    messages.value = messages.value.filter(m => m !== assistant && m !== question_)
     draft.value = question
     toast.add({ title: 'Ask failed', description: err instanceof Error ? err.message : 'Try again in a moment.', color: 'error' })
   }
