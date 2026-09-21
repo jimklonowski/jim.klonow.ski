@@ -5,7 +5,7 @@
     :style="{ '--beat': `${beatSeconds}s` }"
     role="button"
     tabindex="0"
-    aria-label="TICKER — open all digests"
+    :aria-label="ariaLabel"
     @click="emit('open')"
     @keydown.enter.prevent="emit('open')"
     @mouseenter="trigger('bigbeat')"
@@ -76,7 +76,11 @@ const props = withDefaults(defineProps<{
   rhr?: number | null
   /** Short-sleep state: visual beat slows to 45 bpm, eyes half-lidded, zzz. */
   sluggish?: boolean
-}>(), { rhr: null, sluggish: false })
+  /** Replaces the "♥ N bpm live" caption where there is no live reading to show (error page). */
+  caption?: string | null
+  /** Accessible name — says what clicking the heart does in this context. */
+  ariaLabel?: string
+}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests' })
 
 const emit = defineEmits<{ open: [] }>()
 
@@ -98,9 +102,10 @@ const beatSeconds = computed(() => {
   return 60 / Math.min(100, Math.max(40, props.rhr ?? 63))
 })
 
-const bpmLabel = computed(() =>
-  props.rhr != null ? `♥ ${props.rhr} bpm live` : '♥ —— bpm'
-)
+const bpmLabel = computed(() => {
+  if (props.caption) return props.caption
+  return props.rhr != null ? `♥ ${props.rhr} bpm live` : '♥ —— bpm'
+})
 
 // --- Event one-shots -------------------------------------------------------
 // One active at a time, never queued; every event returns to idle within 2s.
