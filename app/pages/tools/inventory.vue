@@ -630,7 +630,9 @@ definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Tools · Inventory' })
 
 const toast = useToast()
-const today: string = new Date().toISOString().slice(0, 10)
+// Home-timezone day (shared/utils/time.ts) — the UTC slice this used to be made every vial's
+// days-open, expiry and run-out math, and the open-vial default date, roll over at 7pm Central.
+const today: string = localToday()
 
 // Stock-dump parsing spends Anthropic tokens — owner-only, like digests and lab summaries.
 const { isOwner } = await useAuth()

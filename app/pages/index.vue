@@ -347,8 +347,9 @@ const contextNote = computed(() => {
   return notes.join('; ') || null
 })
 
-// 90-day windows. Weight/HRV come off the journal, recovery off the Whoop metrics.
-const cutoff = new Date(Date.now() - 90 * 86400000).toLocaleDateString('en-CA')
+// 90-day windows (home timezone, so SSR and the client agree). Weight/HRV come off the journal,
+// recovery off the Whoop metrics.
+const cutoff = localDaysAgo(90)
 
 function series<T extends { date: string }>(list: T[], pick: (row: T) => number | null | undefined) {
   return list

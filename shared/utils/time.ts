@@ -18,12 +18,45 @@ const isoDateFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: HOME_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
 })
 
+// en-GB for a 24-hour clock; h23 so midnight reads 00:xx, never 24:xx.
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: HOME_TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+})
+
 /** Today's date in the home timezone as YYYY-MM-DD. Identical on server and client. */
 export function localToday(): string {
   return isoDateFmt.format(new Date())
 }
 
-/** A date `days` before today (home timezone), as YYYY-MM-DD. Negative values look forward. */
+/** The current wall-clock time in the home timezone as HH:MM. */
+export function localTimeNow(): string {
+  return clockFmt.format(new Date())
+}
+
+/**
+ * A date `days` before today (home timezone), as YYYY-MM-DD. Negative values look forward.
+ *
+ * Calendar arithmetic on the date string, anchored at UTC noon, rather than subtracting
+ * `days × 86 400 000` ms from the instant: across a DST change the ms version lands an hour
+ * off, and in the hour after midnight (or before it, in the fall) that hour is a whole day.
+ */
 export function localDaysAgo(days: number): string {
-  return isoDateFmt.format(new Date(Date.now() - days * 86400000))
+  const d = new Date(localToday() + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * True for a fully-typed, real calendar date in YYYY-MM-DD form. The regex alone accepts
+ * 2026-13-40 — Date rolls overflow forward into the next month rather than failing — so the
+ * parsed parts are compared back against the input.
+ */
+export function isIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!m) return false
+  const d = new Date(`${value}T12:00:00Z`)
+  return !Number.isNaN(d.getTime())
+    && d.getUTCMonth() + 1 === Number(m[2])
+    && d.getUTCDate() === Number(m[3])
 }

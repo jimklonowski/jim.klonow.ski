@@ -178,7 +178,7 @@ const entries = computed(() => data.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
 
 // Logged days only — journal_entries also holds passively-imported vitals rows, which used to
-// make this count Apple Watch coverage. See app/utils/journalLog.ts.
+// make this count Apple Watch coverage. See shared/utils/journalLog.ts.
 const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
 const streak = computed(() => loggedStreak(entries.value, today))
 
@@ -319,9 +319,7 @@ const whoop = computed(() => {
 
 // --- spoke shortcut cards ---
 const activeCompounds = computed(() => {
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 21)
-  const from = cutoff.toLocaleDateString('en-CA')
+  const from = localDaysAgo(21)
   const set = new Set<string>()
   for (const e of entries.value) {
     if (e.date < from) continue
@@ -339,9 +337,7 @@ const trackedCompounds = computed(() => {
 })
 
 const workoutsThisWeek = computed(() => {
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 7)
-  const from = cutoff.toLocaleDateString('en-CA')
+  const from = localDaysAgo(7)
   return (workoutsData.value ?? []).filter(w => w.date >= from).length
 })
 
@@ -367,5 +363,4 @@ const spokeCards = computed(() => {
   }
   return cards
 })
-
 </script>
