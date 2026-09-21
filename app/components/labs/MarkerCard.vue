@@ -13,7 +13,7 @@
           class="w-3 h-3 shrink-0 text-faint"
           title="Computed from other markers"
         />
-        <span class="truncate">{{ meta.label }}{{ caveatCompound ? '*' : '' }}</span>
+        <span class="truncate">{{ meta.label }}{{ caveatCompound ? '*' : '' }}{{ readingNote ? '†' : '' }}</span>
         <span
           v-if="caveatCompound"
           class="shrink-0 text-[9.5px] leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
@@ -82,6 +82,14 @@
         </p>
 
         <p
+          v-for="n in readingNotes"
+          :key="n.date"
+          class="text-[11.5px] leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
+        >
+          † {{ n.dateLabel }} — {{ n.note }}
+        </p>
+
+        <p
           v-if="meta.computed"
           class="text-[11px] text-faint"
         >
@@ -113,6 +121,7 @@
           :unit="meta.unit"
           :data="chartPoints"
           :height="140"
+          marker-key="marker"
         />
 
         <div>
@@ -132,7 +141,10 @@
                 <span class="text-hi">{{ row.value }}<span
                   v-if="row.flagged"
                   class="text-warn"
-                >*</span></span>
+                >*</span><span
+                  v-if="row.noted"
+                  class="text-warn"
+                >†</span></span>
                 <span class="text-[10.5px] text-muted">{{ meta.unit }}</span>
                 <span
                   class="text-[10.5px] w-9 text-right"
@@ -155,7 +167,7 @@
 
 <script setup lang="ts">
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
-import { MARKER_CAVEATS, caveatCompoundOn } from '~/data/markerCaveats'
+import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, readingNoteOn } from '~/data/markerCaveats'
 
 const props = defineProps<{
   biomarkerKey: string
@@ -225,6 +237,12 @@ const caveatCompound = computed(() =>
   carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value) : null
 )
 
+// Assay caveat (the censored 2026-09-09 immunoassay testosterone): belongs to one draw rather
+// than to a medication, so it follows the reading on screen the way the badge above does.
+const readingNote = computed(() =>
+  carriedFrom.value ? readingNoteOn(props.biomarkerKey, carriedFrom.value) : null
+)
+
 const displayValue = computed(() => {
   const v = current.value
   if (v == null) return '—'
@@ -282,7 +300,10 @@ const deltaClass = computed(() => {
 const chartPoints = computed(() =>
   withValue.value.map(e => ({
     date: formatDate(e.date, 'monthDay'),
-    value: e.markers[props.biomarkerKey] as number
+    value: e.markers[props.biomarkerKey] as number,
+    // A reading with its own note (a censored or different-assay value) gets an upward triangle
+    // instead of the usual dot, so the segment into it cannot be misread as a measured move.
+    marker: readingNoteOn(props.biomarkerKey, e.date) ? 'triangle' : ''
   }))
 )
 
@@ -296,7 +317,8 @@ const history = computed(() =>
       value: num(value),
       color: STATUS_COLORS[s],
       label: STATUS_LABELS[s],
-      flagged: caveatCompoundOn(props.biomarkerKey, e.date) != null
+      flagged: caveatCompoundOn(props.biomarkerKey, e.date) != null,
+      noted: readingNoteOn(props.biomarkerKey, e.date) != null
     }
   })
 )
@@ -304,4 +326,13 @@ const history = computed(() =>
 const showCaveat = computed(() =>
   !!caveat.value && (caveatCompound.value != null || history.value.some(r => r.flagged))
 )
+
+// Every per-draw note whose reading is actually on this card, so a daggered history row keeps its
+// explanation one click away even when the reading on the face of the card is a clean one.
+const readingNotes = computed(() => {
+  const shown = new Set(withValue.value.map(e => e.date))
+  return (READING_NOTES[props.biomarkerKey] ?? [])
+    .filter(n => shown.has(n.date))
+    .map(n => ({ ...n, dateLabel: formatDate(n.date) }))
+})
 </script>

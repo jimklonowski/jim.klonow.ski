@@ -184,7 +184,8 @@ export const COMPOUND_GROUPS: Record<string, string[]> = {
   ],
   'Other': [
     'Clenbuterol', 'Finasteride', 'Dutasteride', 'Tadalafil',
-    '5-Amino-1MQ', 'SLU-PP-332', 'Modafinil', 'Bromantane'
+    '5-Amino-1MQ', 'SLU-PP-332', 'Modafinil', 'Bromantane',
+    'Iron Bisglycinate'
   ]
 }
 
@@ -232,6 +233,7 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Finasteride': '#059669',
   'Dutasteride': '#047857',
   'Tadalafil': '#d946ef',
+  'Iron Bisglycinate': '#92400e',
   'Semaglutide': '#0891b2',
   'Tirzepatide': '#0e7490',
   'Retatrutide': '#0369a1',
