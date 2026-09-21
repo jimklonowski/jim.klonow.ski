@@ -182,6 +182,18 @@ export function getStatus(value: number | null, meta: BiomarkerMeta): 'optimal' 
   return 'optimal'
 }
 
+/** How many of a draw's markers sit high, low, and in range against BIOMARKERS' reference bands. */
+export function countFlags(markers: Record<string, number | null>): { high: number, low: number, optimal: number } {
+  const counts = { high: 0, low: 0, optimal: 0 }
+  for (const [key, value] of Object.entries(markers)) {
+    const meta = BIOMARKERS[key]
+    if (!meta || value == null) continue
+    const status = getStatus(value, meta)
+    if (status !== 'unknown') counts[status]++
+  }
+  return counts
+}
+
 export function getStatusColor(status: ReturnType<typeof getStatus>) {
   return {
     optimal: 'success' as const,

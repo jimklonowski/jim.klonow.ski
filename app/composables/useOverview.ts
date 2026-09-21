@@ -4,7 +4,7 @@ import type { DexaEntry } from '~/composables/useDexaEntries'
 import type { HealthMetricsEntry } from '~/composables/useHealthMetricsEntries'
 import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
 import type { Role } from '#shared/utils/access'
-import { BIOMARKERS, getStatus } from '~/data/biomarkers'
+import { BIOMARKERS, countFlags, getStatus } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
 
 export interface FlaggedMarker {
@@ -16,11 +16,14 @@ export interface FlaggedMarker {
   delta: number | null
 }
 
-// Shared aggregator behind the shell (header status line, footer, command palette) and the
-// mission-control home page. The list endpoints 401 without a session, so every fetch is
-// gated on the role — guests get empty arrays instead of failed requests. Login is a hard
-// navigation, so the role is stable for a component's lifetime and the conditional
-// composable calls below stay consistent between SSR and hydration.
+// Aggregator behind the mission-control home page, over the complete lists it charts. The site
+// shell (status line, footer, command palette) used to share this and so loaded every table on
+// every page — it now reads the scalar /api/overview summary through useOverviewSummary().
+//
+// The list endpoints 401 without a session, so every fetch is gated on the role — guests get
+// empty arrays instead of failed requests. Login is a hard navigation, so the role is stable
+// for a component's lifetime and the conditional composable calls below stay consistent
+// between SSR and hydration.
 //
 // Takes the role rather than awaiting useAuth() itself: awaiting inside a plain async
 // composable loses the Nuxt instance context, so the useAsyncData calls below would throw.
@@ -50,7 +53,6 @@ export function useOverview(role: Ref<Role | null>) {
   const healthMetrics = computed<HealthMetricsEntry[]>(() =>
     [...(metrics?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
   )
-  const latestMetrics = computed(() => healthMetrics.value.at(-1) ?? null)
 
   const dexaScans = computed<DexaEntry[]>(() =>
     [...(dexa?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
@@ -60,16 +62,6 @@ export function useOverview(role: Ref<Role | null>) {
   const allWorkouts = computed<WorkoutEntry[]>(() =>
     [...(workouts?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
   )
-
-  /**
-   * Days with something hand-entered, oldest first. `entries` above deliberately stays
-   * unfiltered — the vitals-only rows are what the weight/RHR/HRV series read — but any
-   * "how much have I logged" figure has to use this instead. See app/utils/journalLog.ts.
-   */
-  const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
-
-  /** Consecutive logged days ending today (or yesterday, if today isn't logged yet). */
-  const streak = computed(() => loggedStreak(entries.value, localToday()))
 
   const todayEntry = computed(() => entries.value.find(e => e.date === localToday()) ?? null)
   const sodasToday = computed(() => todayEntry.value?.sodas?.length ?? 0)
@@ -106,19 +98,7 @@ export function useOverview(role: Ref<Role | null>) {
     return prev == null ? null : Math.round((value - prev) * 100) / 100
   }
 
-  const flagCounts = computed(() => ({
-    high: flagged.value.filter(f => f.status === 'high').length,
-    low: flagged.value.filter(f => f.status === 'low').length,
-    optimal: latestDraw.value
-      ? Object.entries(latestDraw.value.markers)
-        .filter(([k, v]) => v != null && BIOMARKERS[k] && getStatus(v, BIOMARKERS[k]!) === 'optimal').length
-      : 0
-  }))
-
-  /** Distinct source PDFs across every draw. */
-  const pdfCount = computed(() =>
-    new Set(draws.value.flatMap(d => d.sources ?? [])).size
-  )
+  const flagCounts = computed(() => countFlags(latestDraw.value?.markers ?? {}))
 
   async function refresh() {
     await Promise.all([
@@ -140,22 +120,15 @@ export function useOverview(role: Ref<Role | null>) {
     hasSession,
     error,
     entries,
-    loggedEntries,
-    latestEntry,
-    todayEntry,
     draws,
     latestDraw,
     healthMetrics,
-    latestMetrics,
-    dexaScans,
     latestDexa,
     allWorkouts,
-    streak,
     sodasToday,
     dosesToday,
     flagged,
     flagCounts,
-    pdfCount,
     refresh
   }
 }

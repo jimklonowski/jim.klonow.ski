@@ -5,17 +5,17 @@
     <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-[10.5px] text-ghost whitespace-nowrap overflow-x-auto">
       <span class="shrink-0">jim.klonow.ski v2</span>
 
-      <template v-if="hasSession">
+      <template v-if="hasSession && summary">
         <span class="shrink-0 hidden sm:inline">D1 <span class="text-accent">✓</span> R2 <span class="text-accent">✓</span> KV <span class="text-accent">✓</span></span>
         <span
-          v-if="pdfCount"
+          v-if="summary.pdfCount"
           class="shrink-0"
-        >{{ pdfCount }} PDFs parsed</span>
+        >{{ summary.pdfCount }} PDFs parsed</span>
         <span
-          v-if="latestDexa"
+          v-if="summary.latestDexa"
           class="shrink-0"
         >
-          DEXA {{ formatDate(latestDexa.date, 'monthDay').toLowerCase() }} · BF {{ latestDexa.total.body_fat_pct.toFixed(1) }}%
+          DEXA {{ formatDate(summary.latestDexa.date, 'monthDay').toLowerCase() }}<template v-if="summary.latestDexa.bodyFatPct != null"> · BF {{ summary.latestDexa.bodyFatPct.toFixed(1) }}%</template>
         </span>
       </template>
 
@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 const { role } = await useAuth()
-const { hasSession, pdfCount, latestDexa } = useOverview(role)
+const { hasSession, data: summary } = useOverviewSummary(role)
 
 async function logout() {
   await $fetch('/api/auth/logout', { method: 'POST' })

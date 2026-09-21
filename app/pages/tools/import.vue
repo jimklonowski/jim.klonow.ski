@@ -547,6 +547,8 @@ async function importRows() {
   finally {
     importDone.value = true
     importing.value = false
+    // Imported rows change the shell's logged-day count and latest-entry date.
+    await refreshNuxtData('overview')
   }
 }
 </script>
