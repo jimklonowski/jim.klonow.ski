@@ -52,6 +52,14 @@ export interface Cycle {
   /** Absent on rows written before tentative starts existed — reads as 'day'. */
   start_precision?: StartPrecision
   planned_weeks: number
+  /**
+   * Exact span in days, for a plan that is not a whole number of weeks — a 10-day iron protocol,
+   * say. Null/absent means the span is `planned_weeks * 7`, which is how every cycle read before
+   * this existed. `planned_weeks` stays authoritative for everything week-RELATIVE (item
+   * fromWeek/toWeek, "wk 3 of 8") and is rounded up to cover the days, so this only ever trims
+   * the tail of the last week; itemWindow clamps to it so adherence stops expecting doses there.
+   */
+  planned_days?: number | null
   /** Set when the cycle is ended off-plan (early on bad labs, or extended); null = as planned. */
   actual_end?: string | null
   compounds: CyclePlanItem[]
@@ -137,9 +145,19 @@ export function diffDays(a: string, b: string): number {
   return Math.round((Date.parse(b + 'T12:00:00') - Date.parse(a + 'T12:00:00')) / DAY_MS)
 }
 
-/** Last day of the plan as written (start + weeks, inclusive). */
+/** The plan's span in days: an exact day count when one was set, otherwise whole weeks. */
+export function cycleSpanDays(cycle: Cycle): number {
+  return cycle.planned_days ?? cycle.planned_weeks * 7
+}
+
+/** How a duration reads on a card: "10 days" when set exactly, else "2 wks". */
+export function durationLabel(cycle: Cycle): string {
+  return cycle.planned_days != null ? `${cycle.planned_days} days` : `${cycle.planned_weeks} wks`
+}
+
+/** Last day of the plan as written (start + span, inclusive). */
 export function plannedEnd(cycle: Cycle): string {
-  return shiftDays(cycle.start_date, cycle.planned_weeks * 7 - 1)
+  return shiftDays(cycle.start_date, cycleSpanDays(cycle) - 1)
 }
 
 /** Last day of the cycle as lived — an off-plan actual_end (early or extended) wins. */
@@ -186,7 +204,11 @@ export function doseLabelOf(item: CyclePlanItem): string {
  * cycle was cut before the item's first week ever arrived. */
 export function itemWindow(cycle: Cycle, item: CyclePlanItem): { from: string, to: string } | null {
   const from = shiftDays(cycle.start_date, (item.fromWeek - 1) * 7)
-  const planned = item.toWeek != null ? shiftDays(cycle.start_date, item.toWeek * 7 - 1) : plannedEnd(cycle)
+  // A week-numbered item never outlives the cycle: on a 10-day plan, "weeks 1-2" ends on day 10,
+  // not day 14, or adherence would score four days the plan never claimed.
+  const span = plannedEnd(cycle)
+  const weekEnd = item.toWeek != null ? shiftDays(cycle.start_date, item.toWeek * 7 - 1) : null
+  const planned = weekEnd != null && weekEnd < span ? weekEnd : span
   const to = cycle.actual_end != null && cycle.actual_end < planned ? cycle.actual_end : planned
   return to < from ? null : { from, to }
 }

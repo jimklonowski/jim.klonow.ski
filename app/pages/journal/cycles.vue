@@ -89,11 +89,11 @@
                  is picked, so it states the period and the length instead. -->
             <div class="mt-1.5 text-[11.5px] text-muted">
               <template v-if="tentativeStartLabel(c)">
-                sometime in {{ tentativeStartLabel(c) }} · {{ c.planned_weeks }} wks planned · no date set
+                sometime in {{ tentativeStartLabel(c) }} · {{ durationLabel(c) }} planned · no date set
               </template>
               <template v-else>
                 {{ formatDate(c.start_date) }} → {{ formatDate(cycleEnd(c)) }}
-                · {{ c.planned_weeks }} wks{{ c.actual_end ? ' planned, ended off-plan' : '' }}
+                · {{ durationLabel(c) }}{{ c.actual_end ? ' planned, ended off-plan' : '' }}
               </template>
             </div>
 
@@ -128,7 +128,8 @@
 import { getCompoundColor } from '~/data/journal'
 import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
 import {
-  cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf, isTentative, tentativeStartLabel
+  cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf, durationLabel, isTentative,
+  tentativeStartLabel
 } from '#shared/utils/cycles'
 
 definePageMeta({ middleware: 'journal-auth' })

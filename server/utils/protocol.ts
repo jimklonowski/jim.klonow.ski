@@ -10,7 +10,7 @@
 import type { Cycle, CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
-  diffDays, doseLabelOf, isTentative, tentativeStartLabel
+  diffDays, doseLabelOf, durationLabel, isTentative, tentativeStartLabel
 } from '#shared/utils/cycles'
 import type { ProtocolRule, ScheduleTally } from '#shared/utils/protocolRules'
 import { nextDueDay, ruleActiveOn, tallySchedule, weekdayOf } from '#shared/utils/protocolRules'
@@ -168,6 +168,7 @@ export async function loadCycles(db: D1Database): Promise<Cycle[]> {
     start_date: row.start_date as string,
     start_precision: (row.start_precision as StartPrecision | undefined) ?? 'day',
     planned_weeks: row.planned_weeks as number,
+    planned_days: (row.planned_days as number | null | undefined) ?? null,
     actual_end: (row.actual_end as string | null) ?? null,
     compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
     notes: (row.notes as string | null) ?? null
@@ -247,7 +248,7 @@ export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cyc
           : ` Passive vitals watch: all measured vitals (${measured.map(s => s.label).join(', ')}) are steady vs the pre-start baseline.`
 
       paragraphs.push(
-        `PLANNED CYCLE — ACTIVE: "${cycle.name}", day ${p.day} of ${p.totalDays} (week ${p.week} of ${p.totalWeeks}; started ${cycle.start_date}, runs through ${end}${cycle.actual_end ? ', ended off-plan' : ''}).${goal} Plan: ${plan}. This layers on the standing schedule above — where the same compound appears in both, the cycle dose replaces the standing one for its window. Anchor interpretation to cycle timing: ${baselineLine}, and weigh whether each shift tracks the cycle's start before attributing it elsewhere.${signalsLine}${notes}`
+        `PLANNED CYCLE — ACTIVE: "${cycle.name}", day ${p.day} of ${p.totalDays} (week ${p.week} of ${p.totalWeeks}; started ${cycle.start_date}, runs through ${end}${cycle.actual_end ? ', ended off-plan' : ''}).${goal} Plan: ${plan}. This layers on the standing schedule above — where the same compound appears in both, the cycle dose replaces the standing one for its window. Anchor interpretation to cycle timing: ${baselineLine}, and weigh whether each shift tracks the cycle's start before attributing it elsewhere. Name this cycle and its day count in the recap, and relate the period's data to the goal and to whatever the notes say to watch for or would end it early — the log showing its doses is not the story; what it is for is.${signalsLine}${notes}`
       )
     }
     // No committed start: intent on file, not a schedule. Said explicitly, because the model
@@ -259,7 +260,7 @@ export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cyc
         ? `The ${lastDraw} draw is recent enough (${drawAge} days old) to serve as the pre-cycle baseline if the run starts soon.`
         : `No draw is recent enough to serve as a baseline (${lastDraw ? `latest is ${lastDraw}, ${drawAge} days old` : 'none on file'}) — getting one before the run starts matters more than anything else about this plan; say so when labs come up.`
       paragraphs.push(
-        `PLANNED CYCLE — NOT SCHEDULED: "${cycle.name}", pencilled in for ${tentativeStartLabel(cycle)}, ${cycle.planned_weeks} weeks planned.${goal} Plan: ${plan}. No start date is committed — treat this as intent, not a schedule: do not state or imply a start date, do not count days to it, and treat none of it as active or upcoming exposure. ${baselineLine}${notes}`
+        `PLANNED CYCLE — NOT SCHEDULED: "${cycle.name}", pencilled in for ${tentativeStartLabel(cycle)}, ${durationLabel(cycle)} planned.${goal} Plan: ${plan}. No start date is committed — treat this as intent, not a schedule: do not state or imply a start date, do not count days to it, and treat none of it as active or upcoming exposure. ${baselineLine}${notes}`
       )
     }
     else if (status === 'upcoming' && diffDays(asOf, cycle.start_date) <= UPCOMING_HORIZON_DAYS) {
@@ -268,17 +269,20 @@ export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cyc
         ? `The ${baseline.drawDate} draw (${diffDays(baseline.drawDate, cycle.start_date)} days pre-start) serves as the baseline.`
         : 'No baseline draw yet — getting one before the start matters more than anything else about this plan; say so when labs come up.'
       paragraphs.push(
-        `PLANNED CYCLE — UPCOMING: "${cycle.name}" starts ${cycle.start_date} (in ${inDays} days), ${cycle.planned_weeks} weeks planned.${goal} Plan: ${plan}. Nothing from this plan is active exposure yet. ${baselineLine}${notes}`
+        `PLANNED CYCLE — UPCOMING: "${cycle.name}" starts ${cycle.start_date} (in ${inDays} days), ${durationLabel(cycle)} planned.${goal} Plan: ${plan}. Nothing from this plan is active exposure yet. ${baselineLine}${notes}`
       )
     }
     else if (status === 'done' && diffDays(end, asOf) <= DONE_RELEVANCE_DAYS) {
-      const weeksRan = Math.round(diffDays(cycle.start_date, end) / 7)
+      // A day-exact plan reports in days; rounding it to weeks would round a 10-day run to "1 week".
+      const ranLabel = cycle.planned_days != null
+        ? `${diffDays(cycle.start_date, end) + 1} of ${cycle.planned_days} planned days`
+        : `${Math.round(diffDays(cycle.start_date, end) / 7)} of ${cycle.planned_weeks} planned weeks`
       const recovery = checkpointStates(cycle, drawDates, asOf).find(cp => cp.key === 'recovery')
       const recoveryLine = recovery?.drawDate
         ? `A recovery draw exists (${recovery.drawDate}) — judge whether ${GATING_PROSE} actually returned toward the pre-cycle baseline${baseline?.drawDate ? ` (${baseline.drawDate})` : ''}.`
         : `Expect ${GATING_PROSE} to drift back toward baseline; a recovery draw in the ${recovery?.windowFrom}–${recovery?.windowTo} window would confirm it.`
       paragraphs.push(
-        `PLANNED CYCLE — RECENTLY COMPLETED: "${cycle.name}" ran ${cycle.start_date} → ${end} (${weeksRan} of ${cycle.planned_weeks} planned weeks${cycle.actual_end ? ', ended off-plan' : ''}). Plan was: ${plan}. ${recoveryLine}${notes}`
+        `PLANNED CYCLE — RECENTLY COMPLETED: "${cycle.name}" ran ${cycle.start_date} → ${end} (${ranLabel}${cycle.actual_end ? ', ended off-plan' : ''}). Plan was: ${plan}. ${recoveryLine}${notes}`
       )
     }
   }

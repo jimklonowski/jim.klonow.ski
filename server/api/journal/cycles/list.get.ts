@@ -28,6 +28,9 @@ export default defineEventHandler(async (event): Promise<Cycle[]> => {
     // correct for every row that predates tentative starts.
     start_precision: (row.start_precision as StartPrecision | undefined) ?? 'day',
     planned_weeks: row.planned_weeks as number,
+    // Undefined until the planned_days migration lands, which reads as whole weeks downstream —
+    // correct for every row written before day-exact spans existed.
+    planned_days: (row.planned_days as number | null | undefined) ?? null,
     actual_end: (row.actual_end as string | null) ?? null,
     compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
     notes: (row.notes as string | null) ?? null,

@@ -4,8 +4,10 @@
 // dose history in aggregate — with full daily detail only for the recent window, so arbitrary
 // questions can be answered without shipping 1,200 journal rows into the prompt.
 import { profileLabel } from '#shared/utils/profile'
+import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
 
 interface Dose { compound: string, dose: number, unit: string }
+interface SodaEntry { time?: string, drink?: string, size?: string | null }
 
 interface JournalRow {
   date: string
@@ -15,7 +17,7 @@ interface JournalRow {
   rhr: number | null
   hrv: number | null
   peptides: Dose[]
-  sodas: unknown[]
+  sodas: SodaEntry[]
   notes: string | null
 }
 
@@ -34,6 +36,14 @@ function avg(vals: Array<number | null | undefined>): number | null {
   const nums = vals.filter((v): v is number => v != null && !Number.isNaN(v))
   if (!nums.length) return null
   return nums.reduce((a, b) => a + b, 0) / nums.length
+}
+
+// "3 sodas (~27 oz)" — ounces alongside the count, since two mini cans read as "two" but are
+// less soda than one 20 oz bottle (shared/utils/soda.ts).
+function sodaText(sodas: SodaEntry[], noun: string): string {
+  const t = sodaTotals(sodas)
+  const oz = fmtSodaOz(t)
+  return `${t.count} ${noun}${oz ? ` (${oz})` : ''}`
 }
 
 async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]> {
@@ -123,7 +133,7 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
       avg(h.map(e => e.recovery_score as number | null)) != null ? `recovery ${round(avg(h.map(e => e.recovery_score as number | null))!)}%` : null,
       avg(h.map(e => e.sleep_total_min as number | null)) != null ? `sleep ${Math.round(avg(h.map(e => e.sleep_total_min as number | null))!)}min` : null,
       `${wo.length} workouts`,
-      `${j.reduce((s, e) => s + (e.sodas?.length ?? 0), 0)} sodas`
+      sodaText(j.flatMap(e => e.sodas ?? []), 'sodas')
     ].filter(Boolean)
     lines.push(`${start} → ${end}: ${parts.join(', ')}`)
   }
@@ -146,7 +156,7 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
         h?.recovery_score != null ? `recovery ${h.recovery_score}%` : null,
         h?.sleep_total_min != null ? `sleep ${h.sleep_total_min}min` : null,
         doses ? `doses: ${doses}` : 'no doses',
-        e.sodas?.length ? `${e.sodas.length} soda` : null,
+        e.sodas?.length ? sodaText(e.sodas, 'soda') : null,
         e.notes?.trim() ? `note: "${e.notes.trim().replace(/\s*\n+\s*/g, ' / ').slice(0, 200)}"` : null
       ].filter(Boolean)
       return `${e.date}: ${parts.join(', ')}`

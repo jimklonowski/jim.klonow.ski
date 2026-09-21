@@ -381,7 +381,8 @@ import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 import type { Cycle } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress,
-  cycleStatusOn, diffDays, doseLabelOf, plannedDoses, shiftDays, tentativeStartLabel
+  cycleSpanDays, cycleStatusOn, diffDays, doseLabelOf, durationLabel, plannedDoses, shiftDays,
+  tentativeStartLabel
 } from '#shared/utils/cycles'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
@@ -435,10 +436,11 @@ const statusLabel = computed(() => {
 // plan is the one number that's actually settled.
 const progressStat = computed(() => {
   if (!cycle.value) return ''
-  if (tentativeStart.value) return `${cycle.value.planned_weeks} WKS`
+  if (tentativeStart.value) return durationLabel(cycle.value).toUpperCase()
   if (status.value === 'upcoming') return `${diffDays(today, cycle.value.start_date)}D`
   if (status.value === 'active') return `${progress.value!.pct}%`
-  return `${totalWeeks.value} WKS`
+  // A day-exact plan reports days: "2 WKS" would overstate a run that ends on day 10.
+  return cycle.value.planned_days != null ? `${cycle.value.planned_days} DAYS` : `${totalWeeks.value} WKS`
 })
 
 // --- adherence (cycle rules only, finished runs included) ---
@@ -749,7 +751,7 @@ async function clearEnd() {
 }
 
 function plannedEndOf(c: Cycle): string {
-  return shiftDays(c.start_date, c.planned_weeks * 7 - 1)
+  return shiftDays(c.start_date, cycleSpanDays(c) - 1)
 }
 
 async function saveEnd(actualEnd: string | null) {
