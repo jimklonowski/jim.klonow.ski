@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { CHART_AXIS, CHART_GRID, CHART_GRID_FIXED, CHART_TEXT, CHART_TOOLTIP, seriesSymbol } from '~/utils/chartTheme'
+import { CHART_AXIS, CHART_GRID, CHART_GRID_FIXED, CHART_TEXT, CHART_TOOLTIP, CHART_WARN, seriesSymbol } from '~/utils/chartTheme'
 
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
@@ -26,6 +26,11 @@ const props = withDefaults(defineProps<{
   /** Row field flagging the rows that get a point marker — the dosing days of a daily step
    * chart, say. Other rows draw none, and the density rule counts only the flagged rows. */
   pointKey?: string
+  /** Row field holding a per-row echarts symbol name ('triangle', 'diamond', …) for readings
+   * that must not be read as ordinary points — a value censored at an assay ceiling, say.
+   * Unlike `pointKey` these ignore the density rule: a data-integrity mark is not decoration
+   * and must never be thinned away. Shape carries the meaning, color only reinforces it. */
+  markerKey?: string
   /** Fixed axis gutters instead of measured ones, so charts stacked on one x-axis stay flush
    * however wide their y-labels are. */
   fixedGutter?: boolean
@@ -38,6 +43,7 @@ const props = withDefaults(defineProps<{
   step: false,
   bare: false,
   pointKey: undefined,
+  markerKey: undefined,
   fixedGutter: false
 })
 
@@ -49,6 +55,8 @@ const option = computed<ECOption>(() => {
   // Per-row symbols only when the density rule allows points at all: an item-level 'circle'
   // would override a series-level 'none'.
   const flagRows = pointKey != null && symbol.symbol !== 'none'
+  const markerKey = props.markerKey
+  const hasMarkers = markerKey != null && props.data.some(d => d[markerKey])
   const gridBase = props.fixedGutter ? CHART_GRID_FIXED : CHART_GRID
 
   return {
@@ -89,14 +97,24 @@ const option = computed<ECOption>(() => {
     series: categories.map(([key, meta], i) => ({
       type: 'line',
       name: meta.name,
-      data: flagRows
-        ? props.data.map(d => ({ value: d[key] as number, symbol: d[pointKey] ? 'circle' : 'none' }))
+      data: flagRows || hasMarkers
+        ? props.data.map((d) => {
+            const marker = markerKey ? d[markerKey] as string : ''
+            return {
+              value: d[key] as number,
+              ...(marker
+                ? { symbol: marker, symbolSize: 9, itemStyle: { color: CHART_WARN } }
+                : flagRows
+                  ? { symbol: d[pointKey as string] ? 'circle' : 'none' }
+                  : {})
+            }
+          })
         : props.data.map(d => d[key] as number),
       smooth: false,
       ...(props.step ? { step: 'end' as const } : {}),
       ...symbol,
       // A crowded category axis thins symbols to the labelled ticks; every flagged row must show.
-      ...(flagRows ? { showAllSymbol: true } : {}),
+      ...(flagRows || hasMarkers ? { showAllSymbol: true } : {}),
       lineStyle: { width: 1.5, color: meta.color },
       itemStyle: { color: meta.color },
       ...(props.area

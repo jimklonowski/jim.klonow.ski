@@ -796,6 +796,21 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Same class-wide risks as finasteride — sexual side effects in a subset of users (with the added caveat that the long half-life means any side effects take much longer to resolve after stopping), and PSA suppression (~50%) that must be accounted for when interpreting prostate labs. Like finasteride, it does not lower compounds that are already DHT-derived (methenolone, oxandrolone). Pregnant women should not handle leaking/damaged capsules (teratogenic). Blood donation deferral: 6 months after the last dose (vs 1 month for finasteride) due to teratogenicity risk.'
   },
 
+  'Iron Bisglycinate': {
+    category: 'Mineral Supplement (Chelated Iron)',
+    aka: 'Ferrous bisglycinate chelate / Ferrochel',
+    summary: 'Elemental iron chelated to two glycine molecules. Absorbed largely intact by a different route than ionic iron salts, which makes it gentler on the gut and less dependent on stomach acid than ferrous sulfate at the same elemental dose. The ordinary use is correcting iron deficiency. It is also used deliberately at high split doses to drive hepcidin UP rather than to absorb iron — the basis of the short iron-loading protocols used in testosterone-driven erythrocytosis.',
+    dosing: {
+      range: '25-50 mg elemental daily for ordinary repletion. The hepcidin-loading protocol runs 70-75 mg three times a day, about 210-225 mg/day elemental, for 5-10 days.',
+      frequency: 'Once daily, or a single dose on alternate days for the best fractional absorption. Three times daily only when the goal is loading hepcidin, not absorbing iron.',
+      timing: 'Morning, empty stomach, away from calcium, coffee, tea and dairy. Vitamin C raises absorption, so take it alongside when repleting and avoid it when the goal is raising hepcidin.'
+    },
+    cycling: 'Continuous while repleting a deficit. The hepcidin-loading use is an intentionally bounded 5-10 day block, never an ongoing regimen.',
+    storage: 'Room temperature, sealed, kept away from children — acute iron overdose is a leading cause of poisoning death in young children.',
+    halfLife: 'Not well described by a plasma half-life. Body iron has no regulated excretion route and losses run only 1-2 mg/day, so what matters is the hepcidin response: a dose above 60 mg raises serum hepcidin within 4-8 hours and keeps it elevated for roughly 24 hours, which blunts absorption of any further dose inside that window by 35-45%.',
+    caution: 'Splitting doses within a day raises hepcidin more while absorbing no more total iron than a single daily dose, so ordinary repletion is better served by one morning dose or alternate-day dosing (Moretti, Blood 2015; Stoffel, Lancet Haematol 2017). Contraindicated in hereditary hemochromatosis (C282Y homozygotes) and in iron overload. In an erythrocytosis state, low iron acts as a brake on red cell production, so supplementing can remove that brake and let hematocrit climb — the mechanism hepcidin mimetics such as rusfertide exploit in reverse. High doses commonly cause constipation, nausea and dark stools. Ferritin is an acute phase reactant and also reads high right after an iron load, so a ferritin drawn during or within about a week of loading overstates true iron stores.'
+  },
+
   'Tadalafil': {
     category: 'PDE5 Inhibitor',
     aka: 'Cialis',

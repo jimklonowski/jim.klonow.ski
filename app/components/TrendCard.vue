@@ -28,6 +28,7 @@
           :show-legend="showLegend"
           :mark-lines="markLines"
           :step="step"
+          :marker-key="markerKey"
         />
         <template #fallback>
           <div :style="{ height: `${height}px` }" />
@@ -56,7 +57,10 @@ const props = withDefaults(defineProps<{
   markLines?: string[]
   /** Render as a step line — right for values that hold flat between changes, like a dose. */
   step?: boolean
-}>(), { color: CHART_ACCENT, height: 128, showLegend: false, markLines: () => [], step: false })
+  /** Row field naming a per-row point symbol, for readings that must not read as ordinary
+   * points (a censored assay value). See AreaChart's `markerKey`. */
+  markerKey?: string
+}>(), { color: CHART_ACCENT, height: 128, showLegend: false, markLines: () => [], step: false, markerKey: undefined })
 
 const resolvedCategories = computed(() =>
   props.categories ?? { value: { name: props.label, color: props.color } }
