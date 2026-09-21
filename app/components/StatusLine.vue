@@ -7,16 +7,16 @@
         {{ todayLabel }}
       </span>
 
-      <template v-if="hasSession">
+      <template v-if="hasSession && summary">
         <span
-          v-if="streak"
+          v-if="summary.streak"
           class="text-muted shrink-0"
-        >streak <span class="text-accent font-medium">{{ streak }}d</span></span>
+        >streak <span class="text-accent font-medium">{{ summary.streak }}d</span></span>
 
         <span
-          v-if="loggedEntries.length"
+          v-if="summary.loggedDays"
           class="text-muted shrink-0"
-        >logged <span class="text-body font-medium">{{ loggedEntries.length.toLocaleString('en-US') }}</span></span>
+        >logged <span class="text-body font-medium">{{ summary.loggedDays.toLocaleString('en-US') }}</span></span>
 
         <span
           v-if="latestDraw"
@@ -29,20 +29,22 @@
           </template>
         </span>
 
+        <!-- sodasToday is null for the doctor role (the soda log isn't in that view), so the
+             cell disappears instead of reading a misleading "soda 0 today". -->
         <span
-          v-if="latestEntry"
+          v-if="summary.latestEntryDate && summary.sodasToday != null"
           class="text-muted shrink-0"
         >
           soda <span
             class="font-medium"
-            :class="sodasToday === 0 ? 'text-accent' : 'text-warn'"
-          >{{ sodasToday }}</span> today
+            :class="summary.sodasToday === 0 ? 'text-accent' : 'text-warn'"
+          >{{ summary.sodasToday }}</span> today
         </span>
       </template>
 
       <span class="sm:ml-auto shrink-0 text-ghost normal-case tracking-normal hidden sm:inline">
         <template v-if="role === 'demo'">demo data · fictional persona</template>
-        <template v-else-if="hasSession && latestMetrics">whoop ✓ apple-health ✓ · synced {{ formatDate(latestMetrics.date, 'monthDay').toLowerCase() }}</template>
+        <template v-else-if="hasSession && summary?.latestMetricsDate">whoop ✓ apple-health ✓ · synced {{ formatDate(summary.latestMetricsDate, 'monthDay').toLowerCase() }}</template>
         <template v-else-if="!hasSession">guest session · <NuxtLink
           to="/labs/login"
           class="text-faint hover:text-accent"
@@ -54,9 +56,7 @@
 
 <script setup lang="ts">
 const { role } = await useAuth()
-const {
-  hasSession, loggedEntries, latestEntry, latestDraw, latestMetrics, streak, sodasToday, flagCounts
-} = useOverview(role)
+const { hasSession, data: summary, latestDraw, flagCounts } = useOverviewSummary(role)
 
 const todayStr = localToday()
 const todayLabel = `${new Date(todayStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })} ${todayStr}`

@@ -599,6 +599,8 @@ async function saveToSite() {
       body: { ...result.value, _type: reportType.value }
     })
     saveResult.value = { ok: true, date: res.date }
+    // The shell summary carries the last-draw date, flag counts, PDF total and latest DEXA.
+    await refreshNuxtData('overview')
     // DEXA saves go to their own table and have no marker history to narrate.
     if (res.table === 'labs_entries') generateSummary(res.date)
   }

@@ -51,7 +51,8 @@ async function syncNow() {
   syncing.value = true
   try {
     const { result } = await $fetch<{ result: { touched: number, workouts: number } }>('/api/whoop/sync', { method: 'POST' })
-    await Promise.all([refresh(), refreshHealth(), refreshWorkouts()])
+    // 'overview' is the shell summary — its "synced <date>" tail reads the newest metrics row.
+    await Promise.all([refresh(), refreshHealth(), refreshWorkouts(), refreshNuxtData('overview')])
     const parts = [`${result.touched} day${result.touched === 1 ? '' : 's'} updated`]
     if (result.workouts) parts.push(`${result.workouts} workout${result.workouts === 1 ? '' : 's'}`)
     toast.add({ title: 'Whoop synced', description: parts.join(' · '), color: 'success', icon: 'i-lucide-check' })

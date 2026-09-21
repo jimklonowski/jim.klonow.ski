@@ -46,7 +46,9 @@ const digestOpen = useState('digest-panel-open', () => false)
 const searchTerm = ref('')
 
 const { role, isOwner, canEdit } = await useAuth()
-const { entries, latestDraw } = useOverview(role)
+// The scalar shell summary — this component sits in the default layout, so it must not drag
+// the full journal and labs lists onto every page the way useOverview() would.
+const { data: summary, latestDraw } = useOverviewSummary(role)
 
 defineShortcuts({
   meta_k: () => { open.value = !open.value }
@@ -159,16 +161,13 @@ const markerItems = computed(() => {
   })
 })
 
-/** Compound → date it was last dosed, most-recent use first. */
-const loggedCompounds = computed(() => {
-  const seen = new Map<string, string>()
-  for (const e of [...entries.value].reverse()) {
-    for (const p of e.peptides ?? []) {
-      if (p.compound && !seen.has(p.compound)) seen.set(p.compound, e.date)
-    }
-  }
-  return seen
-})
+/** Compound → date it was last dosed, most-recent use first (server-derived from the dose log). */
+const loggedCompounds = computed(() =>
+  new Map((summary.value?.compounds ?? []).map(c => [c.compound, c.lastDate] as const))
+)
+
+/** The newest journal days, newest first — the palette's DAYS group. Empty for the doctor role. */
+const recentDays = computed(() => summary.value?.recentDays ?? [])
 
 // Brand names are how these get searched for ("primo", "anavar"), so the aka rides along in the
 // suffix — fuse matches on it, and it explains the hit when the label doesn't contain the term.
@@ -219,21 +218,20 @@ const dateItems = computed(() => {
   // this the list was the only candidate set, and Fuse scored "2026-08-20" as a hit for a typed
   // "2026-03-20" — one character apart — offering the wrong day as the only result.
   if (typedDate.value) {
-    const entry = entries.value.find(e => e.date === typedDate.value)
+    // Only the recent window is on hand, so an older date gets no weight suffix rather than a
+    // guess about whether it has an entry ([date].vue opens a blank form either way).
+    const day = recentDays.value.find(d => d.date === typedDate.value)
     return [{
       label: typedDate.value,
-      suffix: entry?.weight_lbs != null ? `${entry.weight_lbs} lbs` : entry ? '' : 'no entry yet',
+      suffix: day?.weight_lbs != null ? `${day.weight_lbs} lbs` : '',
       onSelect: () => go(`/journal/${typedDate.value}`)
     }]
   }
-  return [...entries.value]
-    .reverse()
-    .slice(0, 14)
-    .map(e => ({
-      label: e.date,
-      suffix: e.weight_lbs != null ? `${e.weight_lbs} lbs` : '',
-      onSelect: () => go(`/journal/${e.date}`)
-    }))
+  return recentDays.value.map(d => ({
+    label: d.date,
+    suffix: d.weight_lbs != null ? `${d.weight_lbs} lbs` : '',
+    onSelect: () => go(`/journal/${d.date}`)
+  }))
 })
 
 const groups = computed(() => {

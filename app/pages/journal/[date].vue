@@ -961,7 +961,8 @@ async function save() {
     await $fetch('/api/journal/save', { method: 'POST', body: payload })
 
     toast.add({ title: 'Entry saved', color: 'success', icon: 'i-lucide-check' })
-    await refresh()
+    // The shell's streak / logged / soda figures come from the scalar summary, not this list.
+    await Promise.all([refresh(), refreshNuxtData('overview')])
   }
   catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'

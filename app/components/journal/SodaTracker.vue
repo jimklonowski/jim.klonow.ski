@@ -258,6 +258,8 @@ async function quickAdd(useCustom = false) {
       body: { date, time: localTimeStr(), drink, size }
     })
     applySodasLocally(date, sodas)
+    // The status line's "soda N today" reads the scalar shell summary, not this list.
+    await refreshNuxtData('overview')
     if (useCustom) {
       customDrink.value = ''
       customSize.value = ''
@@ -285,6 +287,7 @@ async function remove(index: number) {
       query: { date, index }
     })
     applySodasLocally(date, sodas)
+    await refreshNuxtData('overview')
   }
   catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
