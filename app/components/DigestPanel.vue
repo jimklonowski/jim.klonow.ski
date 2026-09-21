@@ -200,7 +200,8 @@ function chips(d: Digest): string[] {
     push(s.weight_lbs, v => `${v} lbs`)
     push(s.doses, v => `${v} dose${v === 1 ? '' : 's'}`)
     push(s.workouts, v => v ? `${v} workout${v === 1 ? '' : 's'}` : '')
-    push(s.sodas, v => v ? `${v} soda${v === 1 ? '' : 's'}` : '')
+    // Ounces beside the count when the sizes carried them — two mini cans are less than one bottle.
+    push(s.sodas, v => v ? `${v} soda${v === 1 ? '' : 's'}${s.soda_oz ? ` · ~${s.soda_oz} oz` : ''}` : '')
   }
   else {
     push(s.avg_recovery, v => `Avg rec ${v}%`)
@@ -209,7 +210,7 @@ function chips(d: Digest): string[] {
     push(s.weight_change, v => `${v >= 0 ? '+' : ''}${v} lbs`)
     push(s.compounds, v => `${v} compound${v === 1 ? '' : 's'}`)
     push(s.workouts, v => `${v} workout${v === 1 ? '' : 's'}`)
-    push(s.sodas, v => `${v} soda${v === 1 ? '' : 's'}`)
+    push(s.sodas, v => `${v} soda${v === 1 ? '' : 's'}${s.soda_oz ? ` · ~${s.soda_oz} oz` : ''}`)
   }
   return out.filter(Boolean)
 }

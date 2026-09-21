@@ -3,6 +3,7 @@ import { mergeRules } from '#shared/utils/cycles'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
 import { localToday } from '#shared/utils/time'
+import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 
 // Personal-health digest generation. Gathers vitals / sleep / recovery / doses / workouts for a
 // period from D1, has Claude write a short plain-text recap, and upserts it into the digests table.
@@ -157,14 +158,16 @@ async function labDatesInRange(db: D1Database, start: string, end: string): Prom
   return (results ?? []).map(r => r.date as string)
 }
 
-// "5 (coke zero x3, dr pepper x2)" — freeform drink names are normalized (trim/lowercase)
-// before counting so near-duplicate spellings don't split the tally.
-function sodaSummary(entries: JournalRow[]): { count: number, breakdown: string } {
+// "5 (coke zero x3, dr pepper x2)" plus ounces — freeform drink names are normalized
+// (trim/lowercase) before counting so near-duplicate spellings don't split the tally, and the
+// size labels are parsed for volume (shared/utils/soda.ts) because ounces, not count, is the
+// number that tracks the goal.
+function sodaSummary(entries: JournalRow[]): SodaTotals & { breakdown: string } {
   const byDrink = new Map<string, { label: string, n: number }>()
-  let count = 0
+  const all: SodaEntry[] = []
   for (const e of entries) {
     for (const s of e.sodas ?? []) {
-      count++
+      all.push(s)
       const label = (s.drink ?? 'unspecified').trim() || 'unspecified'
       const key = label.toLowerCase()
       const cur = byDrink.get(key) ?? { label, n: 0 }
@@ -173,7 +176,14 @@ function sodaSummary(entries: JournalRow[]): { count: number, breakdown: string 
     }
   }
   const breakdown = [...byDrink.values()].sort((a, b) => b.n - a.n).map(d => d.n > 1 ? `${d.label} x${d.n}` : d.label).join(', ')
-  return { count, breakdown }
+  return { ...sodaTotals(all), breakdown }
+}
+
+// "2, ~15 oz (Sprite, Cherry Coke)"; over several days also "~24 oz/day".
+function sodaLine(s: SodaTotals & { breakdown: string }, days = 1): string {
+  const oz = fmtSodaOz(s)
+  const perDay = days > 1 && s.oz ? `, ~${Math.round(s.oz / days)} oz/day` : ''
+  return `${s.count}${oz ? `, ${oz}${perDay}` : ''} (${s.breakdown})`
 }
 
 // Dated journal notes as one fact-sheet line; notes are freeform so newlines are flattened
@@ -247,7 +257,7 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
   }
 
   const sodas = sodaSummary(journal)
-  if (sodas.count) lines.push(`Sodas: ${sodas.count} (${sodas.breakdown})`)
+  if (sodas.count) lines.push(`Sodas: ${sodaLine(sodas)}`)
 
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your note for the day — ${notes.join('; ')}`)
@@ -263,7 +273,8 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
     sleep_min: h?.sleep_total_min ?? null,
     doses: doses.length,
     workouts: workouts.length,
-    sodas: sodas.count
+    sodas: sodas.count,
+    soda_oz: sodas.oz || null
   }
 
   // Baseline is context, not data — decide whether the day is worth summarizing first.
@@ -368,7 +379,7 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   else lines.push('Workouts: none')
 
   const sodas = sodaSummary(journal)
-  lines.push(sodas.count ? `Sodas: ${sodas.count} (${sodas.breakdown})` : 'Sodas: none logged')
+  lines.push(sodas.count ? `Sodas: ${sodaLine(sodas, 7)}` : 'Sodas: none logged')
 
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your notes this week — ${notes.join('; ')}`)
@@ -392,7 +403,8 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   if (pWeights.length) base.push(`avg weight ${round(avg(pWeights)!)} lbs`)
   base.push(`${prevWorkouts.length} workout${prevWorkouts.length === 1 ? '' : 's'}`)
   const pSodas = sodaSummary(prevJournal)
-  base.push(`${pSodas.count} soda${pSodas.count === 1 ? '' : 's'}`)
+  const pOz = fmtSodaOz(pSodas)
+  base.push(`${pSodas.count} soda${pSodas.count === 1 ? '' : 's'}${pOz ? ` (${pOz})` : ''}`)
   if (prevJournal.length || prevHealth.length || prevWorkouts.length) {
     lines.push(`Previous week (${fmtDay(prevStart)} – ${fmtDay(prevEnd)}), for comparison: ${base.join(', ')}`)
   }
@@ -407,7 +419,8 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
     avg_bp_diastolic: bpDia != null ? Math.round(bpDia) : null,
     compounds: doses.length,
     workouts: workouts.length,
-    sodas: sodas.count
+    sodas: sodas.count,
+    soda_oz: sodas.oz || null
   }
 
   const hasData = journal.length > 0 || health.length > 0 || workouts.length > 0
@@ -436,6 +449,8 @@ const STYLE_RULES = `Ground rules:
 - Lines marked "for comparison" are baselines — use them to judge better/worse instead of guessing.
 - If a "Your note(s)" line is present, those are the reader's own words — use them to explain anomalies (a rough night, travel, drinks) rather than speculating.
 - If blood pressure is running high (around 130+ systolic or 85+ diastolic), flag it plainly.
+- Soda is given as a count AND in ounces, and ounces are what matter: two 7.5 oz mini cans (15 oz) are less soda than one 20 oz bottle, so never rank a day or week as worse on count alone. Judge and compare by ounces (and oz/day for a week); use the count only for how often, not how much.
+- If a "PLANNED CYCLE — ACTIVE" paragraph is present, it is part of the story every time while it runs. Name the cycle and where we are in it (day X of Y), and read the period's data against its stated goal and the watch-list in its notes: what the protocol is meant to do, what it asks to watch for, and whether anything in the data matches. Its dose showing up as logged is not the point; what the cycle is for is.
 - A protocol change is news for about two weeks. After that it's background: mention a weeks-old start/stop in one clause at most, and only re-headline it if the metric anchored to it is still moving. Changes to the core protocol (testosterone, HGH, hCG) outrank ancillary peptide starts/stops at any age.
 - When a trend has a plausible physiological mechanism given the protocol, explain it in one clause (e.g. "testosterone raises red-blood-cell production, which pushes RHR adaptation" style reasoning) — the reader wants the why, not just the what. Frame mechanisms as likely explanations, not certainties.
 - Formatting: light Markdown — **bold** the handful of numbers or findings that matter most, *italics* sparingly. No headings, no tables, no code blocks, no bullet lists (this renders inside a small speech bubble).
@@ -449,7 +464,7 @@ ${TICKER_VOICE}
 Recap for ${fmtDateFull(date)}:
 ${facts}
 
-Write 2-4 sentences highlighting what stands out about the day — notable vitals against the prior-7-day baseline, recovery/sleep quality, whether we trained, and protocol adherence as resolved by the "Schedule check" line: it already knows the weekday and states what was due, logged, missed, not due, or not yet logged, so take it as given rather than working out the weekday yourself. A compound listed as not due today is not a miss; one listed as not yet logged on a day still under way is open, not missed. If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "I've been averaging X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Each change carries its age: prefer trends tied to the ongoing core protocol over ones anchored to an ancillary peptide stopped weeks ago, which by now rate a clause, not a headline. Be factual and specific. If it was an unremarkable day, say so briefly — a quiet day is a good day for a heart.
+Write 2-4 sentences highlighting what stands out about the day — an active planned cycle if one is running (name it, the day count, and how today reads against its goal and watch-list), notable vitals against the prior-7-day baseline, recovery/sleep quality, whether we trained, and protocol adherence as resolved by the "Schedule check" line: it already knows the weekday and states what was due, logged, missed, not due, or not yet logged, so take it as given rather than working out the weekday yourself. A compound listed as not due today is not a miss; one listed as not yet logged on a day still under way is open, not missed. If a "Sustained trends" section is present, weave in the most significant trend: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "I've been averaging X since Y began") — it is an observed association, so don't assert causation, but don't bury it either. Each change carries its age: prefer trends tied to the ongoing core protocol over ones anchored to an ancillary peptide stopped weeks ago, which by now rate a clause, not a headline. Be factual and specific. If it was an unremarkable day, say so briefly — a quiet day is a good day for a heart.
 
 ${STYLE_RULES}`
 }
@@ -462,7 +477,7 @@ ${TICKER_VOICE}
 Week of ${fmtDateFull(start)} – ${fmtDateFull(end)}:
 ${facts}
 
-Write about 5 sentences, in order of importance: overall trends this week against the previous week (weight, recovery, sleep, HRV/RHR, blood pressure), training volume, and protocol adherence as resolved by the "Schedule check" lines: they already know which dates each compound was due and list the misses, slides, and off-schedule doses, so take them as given rather than working out weekdays yourself (testosterone logged on both of its due days is full adherence, not a thin log; flag what they list as missed or off-schedule, not matches). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "my resting rate has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Each change carries its age: a finding anchored to the ongoing core protocol outranks one anchored to an ancillary peptide stopped weeks ago, which by now rates a clause, not a headline. Call out anything notably better or worse than the previous week. Be factual and specific.
+Write about 5 sentences, in order of importance: an active or just-finished planned cycle if there is one (name it, where the week fell in it, and how the week's numbers read against its goal and watch-list), overall trends this week against the previous week (weight, recovery, sleep, HRV/RHR, blood pressure), training volume, and protocol adherence as resolved by the "Schedule check" lines: they already know which dates each compound was due and list the misses, slides, and off-schedule doses, so take them as given rather than working out weekdays yourself (testosterone logged on both of its due days is full adherence, not a thin log; flag what they list as missed or off-schedule, not matches). If a "Sustained trends" section is present, lead with its most significant findings: these are precomputed multi-week shifts, and when one is measured against a protocol start date, state that timing relationship plainly (e.g. "my resting rate has averaged X since Y began, up from Z in the month before") — it is an observed association, so don't assert causation, but treat it as the headline it is. Each change carries its age: a finding anchored to the ongoing core protocol outranks one anchored to an ancillary peptide stopped weeks ago, which by now rates a clause, not a headline. Call out anything notably better or worse than the previous week. Be factual and specific.
 
 ${STYLE_RULES}`
 }

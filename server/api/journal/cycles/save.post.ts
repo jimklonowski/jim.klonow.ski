@@ -61,6 +61,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'planned_weeks must be 1-52' })
   }
 
+  // A day-exact span for plans that are not whole weeks. Null keeps the old meaning (weeks × 7).
+  // It must fit inside the week count it was derived from, so week-relative item windows can
+  // never point past the end of the cycle.
+  const rawDays = body.planned_days
+  const days = rawDays == null || rawDays === '' ? null : Number(rawDays)
+  if (days != null && (!Number.isInteger(days) || days < 1 || days > weeks * 7)) {
+    throw createError({ statusCode: 400, message: `planned_days must be 1-${weeks * 7}` })
+  }
+
   const actualEnd = body.actual_end == null || body.actual_end === '' ? null : body.actual_end as string
   if (actualEnd != null && (!DATE_RE.test(actualEnd) || actualEnd < startDate)) {
     throw createError({ statusCode: 400, message: 'Bad actual_end' })
@@ -81,16 +90,16 @@ export default defineEventHandler(async (event) => {
     await db.prepare(`
       UPDATE cycles SET
         name = ?2, goal = ?3, start_date = ?4, start_precision = ?5, planned_weeks = ?6,
-        actual_end = ?7, compounds = ?8, notes = ?9
+        planned_days = ?7, actual_end = ?8, compounds = ?9, notes = ?10
       WHERE id = ?1
-    `).bind(body.id, name, goal, startDate, precision, weeks, actualEnd, compounds, notes).run()
+    `).bind(body.id, name, goal, startDate, precision, weeks, days, actualEnd, compounds, notes).run()
     return { ok: true, id: body.id }
   }
 
   const result = await db.prepare(`
-    INSERT INTO cycles (name, goal, start_date, start_precision, planned_weeks, actual_end, compounds, notes, created_at)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-  `).bind(name, goal, startDate, precision, weeks, actualEnd, compounds, notes, new Date().toISOString()).run()
+    INSERT INTO cycles (name, goal, start_date, start_precision, planned_weeks, planned_days, actual_end, compounds, notes, created_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+  `).bind(name, goal, startDate, precision, weeks, days, actualEnd, compounds, notes, new Date().toISOString()).run()
 
   return { ok: true, id: result.meta.last_row_id }
 })

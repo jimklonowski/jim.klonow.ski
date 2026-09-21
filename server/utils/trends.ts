@@ -4,6 +4,7 @@
 // model narrates precomputed numbers instead of eyeballing raw data: protocol change-points are
 // detected from the dose log, and each metric is compared before/after the change (or against a
 // trailing baseline when no change explains it).
+import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
 
 export interface TrendJournalRow {
   date: string
@@ -79,6 +80,30 @@ const STOP_CLUSTER_GAP_DAYS = 3
 // a before/after comparison is meaningful.
 const MIN_POINTS = 4
 const MIN_DAYS_SINCE_CHANGE = 7
+
+// An ancillary change — a compound that is not on the standing schedule — stops being a useful
+// anchor after this long. The prompt already calls a change "news for about two weeks"; past
+// ~6 weeks a stopped peptide just keeps getting re-headlined as the cause of whatever a metric
+// is doing now (observed: a late-June KPV stop still anchoring RHR in late September, because
+// the anchor loop below keeps the EARLIEST change that clears the bar). Standing compounds are
+// exempt — "since TRT began" is a legitimate months-long anchor.
+const ANCILLARY_ANCHOR_MAX_AGE_DAYS = 42
+const STANDING_COMPOUNDS = new Set(PROTOCOL_RULES.map(r => r.compound))
+
+// "Testosterone Cypionate (resumed)" → "Testosterone Cypionate".
+function baseCompound(name: string): string {
+  return name.replace(/\s*\([^)]*\)\s*$/, '')
+}
+
+function isStandingChange(change: ProtocolChange): boolean {
+  return change.compounds.some(c => STANDING_COMPOUNDS.has(baseCompound(c)))
+}
+
+// Too old to anchor a trend or to be listed on a digest fact sheet. The labs summary keeps the
+// full `changes` list — a months-old stop is still relevant across a four-month lab window.
+function isStaleAncillary(change: ProtocolChange, endDate: string): boolean {
+  return !isStandingChange(change) && dayDiff(endDate, change.date) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
+}
 
 interface MetricDef {
   key: string
@@ -300,6 +325,7 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
     let reversalAnchor: TrendFinding | null = null
     for (const change of changes) {
       if (dayDiff(endDate, change.date) < MIN_DAYS_SINCE_CHANGE) continue
+      if (isStaleAncillary(change, endDate)) continue
 
       const baseline = avgInWindow(points, addDays(change.date, -28), addDays(change.date, -1))
       const recentStart = addDays(endDate, -13) > change.date ? addDays(endDate, -13) : change.date
@@ -391,8 +417,11 @@ export function formatTrendLines(trends: TrendsResult, endDate: string): string[
     return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`
   }
   const lines: string[] = []
-  if (trends.changes.length) {
-    lines.push(`Protocol changes (last ${CHANGE_LOOKBACK_DAYS} days): ${trends.changes
+  // Stale ancillary changes are left off the digest sheet entirely: listed, they get mentioned,
+  // and a quarter-old peptide stop has nothing to say about this week.
+  const listed = trends.changes.filter(c => !isStaleAncillary(c, endDate))
+  if (listed.length) {
+    lines.push(`Protocol changes: ${listed
       .map(c => c.kind === 'stop'
         ? `${c.compounds.join(' + ')} stopped around ${fmtDate(c.date)} (${ago(c.date)}; no doses logged since)`
         : c.kind === 'adjust'

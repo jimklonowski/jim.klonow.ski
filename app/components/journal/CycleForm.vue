@@ -52,18 +52,30 @@
               />
             </div>
           </UFormField>
+          <!-- Weeks is the usual unit, but some protocols are not a whole number of weeks (a
+               10-day iron load) and weeks cannot express those at all. Days stores an exact span;
+               the week count it rounds up to still drives the per-item week windows below. -->
           <UFormField
-            label="Weeks"
+            label="Duration"
             required
             :ui="{ label: 'tui-label' }"
           >
-            <UInput
-              v-model.number="form.planned_weeks"
-              type="number"
-              min="1"
-              max="52"
-              class="w-20"
-            />
+            <div class="flex gap-2">
+              <UInput
+                v-model.number="form.duration"
+                type="number"
+                min="1"
+                :max="form.duration_unit === 'days' ? 364 : 52"
+                class="w-20"
+              />
+              <USelect
+                v-model="form.duration_unit"
+                :items="DURATION_UNITS"
+                value-key="value"
+                label-key="label"
+                class="w-24"
+              />
+            </div>
           </UFormField>
         </div>
         <p
@@ -154,7 +166,7 @@
                     v-model.number="item.fromWeek"
                     type="number"
                     min="1"
-                    :max="form.planned_weeks"
+                    :max="plannedWeeks"
                     class="w-14"
                     size="sm"
                   />
@@ -163,7 +175,7 @@
                     v-model="item.toWeek"
                     type="number"
                     min="1"
-                    :max="form.planned_weeks"
+                    :max="plannedWeeks"
                     placeholder="end"
                     class="w-14"
                     size="sm"
@@ -266,13 +278,20 @@ interface ItemForm {
   toWeek: number | string | undefined
 }
 
+const DURATION_UNITS = [
+  { label: 'weeks', value: 'weeks' },
+  { label: 'days', value: 'days' }
+]
+
 interface CycleFormState {
   id?: number
   name: string
   goal: string
   start_date: string
   start_precision: StartPrecision
-  planned_weeks: number
+  /** The number in the duration box; `duration_unit` says what it counts. */
+  duration: number
+  duration_unit: 'weeks' | 'days'
   actual_end: string
   compounds: ItemForm[]
   notes: string
@@ -289,7 +308,8 @@ function emptyForm(): CycleFormState {
     goal: '',
     start_date: localToday(),
     start_precision: 'day',
-    planned_weeks: 16,
+    duration: 16,
+    duration_unit: 'weeks',
     actual_end: '',
     compounds: [blankItem()],
     notes: ''
@@ -312,7 +332,9 @@ function openForm(cycle?: Cycle, { duplicate = false, precision }: { duplicate?:
       // A duplicate is a fresh plan, so it starts uncommitted rather than inheriting a date;
       // `precision` lets a caller open straight into a mode (the dossier's SET START DATE).
       start_precision: precision ?? (duplicate ? 'month' : startPrecisionOf(cycle)),
-      planned_weeks: cycle.planned_weeks,
+      // A day-exact span round-trips as days; everything else reads back in weeks as before.
+      duration: cycle.planned_days ?? cycle.planned_weeks,
+      duration_unit: cycle.planned_days != null ? 'days' : 'weeks',
       actual_end: duplicate ? '' : (cycle.actual_end ?? ''),
       compounds: cycle.compounds.map(c => ({ ...c, toWeek: c.toWeek ?? undefined })),
       notes: cycle.notes ?? ''
@@ -326,6 +348,13 @@ function openForm(cycle?: Cycle, { duplicate = false, precision }: { duplicate?:
 defineExpose({ open: openForm })
 
 const startHelp = computed(() => PRECISION_HELP[form.start_precision])
+
+/** Whole weeks the plan spans — the ceiling for per-item week windows. A 10-day plan is 2 weeks
+ * here and 10 days on the wire, so "weeks 1-2" still covers it and itemWindow trims the tail. */
+const plannedWeeks = computed(() => {
+  const n = Math.max(1, Math.trunc(form.duration) || 1)
+  return form.duration_unit === 'days' ? Math.ceil(n / 7) : n
+})
 
 /**
  * Selectable anchors for a coarse start: the next two years of months, or eight quarters.
@@ -367,15 +396,15 @@ function toggleDay(item: ItemForm, day: number) {
 function itemHint(item: ItemForm): string {
   if (!item.weekdays.length) return 'pick days'
   const cadence = item.weekdays.length === 7 ? 'daily' : `${item.weekdays.length}×/wk`
-  const to = item.toWeek || form.planned_weeks
-  const span = item.fromWeek === 1 && Number(to) === form.planned_weeks
+  const to = item.toWeek || plannedWeeks.value
+  const span = item.fromWeek === 1 && Number(to) === plannedWeeks.value
     ? 'full run'
     : `wks ${item.fromWeek}–${to}`
   return `${cadence} · ${span}`
 }
 
 const canSave = computed(() =>
-  !!form.name.trim() && !!form.start_date && form.planned_weeks >= 1
+  !!form.name.trim() && !!form.start_date && form.duration >= 1
   && form.compounds.length > 0
   && form.compounds.every(c => c.compound && (c.dose ?? 0) > 0 && c.weekdays.length > 0)
 )
@@ -395,7 +424,8 @@ async function save() {
         goal: form.goal,
         start_date: form.start_date,
         start_precision: form.start_precision,
-        planned_weeks: form.planned_weeks,
+        planned_weeks: plannedWeeks.value,
+        planned_days: form.duration_unit === 'days' ? Math.trunc(form.duration) : null,
         actual_end: form.actual_end || null,
         compounds: form.compounds.map(c => ({
           compound: c.compound,

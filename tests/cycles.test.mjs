@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   checkpointStates, cycleEnd, cycleProgress, cycleRules, cycleStatusOn,
-  diffDays, isTentative, itemWindow, mergeRules, periodLabel, plannedDoses, plannedEnd,
+  diffDays, durationLabel, isTentative, itemWindow, mergeRules, periodLabel, plannedDoses, plannedEnd,
   relevantCycle, shiftDays, startAnchor, tentativeStartLabel
 } from '../shared/utils/cycles.ts'
 
@@ -57,6 +57,26 @@ test('progress counts 1-based days and weeks, clamped to the span', () => {
   assert.equal(day34.day, 34)
   assert.equal(day34.week, 5)
   assert.equal(cycleProgress(c, '2028-01-01').day, 112) // long done — clamps
+})
+
+test('a day-exact span overrides whole weeks and trims week-numbered items to it', () => {
+  // A 10-day iron protocol: 2 weeks on the wire so "weeks 1-2" still covers it, 10 days exact.
+  const iron = { compound: 'Iron Bisglycinate', dose: 225, unit: 'mg', weekdays: [0, 1, 2, 3, 4, 5, 6], fromWeek: 1, toWeek: null }
+  const c = run({ start_date: '2026-09-18', planned_weeks: 2, planned_days: 10, compounds: [iron] })
+  assert.equal(plannedEnd(c), '2026-09-27')
+  assert.equal(cycleEnd(c), '2026-09-27')
+  assert.equal(cycleStatusOn(c, '2026-09-27'), 'active')
+  assert.equal(cycleStatusOn(c, '2026-09-28'), 'done')
+  assert.deepEqual(cycleProgress(c, '2026-09-21'), { day: 4, week: 1, totalDays: 10, totalWeeks: 2, pct: 40 })
+  assert.equal(durationLabel(c), '10 days')
+  // An item spelled out as "weeks 1-2" is clamped to the span — day 10, not day 14 — so adherence
+  // never scores days the plan didn't claim.
+  const spelled = run({ start_date: '2026-09-18', planned_weeks: 2, planned_days: 10, compounds: [{ ...iron, toWeek: 2 }] })
+  assert.deepEqual(itemWindow(spelled, spelled.compounds[0]), { from: '2026-09-18', to: '2026-09-27' })
+  // Null keeps the old meaning exactly: rows written before planned_days existed read as before.
+  const weeks = run({ start_date: '2026-09-18', planned_weeks: 2, planned_days: null, compounds: [iron] })
+  assert.equal(plannedEnd(weeks), '2026-10-01')
+  assert.equal(durationLabel(weeks), '2 wks')
 })
 
 test('item windows are week-relative and clamp to an early end', () => {

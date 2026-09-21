@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS cycles (
   start_date TEXT NOT NULL,
   start_precision TEXT NOT NULL DEFAULT 'day',  -- 'day' | 'month' | 'quarter'; see below
   planned_weeks INTEGER NOT NULL,
+  planned_days INTEGER,             -- exact span when not a whole number of weeks; see below
   actual_end TEXT,
   compounds TEXT NOT NULL DEFAULT '[]',
   notes TEXT,
@@ -293,3 +294,12 @@ CREATE TABLE IF NOT EXISTS profile (
 -- so do one or the other:
 -- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/schema.sql
 -- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/seed-vaccinations.sql
+
+-- One-time migration, do not re-run after it lands on an environment.
+-- Day-exact cycle spans (2026-09-21). Some protocols are not a whole number of weeks — a 10-day
+-- iron load, say — and weeks could not express them (10 days is 1.43 weeks, not 1.5). NULL means
+-- "span is planned_weeks * 7", which is how every existing row already reads, so the backfill is
+-- a no-op. planned_weeks stays authoritative for week-relative item windows and is rounded up to
+-- cover the days. The demo DB has no cycles table (see api/journal/cycles/list.get.ts), so this
+-- one is main-DB only:
+-- ALTER TABLE cycles ADD COLUMN planned_days INTEGER;
