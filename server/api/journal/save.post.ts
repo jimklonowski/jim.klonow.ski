@@ -1,10 +1,11 @@
+import { zJournalSave } from '#shared/utils/schemas'
+
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
-  const body = await readBody<Record<string, unknown>>(event)
-  if (!body?.date || typeof body.date !== 'string') {
-    throw createError({ statusCode: 400, message: 'Missing date field' })
-  }
+  // Shape, bounds and date validity come from the shared schema; a bad field is a named 400
+  // rather than a D1 bind error surfacing as a 500 (or, worse, a string landing in a REAL column).
+  const body = await readValidatedJson(event, zJournalSave)
 
   const db = getDb(event)
   // The `day` column (a hand-typed notebook index) is no longer read or written. It stays in the
@@ -26,16 +27,16 @@ export default defineEventHandler(async (event) => {
       notes = excluded.notes
   `).bind(
     body.date,
-    body.weight_lbs ?? null,
-    body.bp_systolic ?? null,
-    body.bp_diastolic ?? null,
-    body.rhr ?? null,
-    body.hrv ?? null,
-    JSON.stringify(body.peptides ?? []),
-    JSON.stringify(body.reconstitutions ?? []),
-    JSON.stringify(body.food ?? {}),
-    JSON.stringify(body.sodas ?? []),
-    body.notes ?? ''
+    body.weight_lbs,
+    body.bp_systolic,
+    body.bp_diastolic,
+    body.rhr,
+    body.hrv,
+    JSON.stringify(body.peptides),
+    JSON.stringify(body.reconstitutions),
+    JSON.stringify(body.food),
+    JSON.stringify(body.sodas),
+    body.notes
   ).run()
 
   return { ok: true, date: body.date }

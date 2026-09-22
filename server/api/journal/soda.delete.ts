@@ -1,3 +1,5 @@
+import { zSodaRemove } from '#shared/utils/schemas'
+
 // Removes one entry (by index) from a day's `sodas` array - lets the dashboard widget undo a mis-tap.
 //
 // Takes `date`/`index` as query params rather than a JSON body - a DELETE with a body reliably
@@ -12,12 +14,9 @@
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
-  const query = getQuery(event)
-  const date = typeof query.date === 'string' ? query.date : undefined
-  const index = typeof query.index === 'string' ? Number(query.index) : NaN
-  if (!date || !Number.isInteger(index)) {
-    throw createError({ statusCode: 400, message: 'Missing date or index field' })
-  }
+  // A negative index would build the JSON path '$[-1]', which SQLite rejects outright — the
+  // whole statement then failed as an unhandled 500. The schema requires a non-negative integer.
+  const { date, index } = validatedQuery(event, zSodaRemove)
 
   const db = getDb(event)
   await db.prepare(`

@@ -1,24 +1,18 @@
 import { normalizeForm, isPillForm } from '#shared/utils/vialForm'
+import { zVialSave } from '#shared/utils/schemas'
 
 // Insert a new vial (no id) or update an existing one (id present). Used for adding sealed
 // stock, editing any vial, and status changes (e.g. marking an active vial finished).
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
-  const body = await readBody<Record<string, unknown>>(event)
-  if (!body?.compound || typeof body.compound !== 'string') {
-    throw createError({ statusCode: 400, message: 'Missing compound field' })
-  }
-  if (body.vial_amount == null || typeof body.vial_amount !== 'number') {
-    throw createError({ statusCode: 400, message: 'Missing vial_amount field' })
-  }
+  const body = await readValidatedJson(event, zVialSave)
 
   // Pill bottles store the bottle total in vial_amount and the count here, so the per-pill
   // strength can be read back for display; BAC water only makes sense for a vial.
   const form = normalizeForm(body.form)
   const pill = isPillForm(form)
-  const unitCount = typeof body.unit_count === 'number' && body.unit_count > 0 ? Math.round(body.unit_count) : null
-  if (pill && !unitCount) {
+  if (pill && !body.unit_count) {
     throw createError({ statusCode: 400, message: 'Pill bottles need unit_count (tablets per bottle)' })
   }
 
@@ -26,19 +20,19 @@ export default defineEventHandler(async (event) => {
 
   const fields = {
     compound: body.compound,
-    supplier: body.supplier || null,
+    supplier: body.supplier,
     vial_amount: body.vial_amount,
-    vial_unit: body.vial_unit || 'mg',
+    vial_unit: body.vial_unit,
     form,
-    unit_count: pill ? unitCount : null,
-    quantity: body.quantity ?? 1,
-    status: body.status || 'sealed',
-    opened_date: body.opened_date || null,
-    bac_water_ml: pill ? null : (body.bac_water_ml ?? null),
-    lot: body.lot || null,
-    expiry: body.expiry || null,
-    cost: body.cost ?? null,
-    notes: body.notes || null
+    unit_count: pill ? body.unit_count : null,
+    quantity: body.quantity,
+    status: body.status,
+    opened_date: body.opened_date,
+    bac_water_ml: pill ? null : body.bac_water_ml,
+    lot: body.lot,
+    expiry: body.expiry,
+    cost: body.cost,
+    notes: body.notes
   }
 
   if (body.id != null) {

@@ -1,27 +1,18 @@
+import { zSupplementSave } from '#shared/utils/schemas'
+
 // Insert a new supplement (no id) or update an existing one (id present). Discontinuing is
 // just an update that sets `stopped` — rows are kept so recent stops remain AI context.
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
-  const body = await readBody<Record<string, unknown>>(event)
-  if (!body?.name || typeof body.name !== 'string' || !body.name.trim()) {
-    throw createError({ statusCode: 400, message: 'Missing name field' })
-  }
+  const body = await readValidatedJson(event, zSupplementSave)
 
   const db = getDb(event)
 
-  const status = ['active', 'on_hand', 'stopped'].includes(body.status as string) ? body.status as string : 'active'
   const fields = {
-    name: body.name.trim(),
-    dose: body.dose || null,
-    category: body.category === 'skin' ? 'skin' : 'supplement',
-    status,
-    schedule: (typeof body.schedule === 'string' && body.schedule.trim()) || 'daily',
-    started: body.started || null,
+    ...body,
     // A stopped date only makes sense on a stopped row — clear it on reactivate.
-    stopped: status === 'stopped' ? (body.stopped || null) : null,
-    notes: body.notes || null,
-    sort: typeof body.sort === 'number' ? body.sort : 100
+    stopped: body.status === 'stopped' ? body.stopped : null
   }
 
   if (body.id != null) {

@@ -1,4 +1,5 @@
 import { normalizeForm, isPillForm } from '#shared/utils/vialForm'
+import { zVialOpen } from '#shared/utils/schemas'
 import { localToday } from '#shared/utils/time'
 
 // Open one container from a sealed batch: decrement the batch quantity by one and spawn a new
@@ -8,11 +9,8 @@ import { localToday } from '#shared/utils/time'
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
-  const body = await readBody<Record<string, unknown>>(event)
-  if (body?.id == null) {
-    throw createError({ statusCode: 400, message: 'Missing vial id' })
-  }
-  const openedDate = (body.opened_date as string) || localToday()
+  const body = await readValidatedJson(event, zVialOpen)
+  const openedDate = body.opened_date ?? localToday()
 
   const db = getDb(event)
   const row = await db.prepare('SELECT * FROM vials WHERE id = ?1').bind(body.id).first()
@@ -23,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Only sealed vials can be opened' })
   }
   const form = normalizeForm(row.form)
-  const bacWaterMl = isPillForm(form) ? null : ((body.bac_water_ml as number | null) ?? null)
+  const bacWaterMl = isPillForm(form) ? null : body.bac_water_ml
   const remainingQty = ((row.quantity as number | null) ?? 1) - 1
 
   const batchStatement = remainingQty > 0
