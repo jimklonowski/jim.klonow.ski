@@ -96,8 +96,12 @@
           <span
             class="text-right whitespace-nowrap"
             :class="hrClass(w.avg_hr)"
+            :title="hrZone(w.avg_hr) ?? undefined"
           >{{ w.avg_hr != null ? `♥ ${w.avg_hr}` : w.max_hr != null ? '♥ —' : ''
           }}<span
+            v-if="hrZone(w.avg_hr)"
+            class="sr-only"
+          > ({{ hrZone(w.avg_hr) }})</span><span
             v-if="w.max_hr != null"
             class="text-muted"
           >/{{ w.max_hr }}</span></span>
@@ -266,5 +270,17 @@ function hrClass(hr: number | null) {
   if (hr > 180) return 'text-danger'
   if (hr > 150) return 'text-[#e8834b]'
   return 'text-dim'
+}
+
+/**
+ * The word form of hrClass's colour. The zone was carried by colour alone, which is nothing to a
+ * screen reader and little to a red/green-deficient eye — this rides along as a tooltip and as
+ * sr-only text, so the dense row keeps its look.
+ */
+function hrZone(hr: number | null): string | null {
+  if (hr == null) return null
+  if (hr > 180) return 'peak zone'
+  if (hr > 150) return 'hard zone'
+  return null
 }
 </script>

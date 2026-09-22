@@ -82,7 +82,9 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: false })
-useSeoMeta({ title: () => 'Labs · Sign In' })
+// One of only two pages a signed-out visitor can reach, so it's the one place a crawler could
+// actually index — and a sign-in form is nothing anyone should find in search results.
+useSeoMeta({ title: () => 'Labs · Sign In', robots: 'noindex, nofollow' })
 
 const form = reactive({ password: '' })
 const loading = ref(false)

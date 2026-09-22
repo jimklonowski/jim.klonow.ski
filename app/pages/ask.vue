@@ -133,13 +133,21 @@ const spinnerFrame = ref(SPINNER_FRAMES[0])
 const thinkingSeconds = ref(0)
 let thinkingTimer: ReturnType<typeof setInterval> | undefined
 
+// The braille spinner is driven by a timer, so the global prefers-reduced-motion rule in
+// main.css (which only stops CSS animation) can't reach it — check the preference here.
+const reducedMotion = usePreferredReducedMotion()
+
 function startThinking() {
   const startedAt = Date.now()
   thinkingSeconds.value = 0
   let frame = 0
   thinkingTimer = setInterval(() => {
-    frame = (frame + 1) % SPINNER_FRAMES.length
-    spinnerFrame.value = SPINNER_FRAMES[frame]
+    // Under reduced motion the glyph holds still and the elapsed count keeps ticking — that
+    // was the part carrying the information anyway.
+    if (reducedMotion.value !== 'reduce') {
+      frame = (frame + 1) % SPINNER_FRAMES.length
+      spinnerFrame.value = SPINNER_FRAMES[frame]
+    }
     thinkingSeconds.value = Math.floor((Date.now() - startedAt) / 1000)
   }, 100)
 }

@@ -502,6 +502,7 @@
             type="button"
             class="tui-btn"
             :class="uploadCategory === c.value ? 'tui-btn-accent' : ''"
+            :aria-pressed="uploadCategory === c.value"
             @click="uploadCategory = c.value"
           >
             {{ c.label }}
@@ -531,9 +532,11 @@
               class="flex items-center gap-4 w-full"
               @click.stop
             >
+              <!-- Decorative: the date field beside it is the content. -->
               <img
                 v-if="pendingPreviewUrl"
                 :src="pendingPreviewUrl"
+                alt=""
                 class="w-24 h-24 object-cover border border-line"
               >
               <div class="flex-1 space-y-2">
@@ -594,12 +597,21 @@
                 :key="photo.id"
                 class="relative group"
               >
-                <img
-                  :src="photo.thumbUrl ?? photo.url"
-                  loading="lazy"
-                  class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
+                <!-- A button, not a click handler on the image: opening the lightbox has to be
+                     reachable by keyboard and announced as an action. -->
+                <button
+                  type="button"
+                  class="block"
+                  :aria-label="`Enlarge the ${photoCategoryLabel(photo.category)} photo`"
                   @click="lightboxPhoto = photo"
                 >
+                  <img
+                    :src="photo.thumbUrl ?? photo.url"
+                    alt=""
+                    loading="lazy"
+                    class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
+                  >
+                </button>
                 <button
                   v-if="isOwner"
                   type="button"
@@ -689,6 +701,7 @@
         <img
           v-if="lightboxPhoto"
           :src="lightboxPhoto.url"
+          :alt="`${photoCategoryLabel(lightboxPhoto.category)} progress photo, ${dateParam}`"
           class="w-full h-auto"
         >
       </template>

@@ -69,6 +69,7 @@
             :class="bacWaterMl === ml
               ? 'bg-nav-active border-line-accent text-accent'
               : 'border-line-soft text-faint hover:text-accent hover:border-line-accent'"
+            :aria-pressed="bacWaterMl === ml"
             @click="bacWaterMl = ml"
           >
             {{ ml }} mL

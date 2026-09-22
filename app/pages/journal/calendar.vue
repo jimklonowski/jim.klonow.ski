@@ -151,6 +151,7 @@
             type="button"
             class="cursor-pointer uppercase tracking-[0.12em]"
             :class="zoom === opt.value ? 'text-accent' : 'text-faint hover:text-accent'"
+            :aria-pressed="zoom === opt.value"
             @click="zoom = opt.value"
           >{{ zoom === opt.value ? `[${opt.label}]` : opt.label }}</button>
         </span>

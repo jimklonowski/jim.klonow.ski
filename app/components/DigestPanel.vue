@@ -22,6 +22,7 @@
                 type="button"
                 class="cursor-pointer uppercase tracking-[0.12em]"
                 :class="filter === opt.value ? 'text-accent' : 'text-faint hover:text-accent'"
+                :aria-pressed="filter === opt.value"
                 @click="filter = opt.value"
               >{{ filter === opt.value ? `[${opt.label}]` : opt.label }}</button>
             </span>

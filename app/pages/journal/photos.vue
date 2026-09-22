@@ -76,8 +76,10 @@
               @click.stop
             >
               <div class="flex items-center gap-2.5 w-full">
+                <!-- Decorative: the filename and date inputs beside it carry the information. -->
                 <img
                   :src="previewUrlFor(file)"
+                  alt=""
                   class="w-12 h-12 object-cover shrink-0 border border-line-soft"
                 >
                 <div class="flex-1 grid grid-cols-2 gap-2">
@@ -163,6 +165,7 @@
           :class="category === c.value
             ? 'bg-nav-active text-accent'
             : 'bg-bg text-[#6b8578] hover:text-accent'"
+          :aria-pressed="category === c.value"
           @click="category = c.value"
         >
           {{ c.label }} <span class="text-faint">{{ countByCategory[c.value] ?? 0 }}</span>
@@ -269,17 +272,22 @@
             class="grid grid-cols-2 gap-2.5 max-w-[calc(130vh+0.625rem)] mx-auto"
           >
             <div>
-              <div
+              <!-- A button, not a div: this opens the lightbox, so it has to be reachable by
+                   keyboard and announced as an action. -->
+              <button
                 v-if="beforePhoto"
-                class="w-full aspect-square border border-line-soft overflow-hidden cursor-zoom-in"
+                type="button"
+                class="block w-full aspect-square border border-line-soft overflow-hidden cursor-zoom-in"
+                :aria-label="`Enlarge the before photo from ${formatDate(beforePhoto.date)}`"
                 @click="lightboxPhoto = beforePhoto"
               >
                 <img
                   :src="beforePhoto.url"
+                  alt=""
                   class="w-full h-full object-cover"
                   :style="frameStyle(beforePhoto)"
                 >
-              </div>
+              </button>
               <div
                 v-else
                 class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-[12px] text-muted"
@@ -291,17 +299,20 @@
               </p>
             </div>
             <div>
-              <div
+              <button
                 v-if="afterPhoto"
-                class="w-full aspect-square border border-line-soft overflow-hidden cursor-zoom-in"
+                type="button"
+                class="block w-full aspect-square border border-line-soft overflow-hidden cursor-zoom-in"
+                :aria-label="`Enlarge the after photo from ${formatDate(afterPhoto.date)}`"
                 @click="lightboxPhoto = afterPhoto"
               >
                 <img
                   :src="afterPhoto.url"
+                  alt=""
                   class="w-full h-full object-cover"
                   :style="frameStyle(afterPhoto)"
                 >
-              </div>
+              </button>
               <div
                 v-else
                 class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-[12px] text-muted"
@@ -364,8 +375,10 @@
               :title="opt.label"
               @click="pickPhoto(opt.value)"
             >
+              <!-- Decorative: the wrapping button's title/label names the photo. -->
               <img
                 :src="opt.photo.thumbUrl ?? opt.photo.url"
+                alt=""
                 loading="lazy"
                 class="w-15 h-15 object-cover"
                 :style="frameStyle(opt.photo)"
@@ -395,6 +408,7 @@
         <img
           v-if="lightboxPhoto"
           :src="lightboxPhoto.url"
+          :alt="`${photoCategoryLabel(lightboxPhoto.category)} progress photo, ${formatDate(lightboxPhoto.date)}`"
           class="w-full h-auto"
         >
       </template>
@@ -464,9 +478,12 @@
             @pointerup="onReframePointerUp"
             @pointercancel="onReframePointerUp"
           >
+            <!-- Decorative: this is the canvas the reframe controls act on, and the modal title
+                 already names the photo. -->
             <img
               v-if="reframingPhoto"
               :src="reframingPhoto.url"
+              alt=""
               class="absolute inset-0 w-full h-full object-cover pointer-events-none"
               :style="{ transform: `translate(${reframeForm.offsetX}%, ${reframeForm.offsetY}%) scale(${reframeForm.scale})` }"
               draggable="false"

@@ -357,6 +357,4 @@ function asleepMinutes(params: Array<{ seriesName?: string, value?: number | str
     .filter(p => p.seriesName !== 'awake')
     .reduce((sum, p) => sum + Number(p.value ?? 0), 0)
 }
-
-useSeoMeta({ title: 'Journal · Trends' })
 </script>

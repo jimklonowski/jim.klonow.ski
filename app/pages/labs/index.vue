@@ -121,6 +121,7 @@
           :class="activeCategory === cat.key
             ? 'bg-nav-active text-accent'
             : 'bg-bg text-[#6b8578] hover:text-accent'"
+          :aria-pressed="activeCategory === cat.key"
           @click="activeCategory = cat.key"
         >
           {{ cat.short }} <span class="text-faint">{{ cat.count }}</span>
