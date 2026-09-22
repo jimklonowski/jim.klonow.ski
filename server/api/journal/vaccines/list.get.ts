@@ -1,11 +1,13 @@
 import type { Vaccination } from '#shared/utils/vaccines'
 
 // Readable by every authenticated role — an immunization record is exactly the history a
-// doctor viewer wants, same policy as the supplement stack. Demo gets an empty list rather
-// than a query: the sandbox DB has no vaccinations table and the persona has no shots.
+// doctor viewer wants, same policy as the supplement stack.
+//
+// Demo used to short-circuit to an empty list because the sandbox had neither the table nor any
+// shots; it now has both (scripts/demo/generate-demo-data.mjs), so it reads the sandbox like any
+// other role. The catch below still covers a sandbox that hasn't had schema.sql applied yet.
 export default defineEventHandler(async (event): Promise<Vaccination[]> => {
-  const auth = requireLabsAuth(event)
-  if (auth.role === 'demo') return []
+  requireLabsAuth(event)
 
   const db = getDb(event)
   try {

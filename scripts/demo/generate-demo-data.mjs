@@ -549,6 +549,28 @@ for (const [o, phase] of [[420, 0], [40, 1]]) {
   photoRows.push([D(o), 'face', `demo/face-${phase + 1}.svg`, null, `${D(o)}T09:30:00`, `${D(o)}T14:00:00Z`, 0, 0, 1])
 }
 
+// --- vaccinations ---------------------------------------------------------------------------
+
+// Names match KNOWN_VACCINES in shared/utils/vaccines.ts so the coverage table resolves each to
+// a family and works out "next due". Deliberately includes an overdue tetanus (10-year interval,
+// last dose ~4.3 years ago reads as covered) and two flu/COVID seasons, so the page shows both
+// a current row and some history rather than a single lonely entry.
+const vaccinationRows = [
+  [D(24), 'Influenza (flu)', 'Flublok Quadrivalent', 'Pharmacy walk-in, left deltoid.', `${D(24)}T17:20:00.000Z`],
+  [D(24), 'COVID-19', 'Spikevax 2026-27', 'Same visit as the flu shot, opposite arm.', `${D(24)}T17:25:00.000Z`],
+  [D(389), 'Influenza (flu)', 'Fluzone Quadrivalent', null, `${D(389)}T16:05:00.000Z`],
+  [D(402), 'COVID-19', 'Comirnaty 2025-26', null, `${D(402)}T15:40:00.000Z`],
+  [D(1572), 'Tetanus (Td/Tdap)', 'Boostrix', 'Urgent care after a kitchen knife slip — due again in about six years.', `${D(1572)}T21:10:00.000Z`]
+]
+
+// --- profile --------------------------------------------------------------------------------
+
+// Wallet-card facts (PROFILE_FIELDS in shared/utils/profile.ts). Without a row the card on
+// /journal/vaccines renders empty for demo visitors, which reads as a broken feature.
+const profileRows = [
+  ['blood_type', 'O+', `${D(402)}T15:40:00.000Z`]
+]
+
 // --- Assemble ------------------------------------------------------------------------------
 
 const seed = {
@@ -599,6 +621,17 @@ const seed = {
       cols: ['date', 'category', 'r2_key', 'thumb_r2_key', 'taken_at', 'created_at', 'frame_offset_x', 'frame_offset_y', 'frame_scale'],
       jsonCols: [],
       rows: photoRows
+    },
+    // id is AUTOINCREMENT, so it is omitted and left to SQLite.
+    vaccinations: {
+      cols: ['date', 'vaccine', 'product', 'notes', 'created_at'],
+      jsonCols: [],
+      rows: vaccinationRows
+    },
+    profile: {
+      cols: ['key', 'value', 'updated_at'],
+      jsonCols: [],
+      rows: profileRows
     }
   }
 }
