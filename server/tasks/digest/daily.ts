@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- wrangler's Env is ambient, not importable
 /// <reference path="../../../worker-configuration.d.ts" />
 
 export default defineTask({

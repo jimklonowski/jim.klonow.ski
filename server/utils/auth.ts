@@ -155,3 +155,24 @@ export function requireUploadPin(event: H3Event) {
 export function newInviteToken(): string {
   return randomBytes(24).toString('base64url')
 }
+
+// --- Shared-secret compare ---
+
+/**
+ * Constant-time equality for presented credentials (owner password, upload PIN, webhook bearer).
+ * A plain `!==` returns at the first differing byte, which leaks how much of a guess was right;
+ * the rate limits on those routes make that impractical to exploit, but there is no reason to
+ * leak at all. Rejects non-strings and an unset expected value (an unconfigured secret must
+ * never compare equal to anything).
+ */
+export function safeEqual(given: unknown, expected: string | undefined | null): boolean {
+  if (typeof given !== 'string' || typeof expected !== 'string' || !expected) return false
+  const a = Buffer.from(given)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) {
+    // Still burn one comparison so the length mismatch isn't itself a timing tell.
+    timingSafeEqual(b, b)
+    return false
+  }
+  return timingSafeEqual(a, b)
+}

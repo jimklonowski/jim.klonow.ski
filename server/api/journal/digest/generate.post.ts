@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody<{ kind?: string, endDate?: string }>(event)
   const kind = body?.kind
   if (kind !== 'daily' && kind !== 'weekly') {
-    throw createError({ statusCode: 400, message: "kind must be 'daily' or 'weekly'" })
+    throw createError({ statusCode: 400, message: 'kind must be \'daily\' or \'weekly\'' })
   }
   if (body?.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(body.endDate)) {
     throw createError({ statusCode: 400, message: 'Invalid endDate' })

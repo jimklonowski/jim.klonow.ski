@@ -91,7 +91,7 @@ Guests never get a password: the owner mints **share links** (`/share/<token>`) 
 
 Enforcement is layered: `server/middleware/auth.ts` verifies the cookie once per request and gates page navigation, `shared/utils/access.ts` holds the role→page policy shared with the client route middleware, and every API handler asserts its own requirement (`requireLabsAuth` / `requireOwner` / `requireRole` in `server/utils/auth.ts`).
 
-The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token (falls back to `LABS_SECRET` until set).
+The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token — its own secret, never `LABS_SECRET`, so the iOS app never holds the cookie-signing key. The route fails closed when the token isn't configured. Every secret the Worker reads is listed in `.env.example`; set them in production with `wrangler secret put <NAME>`.
 
 ## Demo mode
 
