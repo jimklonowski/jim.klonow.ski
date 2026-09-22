@@ -371,14 +371,10 @@
 </template>
 
 <script setup lang="ts">
+import type { QualitativeResult } from '#shared/types/labs'
 import { BIOMARKERS } from '~/data/biomarkers'
 
 useSeoMeta({ title: () => 'Labs · Upload' })
-
-interface QualitativeResult {
-  name: string
-  result: string
-}
 
 interface LabResult {
   date: string

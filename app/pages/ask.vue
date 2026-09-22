@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-interface ChatMessage { role: 'user' | 'assistant', content: string }
+import type { AskMessage as ChatMessage } from '#shared/utils/askHistory'
 
 const SAMPLE_QUESTIONS = [
   'How has my BP trended since the test cut to 150mg/wk?',

@@ -305,6 +305,7 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays } from '#shared/utils/dates'
 import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
@@ -408,8 +409,7 @@ const latestSummary = computed(() => {
 
 const isRecentDraw = computed(() => {
   if (!latestSummary.value) return false
-  const days = (Date.now() - new Date(latestSummary.value.date + 'T00:00:00').getTime()) / 86400000
-  return days <= 7
+  return diffDays(latestSummary.value.date, localToday()) <= 7
 })
 
 // The regenerate endpoint is PIN-gated like uploads (403 when the labs-upload-auth session

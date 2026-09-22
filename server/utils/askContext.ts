@@ -5,32 +5,8 @@
 // questions can be answered without shipping 1,200 journal rows into the prompt.
 import { profileLabel } from '#shared/utils/profile'
 import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
-
-interface Dose { compound: string, dose: number, unit: string }
-interface SodaEntry { time?: string, drink?: string, size?: string | null }
-
-interface JournalRow {
-  date: string
-  weight_lbs: number | null
-  bp_systolic: number | null
-  bp_diastolic: number | null
-  rhr: number | null
-  hrv: number | null
-  peptides: Dose[]
-  sodas: SodaEntry[]
-  notes: string | null
-}
-
-function shiftDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
-function round(n: number, dp = 1): number {
-  const f = 10 ** dp
-  return Math.round(n * f) / f
-}
+import type { JournalRow, SodaEntry } from '#shared/types/journal'
+import { roundTo, shiftDays } from '#shared/utils/dates'
 
 function avg(vals: Array<number | null | undefined>): number | null {
   const nums = vals.filter((v): v is number => v != null && !Number.isNaN(v))
@@ -111,7 +87,7 @@ function compoundLines(journal: JournalRow[]): string[] {
   return [...map.entries()]
     .sort(([, a], [, b]) => b.last.localeCompare(a.last))
     .map(([name, v]) =>
-      `${name}: ${v.first} → ${v.last}, ${v.days.size} days, avg ${round(v.total / v.days.size, 2)}${v.unit}/day used`
+      `${name}: ${v.first} → ${v.last}, ${v.days.size} days, avg ${roundTo(v.total / v.days.size, 2)}${v.unit}/day used`
     )
 }
 
@@ -126,11 +102,11 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
     const wo = workouts.filter(e => (e.date as string) >= start && (e.date as string) <= end)
     if (!j.length && !h.length && !wo.length) continue
     const parts = [
-      avg(j.map(e => e.weight_lbs)) != null ? `weight ${round(avg(j.map(e => e.weight_lbs))!)}` : null,
-      avg(j.map(e => e.rhr)) != null ? `rhr ${round(avg(j.map(e => e.rhr))!)}` : null,
-      avg(j.map(e => e.hrv)) != null ? `hrv ${round(avg(j.map(e => e.hrv))!)}` : null,
+      avg(j.map(e => e.weight_lbs)) != null ? `weight ${roundTo(avg(j.map(e => e.weight_lbs))!)}` : null,
+      avg(j.map(e => e.rhr)) != null ? `rhr ${roundTo(avg(j.map(e => e.rhr))!)}` : null,
+      avg(j.map(e => e.hrv)) != null ? `hrv ${roundTo(avg(j.map(e => e.hrv))!)}` : null,
       avg(j.map(e => e.bp_systolic)) != null ? `bp ${Math.round(avg(j.map(e => e.bp_systolic))!)}/${Math.round(avg(j.map(e => e.bp_diastolic))! || 0)}` : null,
-      avg(h.map(e => e.recovery_score as number | null)) != null ? `recovery ${round(avg(h.map(e => e.recovery_score as number | null))!)}%` : null,
+      avg(h.map(e => e.recovery_score as number | null)) != null ? `recovery ${roundTo(avg(h.map(e => e.recovery_score as number | null))!)}%` : null,
       avg(h.map(e => e.sleep_total_min as number | null)) != null ? `sleep ${Math.round(avg(h.map(e => e.sleep_total_min as number | null))!)}min` : null,
       `${wo.length} workouts`,
       sodaText(j.flatMap(e => e.sodas ?? []), 'sodas')

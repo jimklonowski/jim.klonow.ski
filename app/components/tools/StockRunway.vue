@@ -97,9 +97,11 @@
 import { getCompoundColor } from '~/data/journal'
 import type { Vial, JournalEntry } from '~/data/journal'
 import { computeRemaining, estimateDailyRate } from '~/utils/vialInventory'
-import { convertUnitFor, type MixUnit } from '~/utils/peptideCalc'
+import { convertUnitFor } from '~/utils/peptideCalc'
+import type { DoseUnit } from '#shared/types/journal'
 import { containerNoun } from '#shared/utils/vialForm'
-import { relevantCycle, cycleStatusOn, shiftDays, tentativeStartLabel } from '#shared/utils/cycles'
+import { relevantCycle, cycleStatusOn, tentativeStartLabel } from '#shared/utils/cycles'
+import { shiftDays } from '#shared/utils/dates'
 import { cycleCoverage, type CycleCoverage } from '#shared/utils/stockRunway'
 
 const props = defineProps<{
@@ -114,7 +116,7 @@ const { data: cyclesData } = await useCycles()
 // vials in another unit bridge through convertUnitFor and unconvertible ones are skipped
 // rather than silently miscounted.
 const stockByCompound = computed(() => {
-  const map = new Map<string, { unit: MixUnit, total: number, repVial: Vial }>()
+  const map = new Map<string, { unit: DoseUnit, total: number, repVial: Vial }>()
   for (const vial of props.vials) {
     if (vial.status === 'finished') continue
     const amount = vial.status === 'active'
@@ -122,10 +124,10 @@ const stockByCompound = computed(() => {
       : vial.vial_amount * (vial.quantity ?? 1)
     const existing = map.get(vial.compound)
     if (!existing) {
-      map.set(vial.compound, { unit: vial.vial_unit as MixUnit, total: amount, repVial: vial })
+      map.set(vial.compound, { unit: vial.vial_unit, total: amount, repVial: vial })
       continue
     }
-    const converted = convertUnitFor(vial.compound, amount, vial.vial_unit as MixUnit, existing.unit)
+    const converted = convertUnitFor(vial.compound, amount, vial.vial_unit, existing.unit)
     if (converted != null) existing.total += converted
   }
   return map
@@ -140,7 +142,7 @@ const cycle = computed(() => {
 const cycleStatus = computed(() => cycle.value ? cycleStatusOn(cycle.value, props.today) : null)
 const tentativeStart = computed(() => cycle.value ? tentativeStartLabel(cycle.value) : null)
 
-function onHandIn(compound: string, unit: MixUnit): number | null {
+function onHandIn(compound: string, unit: DoseUnit): number | null {
   const stock = stockByCompound.value.get(compound)
   if (!stock) return null
   return convertUnitFor(compound, stock.total, stock.unit, unit)
@@ -164,7 +166,7 @@ function typicalContainer(compound: string): { size: number, form: Vial['form'] 
   return [...counts.values()].sort((a, b) => b.n - a.n)[0] ?? null
 }
 
-function unitLabel(unit: MixUnit): string {
+function unitLabel(unit: DoseUnit): string {
   return unit === 'iu' ? 'IU' : unit
 }
 
@@ -191,7 +193,7 @@ const runwayRows = computed(() =>
     .map(([compound, stock]) => {
       const { dailyAmount, basis } = estimateDailyRate(stock.repVial, props.entries, props.today)
       const converted = dailyAmount != null
-        ? convertUnitFor(compound, dailyAmount, stock.repVial.vial_unit as MixUnit, stock.unit)
+        ? convertUnitFor(compound, dailyAmount, stock.repVial.vial_unit, stock.unit)
         : null
       if (!converted || converted <= 0 || stock.total <= 0) return null
       const days = stock.total / converted

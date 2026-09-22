@@ -1,7 +1,9 @@
-import { convertUnitFor, type MixUnit } from './peptideCalc'
+import { convertUnitFor } from './peptideCalc'
+import type { DoseUnit } from '#shared/types/journal'
 import { getCompoundInfo } from '~/data/compoundInfo'
 import type { JournalEntry, Vial } from '~/data/journal'
 import type { VialForm } from '#shared/utils/vialForm'
+import { diffDays, shiftDays } from '#shared/utils/dates'
 
 // Starting point for the add-stock form's Form picker: compoundInfo knows which compounds are
 // orals (an "(Oral)" category or an "Oral…" timing note), and a capsule mention wins over
@@ -40,17 +42,6 @@ export interface VialProjection {
   runOutDate: string | null
 }
 
-function daysBetween(a: string, b: string): number {
-  const ms = new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()
-  return Math.round(ms / 86400000)
-}
-
-function addDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00')
-  d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
 export function roundAmount(n: number): number {
   return Math.round(n * 1000) / 1000
 }
@@ -60,13 +51,13 @@ export function roundAmount(n: number): number {
 // deplete from IU doses); doses in a unit that still can't convert are skipped.
 export function computeUsedAmount(vial: Vial, entries: JournalEntry[]): number {
   if (!vial.opened_date) return 0
-  const vialUnit = vial.vial_unit as MixUnit
+  const vialUnit = vial.vial_unit
   let total = 0
   for (const e of entries) {
     if (e.date < vial.opened_date) continue
     for (const p of e.peptides ?? []) {
       if (p.compound !== vial.compound) continue
-      const converted = convertUnitFor(vial.compound, p.dose, p.unit as MixUnit, vialUnit)
+      const converted = convertUnitFor(vial.compound, p.dose, p.unit, vialUnit)
       if (converted != null) total += converted
     }
   }
@@ -82,7 +73,7 @@ export function computeRemaining(vial: Vial, entries: JournalEntry[]) {
 
 // Best-effort per-day dose from compoundInfo when there isn't enough logged history.
 // Parses the typical dose range (midpoint) and frequency into an amount in `targetUnit`.
-function typicalDailyAmount(compound: string, targetUnit: MixUnit): number | null {
+function typicalDailyAmount(compound: string, targetUnit: DoseUnit): number | null {
   const info = getCompoundInfo(compound)
   if (!info) return null
 
@@ -91,7 +82,7 @@ function typicalDailyAmount(compound: string, targetUnit: MixUnit): number | nul
   const lo = parseFloat(m[1]!)
   const hi = m[2] ? parseFloat(m[2]) : lo
   const mid = (lo + hi) / 2
-  const unit = m[3]!.toLowerCase() as MixUnit
+  const unit = m[3]!.toLowerCase() as DoseUnit
 
   const perDose = convertUnitFor(compound, mid, unit, targetUnit)
   if (perDose == null) return null
@@ -117,15 +108,15 @@ export function estimateDailyRate(
   entries: JournalEntry[],
   today: string
 ): { dailyAmount: number | null, basis: RateBasis } {
-  const vialUnit = vial.vial_unit as MixUnit
-  const windowStart = addDays(today, -RATE_WINDOW_DAYS)
+  const vialUnit = vial.vial_unit
+  const windowStart = shiftDays(today, -RATE_WINDOW_DAYS)
 
   const inWindow: { date: string, amount: number }[] = []
   for (const e of entries) {
     if (e.date < windowStart || e.date > today) continue
     for (const p of e.peptides ?? []) {
       if (p.compound !== vial.compound) continue
-      const converted = convertUnitFor(vial.compound, p.dose, p.unit as MixUnit, vialUnit)
+      const converted = convertUnitFor(vial.compound, p.dose, p.unit, vialUnit)
       if (converted != null) inWindow.push({ date: e.date, amount: converted })
     }
   }
@@ -133,7 +124,7 @@ export function estimateDailyRate(
   const doseDates = [...new Set(inWindow.map(d => d.date))].sort()
   if (doseDates.length >= MIN_HISTORY_DOSE_DAYS) {
     const total = inWindow.reduce((s, d) => s + d.amount, 0)
-    const span = Math.max(1, daysBetween(doseDates[0]!, today) + 1)
+    const span = Math.max(1, diffDays(doseDates[0]!, today) + 1)
     return { dailyAmount: total / span, basis: 'history' }
   }
 
@@ -150,7 +141,7 @@ export function projectVial(vial: Vial, entries: JournalEntry[], today: string):
   let runOutDate: string | null = null
   if (dailyAmount && dailyAmount > 0) {
     daysLeft = remaining / dailyAmount
-    runOutDate = addDays(today, Math.max(0, Math.ceil(daysLeft)))
+    runOutDate = shiftDays(today, Math.max(0, Math.ceil(daysLeft)))
   }
 
   return { used, remaining, pct, dailyAmount, basis, daysLeft, runOutDate }
@@ -158,11 +149,11 @@ export function projectVial(vial: Vial, entries: JournalEntry[], today: string):
 
 export function isExpiringSoon(expiry: string | null | undefined, today: string, withinDays = 30): boolean {
   if (!expiry) return false
-  const d = daysBetween(today, expiry)
+  const d = diffDays(today, expiry)
   return d >= 0 && d <= withinDays
 }
 
 export function isExpired(expiry: string | null | undefined, today: string): boolean {
   if (!expiry) return false
-  return daysBetween(today, expiry) < 0
+  return diffDays(today, expiry) < 0
 }

@@ -540,6 +540,7 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays } from '#shared/utils/dates'
 import exifr from 'exifr'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
@@ -781,9 +782,7 @@ const compareMeta = computed(() => {
   const a = afterPhoto.value
   if (!b || !a) return 'pick two photos'
   const style = b.date.slice(0, 4) === a.date.slice(0, 4) ? 'monthDay' : 'short'
-  const days = Math.abs(Math.round(
-    (new Date(a.date + 'T12:00:00').getTime() - new Date(b.date + 'T12:00:00').getTime()) / 86400000
-  ))
+  const days = Math.abs(diffDays(b.date, a.date))
   return `${formatDate(b.date, style)} → ${formatDate(a.date, style)} · ${days}d apart`
 })
 

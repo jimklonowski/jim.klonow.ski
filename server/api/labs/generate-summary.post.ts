@@ -1,5 +1,6 @@
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { PK_MODELS, drawTiming, pkDosesFor } from '#shared/utils/pk'
+import { shiftDays } from '#shared/utils/dates'
 
 interface LabsRow {
   date: string
@@ -16,12 +17,6 @@ const MAX_PRIOR_DRAWS = 6
 const PROTOCOL_LOOKBACK_DAYS = 120
 const CURRENT_PROTOCOL_DAYS = 21
 
-function addDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
 // Protocol context lines for the prompt: per-compound dosing facts and stop/adjust events near
 // the draw — so the model can attribute marker shifts (e.g. testosterone -> more erythropoiesis
 // -> ferritin drawdown) instead of reading trends in a vacuum.
@@ -31,7 +26,7 @@ function addDays(date: string, n: number): string {
 // detector's CLUSTERED start events (starts within 14 days share the earliest date), and the
 // model fused them into "six dose-days into Testosterone Cypionate started <the HGH date>".
 async function protocolContext(db: D1Database, date: string): Promise<string[]> {
-  const windowStart = addDays(date, -PROTOCOL_LOOKBACK_DAYS)
+  const windowStart = shiftDays(date, -PROTOCOL_LOOKBACK_DAYS)
   const { results } = await db.prepare(
     'SELECT date, peptides FROM journal_entries WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC'
   ).bind(windowStart, date).all()
@@ -56,7 +51,7 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
     }
   }
 
-  const recentCutoff = addDays(date, -CURRENT_PROTOCOL_DAYS)
+  const recentCutoff = shiftDays(date, -CURRENT_PROTOCOL_DAYS)
   const active = [...doseDates.entries()]
     .map(([compound, dates]) => ({ compound, dates, recent: dates.filter(d => d >= recentCutoff).length }))
     .filter(c => c.recent > 0)
@@ -69,7 +64,7 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
       const first = dates[0]!
       // Dosing that reaches back to the edge of the queried window started before it —
       // don't present the window edge as a start date.
-      const since = first <= addDays(windowStart, 1)
+      const since = first <= shiftDays(windowStart, 1)
         ? `ongoing since before ${windowStart} (edge of available data)`
         : `first logged dose ${first}`
       lines.push(`- ${compound}: dosed ${recent} of the last ${CURRENT_PROTOCOL_DAYS} days, ${dates.length} dose-days in the last ${PROTOCOL_LOOKBACK_DAYS} days; ${since}`)

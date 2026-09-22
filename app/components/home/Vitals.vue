@@ -36,7 +36,7 @@
 
 <script setup lang="ts">
 import type { JournalEntry } from '~/data/journal'
-import type { HealthMetricsEntry } from '~/composables/useHealthMetricsEntries'
+import type { HealthMetricsEntry } from '#shared/types/journal'
 
 const props = defineProps<{
   /** Journal entries, oldest first. */

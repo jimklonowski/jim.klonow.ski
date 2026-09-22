@@ -124,7 +124,7 @@
           Draw to
         </p>
         <p class="num-display text-accent text-[44px] leading-none mt-1.5 whitespace-nowrap">
-          {{ round(unitsNeeded, 1) }}<span class="text-[11px] text-muted ml-1.5 tracking-[0.12em] uppercase">units</span>
+          {{ roundTo(unitsNeeded, 1) }}<span class="text-[11px] text-muted ml-1.5 tracking-[0.12em] uppercase">units</span>
         </p>
         <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
           on a u-100 insulin syringe
@@ -136,7 +136,7 @@
           Volume
         </p>
         <p class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap">
-          {{ round(unitsNeeded / 100, 3) }}<span class="text-[10.5px] text-muted ml-1">mL</span>
+          {{ roundTo(unitsNeeded / 100, 3) }}<span class="text-[10.5px] text-muted ml-1">mL</span>
         </p>
         <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
           {{ doseSummary }}
@@ -148,7 +148,7 @@
           Concentration
         </p>
         <p class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap">
-          {{ concentration != null ? round(concentration, 3) : '—' }}<span class="text-[10.5px] text-muted ml-1">{{ vialUnit }}/mL</span>
+          {{ concentration != null ? roundTo(concentration, 3) : '—' }}<span class="text-[10.5px] text-muted ml-1">{{ vialUnit }}/mL</span>
         </p>
         <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
           {{ mixSummary }}
@@ -227,7 +227,9 @@
 <script setup lang="ts">
 import { DOSE_UNITS } from '~/data/journal'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
-import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG, type MixUnit } from '~/utils/peptideCalc'
+import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG } from '~/utils/peptideCalc'
+import type { DoseUnit } from '#shared/types/journal'
+import { roundTo } from '#shared/utils/dates'
 
 useSeoMeta({ title: 'Tools · Calculator' })
 
@@ -240,16 +242,16 @@ function queryNumber(key: string, fallback: number) {
   return Number.isFinite(val) && val > 0 ? val : fallback
 }
 
-function queryUnit(key: string, fallback: MixUnit) {
+function queryUnit(key: string, fallback: DoseUnit) {
   const val = route.query[key]
   return (val === 'mg' || val === 'mcg' || val === 'iu') ? val : fallback
 }
 
 const vialAmount = ref(queryNumber('vialAmount', 10))
-const vialUnit = ref<MixUnit>(queryUnit('vialUnit', 'mg'))
+const vialUnit = ref<DoseUnit>(queryUnit('vialUnit', 'mg'))
 const bacWaterMl = ref(queryNumber('bacWaterMl', 2))
 const dose = ref(queryNumber('dose', 250))
-const doseUnit = ref<MixUnit>(queryUnit('doseUnit', 'mcg'))
+const doseUnit = ref<DoseUnit>(queryUnit('doseUnit', 'mcg'))
 
 // Compound context arrives from a dossier's "calculator →" link. For compounds with a known
 // IU↔mass factor (IU_PER_MG) it unlocks mixed-unit math — an HGH mix is labeled in mg but
@@ -260,7 +262,7 @@ const bridgeFactor = computed(() => IU_PER_MG[compound.value] ?? null)
 const concentration = computed(() => calcConcentration(vialAmount.value, bacWaterMl.value))
 
 const mismatchedUnits = computed(() => {
-  const massBased = (u: MixUnit) => u === 'mg' || u === 'mcg'
+  const massBased = (u: DoseUnit) => u === 'mg' || u === 'mcg'
   return massBased(vialUnit.value) !== massBased(doseUnit.value)
 })
 
@@ -292,14 +294,9 @@ const referenceTable = computed(() => {
     const doseValue = calcDoseForUnits(units, vialAmount.value, vialUnit.value, bacWaterMl.value, doseUnit.value, compound.value || undefined)
     return {
       units,
-      ml: round(units / 100, 2),
-      dose: doseValue != null ? round(doseValue, 2) : null
+      ml: roundTo(units / 100, 2),
+      dose: doseValue != null ? roundTo(doseValue, 2) : null
     }
   })
 })
-
-function round(n: number, decimals: number) {
-  const factor = 10 ** decimals
-  return Math.round(n * factor) / factor
-}
 </script>

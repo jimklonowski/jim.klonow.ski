@@ -8,9 +8,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   checkpointStates, cycleEnd, cycleProgress, cycleRules, cycleStatusOn,
-  diffDays, durationLabel, isTentative, itemWindow, mergeRules, periodLabel, plannedDoses, plannedEnd,
-  relevantCycle, shiftDays, startAnchor, tentativeStartLabel
+  durationLabel, isTentative, itemWindow, mergeRules, periodLabel, plannedDoses, plannedEnd,
+  relevantCycle, startAnchor, tentativeStartLabel
 } from '../shared/utils/cycles.ts'
+import { shiftDays } from '../shared/utils/dates.ts'
 
 // 2026-09-14 is a Monday.
 const primo = { compound: 'Methenolone Enanthate', dose: 200, unit: 'mg', weekdays: [1, 4], fromWeek: 1, toWeek: null }
@@ -27,14 +28,6 @@ function run(overrides = {}) {
     ...overrides
   }
 }
-
-test('date helpers', () => {
-  assert.equal(shiftDays('2026-09-14', 7), '2026-09-21')
-  assert.equal(shiftDays('2026-03-01', -1), '2026-02-28')
-  assert.equal(diffDays('2026-09-14', '2026-09-21'), 7)
-  // Spans the US spring-forward DST change — noon anchoring keeps it whole days.
-  assert.equal(diffDays('2026-03-07', '2026-03-09'), 2)
-})
 
 test('cycle end and status derive from dates', () => {
   const c = run()

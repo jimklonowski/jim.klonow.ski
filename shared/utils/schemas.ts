@@ -14,6 +14,7 @@
 //     retired field keeps working.
 import { z } from 'zod'
 import { isIsoDate } from './time.ts'
+import { DOSE_UNIT_VALUES } from '../types/journal.ts'
 
 /** A real YYYY-MM-DD calendar day (rejects 2026-13-40, which `new Date()` would roll forward). */
 export const zIsoDate = z.string().refine(isIsoDate, 'expected a YYYY-MM-DD date')
@@ -50,7 +51,7 @@ const zOptDate = zIsoDate.or(z.literal('')).nullish().transform(v => v || null)
 
 // Dose units are stored lowercase; the picker has always sent lowercase, but a hand-edited or
 // imported row can carry "IU", and rejecting that would block re-saving a day that already exists.
-const zDoseUnit = z.string().transform(s => s.toLowerCase()).pipe(z.enum(['mg', 'mcg', 'iu']))
+const zDoseUnit = z.string().transform(s => s.toLowerCase()).pipe(z.enum(DOSE_UNIT_VALUES))
 
 // --- journal day ---
 

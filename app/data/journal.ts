@@ -1,51 +1,11 @@
-import type { VialForm } from '#shared/utils/vialForm'
+import type { JournalEntry, SodaEntry, Vial } from '#shared/types/journal'
 
-export interface PeptideEntry {
-  time: string
-  compound: string
-  dose: number
-  unit: 'mg' | 'mcg' | 'iu'
-  site: string
-}
-
-export interface SodaEntry {
-  time: string
-  drink?: string
-  size?: string
-}
-
-export interface ReconstitutionEntry {
-  compound: string
-  vial_amount: number
-  vial_unit: 'mg' | 'mcg' | 'iu'
-  supplier?: string
-  bac_water_ml: number
-}
-
-export type VialStatus = 'sealed' | 'active' | 'finished'
-
-export interface Vial {
-  id?: number
-  compound: string
-  supplier?: string | null
-  /** Total content of ONE container — a pill bottle's unit_count × strength, never the per-pill dose. */
-  vial_amount: number
-  vial_unit: 'mg' | 'mcg' | 'iu'
-  /** vial (powder/oil/pen) or a pill bottle (tablet/capsule); see shared/utils/vialForm.ts. */
-  form: VialForm
-  /** Tablets/capsules per bottle; null for vials. */
-  unit_count?: number | null
-  /** Identical containers on hand (sealed batches); always 1 once opened. */
-  quantity: number
-  status: VialStatus
-  opened_date?: string | null
-  bac_water_ml?: number | null
-  lot?: string | null
-  expiry?: string | null
-  cost?: number | null
-  notes?: string | null
-  created_at?: string
-}
+// The row shapes live in shared/types/journal.ts (the server reads the same rows); re-exported
+// so the pages' existing `~/data/journal` imports keep working.
+export type {
+  DoseUnit, JournalEntry, PeptideEntry, ReconstitutionEntry, SodaEntry, Supplement,
+  SupplementCategory, SupplementStatus, Vial, VialStatus
+} from '#shared/types/journal'
 
 export function blankVial(compound = ''): Vial {
   return {
@@ -64,46 +24,6 @@ export function blankVial(compound = ''): Vial {
     cost: null,
     notes: ''
   }
-}
-
-// Standing vitamin/supplement/skin-routine stack — the regimen itself, not day-by-day dose
-// logs. 'on_hand' rows are owned but not being taken; 'stopped' rows are kept as history
-// (recent stops stay relevant to lab trends). Feeds the AI digest/lab-summary prompts via
-// server/utils/protocol.ts.
-export type SupplementCategory = 'supplement' | 'skin'
-export type SupplementStatus = 'active' | 'on_hand' | 'stopped'
-
-export interface Supplement {
-  id?: number
-  name: string
-  dose?: string | null
-  category: SupplementCategory
-  status: SupplementStatus
-  schedule: string
-  started?: string | null
-  stopped?: string | null
-  notes?: string | null
-  sort?: number
-  created_at?: string
-}
-
-export interface JournalEntry {
-  date: string
-  weight_lbs?: number | null
-  bp_systolic?: number | null
-  bp_diastolic?: number | null
-  rhr?: number | null
-  hrv?: number | null
-  peptides?: PeptideEntry[]
-  reconstitutions?: ReconstitutionEntry[]
-  food?: {
-    breakfast?: string
-    snack?: string
-    lunch?: string
-    dinner?: string
-  }
-  sodas?: SodaEntry[]
-  notes?: string
 }
 
 export const SODA_DRINKS = [

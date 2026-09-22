@@ -167,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LabsEntry } from '~/composables/useLabsEntries'
+import type { LabsEntry } from '#shared/types/labs'
 import { BIOMARKERS } from '~/data/biomarkers'
 import { drawFlags } from '#shared/utils/labsTimeline'
 

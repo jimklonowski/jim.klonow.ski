@@ -153,14 +153,15 @@
 
 <script setup lang="ts">
 import type { JournalEntry } from '~/data/journal'
-import type { LabsEntry } from '~/composables/useLabsEntries'
-import type { HealthMetricsEntry } from '~/composables/useHealthMetricsEntries'
+import type { LabsEntry } from '#shared/types/labs'
+import type { HealthMetricsEntry } from '#shared/types/journal'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { Cycle } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress,
-  cycleStatusOn, diffDays, doseLabelOf, relevantCycle, tentativeStartLabel
+  cycleStatusOn, doseLabelOf, relevantCycle, tentativeStartLabel
 } from '#shared/utils/cycles'
+import { diffDays } from '#shared/utils/dates'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 
 // The one-glance cycle strip for the home dashboard's protocol column. Three states:

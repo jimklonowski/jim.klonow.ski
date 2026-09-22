@@ -381,9 +381,9 @@ import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 import type { Cycle } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress,
-  cycleSpanDays, cycleStatusOn, diffDays, doseLabelOf, durationLabel, plannedDoses, shiftDays,
-  tentativeStartLabel
+  cycleSpanDays, cycleStatusOn, doseLabelOf, durationLabel, plannedDoses, tentativeStartLabel
 } from '#shared/utils/cycles'
+import { diffDays, shiftDays } from '#shared/utils/dates'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
 import type { AdherenceWeek } from '~/utils/adherence'

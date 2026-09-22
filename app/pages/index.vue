@@ -251,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays } from '#shared/utils/dates'
 import { isFullAccessRole } from '#shared/utils/access'
 import type { PeptideEntry } from '~/data/journal'
 
@@ -318,7 +319,7 @@ function workoutAge(w: typeof allWorkouts.value[number]): string | null {
   }
   // No usable start time: whole days from the entry date, and nothing for today's — under
   // the "LOGGED TODAY" header "today" would only restate the heading.
-  const days = Math.round((Date.parse(today) - Date.parse(w.date)) / 86400000)
+  const days = diffDays(w.date, today)
   return days < 1 ? null : `${days}d ago`
 }
 

@@ -2,26 +2,15 @@ import { mergeRules } from '#shared/utils/cycles'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
 import { localToday } from '#shared/utils/time'
+import { roundTo, shiftDays } from '#shared/utils/dates'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
+import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 
 // Personal-health digest generation. Gathers vitals / sleep / recovery / doses / workouts for a
 // period from D1, has Claude write a short plain-text recap, and upserts it into the digests table.
 // Shared by the scheduled tasks (digest:daily, digest:weekly) and the on-demand generate endpoint.
 
 export type DigestKind = 'daily' | 'weekly'
-
-interface Peptide { compound: string, dose: number, unit: string }
-
-function addDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
-function round(n: number, dp = 1): number {
-  const f = 10 ** dp
-  return Math.round(n * f) / f
-}
 
 function fmtDuration(min: number): string {
   const h = Math.floor(min / 60)
@@ -56,39 +45,11 @@ function doseDatesOf(entries: JournalRow[]): Map<string, Set<string>> {
   return map
 }
 
-interface SodaEntry { time?: string, drink?: string, size?: string }
-
-interface JournalRow {
-  date: string
-  weight_lbs: number | null
-  bp_systolic: number | null
-  bp_diastolic: number | null
-  rhr: number | null
-  hrv: number | null
-  peptides: Peptide[]
-  sodas: SodaEntry[]
-  notes: string | null
-}
-
-interface HealthRow {
-  date: string
-  recovery_score: number | null
-  strain: number | null
-  sleep_total_min: number | null
-  sleep_performance_pct: number | null
-  sleep_deep_min: number | null
-  sleep_rem_min: number | null
-  body_fat_pct: number | null
-  lean_body_mass_lbs: number | null
-}
-
-interface WorkoutRow {
-  date: string
-  workout_type: string | null
-  duration_min: number | null
-  calories: number | null
-  avg_hr: number | null
-}
+// The columns the digest reads (see the SELECTs below).
+type HealthRow = Pick<HealthMetricsEntry,
+  'date' | 'recovery_score' | 'strain' | 'sleep_total_min' | 'sleep_performance_pct'
+  | 'sleep_deep_min' | 'sleep_rem_min' | 'body_fat_pct' | 'lean_body_mass_lbs'>
+type WorkoutRow = Pick<WorkoutEntry, 'date' | 'workout_type' | 'duration_min' | 'calories' | 'avg_hr'>
 
 const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, notes'
 
@@ -206,7 +167,7 @@ function tallyDoses(entries: JournalRow[]) {
     }
   }
   return [...map.entries()]
-    .map(([compound, v]) => ({ compound, days: v.days.size, total: round(v.total, 2), unit: v.unit }))
+    .map(([compound, v]) => ({ compound, days: v.days.size, total: roundTo(v.total, 2), unit: v.unit }))
     .sort((a, b) => b.days - a.days)
 }
 
@@ -220,8 +181,8 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
     healthInRange(db, date, date),
     workoutsInRange(db, date, date),
     priorJournal(db, date),
-    journalInRange(db, addDays(date, -7), addDays(date, -1)),
-    healthInRange(db, addDays(date, -7), addDays(date, -1)),
+    journalInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
+    healthInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
     labDatesInRange(db, date, date)
   ])
   const entry = journal[0] ?? null
@@ -229,14 +190,14 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
 
   const lines: string[] = []
   if (entry?.weight_lbs != null) {
-    const delta = prev?.weight_lbs != null ? ` (${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${round(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDay(prev.date)})` : ''
+    const delta = prev?.weight_lbs != null ? ` (${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${roundTo(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDay(prev.date)})` : ''
     lines.push(`Weight: ${entry.weight_lbs} lbs${delta}`)
   }
   if (entry?.bp_systolic != null && entry?.bp_diastolic != null) lines.push(`Blood pressure: ${entry.bp_systolic}/${entry.bp_diastolic}`)
   if (entry?.rhr != null) lines.push(`Resting HR: ${entry.rhr} bpm`)
   if (entry?.hrv != null) lines.push(`HRV: ${entry.hrv} ms`)
   if (h?.recovery_score != null) lines.push(`Whoop recovery: ${h.recovery_score}%`)
-  if (h?.strain != null) lines.push(`Whoop strain: ${round(h.strain)}`)
+  if (h?.strain != null) lines.push(`Whoop strain: ${roundTo(h.strain)}`)
   if (h?.sleep_total_min != null) {
     const stages = [
       h.sleep_deep_min != null ? `${fmtDuration(h.sleep_deep_min)} deep` : null,
@@ -266,7 +227,7 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
     rhr: entry?.rhr ?? null,
     hrv: entry?.hrv ?? null,
     recovery: h?.recovery_score ?? null,
-    strain: h?.strain != null ? round(h.strain) : null,
+    strain: h?.strain != null ? roundTo(h.strain) : null,
     sleep_min: h?.sleep_total_min ?? null,
     doses: doses.length,
     workouts: workouts.length,
@@ -284,13 +245,13 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
 
   const base: string[] = []
   const bWeight = avg(baseJournal.map(e => e.weight_lbs!))
-  if (bWeight != null) base.push(`avg weight ${round(bWeight)} lbs`)
+  if (bWeight != null) base.push(`avg weight ${roundTo(bWeight)} lbs`)
   const bRhr = avg(baseJournal.map(e => e.rhr!))
-  if (bRhr != null) base.push(`avg resting HR ${round(bRhr)} bpm`)
+  if (bRhr != null) base.push(`avg resting HR ${roundTo(bRhr)} bpm`)
   const bHrv = avg(baseJournal.map(e => e.hrv!))
-  if (bHrv != null) base.push(`avg HRV ${round(bHrv)} ms`)
+  if (bHrv != null) base.push(`avg HRV ${roundTo(bHrv)} ms`)
   const bRec = avg(baseHealth.map(x => x.recovery_score!))
-  if (bRec != null) base.push(`avg recovery ${round(bRec)}%`)
+  if (bRec != null) base.push(`avg recovery ${roundTo(bRec)}%`)
   const bSleep = avg(baseHealth.map(x => x.sleep_total_min!))
   if (bSleep != null) base.push(`avg sleep ${fmtDuration(bSleep)}`)
   if (base.length) lines.push(`Prior 7 days, for comparison: ${base.join(', ')}`)
@@ -301,8 +262,8 @@ async function buildDaily(db: D1Database, date: string, rules: ProtocolRule[], t
 // --- Weekly ---
 
 async function buildWeekly(db: D1Database, start: string, end: string, rules: ProtocolRule[], today: string) {
-  const prevStart = addDays(start, -7)
-  const prevEnd = addDays(start, -1)
+  const prevStart = shiftDays(start, -7)
+  const prevEnd = shiftDays(start, -1)
   const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates] = await Promise.all([
     journalInRange(db, start, end),
     healthInRange(db, start, end),
@@ -318,12 +279,12 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   if (weights.length) {
     const first = weights[0]!
     const last = weights[weights.length - 1]!
-    lines.push(`Weight: ${last} lbs now (${last - first >= 0 ? '+' : ''}${round(last - first)} over the week), avg ${round(avg(weights)!)}, range ${Math.min(...weights)}–${Math.max(...weights)}`)
+    lines.push(`Weight: ${last} lbs now (${last - first >= 0 ? '+' : ''}${roundTo(last - first)} over the week), avg ${roundTo(avg(weights)!)}, range ${Math.min(...weights)}–${Math.max(...weights)}`)
   }
   const rhr = avg(journal.map(e => e.rhr!).filter(v => v != null))
-  if (rhr != null) lines.push(`Avg resting HR: ${round(rhr)} bpm`)
+  if (rhr != null) lines.push(`Avg resting HR: ${roundTo(rhr)} bpm`)
   const hrv = avg(journal.map(e => e.hrv!).filter(v => v != null))
-  if (hrv != null) lines.push(`Avg HRV: ${round(hrv)} ms`)
+  if (hrv != null) lines.push(`Avg HRV: ${roundTo(hrv)} ms`)
 
   const sysVals = journal.map(e => e.bp_systolic).filter((v): v is number => v != null)
   const diaVals = journal.map(e => e.bp_diastolic).filter((v): v is number => v != null)
@@ -334,9 +295,9 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   }
 
   const rec = avg(health.map(h => h.recovery_score!).filter(v => v != null))
-  if (rec != null) lines.push(`Avg Whoop recovery: ${round(rec)}%`)
+  if (rec != null) lines.push(`Avg Whoop recovery: ${roundTo(rec)}%`)
   const strain = avg(health.map(h => h.strain!).filter(v => v != null))
-  if (strain != null) lines.push(`Avg Whoop strain: ${round(strain)}`)
+  if (strain != null) lines.push(`Avg Whoop strain: ${roundTo(strain)}`)
   const sleep = avg(health.map(h => h.sleep_total_min!).filter(v => v != null))
   if (sleep != null) {
     const deep = avg(health.map(h => h.sleep_deep_min!))
@@ -352,8 +313,8 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   const lean = avg(health.map(h => h.lean_body_mass_lbs!))
   if (fat != null || lean != null) {
     const parts = [
-      fat != null ? `avg body fat ${round(fat)}%` : null,
-      lean != null ? `avg lean mass ${round(lean)} lbs` : null
+      fat != null ? `avg body fat ${roundTo(fat)}%` : null,
+      lean != null ? `avg lean mass ${roundTo(lean)} lbs` : null
     ].filter(Boolean)
     lines.push(`Body composition (scale): ${parts.join(', ')}`)
   }
@@ -371,7 +332,7 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   if (workouts.length) {
     const totalMin = workouts.reduce((s, w) => s + (w.duration_min ?? 0), 0)
     const totalCal = workouts.reduce((s, w) => s + (w.calories ?? 0), 0)
-    lines.push(`Workouts: ${workouts.length} sessions, ${round(totalMin)} min total${totalCal ? `, ${Math.round(totalCal)} kcal` : ''}`)
+    lines.push(`Workouts: ${workouts.length} sessions, ${roundTo(totalMin)} min total${totalCal ? `, ${Math.round(totalCal)} kcal` : ''}`)
   }
   else lines.push('Workouts: none')
 
@@ -386,18 +347,18 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
   // Previous-week baseline so "better/worse than a typical week" is grounded in numbers.
   const base: string[] = []
   const pRec = avg(prevHealth.map(h => h.recovery_score!))
-  if (pRec != null) base.push(`avg recovery ${round(pRec)}%`)
+  if (pRec != null) base.push(`avg recovery ${roundTo(pRec)}%`)
   const pSleep = avg(prevHealth.map(h => h.sleep_total_min!))
   if (pSleep != null) base.push(`avg sleep ${fmtDuration(pSleep)}/night`)
   const pRhr = avg(prevJournal.map(e => e.rhr!))
-  if (pRhr != null) base.push(`avg resting HR ${round(pRhr)} bpm`)
+  if (pRhr != null) base.push(`avg resting HR ${roundTo(pRhr)} bpm`)
   const pHrv = avg(prevJournal.map(e => e.hrv!))
-  if (pHrv != null) base.push(`avg HRV ${round(pHrv)} ms`)
+  if (pHrv != null) base.push(`avg HRV ${roundTo(pHrv)} ms`)
   const pSys = avg(prevJournal.map(e => e.bp_systolic!))
   const pDia = avg(prevJournal.map(e => e.bp_diastolic!))
   if (pSys != null && pDia != null) base.push(`avg BP ${Math.round(pSys)}/${Math.round(pDia)}`)
   const pWeights = prevJournal.map(e => e.weight_lbs).filter((v): v is number => v != null)
-  if (pWeights.length) base.push(`avg weight ${round(avg(pWeights)!)} lbs`)
+  if (pWeights.length) base.push(`avg weight ${roundTo(avg(pWeights)!)} lbs`)
   base.push(`${prevWorkouts.length} workout${prevWorkouts.length === 1 ? '' : 's'}`)
   const pSodas = sodaSummary(prevJournal)
   const pOz = fmtSodaOz(pSodas)
@@ -408,9 +369,9 @@ async function buildWeekly(db: D1Database, start: string, end: string, rules: Pr
 
   const stats = {
     weight_lbs: weights.at(-1) ?? null,
-    weight_change: weights.length >= 2 ? round(weights.at(-1)! - weights[0]!) : null,
-    avg_recovery: rec != null ? round(rec) : null,
-    avg_strain: strain != null ? round(strain) : null,
+    weight_change: weights.length >= 2 ? roundTo(weights.at(-1)! - weights[0]!) : null,
+    avg_recovery: rec != null ? roundTo(rec) : null,
+    avg_strain: strain != null ? roundTo(strain) : null,
     avg_sleep_min: sleep != null ? Math.round(sleep) : null,
     avg_bp_systolic: bpSys != null ? Math.round(bpSys) : null,
     avg_bp_diastolic: bpDia != null ? Math.round(bpDia) : null,
@@ -544,8 +505,8 @@ export async function generateDigest(
 ): Promise<DigestResult> {
   // Home-timezone yesterday: the crons fire mid-morning Central where UTC agrees, but an
   // on-demand regenerate after 7pm used to pick a period ending on the wrong day.
-  const end = endDate ?? addDays(localToday(), -1)
-  const start = kind === 'weekly' ? addDays(end, -6) : end
+  const end = endDate ?? shiftDays(localToday(), -1)
+  const start = kind === 'weekly' ? shiftDays(end, -6) : end
 
   // The effective dosing schedule — standing rules with any planned cycle merged in — and the
   // home-timezone "today", so the schedule check knows whether the period is still under way
@@ -564,7 +525,7 @@ export async function generateDigest(
   // Long-horizon context: protocol change-points and sustained metric shifts over the last
   // ~4 months, so the recap can connect a month of elevated RHR to the TRT start instead of
   // only seeing the period's own numbers.
-  const trendWindowStart = addDays(end, -119)
+  const trendWindowStart = shiftDays(end, -119)
   const [trendJournal, trendHealth] = await Promise.all([
     journalInRange(db, trendWindowStart, end),
     healthInRange(db, trendWindowStart, end)

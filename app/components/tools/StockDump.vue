@@ -211,32 +211,13 @@
 
 <script setup lang="ts">
 import { KNOWN_COMPOUNDS, DOSE_UNITS } from '~/data/journal'
-import { VIAL_FORMS, isPillForm, pillNoun, pillStrength, pillTotal, type VialForm } from '#shared/utils/vialForm'
-
+import { VIAL_FORMS, isPillForm, pillNoun, pillStrength, pillTotal } from '#shared/utils/vialForm'
 // What /api/journal/vials/parse returns — DB terms, vial_amount is the whole-container total.
-interface ParsedRow {
-  compound: string
-  form: VialForm
-  vial_amount: number
-  vial_unit: 'mg' | 'mcg' | 'iu'
-  unit_count: number | null
-  quantity: number
-  notes: string
-  assumption: string
-}
+import type { ParsedVial as ParsedRow } from '#shared/types/journal'
 
 // What the confirm table edits — label terms: `amount` is per vial, or per tab/cap for a pill
 // bottle, and the bottle total is recomputed on save.
-interface DumpRow {
-  compound: string
-  form: VialForm
-  amount: number
-  vial_unit: 'mg' | 'mcg' | 'iu'
-  unit_count: number
-  quantity: number
-  notes: string
-  assumption: string
-}
+type DumpRow = Omit<ParsedRow, 'vial_amount' | 'unit_count'> & { amount: number, unit_count: number }
 
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ saved: [] }>()

@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  nextDueDay, PROTOCOL_RULES, ruleDueOn, scheduledFor, tallySchedule, weekdayOf
+  nextDueDay, PROTOCOL_RULES, ruleDueOn, scheduledFor, tallySchedule
 } from '../shared/utils/protocolRules.ts'
 
 // 2026-09-09 is a Wednesday; 2026-09-06 (Sun) through 2026-09-12 (Sat) is one calendar week.
@@ -22,12 +22,6 @@ const doses = (pairs) => {
   }
   return map
 }
-
-test('weekdayOf resolves ISO dates to 0=Sun … 6=Sat', () => {
-  assert.equal(weekdayOf('2026-09-06'), 0)
-  assert.equal(weekdayOf(WED), 3)
-  assert.equal(weekdayOf('2026-09-12'), 6)
-})
 
 test('a Wednesday is due HGH and finasteride only — not testosterone or hCG', () => {
   const due = scheduledFor(WED).map(r => r.compound).sort()

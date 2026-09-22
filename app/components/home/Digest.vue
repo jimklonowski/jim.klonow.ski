@@ -110,6 +110,7 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays } from '#shared/utils/dates'
 import type { Digest } from '~/composables/useDigests'
 
 const props = withDefaults(defineProps<{
@@ -165,7 +166,7 @@ const weeklyPeriod = computed(() => {
 })
 
 function relative(date: string) {
-  const days = Math.round((Date.now() - new Date(date + 'T12:00:00').getTime()) / 86400000)
+  const days = diffDays(date, localToday())
   if (days <= 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days}d ago`
@@ -244,7 +245,7 @@ onMounted(() => {
 })
 
 function isRecent(date: string) {
-  return (Date.parse(localToday()) - Date.parse(date)) / 86400000 <= 7
+  return diffDays(date, localToday()) <= 7
 }
 </script>
 

@@ -1,22 +1,9 @@
 import { KNOWN_COMPOUNDS } from '../../../../app/data/journal'
-import { normalizeForm, isPillForm, type VialForm } from '#shared/utils/vialForm'
+import { normalizeForm, isPillForm } from '#shared/utils/vialForm'
+import type { ParsedVial } from '#shared/types/journal'
 
 // Freeform stockpile text -> proposed sealed rows for the inventory confirm table.
 // Owner-only like every Claude-spending endpoint (digests, lab summaries).
-
-export interface ParsedVial {
-  compound: string
-  /** vial (powder, oil, pen) or a pill bottle (tablet | capsule). */
-  form: VialForm
-  /** Total content of one container — for a bottle, unit_count × per-pill strength. */
-  vial_amount: number
-  vial_unit: 'mg' | 'mcg' | 'iu'
-  /** Pills per bottle for tablet/capsule rows; null otherwise. */
-  unit_count: number | null
-  quantity: number
-  notes: string
-  assumption: string
-}
 
 const MAX_TEXT_LENGTH = 4000
 
