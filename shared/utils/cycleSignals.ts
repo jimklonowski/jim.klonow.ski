@@ -5,8 +5,8 @@
 // (RHR/HRV/recovery/sleep). Nothing to press, ever.
 //
 // Model: each metric's average over the last two weeks of the cycle-so-far is compared against
-// its average over the four weeks before the start. Noise thresholds are the same per-metric
-// values the digest trend engine uses (server/utils/trends.ts) so "flagged here" and "trend
+// its average over the four weeks before the start. Noise thresholds come from metricNoise.ts,
+// shared with the digest trend engine (server/utils/trends.ts), so "flagged here" and "trend
 // there" never disagree about what counts as real. Weight additionally gets a rate check —
 // fast gain is the water-retention tell long before the total looks alarming.
 //
@@ -16,7 +16,9 @@
 import type { Cycle } from './cycles'
 // Explicit .ts extension: runtime values, and the plain-node test runner can't resolve the
 // import extensionless the way Vite does.
-import { cycleEnd, cycleStatusOn, shiftDays } from './cycles.ts'
+import { cycleEnd, cycleStatusOn } from './cycles.ts'
+import { roundTo, shiftDays } from './dates.ts'
+import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
 
 /** Structural shapes of journal_entries / health_metrics rows — the app types and raw D1 rows
  * both satisfy them. */
@@ -61,7 +63,7 @@ interface MetricDef {
   key: CycleSignal['key']
   label: string
   unit: string
-  /** Same noise floors as server/utils/trends.ts METRICS — keep the two in sync. */
+  /** From METRIC_NOISE_FLOOR — the same floor the digest trend engine uses. */
   threshold: number
   decimals: number
   /** Which direction reads as adverse while on compounds. */
@@ -69,18 +71,17 @@ interface MetricDef {
 }
 
 const METRICS: MetricDef[] = [
-  { key: 'weight', label: 'Weight', unit: 'lbs', threshold: 2.5, decimals: 1, adverseDir: 'either' },
-  { key: 'bp_systolic', label: 'Systolic BP', unit: 'mmHg', threshold: 6, decimals: 0, adverseDir: 'up' },
-  { key: 'rhr', label: 'Resting HR', unit: 'bpm', threshold: 4, decimals: 0, adverseDir: 'up' },
-  { key: 'hrv', label: 'HRV', unit: 'ms', threshold: 7, decimals: 0, adverseDir: 'down' },
-  { key: 'recovery', label: 'Recovery', unit: '%', threshold: 8, decimals: 0, adverseDir: 'down' },
-  { key: 'sleep', label: 'Sleep', unit: 'min', threshold: 30, decimals: 0, adverseDir: 'down' }
+  { key: 'weight', label: 'Weight', unit: 'lbs', threshold: METRIC_NOISE_FLOOR.weight, decimals: 1, adverseDir: 'either' },
+  { key: 'bp_systolic', label: 'Systolic BP', unit: 'mmHg', threshold: METRIC_NOISE_FLOOR.bp_systolic, decimals: 0, adverseDir: 'up' },
+  { key: 'rhr', label: 'Resting HR', unit: 'bpm', threshold: METRIC_NOISE_FLOOR.rhr, decimals: 0, adverseDir: 'up' },
+  { key: 'hrv', label: 'HRV', unit: 'ms', threshold: METRIC_NOISE_FLOOR.hrv, decimals: 0, adverseDir: 'down' },
+  { key: 'recovery', label: 'Recovery', unit: '%', threshold: METRIC_NOISE_FLOOR.recovery, decimals: 0, adverseDir: 'down' },
+  { key: 'sleep', label: 'Sleep', unit: 'min', threshold: METRIC_NOISE_FLOOR.sleep, decimals: 0, adverseDir: 'down' }
 ]
 
 const BASELINE_DAYS = 28
 const CURRENT_DAYS = 14
-/** Same floor as trends.ts MIN_POINTS — fewer readings than this is an anecdote, not a window. */
-const MIN_POINTS = 4
+const MIN_POINTS = MIN_WINDOW_POINTS
 /** Sustained weight change this fast escalates regardless of the level delta. */
 const RATE_WATCH_LBS_WK = 1.5
 const RATE_FLAG_LBS_WK = 2.5
@@ -100,8 +101,6 @@ function avg(points: Point[], from: string, to: string): number | null {
   const vals = points.filter(p => p.date >= from && p.date <= to)
   return vals.length >= MIN_POINTS ? vals.reduce((s, p) => s + p.value, 0) / vals.length : null
 }
-
-const round = (n: number, dp: number) => Math.round(n * 10 ** dp) / 10 ** dp
 
 export function computeCycleSignals(
   cycle: Cycle,
@@ -137,7 +136,7 @@ export function computeCycleSignals(
     if (status === 'upcoming') {
       return {
         key: m.key, label: m.label, unit: m.unit, decimals: m.decimals,
-        baseline: baseline != null ? round(baseline, m.decimals) : null,
+        baseline: baseline != null ? roundTo(baseline, m.decimals) : null,
         current: null, delta: null, ratePerWeek: null,
         state: baseline != null ? 'baseline' as const : 'no-data' as const,
         adverse: false, spark, sparkStartIdx
@@ -152,14 +151,14 @@ export function computeCycleSignals(
     if (m.key === 'weight') {
       const lastWk = avg(points, shiftDays(asOf, -6), asOf)
       const priorWk = avg(points, shiftDays(asOf, -13), shiftDays(asOf, -7))
-      if (lastWk != null && priorWk != null) ratePerWeek = round(lastWk - priorWk, 1)
+      if (lastWk != null && priorWk != null) ratePerWeek = roundTo(lastWk - priorWk, 1)
     }
 
     if (baseline == null || current == null) {
       return {
         key: m.key, label: m.label, unit: m.unit, decimals: m.decimals,
-        baseline: baseline != null ? round(baseline, m.decimals) : null,
-        current: current != null ? round(current, m.decimals) : null,
+        baseline: baseline != null ? roundTo(baseline, m.decimals) : null,
+        current: current != null ? roundTo(current, m.decimals) : null,
         delta: null, ratePerWeek, state: 'no-data' as const, adverse: false, spark, sparkStartIdx
       }
     }
@@ -182,9 +181,9 @@ export function computeCycleSignals(
 
     return {
       key: m.key, label: m.label, unit: m.unit, decimals: m.decimals,
-      baseline: round(baseline, m.decimals),
-      current: round(current, m.decimals),
-      delta: round(delta, m.decimals),
+      baseline: roundTo(baseline, m.decimals),
+      current: roundTo(current, m.decimals),
+      delta: roundTo(delta, m.decimals),
       ratePerWeek,
       state, adverse, spark, sparkStartIdx
     }

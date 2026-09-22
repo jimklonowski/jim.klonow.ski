@@ -713,7 +713,7 @@
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, oppositeSite } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
-import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
+import type { WorkoutEntry } from '#shared/types/journal'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 import exifr from 'exifr'

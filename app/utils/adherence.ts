@@ -10,25 +10,15 @@
 
 import type { JournalEntry } from '~/data/journal'
 import type { Cycle } from '#shared/utils/cycles'
-import { cycleRules, diffDays, mergeRules } from '#shared/utils/cycles'
+import { cycleRules, mergeRules } from '#shared/utils/cycles'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
-import { PROTOCOL_RULES, ruleActiveOn, weekdayOf } from '#shared/utils/protocolRules'
+import { PROTOCOL_RULES, ruleActiveOn } from '#shared/utils/protocolRules'
+import { diffDays, shiftDays, weekStartOf, weekdayOf } from '#shared/utils/dates'
 
 // The rule set itself, plus scheduledFor() for the calendar rings, live in
 // shared/utils/protocolRules.ts so the server's digest prompts score against the same cadence.
 
 const DAY_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-
-function shiftDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00')
-  d.setDate(d.getDate() + n)
-  return d.toLocaleDateString('en-CA')
-}
-
-/** Sunday that starts the week containing `date` — matches the calendar grid. */
-function weekStartOf(date: string): string {
-  return shiftDays(date, -weekdayOf(date))
-}
 
 /** "DAILY" / "MON+THU" — Monday-first, since that's how a week reads. */
 export function cadenceLabel(rule: ProtocolRule): string {

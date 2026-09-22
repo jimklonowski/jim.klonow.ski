@@ -200,7 +200,8 @@ function localDateStr() {
 function localTimeStr() {
   return localTimeNow()
 }
-function shiftDays(delta: number) {
+/** The local date `delta` days from today (negative = past). */
+function daysFromToday(delta: number) {
   return localDaysAgo(-delta)
 }
 
@@ -309,7 +310,7 @@ const days = computed(() => {
     if (n) counts.set(e.date, n)
   }
   const series = Array.from({ length: WINDOW_DAYS }, (_, i) => {
-    const date = shiftDays(i - (WINDOW_DAYS - 1))
+    const date = daysFromToday(i - (WINDOW_DAYS - 1))
     return { date, count: counts.get(date) ?? 0 }
   })
   const max = Math.max(1, ...series.map(d => d.count))
@@ -326,8 +327,8 @@ const startLabel = computed(() =>
 )
 
 function countBetween(fromDaysAgo: number, toDaysAgo: number) {
-  const from = shiftDays(-fromDaysAgo)
-  const to = shiftDays(-toDaysAgo)
+  const from = daysFromToday(-fromDaysAgo)
+  const to = daysFromToday(-toDaysAgo)
   return entries.value
     .filter(e => e.date >= from && e.date <= to)
     .reduce((n, e) => n + (e.sodas?.length ?? 0), 0)

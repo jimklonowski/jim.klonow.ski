@@ -12,6 +12,8 @@
 // The en-CA locale is used purely because it formats as ISO YYYY-MM-DD (en-US would give
 // 08/24/2026); the timeZone option does the actual conversion. Same trick as
 // server/tasks/whoop/sync.ts, which hit this bug first with evening Whoop workouts.
+import { shiftDays } from './dates.ts'
+
 export const HOME_TZ = 'America/Chicago'
 
 const isoDateFmt = new Intl.DateTimeFormat('en-CA', {
@@ -41,9 +43,7 @@ export function localTimeNow(): string {
  * off, and in the hour after midnight (or before it, in the fall) that hour is a whole day.
  */
 export function localDaysAgo(days: number): string {
-  const d = new Date(localToday() + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() - days)
-  return d.toISOString().slice(0, 10)
+  return shiftDays(localToday(), -days)
 }
 
 /**

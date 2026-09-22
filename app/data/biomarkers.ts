@@ -1,3 +1,5 @@
+import { roundTo } from '#shared/utils/dates'
+
 export const CATEGORY_LABELS = {
   hormones: 'Hormones',
   metabolic: 'Metabolic',
@@ -127,31 +129,26 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
 // they flow through the cards, category tabs, deltas and trend charts like any other marker.
 type ComputedMeta = BiomarkerMeta & { compute: (m: Record<string, number | null>) => number | null }
 
-function round(n: number, decimals = 2): number {
-  const f = 10 ** decimals
-  return Math.round(n * f) / f
-}
-
 export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
   trig_hdl_ratio: {
     label: 'Trig/HDL Ratio', unit: '', category: 'lipids', refMax: 2.0, optimalMax: 1.5, computed: true,
     description: 'Triglycerides divided by HDL — a strong surrogate for insulin resistance and a marker of small, dense (atherogenic) LDL particles. Optimal is below 2.0; above 3.0 suggests insulin resistance.',
-    compute: m => (m.triglycerides != null && m.hdl) ? round(m.triglycerides / m.hdl, 1) : null
+    compute: m => (m.triglycerides != null && m.hdl) ? roundTo(m.triglycerides / m.hdl, 1) : null
   },
   homa_ir: {
     label: 'HOMA-IR', unit: '', category: 'metabolic', refMax: 2.0, optimalMax: 1.5, computed: true,
     description: 'Homeostatic Model Assessment of Insulin Resistance — (fasting glucose × fasting insulin) / 405. Estimates insulin resistance from a fasting draw. Optimal is below 1.5; values above ~2.9 indicate significant insulin resistance.',
-    compute: m => (m.glucose != null && m.insulin != null) ? round((m.glucose * m.insulin) / 405, 2) : null
+    compute: m => (m.glucose != null && m.insulin != null) ? roundTo((m.glucose * m.insulin) / 405, 2) : null
   },
   remnant_cholesterol: {
     label: 'Remnant Cholesterol', unit: 'mg/dL', category: 'lipids', refMax: 30, computed: true,
     description: 'Total cholesterol minus HDL minus LDL — the cholesterol carried in triglyceride-rich remnant particles. An independent, often-overlooked driver of cardiovascular risk. Optimal is below 30 mg/dL.',
-    compute: m => (m.cholesterol != null && m.hdl != null && m.ldl != null) ? round(m.cholesterol - m.hdl - m.ldl, 0) : null
+    compute: m => (m.cholesterol != null && m.hdl != null && m.ldl != null) ? roundTo(m.cholesterol - m.hdl - m.ldl, 0) : null
   },
   free_t_pct: {
     label: 'Free T %', unit: '%', category: 'hormones', refMin: 1.5, refMax: 3.0, computed: true,
     description: 'Free testosterone as a percentage of total testosterone (unit-normalized: free pg/mL vs total ng/dL). Reflects how much of your testosterone is bioavailable rather than bound to SHBG. Typically 1.5–3%.',
-    compute: m => (m.testosterone_free != null && m.testosterone_total) ? round((m.testosterone_free / (m.testosterone_total * 10)) * 100, 2) : null
+    compute: m => (m.testosterone_free != null && m.testosterone_total) ? roundTo((m.testosterone_free / (m.testosterone_total * 10)) * 100, 2) : null
   }
 }
 

@@ -164,6 +164,7 @@
 </template>
 
 <script setup lang="ts">
+import { eachDay, shiftDays } from '#shared/utils/dates'
 import { getCompoundColor } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Entries' })
@@ -216,10 +217,7 @@ const streak = computed(() => loggedStreak(entries.value, today))
 const streakStrip = computed(() => {
   const byDate = new Map(loggedEntries.value.map(e => [e.date, e]))
   const cells: Array<{ date: string, logged: boolean, class: string, title: string }> = []
-  const d = new Date(today + 'T12:00:00')
-  d.setDate(d.getDate() - 59)
-  for (let i = 0; i < 60; i++) {
-    const date = d.toLocaleDateString('en-CA')
+  for (const date of eachDay(shiftDays(today, -59), today)) {
     const entry = byDate.get(date)
     const extra = !!entry && ((photoCounts.value[date] ?? 0) > 0 || (entry.reconstitutions ?? []).length > 0)
     cells.push({
@@ -228,7 +226,6 @@ const streakStrip = computed(() => {
       class: !entry ? 'bg-[#0d1310]' : extra ? 'bg-accent' : 'bg-[#1e3a2e]',
       title: !entry ? `${date} · not logged` : extra ? `${date} · logged + photos/recon` : `${date} · logged`
     })
-    d.setDate(d.getDate() + 1)
   }
   return cells
 })

@@ -5,21 +5,13 @@
 // detected from the dose log, and each metric is compared before/after the change (or against a
 // trailing baseline when no change explains it).
 import { PROTOCOL_RULES, ruleActiveOn } from '#shared/utils/protocolRules'
+import { diffDays, roundTo, shiftDays } from '#shared/utils/dates'
+import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from '#shared/utils/metricNoise'
+import type { HealthMetricsEntry, JournalRow } from '#shared/types/journal'
 
-export interface TrendJournalRow {
-  date: string
-  weight_lbs: number | null
-  rhr: number | null
-  hrv: number | null
-  bp_systolic: number | null
-  peptides: Array<{ compound: string, dose?: number | null, unit?: string | null }>
-}
-
-export interface TrendHealthRow {
-  date: string
-  recovery_score: number | null
-  sleep_total_min: number | null
-}
+// The slices of the shared row shapes the trend engine reads.
+export type TrendJournalRow = Pick<JournalRow, 'date' | 'weight_lbs' | 'rhr' | 'hrv' | 'bp_systolic' | 'peptides'>
+export type TrendHealthRow = Pick<HealthMetricsEntry, 'date' | 'recovery_score' | 'sleep_total_min'>
 
 export interface ProtocolChange {
   date: string
@@ -78,7 +70,7 @@ const CLUSTER_GAP_DAYS = 14
 const STOP_CLUSTER_GAP_DAYS = 3
 // Minimum data points per comparison window, and minimum days elapsed since a change before
 // a before/after comparison is meaningful.
-const MIN_POINTS = 4
+const MIN_POINTS = MIN_WINDOW_POINTS
 const MIN_DAYS_SINCE_CHANGE = 7
 
 // An ancillary change — a compound that is not on the standing schedule — stops being a useful
@@ -108,7 +100,7 @@ function isStandingChange(change: ProtocolChange, endDate: string): boolean {
 // Too old to anchor a trend or to be listed on a digest fact sheet. The labs summary keeps the
 // full `changes` list — a months-old stop is still relevant across a four-month lab window.
 function isStaleAncillary(change: ProtocolChange, endDate: string): boolean {
-  return !isStandingChange(change, endDate) && dayDiff(endDate, change.date) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
+  return !isStandingChange(change, endDate) && diffDays(change.date, endDate) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
 }
 
 interface MetricDef {
@@ -127,31 +119,16 @@ function series<T extends { date: string }>(rows: T[], get: (r: T) => number | n
   })
 }
 
-// Per-metric noise thresholds: a before/after delta below these is normal day-to-day variance,
-// not a trend worth telling the user about.
+// Per-metric noise thresholds (shared with the cycle vitals watch): a before/after delta below
+// these is normal day-to-day variance, not a trend worth telling the user about.
 const METRICS: MetricDef[] = [
-  { key: 'rhr', label: 'Resting HR', unit: 'bpm', threshold: 4, decimals: 0, pick: r => series(r.journal, x => x.rhr) },
-  { key: 'hrv', label: 'HRV', unit: 'ms', threshold: 7, decimals: 0, pick: r => series(r.journal, x => x.hrv) },
-  { key: 'weight_lbs', label: 'Weight', unit: 'lbs', threshold: 2.5, decimals: 1, pick: r => series(r.journal, x => x.weight_lbs) },
-  { key: 'bp_systolic', label: 'Systolic BP', unit: 'mmHg', threshold: 6, decimals: 0, pick: r => series(r.journal, x => x.bp_systolic) },
-  { key: 'recovery_score', label: 'Whoop recovery', unit: '%', threshold: 8, decimals: 0, pick: r => series(r.health, x => x.recovery_score) },
-  { key: 'sleep_total_min', label: 'Sleep', unit: 'min/night', threshold: 30, decimals: 0, pick: r => series(r.health, x => x.sleep_total_min) }
+  { key: 'rhr', label: 'Resting HR', unit: 'bpm', threshold: METRIC_NOISE_FLOOR.rhr, decimals: 0, pick: r => series(r.journal, x => x.rhr) },
+  { key: 'hrv', label: 'HRV', unit: 'ms', threshold: METRIC_NOISE_FLOOR.hrv, decimals: 0, pick: r => series(r.journal, x => x.hrv) },
+  { key: 'weight_lbs', label: 'Weight', unit: 'lbs', threshold: METRIC_NOISE_FLOOR.weight, decimals: 1, pick: r => series(r.journal, x => x.weight_lbs) },
+  { key: 'bp_systolic', label: 'Systolic BP', unit: 'mmHg', threshold: METRIC_NOISE_FLOOR.bp_systolic, decimals: 0, pick: r => series(r.journal, x => x.bp_systolic) },
+  { key: 'recovery_score', label: 'Whoop recovery', unit: '%', threshold: METRIC_NOISE_FLOOR.recovery, decimals: 0, pick: r => series(r.health, x => x.recovery_score) },
+  { key: 'sleep_total_min', label: 'Sleep', unit: 'min/night', threshold: METRIC_NOISE_FLOOR.sleep, decimals: 0, pick: r => series(r.health, x => x.sleep_total_min) }
 ]
-
-function addDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-
-function dayDiff(a: string, b: string): number {
-  return Math.round((Date.parse(a + 'T12:00:00Z') - Date.parse(b + 'T12:00:00Z')) / 86_400_000)
-}
-
-function round(n: number, dp: number): number {
-  const f = 10 ** dp
-  return Math.round(n * f) / f
-}
 
 function avgInWindow(points: Array<{ date: string, value: number }>, start: string, end: string): { avg: number, n: number } {
   const vals = points.filter(p => p.date >= start && p.date <= end).map(p => p.value)
@@ -177,10 +154,10 @@ function detectDoseAdjustments(compound: string, days: DoseDay[], endDate: strin
   for (const day of days) {
     // Needs two weeks of established dosing before, and at least ~a week of follow-through
     // after (a change made yesterday can't be called a pattern yet).
-    if (dayDiff(day.date, first) < 14 || dayDiff(endDate, day.date) < 8) continue
-    const beforeDays = days.filter(d => d.date >= addDays(day.date, -14) && d.date < day.date)
-    const afterEnd = addDays(day.date, 13) < endDate ? addDays(day.date, 13) : endDate
-    const afterSpan = dayDiff(afterEnd, day.date) + 1
+    if (diffDays(first, day.date) < 14 || diffDays(day.date, endDate) < 8) continue
+    const beforeDays = days.filter(d => d.date >= shiftDays(day.date, -14) && d.date < day.date)
+    const afterEnd = shiftDays(day.date, 13) < endDate ? shiftDays(day.date, 13) : endDate
+    const afterSpan = diffDays(day.date, afterEnd) + 1
     const afterDays = days.filter(d => d.date >= day.date && d.date <= afterEnd)
     if (beforeDays.length < 4 || afterDays.length < 2) continue
 
@@ -210,14 +187,14 @@ function detectDoseAdjustments(compound: string, days: DoseDay[], endDate: strin
   const events: Array<{ date: string, label: string }> = []
   let group: typeof hits = []
   for (const hit of hits) {
-    if (group.length && dayDiff(hit.date, group[0]!.date) > 28) {
+    if (group.length && diffDays(group[0]!.date, hit.date) > 28) {
       events.push(group.reduce((a, b) => b.score > a.score ? b : a))
       group = []
     }
     group.push(hit)
   }
   if (group.length) events.push(group.reduce((a, b) => b.score > a.score ? b : a))
-  return events.filter(e => dayDiff(endDate, e.date) <= CHANGE_LOOKBACK_DAYS)
+  return events.filter(e => diffDays(e.date, endDate) <= CHANGE_LOOKBACK_DAYS)
 }
 
 // `includeAdjustments: false` skips the sliding-window dose-adjustment detector — by far the
@@ -256,10 +233,10 @@ export function detectProtocolChanges(
   for (const [compound, dates] of doseDates) {
     for (let i = 0; i < dates.length; i++) {
       const isStart = i === 0
-      const isResume = i > 0 && dayDiff(dates[i]!, dates[i - 1]!) >= RESUME_GAP_DAYS
+      const isResume = i > 0 && diffDays(dates[i - 1]!, dates[i]!) >= RESUME_GAP_DAYS
       if (!isStart && !isResume) continue
       const date = dates[i]!
-      if (dayDiff(endDate, date) > CHANGE_LOOKBACK_DAYS || date > endDate) continue
+      if (diffDays(date, endDate) > CHANGE_LOOKBACK_DAYS || date > endDate) continue
       // Count dose-days from this event onward so a compound tried once doesn't register.
       if (dates.slice(i).filter(d => d <= endDate).length < MIN_DOSE_DAYS) continue
       events.push({ date, label: isResume ? `${compound} (resumed)` : compound, kind: 'start' })
@@ -269,10 +246,10 @@ export function detectProtocolChanges(
     // surface as resumes and would otherwise add noise).
     let stopDate: string | null = null
     const lastDose = dates.filter(d => d <= endDate).at(-1)
-    if (lastDose && dayDiff(endDate, lastDose) >= STOP_GAP_DAYS) {
-      const candidate = addDays(lastDose, 1)
-      const regularBefore = dates.filter(d => d <= lastDose && dayDiff(lastDose, d) <= 27).length >= MIN_DOSE_DAYS
-      if (regularBefore && dayDiff(endDate, candidate) <= CHANGE_LOOKBACK_DAYS) {
+    if (lastDose && diffDays(lastDose, endDate) >= STOP_GAP_DAYS) {
+      const candidate = shiftDays(lastDose, 1)
+      const regularBefore = dates.filter(d => d <= lastDose && diffDays(d, lastDose) <= 27).length >= MIN_DOSE_DAYS
+      if (regularBefore && diffDays(candidate, endDate) <= CHANGE_LOOKBACK_DAYS) {
         stopDate = candidate
         events.push({ date: candidate, label: compound, kind: 'stop' })
       }
@@ -282,7 +259,7 @@ export function detectProtocolChanges(
       for (const adj of detectDoseAdjustments(compound, doseDays.get(compound) ?? [], endDate)) {
         // An adjustment right before the compound's stop is the stop's shadow (the sliding window
         // sees dose silence as a frequency collapse), not a real dosing change.
-        if (stopDate && dayDiff(stopDate, adj.date) <= CLUSTER_GAP_DAYS && adj.date <= stopDate) continue
+        if (stopDate && diffDays(adj.date, stopDate) <= CLUSTER_GAP_DAYS && adj.date <= stopDate) continue
         events.push({ date: adj.date, label: adj.label, kind: 'adjust' })
       }
     }
@@ -297,7 +274,7 @@ export function detectProtocolChanges(
     const gap = e.kind === 'stop' ? STOP_CLUSTER_GAP_DAYS : CLUSTER_GAP_DAYS
     // Cluster gap is measured from the cluster's anchor date, which stays the earliest event so
     // metric baselines are taken from before anything in the cluster started.
-    if (current && dayDiff(e.date, current.date) <= gap) current.compounds.push(e.label)
+    if (current && diffDays(current.date, e.date) <= gap) current.compounds.push(e.label)
     else changes.push({ date: e.date, compounds: [e.label], kind: e.kind })
   }
   return changes.sort((a, b) => a.date.localeCompare(b.date))
@@ -330,21 +307,21 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
     let stableAnchor: TrendFinding | null = null
     let reversalAnchor: TrendFinding | null = null
     for (const change of changes) {
-      if (dayDiff(endDate, change.date) < MIN_DAYS_SINCE_CHANGE) continue
+      if (diffDays(change.date, endDate) < MIN_DAYS_SINCE_CHANGE) continue
       if (isStaleAncillary(change, endDate)) continue
 
-      const baseline = avgInWindow(points, addDays(change.date, -28), addDays(change.date, -1))
-      const recentStart = addDays(endDate, -13) > change.date ? addDays(endDate, -13) : change.date
+      const baseline = avgInWindow(points, shiftDays(change.date, -28), shiftDays(change.date, -1))
+      const recentStart = shiftDays(endDate, -13) > change.date ? shiftDays(endDate, -13) : change.date
       const recent = avgInWindow(points, recentStart, endDate)
       if (baseline.n < MIN_POINTS || recent.n < MIN_POINTS) continue
 
-      const onsetEnd = addDays(change.date, 27) < endDate ? addDays(change.date, 27) : endDate
+      const onsetEnd = shiftDays(change.date, 27) < endDate ? shiftDays(change.date, 27) : endDate
       const onset = avgInWindow(points, change.date, onsetEnd)
       const onsetMove = onset.avg - baseline.avg
       if (onset.n < 3 || Math.abs(onsetMove) < metric.threshold / 2) continue
 
-      const priorHalf = avgInWindow(points, addDays(change.date, -28), addDays(change.date, -15))
-      const nearHalf = avgInWindow(points, addDays(change.date, -14), addDays(change.date, -1))
+      const priorHalf = avgInWindow(points, shiftDays(change.date, -28), shiftDays(change.date, -15))
+      const nearHalf = avgInWindow(points, shiftDays(change.date, -14), shiftDays(change.date, -1))
       const preDrift = nearHalf.avg - priorHalf.avg
       const driftKnown = priorHalf.n >= 3 && nearHalf.n >= 3
       const stable = !driftKnown || Math.abs(preDrift) < metric.threshold / 2
@@ -360,9 +337,9 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
         key: metric.key,
         label: metric.label,
         unit: metric.unit,
-        recentAvg: round(recent.avg, metric.decimals),
-        baselineAvg: round(base.avg, metric.decimals),
-        delta: round(delta, metric.decimals),
+        recentAvg: roundTo(recent.avg, metric.decimals),
+        baselineAvg: roundTo(base.avg, metric.decimals),
+        delta: roundTo(delta, metric.decimals),
         since: change,
         reversal,
         significance: Math.abs(delta) / metric.threshold
@@ -374,7 +351,7 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
         stableAnchor = finding // → keeps the earliest
       }
       else if (stableAnchor.since?.kind === 'adjust' && change.kind !== 'adjust'
-        && dayDiff(change.date, stableAnchor.since.date) <= CLUSTER_GAP_DAYS) {
+        && diffDays(stableAnchor.since.date, change.date) <= CLUSTER_GAP_DAYS) {
         // A start/stop within days of a held adjust anchor outranks it: a compound starting or
         // stopping is the bigger event when both moved together (e.g. GHK-Cu going daily two
         // days before TRT began — the TRT start is the story).
@@ -386,8 +363,8 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
     // No protocol change explains it (or none cleared the bar): check for plain drift,
     // last 2 weeks vs the ~6 weeks before that.
     if (!best) {
-      const recent = avgInWindow(points, addDays(endDate, -13), endDate)
-      const prior = avgInWindow(points, addDays(endDate, -55), addDays(endDate, -14))
+      const recent = avgInWindow(points, shiftDays(endDate, -13), endDate)
+      const prior = avgInWindow(points, shiftDays(endDate, -55), shiftDays(endDate, -14))
       if (recent.n >= MIN_POINTS && prior.n >= MIN_POINTS) {
         const delta = recent.avg - prior.avg
         if (Math.abs(delta) >= metric.threshold) {
@@ -395,9 +372,9 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
             key: metric.key,
             label: metric.label,
             unit: metric.unit,
-            recentAvg: round(recent.avg, metric.decimals),
-            baselineAvg: round(prior.avg, metric.decimals),
-            delta: round(delta, metric.decimals),
+            recentAvg: roundTo(recent.avg, metric.decimals),
+            baselineAvg: roundTo(prior.avg, metric.decimals),
+            delta: roundTo(delta, metric.decimals),
             significance: Math.abs(delta) / metric.threshold
           }
         }
@@ -419,7 +396,7 @@ function fmtDate(d: string): string {
 // change carry its age, so the model can treat a weeks-old stop as background rather than news.
 export function formatTrendLines(trends: TrendsResult, endDate: string): string[] {
   const ago = (d: string) => {
-    const n = dayDiff(endDate, d)
+    const n = diffDays(d, endDate)
     return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`
   }
   const lines: string[] = []

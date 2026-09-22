@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { activeSignals, computeCycleSignals, signalShorthand } from '../shared/utils/cycleSignals.ts'
-import { shiftDays } from '../shared/utils/cycles.ts'
+import { shiftDays } from '../shared/utils/dates.ts'
 
 // 2026-09-14 is a Monday. Cycle runs 16 weeks unless ended.
 function cycle(overrides = {}) {

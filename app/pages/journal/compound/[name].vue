@@ -376,10 +376,12 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays, eachDay } from '#shared/utils/dates'
 import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
-import { calcUnits, convertUnitFor, iuEquivalentLabel, type MixUnit } from '~/utils/peptideCalc'
+import { calcUnits, convertUnitFor, iuEquivalentLabel } from '~/utils/peptideCalc'
+import type { DoseUnit } from '#shared/types/journal'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 
 const route = useRoute()
@@ -440,7 +442,7 @@ const avgDoseEquiv = computed(() =>
 const daysAgo = computed(() => {
   const last = onDays.value.at(-1)?.date
   if (!last) return null
-  return Math.floor((Date.now() - new Date(last + 'T12:00:00').getTime()) / 86400000)
+  return diffDays(last, localToday())
 })
 
 /** "18 days used · last -3d" — the title-row usage note, assembled here so Vue's whitespace
@@ -537,18 +539,6 @@ const chartWindow = computed(() => {
   return { from: first > floor ? first : floor, to: localToday() }
 })
 
-/** Every calendar day in [from, to], as YYYY-MM-DD — the same walk exposureSeries takes. */
-function eachDay(from: string, to: string): string[] {
-  const out: string[] = []
-  const cur = new Date(from + 'T12:00:00')
-  const end = new Date(to + 'T12:00:00')
-  while (cur <= end) {
-    out.push(cur.toLocaleDateString('en-CA'))
-    cur.setDate(cur.getDate() + 1)
-  }
-  return out
-}
-
 // --- Dose chart ---
 // `dosed` flags the actual dosing days: those get point markers, the held days between don't.
 const doseChart = computed(() => {
@@ -643,13 +633,13 @@ const mixLine = computed(() => {
   // When the vial is labeled in a different unit than the doses (HGH: mg vial, IU doses),
   // spell out what the vial holds in dose units so the two scales connect.
   const vialInDoseUnit = mix.vial_unit !== unit.value
-    ? convertUnitFor(compoundName.value, mix.vial_amount, mix.vial_unit as MixUnit, unit.value as MixUnit)
+    ? convertUnitFor(compoundName.value, mix.vial_amount, mix.vial_unit, unit.value as DoseUnit)
     : null
   const vialEquiv = vialInDoseUnit != null ? ` (≈ ${Math.round(vialInDoseUnit * 100) / 100} ${unit.value})` : ''
   const parts = [`${mix.vial_amount}${mix.vial_unit} vial${vialEquiv} + ${mix.bac_water_ml}mL BAC water`]
   const perMl = mix.bac_water_ml ? Math.round((mix.vial_amount / mix.bac_water_ml) * 1000) / 1000 : null
   if (perMl != null) parts.push(`≈ ${perMl} ${mix.vial_unit}/mL`)
-  const units = calcUnits(1, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)
+  const units = calcUnits(1, unit.value as DoseUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)
   if (units) parts.push(`1 unit ≈ ${Math.round((1 / units) * 1000) / 1000} ${unit.value}`)
   return parts.join(' · ')
 })
@@ -660,7 +650,7 @@ const syringeChart = computed(() => {
   const doses = [...new Set(allDoses.value.map(p => p.dose))].sort((a, b) => a - b)
   return doses
     .map((dose) => {
-      const units = calcUnits(dose, unit.value as MixUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)
+      const units = calcUnits(dose, unit.value as DoseUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)
       return { dose: `${dose} ${unit.value}`, units: units != null ? Math.round(units * 10) / 10 : null }
     })
     .filter((d): d is { dose: string, units: number } => d.units != null)

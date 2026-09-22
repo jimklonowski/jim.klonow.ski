@@ -128,9 +128,10 @@
 import { getCompoundColor } from '~/data/journal'
 import type { Cycle, CyclePlanItem } from '#shared/utils/cycles'
 import {
-  cycleEnd, cycleProgress, cycleStatusOn, diffDays, doseLabelOf, durationLabel, isTentative,
+  cycleEnd, cycleProgress, cycleStatusOn, doseLabelOf, durationLabel, isTentative,
   tentativeStartLabel
 } from '#shared/utils/cycles'
+import { diffDays } from '#shared/utils/dates'
 
 useSeoMeta({ title: 'Journal · Cycles' })
 

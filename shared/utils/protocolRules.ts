@@ -13,8 +13,9 @@
 // describes the real protocol only; the demo persona's dose dates re-anchor nightly and drift
 // across weekdays, so adherence UI is hidden for demo sessions.
 //
-// Keep this module free of runtime imports: tests load it under Node's native type stripping,
-// which can't resolve extension-less relative paths.
+// Relative imports carry an explicit .ts: tests load this under Node's native type stripping,
+// which can't resolve extension-less paths the way Vite does.
+import { shiftDays, weekdayOf } from './dates.ts'
 
 export interface ProtocolRule {
   compound: string
@@ -42,17 +43,6 @@ export const PROTOCOL_RULES: ProtocolRule[] = [
   { compound: 'Finasteride', doseLabel: '1 mg', weekdays: EVERY_DAY, from: '2026-07-29' }
 ]
 
-/** 0=Sun … 6=Sat for a YYYY-MM-DD string. Noon-local anchoring keeps it timezone-proof. */
-export function weekdayOf(date: string): number {
-  return new Date(date + 'T12:00:00').getDay()
-}
-
-function nextDay(date: string): string {
-  const d = new Date(date + 'T12:00:00')
-  d.setDate(d.getDate() + 1)
-  return d.toLocaleDateString('en-CA')
-}
-
 export function ruleActiveOn(rule: ProtocolRule, date: string): boolean {
   return date >= rule.from && (rule.to == null || date <= rule.to)
 }
@@ -71,7 +61,7 @@ export function scheduledFor(date: string, rules: ProtocolRule[] = PROTOCOL_RULE
 export function nextDueDay(rule: ProtocolRule, date: string, horizonDays = 7): string | null {
   let d = date
   for (let i = 0; i < horizonDays; i++) {
-    d = nextDay(d)
+    d = shiftDays(d, 1)
     if (ruleDueOn(rule, d)) return d
   }
   return null
@@ -108,7 +98,7 @@ export function tallySchedule(
     if (rule.from > end || (rule.to != null && rule.to < start)) continue
     const logged = doseDates.get(rule.compound) ?? new Set<string>()
     const tally: ScheduleTally = { rule, hit: [], missed: [], pending: null, offSchedule: [] }
-    for (let d = start; d <= end && d <= today; d = nextDay(d)) {
+    for (let d = start; d <= end && d <= today; d = shiftDays(d, 1)) {
       // Off-schedule only counts inside the rule's own window: a cycle that overrides this
       // compound splits the standing rule around itself, and the cycle's rule owns those days.
       if (!ruleActiveOn(rule, d)) continue

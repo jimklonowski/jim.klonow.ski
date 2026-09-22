@@ -6,7 +6,7 @@
 // unit of value here is the per-family coverage row, not the individual dose.
 // Explicit extension: the tests import this file straight into Node's native type-stripping,
 // whose ESM resolver doesn't guess extensions (same as stockRunway.ts / cycleSignals.ts).
-import { diffDays, shiftDays } from './cycles.ts'
+import { diffDays, shiftDays } from './dates.ts'
 
 export interface Vaccination {
   id?: number

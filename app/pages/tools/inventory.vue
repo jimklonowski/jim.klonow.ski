@@ -615,6 +615,7 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays } from '#shared/utils/dates'
 import { getCompoundColor, KNOWN_COMPOUNDS, DOSE_UNITS, blankVial } from '~/data/journal'
 import type { Vial } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
@@ -741,7 +742,7 @@ function remainingOf(v: Vial): string {
 
 function daysSinceOpened(v: Vial) {
   if (!v.opened_date) return 0
-  return Math.floor((new Date(today + 'T12:00:00').getTime() - new Date(v.opened_date + 'T12:00:00').getTime()) / 86400000)
+  return diffDays(v.opened_date, today)
 }
 
 function daysLeftText(proj: VialProjection): string {

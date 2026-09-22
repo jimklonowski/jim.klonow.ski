@@ -19,12 +19,15 @@
 
 import type { PkDose } from './pk'
 import type { ProtocolRule } from './protocolRules'
+import type { DoseUnit } from '../types/journal'
+// Explicit .ts: a runtime import, and the plain-node test runner can't resolve it extensionless.
+import { diffDays, shiftDays } from './dates.ts'
 
 export interface CyclePlanItem {
   /** Must match a KNOWN_COMPOUNDS name — that's what links colors, PK models, and dose logs. */
   compound: string
   dose: number
-  unit: 'mg' | 'mcg' | 'iu'
+  unit: DoseUnit
   /** Scheduled weekdays, 0=Sun … 6=Sat. All seven = daily. */
   weekdays: number[]
   /** First cycle week this compound runs, 1-based. */
@@ -80,8 +83,6 @@ export const GATING_MARKERS = ['hdl', 'ldl', 'alt', 'ast', 'hematocrit', 'ferrit
 /** How stale a draw may be and still read as a cycle's pre-start baseline. */
 export const BASELINE_LOOKBACK_DAYS = 45
 
-const DAY_MS = 86400000
-
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function startPrecisionOf(cycle: Cycle): StartPrecision {
@@ -132,17 +133,6 @@ export function periodLabel(anchor: string, precision: 'month' | 'quarter'): str
 export function tentativeStartLabel(cycle: Cycle): string | null {
   const precision = startPrecisionOf(cycle)
   return precision === 'day' ? null : periodLabel(cycle.start_date, precision)
-}
-
-export function shiftDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00')
-  d.setDate(d.getDate() + n)
-  return d.toLocaleDateString('en-CA')
-}
-
-/** Whole days from a to b (positive when b is later). Noon anchors dodge DST edges. */
-export function diffDays(a: string, b: string): number {
-  return Math.round((Date.parse(b + 'T12:00:00') - Date.parse(a + 'T12:00:00')) / DAY_MS)
 }
 
 /** The plan's span in days: an exact day count when one was set, otherwise whole weeks. */

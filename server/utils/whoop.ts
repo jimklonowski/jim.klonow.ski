@@ -1,3 +1,5 @@
+import type { WhoopStatus } from '#shared/types/whoop'
+
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 const WHOOP_API_BASE = 'https://api.prod.whoop.com/developer'
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
@@ -11,17 +13,6 @@ export interface WhoopTokens {
   access_token: string
   refresh_token: string
   expires_at: number
-}
-
-export interface WhoopStatus {
-  connected: boolean
-  /** ISO timestamp of the last sync that completed without errors, or null. */
-  lastSyncedAt: string | null
-  /** Why the last sync failed, or null when the last one succeeded. */
-  lastError: string | null
-  lastErrorAt: string | null
-  /** True when the refresh token was rejected — only a reconnect fixes it. */
-  needsReconnect: boolean
 }
 
 interface TokenRow extends WhoopTokens {

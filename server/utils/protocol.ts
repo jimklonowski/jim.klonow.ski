@@ -10,13 +10,15 @@
 import type { Cycle, CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, checkpointStates, cycleEnd, cycleProgress, cycleStatusOn,
-  diffDays, doseLabelOf, durationLabel, isTentative, tentativeStartLabel
+  doseLabelOf, durationLabel, isTentative, tentativeStartLabel
 } from '#shared/utils/cycles'
 import type { ProtocolRule, ScheduleTally } from '#shared/utils/protocolRules'
-import { nextDueDay, ruleActiveOn, tallySchedule, weekdayOf } from '#shared/utils/protocolRules'
+import { nextDueDay, ruleActiveOn, tallySchedule } from '#shared/utils/protocolRules'
+import { diffDays, shiftDays, weekdayOf } from '#shared/utils/dates'
 import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 import type { Vaccination } from '#shared/utils/vaccines'
+import type { Supplement } from '#shared/types/journal'
 import { VACCINE_EFFECT_DAYS, recentVaccinations, vaccineCoverage, vaccineFamily } from '#shared/utils/vaccines'
 
 export const PROTOCOL_SCHEDULE = `Intended dosing schedule (the reference for adherence — journal dose logs should line up with this; call out deviations, don't re-announce matches):
@@ -89,22 +91,8 @@ export function eventContext(asOf: string, events: ProtocolEvent[] = PROTOCOL_EV
 // ~4-month protocol lookback the labs summary and digest trends already use.
 const CHANGE_RELEVANCE_DAYS = 120
 
-interface SupplementRow {
-  name: string
-  dose: string | null
-  category: string
-  status: string
-  schedule: string
-  started: string | null
-  stopped: string | null
-  notes: string | null
-}
-
-function shiftDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
+// A supplements row as read below: every column present, NULLs kept.
+type SupplementRow = Pick<Required<Supplement>, 'name' | 'dose' | 'category' | 'status' | 'schedule' | 'started' | 'stopped' | 'notes'>
 
 function describe(s: SupplementRow, recentSince: string): string {
   const parts = [s.name]

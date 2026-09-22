@@ -1,4 +1,4 @@
-export type MixUnit = 'mg' | 'mcg' | 'iu'
+import type { DoseUnit } from '#shared/types/journal'
 
 const SYRINGE_UNITS_PER_ML = 100 // U-100 insulin syringe: 1 unit = 0.01 mL
 
@@ -12,7 +12,7 @@ export const IU_PER_MG: Record<string, number> = {
   hCG: 9300
 }
 
-export function convertUnit(amount: number, from: MixUnit, to: MixUnit): number | null {
+export function convertUnit(amount: number, from: DoseUnit, to: DoseUnit): number | null {
   if (from === to) return amount
   if (from === 'mg' && to === 'mcg') return amount * 1000
   if (from === 'mcg' && to === 'mg') return amount / 1000
@@ -20,7 +20,7 @@ export function convertUnit(amount: number, from: MixUnit, to: MixUnit): number 
 }
 
 /** convertUnit that can also bridge IU↔mass when the compound has a known IU_PER_MG factor. */
-export function convertUnitFor(compound: string, amount: number, from: MixUnit, to: MixUnit): number | null {
+export function convertUnitFor(compound: string, amount: number, from: DoseUnit, to: DoseUnit): number | null {
   const direct = convertUnit(amount, from, to)
   if (direct != null) return direct
   const perMg = IU_PER_MG[compound]
@@ -49,9 +49,9 @@ export function calcConcentration(vialAmount: number, bacWaterMl: number): numbe
 
 export function calcUnits(
   dose: number,
-  doseUnit: MixUnit,
+  doseUnit: DoseUnit,
   vialAmount: number,
-  vialUnit: MixUnit,
+  vialUnit: DoseUnit,
   bacWaterMl: number,
   compound?: string
 ): number | null {
@@ -68,9 +68,9 @@ export function calcUnits(
 export function calcDoseForUnits(
   units: number,
   vialAmount: number,
-  vialUnit: MixUnit,
+  vialUnit: DoseUnit,
   bacWaterMl: number,
-  doseUnit: MixUnit,
+  doseUnit: DoseUnit,
   compound?: string
 ): number | null {
   const concentration = calcConcentration(vialAmount, bacWaterMl)

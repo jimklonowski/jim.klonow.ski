@@ -24,6 +24,8 @@
 </template>
 
 <script setup lang="ts">
+import type { WhoopStatus } from '#shared/types/whoop'
+
 // Whoop connection control for the journal header: a connect link when unlinked, otherwise a
 // Sync Now / Reconnect menu. Syncing refreshes the shared journal/health/workout stores, so the
 // page sections update without the parent knowing anything happened.
@@ -34,14 +36,6 @@
 // Nitro server routes (they 302 out to Whoop's OAuth consent screen), not page routes.
 const AUTHORIZE_URL = '/api/whoop/authorize'
 const RECONNECT_URL = `${AUTHORIZE_URL}?reconnect=true`
-
-interface WhoopStatus {
-  connected: boolean
-  lastSyncedAt: string | null
-  lastError: string | null
-  lastErrorAt: string | null
-  needsReconnect: boolean
-}
 
 const toast = useToast()
 const { refresh } = await useJournalEntries()

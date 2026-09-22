@@ -152,7 +152,8 @@
 </template>
 
 <script setup lang="ts">
-import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
+import { diffDays, weekStartOf } from '#shared/utils/dates'
+import type { WorkoutEntry } from '#shared/types/journal'
 import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 
 useSeoMeta({ title: 'Journal · Workouts' })
@@ -173,9 +174,7 @@ const workouts = computed(() =>
 const today = localToday()
 
 function daysAgo(date: string) {
-  return Math.round(
-    (new Date(today + 'T12:00:00').getTime() - new Date(date + 'T12:00:00').getTime()) / 86400000
-  )
+  return diffDays(date, today)
 }
 
 // --- stat cells (trailing 7 days vs the 7 before it) ---
@@ -239,13 +238,6 @@ const totalPages = computed(() => Math.max(1, Math.ceil(workouts.value.length / 
 const pageRows = computed(() =>
   workouts.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE)
 )
-
-/** Sunday-start week key. */
-function weekStartOf(date: string) {
-  const d = new Date(date + 'T12:00:00')
-  d.setDate(d.getDate() - d.getDay())
-  return d.toLocaleDateString('en-CA')
-}
 
 const weekGroups = computed(() => {
   const groups: Array<{ weekStart: string, label: string, count: number, minutes: number, rows: WorkoutEntry[] }> = []

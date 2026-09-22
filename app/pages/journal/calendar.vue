@@ -228,6 +228,7 @@
 </template>
 
 <script setup lang="ts">
+import { eachDay, weekStartOf } from '#shared/utils/dates'
 import { getCompoundColor, STANDING_COMPOUNDS } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Calendar' })
@@ -436,15 +437,8 @@ const timelineLabel = computed(() => {
   return `PROTOCOL TIMELINE · ${from} → ${to}`
 })
 
-/** Sunday-start week key for a date. */
-function getWeekStart(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00')
-  d.setDate(d.getDate() - d.getDay())
-  return d.toLocaleDateString('en-CA')
-}
-
 function slotKey(dateStr: string): string {
-  return zoom.value === 'week' ? getWeekStart(dateStr) : dateStr.slice(0, 7)
+  return zoom.value === 'week' ? weekStartOf(dateStr) : dateStr.slice(0, 7)
 }
 
 const slots = computed((): string[] => {
@@ -452,12 +446,7 @@ const slots = computed((): string[] => {
   if (!first) return []
   const result: string[] = []
   if (zoom.value === 'week') {
-    const cur = new Date(getWeekStart(first) + 'T12:00:00')
-    const end = new Date(getWeekStart(todayDate) + 'T12:00:00')
-    while (cur <= end) {
-      result.push(cur.toLocaleDateString('en-CA'))
-      cur.setDate(cur.getDate() + 7)
-    }
+    result.push(...eachDay(weekStartOf(first), weekStartOf(todayDate), 7))
   }
   else {
     let [y, m] = first.split('-').map(Number) as [number, number]

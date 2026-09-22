@@ -272,6 +272,7 @@
 </template>
 
 <script setup lang="ts">
+import { diffDays, eachDay, weekStartOf } from '#shared/utils/dates'
 import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS, STANDING_COMPOUNDS } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
@@ -331,9 +332,7 @@ const usage = computed(() => {
 const trackedCount = computed(() => new Set([...KNOWN_COMPOUNDS, ...usage.value.keys()]).size)
 
 function daysAgo(date: string) {
-  return Math.round(
-    (new Date(today + 'T12:00:00').getTime() - new Date(date + 'T12:00:00').getTime()) / 86400000
-  )
+  return diffDays(date, today)
 }
 
 /**
@@ -517,25 +516,14 @@ const timelineLabel = computed(() => {
   return `FULL TIMELINE · ${from} → NOW`
 })
 
-function getWeekStart(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00')
-  d.setDate(d.getDate() - d.getDay())
-  return d.toLocaleDateString('en-CA')
-}
-
 function slotKey(dateStr: string) {
-  return zoom.value === 'week' ? getWeekStart(dateStr) : dateStr.slice(0, 7)
+  return zoom.value === 'week' ? weekStartOf(dateStr) : dateStr.slice(0, 7)
 }
 
 const slots = computed((): string[] => {
   const out: string[] = []
   if (zoom.value === 'week') {
-    const cur = new Date(getWeekStart(historyStart.value) + 'T12:00:00')
-    const end = new Date(getWeekStart(today) + 'T12:00:00')
-    while (cur <= end) {
-      out.push(cur.toLocaleDateString('en-CA'))
-      cur.setDate(cur.getDate() + 7)
-    }
+    out.push(...eachDay(weekStartOf(historyStart.value), weekStartOf(today), 7))
   }
   else {
     let [y, m] = historyStart.value.split('-').map(Number) as [number, number]
