@@ -626,7 +626,6 @@ import {
   describeContents, stockNoun
 } from '#shared/utils/vialForm'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Tools · Inventory' })
 
 const toast = useToast()

@@ -388,8 +388,6 @@ import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
 import type { AdherenceWeek } from '~/utils/adherence'
 
-definePageMeta({ middleware: 'journal-auth' })
-
 const route = useRoute()
 const toast = useToast()
 const { isOwner } = await useAuth()

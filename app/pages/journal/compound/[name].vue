@@ -374,8 +374,6 @@ import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcUnits, convertUnitFor, iuEquivalentLabel, type MixUnit } from '~/utils/peptideCalc'
 import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
 
-definePageMeta({ middleware: 'journal-auth' })
-
 const route = useRoute()
 const { role } = await useAuth()
 // Dose rows link to /journal/<date> only for roles allowed there (shared/utils/access.ts).

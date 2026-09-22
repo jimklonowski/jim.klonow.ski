@@ -189,7 +189,6 @@
 import { DEXA_OTHER_METRICS, DEXA_TOTAL_METRICS, REGION_LABELS, formatLbs } from '~/data/dexa'
 import type { DexaEntry, DexaRegion } from '~/composables/useDexaEntries'
 
-definePageMeta({ middleware: 'labs-auth' })
 useSeoMeta({ title: () => 'Labs · DEXA' })
 
 const { data, refresh, error } = await useDexaEntries()

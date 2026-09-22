@@ -545,7 +545,6 @@ import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Photos' })
 
 const { data: photosData, refresh, error } = await usePhotoEntries()

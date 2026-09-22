@@ -132,7 +132,6 @@ import {
   tentativeStartLabel
 } from '#shared/utils/cycles'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Cycles' })
 
 const toast = useToast()

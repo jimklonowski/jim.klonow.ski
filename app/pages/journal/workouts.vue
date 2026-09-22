@@ -149,7 +149,6 @@
 import type { WorkoutEntry } from '~/composables/useWorkoutsEntries'
 import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Workouts' })
 
 const { data, refresh, error } = await useWorkoutsEntries()

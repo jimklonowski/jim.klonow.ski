@@ -309,7 +309,6 @@ import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
 
-definePageMeta({ middleware: 'labs-auth' })
 useSeoMeta({ title: 'Labs' })
 
 const { data, refresh, error } = await useLabsEntries()

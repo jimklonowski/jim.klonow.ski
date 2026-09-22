@@ -109,8 +109,6 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ middleware: 'journal-auth' })
-
 interface ChatMessage { role: 'user' | 'assistant', content: string }
 
 const SAMPLE_QUESTIONS = [

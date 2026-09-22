@@ -161,7 +161,6 @@
 <script setup lang="ts">
 import { getCompoundColor } from '~/data/journal'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Entries' })
 
 const { data, refresh, error } = await useJournalEntries()

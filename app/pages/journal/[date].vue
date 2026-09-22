@@ -718,8 +718,6 @@ import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 import exifr from 'exifr'
 
-definePageMeta({ middleware: 'journal-auth' })
-
 // Shared :ui overrides so every field on this long form reads the same.
 const FIELD_UI = { label: 'tui-label', hint: 'text-[10px] text-faint' }
 // Shared by the USelects and the autocomplete UInputMenus (compound / food / soda) so every

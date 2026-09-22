@@ -230,7 +230,6 @@
 <script setup lang="ts">
 import { getCompoundColor, STANDING_COMPOUNDS } from '~/data/journal'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Calendar' })
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
