@@ -65,19 +65,19 @@
                 <template v-if="isOwner">
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
                     :aria-label="`Edit ${c.name}`"
                     @click="cycleForm?.open(c)"
                   >edit</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
                     :aria-label="`Duplicate ${c.name}`"
                     @click="cycleForm?.open(c, { duplicate: true })"
                   >duplicate</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
                     :aria-label="`Delete ${c.name}`"
                     @click="confirmDelete(c)"
                   >✕</button>

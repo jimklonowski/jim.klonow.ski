@@ -91,53 +91,57 @@
             label="VITALS · ON DAYS VS OFF"
             :dashes="4"
           />
-          <table class="w-full mt-2.5 text-[12.5px]">
-            <thead>
-              <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-                <th class="text-left font-medium py-1.5">
-                  Metric
-                </th>
-                <th class="text-right font-medium py-1.5">
-                  <span class="inline-flex items-center gap-1.5">
-                    <span
-                      class="w-1.5 h-1.5 rounded-full"
-                      :style="{ background: compoundColor }"
-                    />
-                    On
-                  </span>
-                </th>
-                <th class="text-right font-medium py-1.5">
-                  Off
-                </th>
-                <th class="text-right font-medium py-1.5">
-                  Diff
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="row in vitalsRows"
-                :key="row.label"
-                class="border-t border-line-soft"
-              >
-                <td class="py-2 text-muted uppercase text-[11px] tracking-[0.08em]">
-                  {{ row.label }}
-                </td>
-                <td class="py-2 text-right text-hi">
-                  {{ row.on ?? '—' }}
-                </td>
-                <td class="py-2 text-right text-muted">
-                  {{ row.off ?? '—' }}
-                </td>
-                <td
-                  class="py-2 text-right"
-                  :class="row.deltaClass"
+          <!-- Four columns of numbers inside a 380px track: without a scroll container this
+               overflowed the page on a phone instead of scrolling itself. -->
+          <div class="overflow-x-auto">
+            <table class="w-full mt-2.5 text-[12.5px]">
+              <thead>
+                <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                  <th class="text-left font-medium py-1.5">
+                    Metric
+                  </th>
+                  <th class="text-right font-medium py-1.5">
+                    <span class="inline-flex items-center gap-1.5">
+                      <span
+                        class="w-1.5 h-1.5 rounded-full"
+                        :style="{ background: compoundColor }"
+                      />
+                      On
+                    </span>
+                  </th>
+                  <th class="text-right font-medium py-1.5">
+                    Off
+                  </th>
+                  <th class="text-right font-medium py-1.5">
+                    Diff
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in vitalsRows"
+                  :key="row.label"
+                  class="border-t border-line-soft"
                 >
-                  {{ row.deltaText }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  <td class="py-2 text-muted uppercase text-[11px] tracking-[0.08em]">
+                    {{ row.label }}
+                  </td>
+                  <td class="py-2 text-right text-hi">
+                    {{ row.on ?? '—' }}
+                  </td>
+                  <td class="py-2 text-right text-muted">
+                    {{ row.off ?? '—' }}
+                  </td>
+                  <td
+                    class="py-2 text-right"
+                    :class="row.deltaClass"
+                  >
+                    {{ row.deltaText }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <p class="mt-2 text-[11px] text-faint leading-[1.6]">
             {{ onDaysWithVitals }} on-day vs {{ offDaysWithVitals.toLocaleString('en-US') }} off-day readings · correlation only — not causal
           </p>
@@ -277,53 +281,57 @@
             :label="isInjected ? 'RECENT INJECTIONS' : 'RECENT DOSES'"
             :dashes="10"
           />
-          <table class="w-full mt-2.5 text-[12.5px]">
-            <thead>
-              <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-                <th class="text-left font-medium py-1.5">
-                  Date
-                </th>
-                <th class="text-left font-medium py-1.5">
-                  Time
-                </th>
-                <th class="text-right font-medium py-1.5">
-                  Dose
-                </th>
-                <th class="text-right font-medium py-1.5">
-                  {{ isInjected ? 'Site' : 'Route' }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- The date is a real link (keyboard / middle-click work) and only for roles that
+          <!-- Four columns of numbers inside a 380px track: without a scroll container this
+               overflowed the page on a phone instead of scrolling itself. -->
+          <div class="overflow-x-auto">
+            <table class="w-full mt-2.5 text-[12.5px]">
+              <thead>
+                <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                  <th class="text-left font-medium py-1.5">
+                    Date
+                  </th>
+                  <th class="text-left font-medium py-1.5">
+                    Time
+                  </th>
+                  <th class="text-right font-medium py-1.5">
+                    Dose
+                  </th>
+                  <th class="text-right font-medium py-1.5">
+                    {{ isInjected ? 'Site' : 'Route' }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- The date is a real link (keyboard / middle-click work) and only for roles that
                    can open the day; the doctor sees the dose history without a dead-end jump. -->
-              <tr
-                v-for="(inj, i) in recentDoses"
-                :key="`${inj.date}-${inj.time}-${i}`"
-                :class="[i % 2 ? 'bg-inset' : '', canOpenDays ? 'hover:bg-[#101a15] transition-colors' : '']"
-              >
-                <td class="py-1.5 text-body">
-                  <NuxtLink
-                    v-if="canOpenDays"
-                    :to="`/journal/${inj.date}`"
-                    class="hover:text-accent"
-                  >{{ inj.date }}</NuxtLink>
-                  <template v-else>
-                    {{ inj.date }}
-                  </template>
-                </td>
-                <td class="py-1.5 text-muted">
-                  {{ inj.time || '—' }}
-                </td>
-                <td class="py-1.5 text-right text-hi">
-                  {{ inj.dose }} <span class="text-muted">{{ inj.unit }}</span>
-                </td>
-                <td class="py-1.5 text-right text-muted uppercase">
-                  {{ shortSite(inj.site) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                <tr
+                  v-for="(inj, i) in recentDoses"
+                  :key="`${inj.date}-${inj.time}-${i}`"
+                  :class="[i % 2 ? 'bg-inset' : '', canOpenDays ? 'hover:bg-[#101a15] transition-colors' : '']"
+                >
+                  <td class="py-1.5 text-body">
+                    <NuxtLink
+                      v-if="canOpenDays"
+                      :to="`/journal/${inj.date}`"
+                      class="hover:text-accent"
+                    >{{ inj.date }}</NuxtLink>
+                    <template v-else>
+                      {{ inj.date }}
+                    </template>
+                  </td>
+                  <td class="py-1.5 text-muted">
+                    {{ inj.time || '—' }}
+                  </td>
+                  <td class="py-1.5 text-right text-hi">
+                    {{ inj.dose }} <span class="text-muted">{{ inj.unit }}</span>
+                  </td>
+                  <td class="py-1.5 text-right text-muted uppercase">
+                    {{ shortSite(inj.site) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Syringe units for the current mix -->

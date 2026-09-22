@@ -224,13 +224,13 @@
                   >{{ isPillForm(row.vial.form) ? '▸ open' : '⚗ open' }}</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
                     :aria-label="`Edit ${row.vial.compound} ${containerNoun(row.vial.form)}`"
                     @click="openEditModal(row.vial)"
                   >edit</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
                     :aria-label="`Delete ${row.vial.compound} ${containerNoun(row.vial.form)}`"
                     @click="confirmDelete(row.vial)"
                   >✕</button>
@@ -276,13 +276,13 @@
             <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
                 :aria-label="`Reactivate ${vial.compound} ${containerNoun(vial.form)}`"
                 @click="reactivate(vial)"
               >↻ reactivate</button>
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
                 :aria-label="`Delete ${vial.compound} ${containerNoun(vial.form)}`"
                 @click="confirmDelete(vial)"
               >✕</button>

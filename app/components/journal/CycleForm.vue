@@ -114,11 +114,13 @@
                   class="w-1.5 h-1.5 rounded-full shrink-0"
                   :style="{ background: getCompoundColor(item.compound) }"
                 />
+                <!-- Fills the row on a phone instead of forcing 56+22+20 units of fixed width
+                     (~420px) into a ~330px modal, which wrapped the remove button to its own line. -->
                 <USelectMenu
                   v-model="item.compound"
                   :items="KNOWN_COMPOUNDS"
                   placeholder="Compound"
-                  class="w-56"
+                  class="w-full sm:w-56 min-w-0"
                 />
                 <UInput
                   v-model.number="item.dose"

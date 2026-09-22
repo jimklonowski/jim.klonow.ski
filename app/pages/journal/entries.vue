@@ -71,47 +71,52 @@
         <span class="text-hi uppercase">{{ formatDate(row.date, 'monthDay') }}</span>
         <span class="text-dim truncate">{{ row.vitals }}</span>
 
-        <span class="flex items-center gap-1 flex-wrap">
-          <span
-            v-for="c in row.compounds"
-            :key="c"
-            class="w-1.5 h-1.5 rounded-full shrink-0"
-            :style="{ background: getCompoundColor(c) }"
-            :title="c"
-          />
-          <span
-            v-if="row.photos"
-            class="text-[10px] text-faint"
-            :title="`${row.photos} progress photo${row.photos > 1 ? 's' : ''}`"
-          >📷</span>
-          <span
-            v-if="row.recon"
-            class="text-[10px] text-faint"
-            :title="`${row.recon} reconstitution${row.recon > 1 ? 's' : ''}`"
-          >⚗</span>
-          <span
-            v-if="row.isDraw"
-            class="text-[10px] text-accent whitespace-nowrap"
-          >▲ lab draw</span>
-        </span>
+        <!-- Same treatment as the workout log: below lg the four trailing cells share one
+             wrapped row instead of alternating between the date and vitals columns, which put
+             the right-aligned flags under the date. `lg:contents` restores the real grid. -->
+        <span class="col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:contents">
+          <span class="flex items-center gap-1 flex-wrap">
+            <span
+              v-for="c in row.compounds"
+              :key="c"
+              class="w-1.5 h-1.5 rounded-full shrink-0"
+              :style="{ background: getCompoundColor(c) }"
+              :title="c"
+            />
+            <span
+              v-if="row.photos"
+              class="text-[10px] text-faint"
+              :title="`${row.photos} progress photo${row.photos > 1 ? 's' : ''}`"
+            >📷</span>
+            <span
+              v-if="row.recon"
+              class="text-[10px] text-faint"
+              :title="`${row.recon} reconstitution${row.recon > 1 ? 's' : ''}`"
+            >⚗</span>
+            <span
+              v-if="row.isDraw"
+              class="text-[10px] text-accent whitespace-nowrap"
+            >▲ lab draw</span>
+          </span>
 
-        <span
-          v-if="showSoda"
-          class="text-muted"
-        >{{ row.sodas || '' }}</span>
-
-        <span
-          class="text-accent"
-          :title="row.workouts ? `${row.workouts} workout${row.workouts > 1 ? 's' : ''}` : undefined"
-        >{{ row.workouts ? '✓' : '' }}</span>
-
-        <span class="text-right">
           <span
-            v-for="flag in row.flags"
-            :key="flag.text"
-            :class="flag.class"
-            class="ml-2"
-          >{{ flag.text }}</span>
+            v-if="showSoda"
+            class="text-muted"
+          >{{ row.sodas || '' }}</span>
+
+          <span
+            class="text-accent"
+            :title="row.workouts ? `${row.workouts} workout${row.workouts > 1 ? 's' : ''}` : undefined"
+          >{{ row.workouts ? '✓' : '' }}</span>
+
+          <span class="text-right lg:ml-0 ml-auto">
+            <span
+              v-for="flag in row.flags"
+              :key="flag.text"
+              :class="flag.class"
+              class="ml-2"
+            >{{ flag.text }}</span>
+          </span>
         </span>
       </NuxtLink>
 

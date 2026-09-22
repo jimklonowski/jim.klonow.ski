@@ -615,7 +615,7 @@
                 <button
                   v-if="isOwner"
                   type="button"
-                  class="absolute top-0 right-0 px-1 text-[11px] bg-bg text-faint hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  class="absolute top-0 right-0 px-1 text-[11px] bg-bg text-faint hover:text-danger tui-row-action cursor-pointer"
                   aria-label="Delete photo"
                   @click="deletePhoto(photo.id)"
                 >
