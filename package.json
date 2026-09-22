@@ -11,7 +11,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "preview": "pnpm run build && wrangler dev",
-    "postinstall": "nuxt prepare",
+    "postinstall": "wrangler types && nuxt prepare",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "test:watch": "node --test --watch \"tests/**/*.test.mjs\"",
