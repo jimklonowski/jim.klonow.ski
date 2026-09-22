@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { mergeRules } from '#shared/utils/cycles'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
@@ -8,8 +7,6 @@ import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 // Personal-health digest generation. Gathers vitals / sleep / recovery / doses / workouts for a
 // period from D1, has Claude write a short plain-text recap, and upserts it into the digests table.
 // Shared by the scheduled tasks (digest:daily, digest:weekly) and the on-demand generate endpoint.
-
-const MODEL = 'claude-sonnet-5'
 
 export type DigestKind = 'daily' | 'weekly'
 
@@ -482,24 +479,30 @@ Write about 5 sentences, in order of importance: an active or just-finished plan
 ${STYLE_RULES}`
 }
 
-async function callClaude(apiKey: string, prompt: string): Promise<string> {
+async function callClaude(prompt: string): Promise<string> {
   // The scheduled tasks get exactly one shot per day at this call, so lean on the SDK's
-  // backoff-retry (default 2 attempts) a bit harder and cap the request so a hung connection
+  // backoff-retry a bit harder than the shared default and cap the request so a hung connection
   // can't run the task into the Workers time limit.
-  const anthropic = new Anthropic({ apiKey, maxRetries: 4, timeout: 60_000 })
-  // Sonnet 5 runs adaptive thinking by default and max_tokens caps thinking + text
-  // together, so leave generous headroom; low effort keeps the thinking spend small
-  // for what is a short writing task over precomputed facts.
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 8192,
-    output_config: { effort: 'low' },
-    messages: [{ role: 'user', content: prompt }]
-  })
-  if (response.stop_reason !== 'end_turn') {
-    throw new Error(`Digest generation stopped early (${response.stop_reason}) — not storing a truncated summary`)
+  const startedAt = Date.now()
+  let response
+  try {
+    // The model runs adaptive thinking by default and max_tokens caps thinking + text
+    // together, so leave generous headroom; low effort keeps the thinking spend small
+    // for what is a short writing task over precomputed facts.
+    response = await createAnthropic({ maxRetries: 4, timeout: 60_000 }).messages.create({
+      model: AI_MODELS.digest,
+      max_tokens: 8192,
+      output_config: { effort: 'low' },
+      messages: [{ role: 'user', content: prompt }]
+    })
   }
-  const text = response.content.find(b => b.type === 'text')?.text?.trim()
+  catch (err) {
+    throw aiError(err, 'digest')
+  }
+  logAiUsage('digest', AI_MODELS.digest, response.usage, response.stop_reason, startedAt)
+  // Never store a truncated recap: the text reads finished but stops mid-thought.
+  assertCompleted(response.stop_reason, 'digest')
+  const text = textOf(response.content)
   if (!text) throw new Error('Digest generation returned no text')
   return text
 }
@@ -536,7 +539,6 @@ export interface DigestResult {
 // the 7 days ending on endDate. Returns { skipped: true } when the period has no data to summarize.
 export async function generateDigest(
   db: D1Database,
-  apiKey: string,
   kind: DigestKind,
   endDate?: string
 ): Promise<DigestResult> {
@@ -593,7 +595,7 @@ export async function generateDigest(
 
   const facts = built.lines.join('\n')
   const prompt = kind === 'weekly' ? weeklyPrompt(start, end, facts, regimen) : dailyPrompt(end, facts, regimen)
-  const summary = await callClaude(apiKey, prompt)
+  const summary = await callClaude(prompt)
   await storeDigest(db, kind, start, end, summary, built.stats)
 
   return { ok: true, type: kind, period_start: start, period_end: end, summary }

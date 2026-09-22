@@ -7,11 +7,10 @@ export default defineTask({
   },
   async run(event): Promise<{ result: DigestResult | { error: string } }> {
     const db = ((event.context as unknown as { cloudflare: { env: Env } }).cloudflare.env).DB
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) return { result: { error: 'ANTHROPIC_API_KEY not configured' } }
 
     try {
-      const result = await generateDigest(db, apiKey, 'weekly')
+      // The API key is read (and its absence reported) inside createAnthropic — see server/utils/ai.ts.
+      const result = await generateDigest(db, 'weekly')
       return { result }
     }
     catch (err) {
