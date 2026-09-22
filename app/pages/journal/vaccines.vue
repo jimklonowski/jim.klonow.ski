@@ -303,7 +303,6 @@ import { PROFILE_FIELDS } from '#shared/utils/profile'
 import type { Vaccination, VaccineCoverage } from '#shared/utils/vaccines'
 import { VACCINE_NAMES, vaccineCoverage } from '#shared/utils/vaccines'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Vaccines' })
 
 const toast = useToast()

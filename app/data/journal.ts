@@ -161,7 +161,10 @@ export const DOSE_UNITS = [
   { label: 'IU', value: 'iu' }
 ]
 
-export const COMPOUND_GROUPS: Record<string, string[]> = {
+// `as const` so KnownCompound below is the literal union of every name, which is what makes
+// COMPOUND_COLORS exhaustive at compile time — HGH, the daily core compound, sat without a colour
+// for months and rendered grey on every timeline because nothing checked.
+export const COMPOUND_GROUPS = {
   'Peptides': [
     'MOTS-C', 'NAD+', 'GHK-Cu', 'KPV', 'BPC-157', 'TB-500', 'BPC-157 / TB-500',
     'Ipamorelin', 'CJC-1295', 'CJC-1295 / Ipamorelin', 'SS-31', 'Epitalon', 'Humanin',
@@ -187,7 +190,7 @@ export const COMPOUND_GROUPS: Record<string, string[]> = {
     '5-Amino-1MQ', 'SLU-PP-332', 'Modafinil', 'Bromantane',
     'Iron Bisglycinate'
   ]
-}
+} as const satisfies Record<string, readonly string[]>
 
 export interface StandingCompound {
   compound: string
@@ -209,9 +212,19 @@ export const STANDING_COMPOUNDS: StandingCompound[] = [
   { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet' }
 ]
 
-export const KNOWN_COMPOUNDS = Object.values(COMPOUND_GROUPS).flat()
+/** Every name in COMPOUND_GROUPS, as a union — the key set COMPOUND_COLORS must cover. */
+export type KnownCompound = (typeof COMPOUND_GROUPS)[keyof typeof COMPOUND_GROUPS][number]
 
-export const COMPOUND_COLORS: Record<string, string> = {
+export const KNOWN_COMPOUNDS: string[] = Object.values(COMPOUND_GROUPS).flat()
+
+/**
+ * Timeline/dot colour per compound. The `satisfies` is load-bearing: adding a name to
+ * COMPOUND_GROUPS without a colour here is now a typecheck failure rather than a silently grey
+ * row. Freeform compounds that aren't in the list fall back in getCompoundColor().
+ *
+ * The three testosterone esters deliberately share one red — same hormone, different ester.
+ */
+export const COMPOUND_COLORS = {
   'MOTS-C': '#3b82f6',
   'NAD+': '#8b5cf6',
   'GHK-Cu': '#f59e0b',
@@ -227,6 +240,9 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Testosterone Cypionate': '#dc2626',
   'Testosterone Enanthate': '#dc2626',
   'Testosterone Propionate': '#dc2626',
+  // Core protocol beside testosterone and hCG: a bright cyan so the daily HGH row is
+  // unmistakable against the red and amber of the other two.
+  'HGH': '#67e8f9',
   'hCG': '#b45309',
   'Anastrozole': '#6366f1',
   'Enclomiphene': '#7c3aed',
@@ -262,17 +278,28 @@ export const COMPOUND_COLORS: Record<string, string> = {
   'Methasterone': '#86198f',
   'Fluoxymesterone': '#78350f',
   'Clenbuterol': '#14b8a6',
+  // Nootropics and sleep, kept to one indigo→slate family so the group reads as a group on a
+  // timeline; Modafinil takes the bright yellow since it's the stimulant among them.
   'Cerebrolysin': '#818cf8',
+  'Semax': '#a5b4fc',
+  'Selank': '#c7d2fe',
+  'DSIP': '#94a3b8',
   'Bromantane': '#78716c',
+  'Modafinil': '#fde047',
   '5-Amino-1MQ': '#0d9488',
   'SLU-PP-332': '#ca8a04',
   'Humanin': '#eab308',
   'Thymosin Alpha-1': '#22c55e',
   'Thymosin Beta-4': '#f472b6'
-}
+} as const satisfies Record<KnownCompound, string>
+
+/** Neutral grey for a freeform compound that isn't one of the known names. */
+export const UNKNOWN_COMPOUND_COLOR = '#6b7280'
 
 export function getCompoundColor(compound: string): string {
-  return COMPOUND_COLORS[compound] ?? '#6b7280'
+  // Cast because the map is keyed by the known union, while callers pass logged text that may
+  // be anything the day form accepted.
+  return (COMPOUND_COLORS as Record<string, string>)[compound] ?? UNKNOWN_COMPOUND_COLOR
 }
 
 export function formatSite(site: string): string {

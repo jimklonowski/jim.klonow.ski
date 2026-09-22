@@ -50,7 +50,9 @@
 </template>
 
 <script setup lang="ts">
-useSeoMeta({ title: 'Shared View' })
+// The URL *is* the credential. Beyond not indexing it, Referrer-Policy: no-referrer (set in
+// nuxt.config's security headers) keeps the token out of outbound requests.
+useSeoMeta({ title: 'Shared View', robots: 'noindex, nofollow' })
 
 // Public landing for owner-minted share links: exchanges the URL token for a role session
 // cookie, then hard-navigates so SSR renders the role's view from the first request.

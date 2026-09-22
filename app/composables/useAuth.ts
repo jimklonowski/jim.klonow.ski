@@ -8,7 +8,13 @@ export async function useAuth() {
   const { data, refresh } = await useAsyncData(
     'auth-me',
     () => requestFetch<{ role: Role | null }>('/api/auth/me'),
-    { getCachedData: (key, nuxtApp) => nuxtApp.payload.data[key] ?? nuxtApp.static.data[key] }
+    {
+      // Serve the payload cache on the initial load only. Nuxt 4 consults getCachedData on
+      // refresh() too, so returning the cache unconditionally made the exported refresh() a
+      // no-op — nothing could pick up a role change without a full reload.
+      getCachedData: (key, nuxtApp, ctx) =>
+        ctx.cause === 'initial' ? (nuxtApp.payload.data[key] ?? nuxtApp.static.data[key]) : undefined
+    }
   )
   const role = computed<Role | null>(() => data.value?.role ?? null)
   const isOwner = computed(() => role.value === 'owner')

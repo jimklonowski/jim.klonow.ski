@@ -234,7 +234,6 @@
 <script setup lang="ts">
 import type { Supplement, SupplementCategory, SupplementStatus } from '~/data/journal'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Supplements' })
 
 const toast = useToast()

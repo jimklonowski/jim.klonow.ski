@@ -176,6 +176,7 @@
               type="button"
               class="cursor-pointer normal-case"
               :class="zoom === opt ? 'text-accent' : 'text-faint hover:text-accent'"
+              :aria-pressed="zoom === opt"
               @click="zoom = opt"
             >{{ zoom === opt ? `[${opt}]` : opt }}</button>
           </span>
@@ -278,7 +279,6 @@ import { ruleActiveOn } from '#shared/utils/protocolRules'
 import type { AdherenceWeek } from '~/utils/adherence'
 import { iuEquivalentLabel } from '~/utils/peptideCalc'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Compounds' })
 
 const { data, refresh, error } = await useJournalEntries()
@@ -693,6 +693,4 @@ const inactiveGroups = computed(() => {
     })
     .filter(g => g.count > 0)
 })
-
-useSeoMeta({ title: 'Journal · Compounds' })
 </script>

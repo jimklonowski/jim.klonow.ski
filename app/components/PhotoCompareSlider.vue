@@ -7,14 +7,18 @@
     @pointerup="onPointerUp"
     @pointercancel="onPointerUp"
   >
+    <!-- The two photos are the content here, so they carry real alt text built from the same
+         dates the visible corner labels show. -->
     <img
       :src="afterUrl"
+      :alt="afterLabel ? `After: ${afterLabel}` : 'After photo'"
       class="absolute inset-0 w-full h-full object-cover pointer-events-none"
       :style="afterStyle"
       draggable="false"
     >
     <img
       :src="beforeUrl"
+      :alt="beforeLabel ? `Before: ${beforeLabel}` : 'Before photo'"
       class="absolute inset-0 w-full h-full object-cover pointer-events-none"
       :style="{ clipPath: `inset(0 ${100 - pct}% 0 0)`, ...beforeStyle }"
       draggable="false"

@@ -4,6 +4,7 @@
       type="button"
       class="cursor-pointer"
       :class="smooth ? 'text-body' : 'text-faint hover:text-accent'"
+      :aria-pressed="smooth"
       @click="smooth = !smooth"
     >7d avg <span :class="smooth ? 'text-accent' : 'text-faint'">[{{ smooth ? 'on' : 'off' }}]</span></button>
     <span class="text-ghost">·</span>
@@ -14,6 +15,7 @@
         type="button"
         class="cursor-pointer"
         :class="days === opt.days ? 'text-accent' : 'text-faint hover:text-accent'"
+        :aria-pressed="days === opt.days"
         @click="days = opt.days"
       >{{ days === opt.days ? `[${opt.label}]` : opt.label }}</button>
     </span>

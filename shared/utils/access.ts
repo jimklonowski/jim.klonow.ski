@@ -53,6 +53,28 @@ const DOCTOR_PAGES = [
   /^\/journal\/cycle\//
 ]
 
+/** The sign-in page: inside the gated prefix, but it is the way in, so never gated itself. */
+export const LOGIN_PATH = '/labs/login'
+
+/** Trailing slashes off, empty means root — so '/journal/' and '/journal' are one path. */
+export function normalizePath(path: string): string {
+  return path.replace(/\/+$/, '') || '/'
+}
+
+/**
+ * Page paths behind the auth gate. Shared so the server middleware (hard navigation) and the
+ * global route middleware (SPA navigation) gate exactly the same set — they were two hand-kept
+ * lists, and the client's was opt-in per page, so a new page under /journal was protected on a
+ * hard load and open on an in-app link until someone remembered the definePageMeta line.
+ */
+export function isProtectedPage(path: string): boolean {
+  const p = normalizePath(path)
+  return p === '/labs' || p.startsWith('/labs/')
+    || p === '/journal' || p.startsWith('/journal/')
+    || p === '/tools' || p.startsWith('/tools/')
+    || p === '/ask'
+}
+
 export function canAccessPage(role: Role, path: string): boolean {
   if (role === 'owner') return true
   if (role === 'demo') return !DEMO_BLOCKED_PAGES.some(re => re.test(path))

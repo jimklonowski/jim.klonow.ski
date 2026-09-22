@@ -150,7 +150,6 @@
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { CHART_ACCENT, CHART_DANGER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Journal · Trends' })
 
 const { data: journalData, refresh, error } = await useJournalEntries()
@@ -357,6 +356,4 @@ function asleepMinutes(params: Array<{ seriesName?: string, value?: number | str
     .filter(p => p.seriesName !== 'awake')
     .reduce((sum, p) => sum + Number(p.value ?? 0), 0)
 }
-
-useSeoMeta({ title: 'Journal · Trends' })
 </script>

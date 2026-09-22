@@ -161,7 +161,6 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Tools · Sharing' })
 
 interface Invite {

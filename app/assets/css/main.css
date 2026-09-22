@@ -34,12 +34,17 @@
   --color-warn: #e8b34b;
   --color-danger: #e86a5e;
 
-  /* Text ramp (muted/dimmed also flow through the --ui-text-* overrides below) */
+  /* Text ramp (muted/dimmed also flow through the --ui-text-* overrides below).
+     The bottom of the ramp was raised 2026-09-22 for contrast against --color-bg: `faint` carries
+     real content (every .tui-label section header, at 10.5px) and sat at 3.1:1, under the 4.5:1
+     AA floor for body text. It now clears it, and `ghost` inherits the old `faint` value since it
+     is only ever rules, separators and disabled text. Previous values, to revert the look:
+     faint #4a6357 (3.1:1), ghost #3f5449 (2.4:1). */
   --color-hi: #e6f2ec;
   --color-body: #c7d4cd;
   --color-dim: #a7bcb0;
-  --color-faint: #4a6357;
-  --color-ghost: #3f5449;
+  --color-faint: #62806f;
+  --color-ghost: #4a6357;
 
   /* Misc series colors from the handoff */
   --color-indigo-dot: #8593ea;
@@ -89,7 +94,9 @@
   --ui-bg-inverted: var(--color-hi);
 
   --ui-text-dimmed: var(--color-faint);
-  --ui-text-muted: #5d7a6d;
+  /* Raised from #5d7a6d (4.2:1) — this is the label/secondary colour on Nuxt UI form controls
+     and reads at 10.5-12px, where 4.2 was under the AA floor. */
+  --ui-text-muted: #7a9688;
   --ui-text-toned: var(--color-dim);
   --ui-text: var(--color-body);
   --ui-text-highlighted: var(--color-hi);
@@ -220,4 +227,22 @@
 @keyframes tui-blink {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
+}
+
+/* Nothing here is motion that carries meaning — blinking carets, a pulsing streaming cursor, a
+   spinning upload glyph, bar/transition easing — so honour the OS preference and stop all of it. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* tui-blink's last keyframe is opacity 0, so a cancelled animation would leave the caret
+     invisible rather than steady. Matches the arbitrary-value utility (animate-[tui-blink_…]). */
+  [class*="tui-blink"],
+  .animate-pulse {
+    opacity: 1 !important;
+  }
 }

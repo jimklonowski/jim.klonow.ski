@@ -69,6 +69,7 @@
             :class="bacWaterMl === ml
               ? 'bg-nav-active border-line-accent text-accent'
               : 'border-line-soft text-faint hover:text-accent hover:border-line-accent'"
+            :aria-pressed="bacWaterMl === ml"
             @click="bacWaterMl = ml"
           >
             {{ ml }} mL
@@ -228,7 +229,6 @@ import { DOSE_UNITS } from '~/data/journal'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG, type MixUnit } from '~/utils/peptideCalc'
 
-definePageMeta({ middleware: 'journal-auth' })
 useSeoMeta({ title: 'Tools · Calculator' })
 
 const route = useRoute()

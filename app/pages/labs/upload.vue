@@ -94,6 +94,7 @@
           :class="reportType === t.value
             ? 'bg-nav-active text-accent'
             : 'bg-bg text-[#6b8578] hover:text-accent'"
+          :aria-pressed="reportType === t.value"
           @click="reportType = t.value"
         >
           {{ t.label }}
@@ -372,7 +373,6 @@
 <script setup lang="ts">
 import { BIOMARKERS } from '~/data/biomarkers'
 
-definePageMeta({ middleware: 'labs-auth' })
 useSeoMeta({ title: () => 'Labs · Upload' })
 
 interface QualitativeResult {

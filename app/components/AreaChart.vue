@@ -1,7 +1,12 @@
 <template>
+  <!-- The SVG echarts renders is a pile of unlabelled paths, so the chart is exposed as a single
+       image with a text alternative. Callers that can say something specific pass `ariaLabel`;
+       everything else gets the series names and range derived below. -->
   <VChart
     :option="option"
     autoresize
+    role="img"
+    :aria-label="ariaLabel ?? describedChart"
     :style="{ height: typeof height === 'number' ? `${height}px` : height }"
   />
 </template>
@@ -34,6 +39,8 @@ const props = withDefaults(defineProps<{
   /** Fixed axis gutters instead of measured ones, so charts stacked on one x-axis stay flush
    * however wide their y-labels are. */
   fixedGutter?: boolean
+  /** Text alternative for screen readers. Falls back to a generated series/range summary. */
+  ariaLabel?: string
 }>(), {
   xAxisKey: 'date',
   height: 160,
@@ -44,7 +51,16 @@ const props = withDefaults(defineProps<{
   bare: false,
   pointKey: undefined,
   markerKey: undefined,
-  fixedGutter: false
+  fixedGutter: false,
+  ariaLabel: undefined
+})
+
+/** "Line chart: Weight, Resting HR — 90 points, 2026-06-24 to 2026-09-22" */
+const describedChart = computed(() => {
+  const names = Object.values(props.categories).map(c => c.name).join(', ')
+  const labels = props.data.map(d => d[props.xAxisKey] as string).filter(Boolean)
+  const span = labels.length > 1 ? `, ${labels[0]} to ${labels.at(-1)}` : ''
+  return `Line chart: ${names || 'no series'} — ${props.data.length} point${props.data.length === 1 ? '' : 's'}${span}`
 })
 
 const option = computed<ECOption>(() => {
