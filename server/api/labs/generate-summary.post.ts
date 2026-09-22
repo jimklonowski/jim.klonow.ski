@@ -211,8 +211,10 @@ Be factual, specific, and concise. If everything is stable and in range, say so 
     response = await createAnthropic().messages.create({
       model: AI_MODELS.summary,
       // 3-5 paragraphs of prose. The old 2048 cap could truncate a summary of a wide panel
-      // mid-sentence, and the truncated text was stored as though it were finished.
-      max_tokens: 8192,
+      // mid-sentence, and the truncated text was stored as though it were finished. Adaptive
+      // thinking shares the max_tokens budget with the prose, hence the headroom.
+      max_tokens: 16_000,
+      output_config: { effort: 'medium' },
       messages: [{ role: 'user', content: prompt }]
     })
   }

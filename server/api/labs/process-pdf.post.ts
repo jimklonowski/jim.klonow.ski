@@ -205,8 +205,11 @@ export default defineEventHandler(async (event) => {
     response = await createAnthropic({ timeout: 120_000 }).messages.create({
       model: AI_MODELS.extract,
       // A wide panel's JSON runs long; 2048 could truncate it mid-object, which then surfaced
-      // only as an opaque "could not parse" with the cause invisible.
-      max_tokens: 8192,
+      // only as an opaque "could not parse" with the cause invisible. This model also thinks
+      // adaptively and max_tokens caps thinking + output together, hence the headroom. Medium
+      // effort: a misread value lands in the lab history, so this is worth some reasoning.
+      max_tokens: 16_000,
+      output_config: { effort: 'medium' },
       messages: [{
         role: 'user',
         content: [

@@ -16,11 +16,11 @@ export const AI_MODELS = {
   /** Daily + weekly recaps, written from precomputed facts. */
   digest: 'claude-sonnet-5',
   /** Lab/DEXA/echo PDF → structured JSON. */
-  extract: 'claude-opus-4-8',
+  extract: 'claude-opus-5-5',
   /** Prose trend summary for a draw. */
-  summary: 'claude-opus-4-8',
+  summary: 'claude-opus-5-5',
   /** Freeform stockpile text → inventory rows (structured output). */
-  parse: 'claude-opus-5'
+  parse: 'claude-opus-5-5'
 } as const
 
 export type AiTask = keyof typeof AI_MODELS
