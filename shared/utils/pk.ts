@@ -12,6 +12,8 @@ export interface PkModel {
   absorptionHalfLifeDays: number
   /** Elimination half-life in days once in circulation. */
   eliminationHalfLifeDays: number
+  /** The unit doses are summed in. A dose logged in another unit is converted or dropped. */
+  unit: 'mg' | 'iu'
 }
 
 export interface PkDose {
@@ -28,22 +30,61 @@ export interface PkDose {
 // absorption and the slow one elimination (subq peptide, ~33h); for the esters it's the
 // reverse (depot release limits) — the Bateman shape doesn't care which is which.
 export const PK_MODELS: Record<string, PkModel> = {
-  'Testosterone Cypionate': { absorptionHalfLifeDays: 8, eliminationHalfLifeDays: 1 },
-  'Testosterone Enanthate': { absorptionHalfLifeDays: 7, eliminationHalfLifeDays: 1 },
-  'Testosterone Propionate': { absorptionHalfLifeDays: 2, eliminationHalfLifeDays: 0.35 },
-  'Sustanon 250': { absorptionHalfLifeDays: 9, eliminationHalfLifeDays: 1 },
-  'Methenolone Enanthate': { absorptionHalfLifeDays: 10, eliminationHalfLifeDays: 1 },
-  'Nandrolone Decanoate': { absorptionHalfLifeDays: 12, eliminationHalfLifeDays: 1 },
-  'hCG': { absorptionHalfLifeDays: 0.3, eliminationHalfLifeDays: 1.4 }
+  'Testosterone Cypionate': { absorptionHalfLifeDays: 8, eliminationHalfLifeDays: 1, unit: 'mg' },
+  'Testosterone Enanthate': { absorptionHalfLifeDays: 7, eliminationHalfLifeDays: 1, unit: 'mg' },
+  'Testosterone Propionate': { absorptionHalfLifeDays: 2, eliminationHalfLifeDays: 0.35, unit: 'mg' },
+  'Sustanon 250': { absorptionHalfLifeDays: 9, eliminationHalfLifeDays: 1, unit: 'mg' },
+  'Methenolone Enanthate': { absorptionHalfLifeDays: 10, eliminationHalfLifeDays: 1, unit: 'mg' },
+  'Nandrolone Decanoate': { absorptionHalfLifeDays: 12, eliminationHalfLifeDays: 1, unit: 'mg' },
+  'hCG': { absorptionHalfLifeDays: 0.3, eliminationHalfLifeDays: 1.4, unit: 'iu' }
+}
+
+/**
+ * A logged amount in the model's unit, or null when it can't be expressed there.
+ *
+ * Superposition adds amounts, so they have to share a unit: a testosterone dose logged as
+ * 75000 mcg used to be summed as 75000 alongside the 75s, and the curve spiked a thousandfold.
+ * mcg→mg is exact. IU↔mass is not — for hCG it's a bioactivity unit with no fixed mass — so a
+ * dose in the wrong kind of unit is dropped rather than guessed at. A missing unit is read as
+ * the model's own, which is what every row written before units were logged meant.
+ */
+export function pkDoseAmount(amount: number | null | undefined, unit: string | null | undefined, model: PkModel): number | null {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+  const u = (unit || model.unit).toLowerCase()
+  if (u === model.unit) return amount
+  if (model.unit === 'mg' && u === 'mcg') return amount / 1000
+  return null
+}
+
+interface LoggedDay {
+  date: string
+  peptides?: Array<{ compound: string, dose?: number | null, unit?: string | null, time?: string | null }> | null
+}
+
+/** Every logged dose of `compound`, in the model's unit, ready for exposureSeries / drawTiming. */
+export function pkDosesFor(entries: LoggedDay[], compound: string, model: PkModel): PkDose[] {
+  const out: PkDose[] = []
+  for (const e of entries) {
+    for (const p of e.peptides ?? []) {
+      if (p.compound !== compound) continue
+      const amount = pkDoseAmount(p.dose, p.unit, model)
+      if (amount != null && amount > 0) out.push({ date: e.date, time: p.time, amount })
+    }
+  }
+  return out
 }
 
 const LN2 = Math.log(2)
 const MS_PER_HOUR = 3_600_000
 
+function hasTime(d: PkDose): boolean {
+  return !!d.time && /^\d{2}:\d{2}$/.test(d.time)
+}
+
 /** Hours since epoch for a dose. Parsed without a zone marker, so diffs stay consistent
  * whether this runs in the browser (local time) or on a Worker (UTC). */
 function doseHours(d: PkDose): number {
-  const time = d.time && /^\d{2}:\d{2}$/.test(d.time) ? d.time : '08:00'
+  const time = hasTime(d) ? d.time! : '08:00'
   return Date.parse(`${d.date}T${time}:00`) / MS_PER_HOUR
 }
 
@@ -122,7 +163,7 @@ export interface DrawTiming {
   lastDoseDate: string
   lastDoseAmount: number
   daysSinceLastDose: number
-  /** Modeled level at the draw as % of the highest modeled level in the prior ~4 weeks. */
+  /** Modeled level at the draw as % of the highest modeled level in the prior two weeks. */
   pctOfRecentPeak: number
   phase: 'rising' | 'near peak' | 'past peak'
 }
@@ -131,8 +172,12 @@ export interface DrawTiming {
  * to still matter (or none precedes the draw at all). */
 export function drawTiming(doses: PkDose[], model: PkModel, drawDate: string): DrawTiming | null {
   const drawH = Date.parse(`${drawDate}T08:00:00`) / MS_PER_HOUR
+  // An untimed dose defaults to 08:00, exactly the assumed draw time, so it used to count as
+  // taken before the draw: zero hours elapsed, phase "rising", 0% of peak — and the AI was told
+  // the draw caught the very bottom of the curve. Morning draws are fasted and the shot usually
+  // follows, so an untimed dose on the draw date is treated as after it.
   const prior = doses
-    .filter(d => doseHours(d) <= drawH)
+    .filter(d => doseHours(d) <= drawH && !(d.date === drawDate && !hasTime(d)))
     .sort((a, b) => doseHours(a) - doseHours(b))
   const last = prior.at(-1)
   if (!last) return null

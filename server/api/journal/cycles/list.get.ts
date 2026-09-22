@@ -13,10 +13,12 @@ export default defineEventHandler(async (event): Promise<Cycle[]> => {
   try {
     ({ results } = await db.prepare('SELECT * FROM cycles ORDER BY start_date DESC').all())
   }
-  catch {
+  catch (err) {
     // Missing table (migration not applied yet) reads as "no cycles", not a 500 — every
-    // consumer of this list (home strip, adherence merge, calendar) degrades cleanly.
-    return []
+    // consumer of this list (home strip, adherence merge, calendar) degrades cleanly. Any
+    // other error is a real failure and must not masquerade as an empty planner.
+    if (isMissingTable(err)) return []
+    throw err
   }
 
   return (results ?? []).map(row => ({

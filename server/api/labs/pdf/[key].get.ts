@@ -3,11 +3,7 @@ export default defineEventHandler(async (event) => {
   // an explicit role list keeps a demo session from fetching a real PDF by guessing its key.
   requireRole(event, 'owner', 'friend', 'doctor')
 
-  const rawKey = getRouterParam(event, 'key')
-  if (!rawKey) {
-    throw createError({ statusCode: 400, message: 'Missing key' })
-  }
-  const key = decodeURIComponent(rawKey)
+  const key = decodeObjectKey(getRouterParam(event, 'key'))
 
   const bucket = getLabsBucket(event)
   const object = await bucket.get(key)

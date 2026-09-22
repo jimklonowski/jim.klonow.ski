@@ -29,6 +29,28 @@ export function getPhotosBucket(event: H3Event): R2Bucket {
   return (event.context.cloudflare.env as unknown as Env).PHOTOS_BUCKET
 }
 
+/**
+ * True when a D1 error is SQLite reporting that a table doesn't exist — the one failure a list
+ * handler should quietly read as "nothing here yet" (a sandbox or environment that hasn't had
+ * the migration). Anything else is a real outage and must surface: swallowing every error as
+ * an empty list made a D1 incident look exactly like having no vaccinations or cycles.
+ */
+export function isMissingTable(err: unknown): boolean {
+  return err instanceof Error && /no such table/i.test(err.message)
+}
+
+/** An R2 key from a URL segment, or a 400 — decodeURIComponent throws on a malformed escape. */
+export function decodeObjectKey(raw: string | undefined): string {
+  if (!raw) throw createError({ statusCode: 400, message: 'Missing key' })
+  try {
+    return decodeURIComponent(raw)
+  }
+  catch {
+    // e.g. "/api/labs/pdf/%E0%A4%A" — a truncated percent-escape used to be an unhandled 500.
+    throw createError({ statusCode: 400, message: 'Malformed key' })
+  }
+}
+
 // R2 objects are private; every source key is served through the authenticated proxy route.
 export function toPdfUrl(key: string): string {
   return `/api/labs/pdf/${encodeURIComponent(key)}`

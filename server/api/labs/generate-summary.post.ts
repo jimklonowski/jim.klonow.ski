@@ -1,5 +1,5 @@
 import { BIOMARKERS } from '../../../app/data/biomarkers'
-import { PK_MODELS, drawTiming, type PkDose } from '#shared/utils/pk'
+import { PK_MODELS, drawTiming, pkDosesFor } from '#shared/utils/pk'
 
 interface LabsRow {
   date: string
@@ -45,22 +45,14 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
   }))
   if (!journal.length) return []
 
-  // Unique dose dates per compound, ascending (rows are already sorted). The PK-modeled
-  // esters also keep dose-level detail — drawTiming needs amounts and clock times, which
-  // the dose-DAY rollup throws away.
+  // Unique dose dates per compound, ascending (rows are already sorted).
   const doseDates = new Map<string, string[]>()
-  const pkDoses = new Map<string, Array<PkDose & { unit?: string | null }>>()
   for (const row of journal) {
     for (const p of row.peptides ?? []) {
       if (!p.compound) continue
       const dates = doseDates.get(p.compound) ?? []
       if (dates.at(-1) !== row.date) dates.push(row.date)
       doseDates.set(p.compound, dates)
-      if (p.compound in PK_MODELS && p.dose != null) {
-        const list = pkDoses.get(p.compound) ?? []
-        list.push({ date: row.date, time: (p as { time?: string | null }).time, amount: p.dose, unit: p.unit })
-        pkDoses.set(p.compound, list)
-      }
     }
   }
 
@@ -90,12 +82,13 @@ async function protocolContext(db: D1Database, date: string): Promise<string[]> 
   // Where the draw landed on each slow-release compound's dosing curve — a draw a day or two
   // after an injection reads near peak on the hormones that ester carries; one right before
   // the next injection reads near trough. Same model as the exposure charts (shared/utils/pk).
+  // Doses come back in the model's own unit (pkDosesFor converts mcg and drops anything it
+  // can't express), so the amount printed is in that unit too.
   const timing: string[] = []
-  for (const [compound, doses] of pkDoses) {
-    const t = drawTiming(doses, PK_MODELS[compound]!, date)
+  for (const [compound, model] of Object.entries(PK_MODELS)) {
+    const t = drawTiming(pkDosesFor(journal, compound, model), model, date)
     if (!t) continue
-    const unit = doses.find(d => d.date === t.lastDoseDate)?.unit
-    const amount = `${t.lastDoseAmount}${unit === 'iu' ? ' IU' : ` ${unit ?? 'mg'}`}`
+    const amount = `${t.lastDoseAmount} ${model.unit === 'iu' ? 'IU' : 'mg'}`
     timing.push(`- ${compound}: last dose ${amount} on ${t.lastDoseDate}, ${t.daysSinceLastDose} days before the draw; modeled exposure at draw ≈ ${t.pctOfRecentPeak}% of its recent peak (${t.phase}).`)
   }
   if (timing.length) {

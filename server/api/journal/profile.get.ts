@@ -13,8 +13,10 @@ export default defineEventHandler(async (event): Promise<Profile> => {
     const { results } = await db.prepare('SELECT key, value FROM profile').all<{ key: string, value: string }>()
     return Object.fromEntries((results ?? []).map(r => [r.key, r.value]))
   }
-  catch {
-    // Missing table (migration not applied yet) reads as "nothing recorded", not a 500.
-    return {}
+  catch (err) {
+    // Missing table (migration not applied yet) reads as "nothing recorded", not a 500. Any
+    // other error is a real failure and must not read as "no blood type on file".
+    if (isMissingTable(err)) return {}
+    throw err
   }
 })

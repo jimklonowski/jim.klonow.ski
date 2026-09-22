@@ -377,7 +377,7 @@
 <script setup lang="ts">
 import { getCompoundColor } from '~/data/journal'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
-import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
+import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 import type { Cycle } from '#shared/utils/cycles'
 import {
   BASELINE_LOOKBACK_DAYS, GATING_MARKERS, checkpointStates, cycleEnd, cycleProgress,
@@ -529,11 +529,7 @@ const overlayRows = computed(() => {
     const plan = plannedDoses(cycle.value, compound)
     const plannedPoints = exposureSeries(plan, model, from, to)
 
-    const logged = entries.value.flatMap(e =>
-      (e.peptides ?? [])
-        .filter(p => p.compound === compound)
-        .map(p => ({ date: e.date, time: p.time, amount: p.dose }))
-    )
+    const logged = pkDosesFor(entries.value, compound, model)
     const actualPoints = logged.length ? exposureSeries(logged, model, from, actualCap) : []
 
     const peak = Math.max(...plannedPoints.map(p => p.level), ...actualPoints.map(p => p.level), 0)

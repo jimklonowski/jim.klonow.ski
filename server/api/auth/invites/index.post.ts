@@ -13,12 +13,15 @@ export default defineEventHandler(async (event) => {
   if (role !== 'friend' && role !== 'doctor') {
     throw createError({ statusCode: 400, message: 'role must be "friend" or "doctor"' })
   }
-  const label = body?.label?.trim() || null
+  // Bounded because it's shown on the sharing page and stored forever.
+  const label = typeof body?.label === 'string' ? body.label.trim().slice(0, 80) || null : null
+  // Capped at ten years: an unbounded value overflowed Date and `toISOString()` threw a
+  // RangeError, which surfaced as a 500. The UI only offers 7/30/90 days or none anyway.
   const expiresDays = body?.expiresDays != null && Number.isFinite(body.expiresDays) && body.expiresDays > 0
-    ? Math.floor(body.expiresDays)
+    ? Math.min(Math.floor(body.expiresDays), 3650)
     : null
   const maxUses = body?.maxUses != null && Number.isFinite(body.maxUses) && body.maxUses > 0
-    ? Math.floor(body.maxUses)
+    ? Math.min(Math.floor(body.maxUses), 10000)
     : null
 
   // The row stores only the digest; the token itself is returned once, here, and never again —
