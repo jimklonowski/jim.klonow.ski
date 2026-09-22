@@ -4,15 +4,20 @@
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
     "preview": "pnpm run build && wrangler dev",
     "postinstall": "nuxt prepare",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:watch": "node --test --watch \"tests/**/*.test.mjs\"",
     "typecheck": "nuxt typecheck",
-    "deploy": "pnpm run build && wrangler deploy",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm test",
+    "deploy": "pnpm run check && pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "sync:local": "node scripts/sync-local.mjs",
     "sync:local:r2": "node scripts/sync-r2-local.mjs",

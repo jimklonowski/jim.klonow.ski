@@ -2,14 +2,26 @@ name: ci
 
 on: push
 
+permissions:
+  contents: read
+
+# A newer push to the same branch supersedes the run in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        node: [22]
+        # The unit tests load shared/utils/*.ts through Node's native type stripping (22.18+),
+        # so both maintained lines run: 22 is the CI floor from package.json engines, 24 is
+        # what the dev machine runs.
+        node: [22, 24]
 
     steps:
       - name: Checkout
@@ -32,3 +44,11 @@ jobs:
 
       - name: Typecheck
         run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # The same build `pnpm deploy` runs, so a bundle break is caught here rather than during
+      # a laptop deploy. No Cloudflare credentials are needed for the build itself.
+      - name: Build
+        run: pnpm run build

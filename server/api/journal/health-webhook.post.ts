@@ -46,18 +46,19 @@ function numOrQty(v: unknown): number | null {
 }
 
 export default defineEventHandler(async (event) => {
-  // Machine auth: WEBHOOK_TOKEN is the intended credential; LABS_SECRET is accepted as a
-  // fallback so the existing Health Auto Export config keeps working until it's updated.
-  // Once the iOS app carries WEBHOOK_TOKEN, rotate LABS_SECRET to retire the old value.
-  const auth = getHeader(event, 'authorization')
-  const token = process.env.WEBHOOK_TOKEN || process.env.LABS_SECRET
-  if (!token || auth !== `Bearer ${token}`) {
+  // Machine auth: WEBHOOK_TOKEN is the only accepted credential, and the route fails closed
+  // without it. It used to fall back to LABS_SECRET — the cookie-signing key — which meant that
+  // whenever the token wasn't set, a third-party iOS app was holding the secret that mints owner
+  // sessions. The compare is constant-time (server/utils/auth.ts).
+  const token = process.env.WEBHOOK_TOKEN
+  if (!token) throw createError({ statusCode: 500, message: 'WEBHOOK_TOKEN is not configured' })
+  if (!safeEqual(getHeader(event, 'authorization'), `Bearer ${token}`)) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 
   const body = await readBody(event)
-  const metrics: Array<{ name: string, units?: string, data: Array<Record<string, unknown>> }> =
-    body?.data?.metrics ?? []
+  const metrics: Array<{ name: string, units?: string, data: Array<Record<string, unknown>> }>
+    = body?.data?.metrics ?? []
   const workoutsIn: Array<Record<string, unknown>> = body?.data?.workouts ?? []
 
   const byDate: Record<string, Vitals> = {}
@@ -71,7 +72,8 @@ export default defineEventHandler(async (event) => {
       if (!byDate[dateStr]) byDate[dateStr] = {}
       if (!healthByDate[dateStr]) healthByDate[dateStr] = {}
 
-      const qty = typeof point.qty === 'number' ? point.qty
+      const qty = typeof point.qty === 'number'
+        ? point.qty
         : typeof point.value === 'number' ? point.value : null
 
       if (name === 'body_mass' && qty != null) {
