@@ -66,11 +66,18 @@ CREATE TABLE IF NOT EXISTS workouts (
 );
 CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
 
+-- Single-row OAuth state for the Whoop connection. `revoked` is set when Whoop rejects the saved
+-- refresh token: the row is kept (rather than deleted) so /api/whoop/status can explain why
+-- syncing stopped instead of silently reporting "connected" while every nightly run fails.
 CREATE TABLE IF NOT EXISTS whoop_tokens (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   access_token TEXT NOT NULL,
   refresh_token TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0,
+  last_synced_at TEXT,
+  last_error TEXT,
+  last_error_at TEXT
 );
 
 -- Stock inventory: sealed containers and the active (opened) ones. `form` says what a container
@@ -303,3 +310,15 @@ CREATE TABLE IF NOT EXISTS profile (
 -- cover the days. The demo DB has no cycles table (see api/journal/cycles/list.get.ts), so this
 -- one is main-DB only:
 -- ALTER TABLE cycles ADD COLUMN planned_days INTEGER;
+
+-- One-time migration, do not re-run after it lands on an environment.
+-- Whoop sync state (2026-09-22). Makes a broken connection visible: `revoked` is set when Whoop
+-- rejects the refresh token (only a reconnect clears it), and last_synced_at/last_error let the
+-- journal header say "last synced 3 days ago" instead of a bare green check. Existing rows are a
+-- live connection that has never errored, which is exactly what the defaults backfill. The demo DB
+-- has no Whoop connection, so this one is main-DB only — but the file is also in schema.sql above,
+-- so a fresh database gets the columns without running this:
+-- ALTER TABLE whoop_tokens ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0;
+-- ALTER TABLE whoop_tokens ADD COLUMN last_synced_at TEXT;
+-- ALTER TABLE whoop_tokens ADD COLUMN last_error TEXT;
+-- ALTER TABLE whoop_tokens ADD COLUMN last_error_at TEXT;
