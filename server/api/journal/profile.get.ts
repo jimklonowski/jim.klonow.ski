@@ -1,10 +1,12 @@
 import type { Profile } from '#shared/utils/profile'
 
 // Readable by every authenticated role — blood type is exactly what a clinician asks first.
-// Demo gets an empty card: the sandbox DB has no profile table and the persona has no facts.
+//
+// Demo used to short-circuit to an empty card; the sandbox now carries a blood type of its own
+// (scripts/demo/generate-demo-data.mjs), so it reads like any other role. The catch below still
+// covers a sandbox that hasn't had schema.sql applied yet.
 export default defineEventHandler(async (event): Promise<Profile> => {
-  const auth = requireLabsAuth(event)
-  if (auth.role === 'demo') return {}
+  requireLabsAuth(event)
 
   const db = getDb(event)
   try {

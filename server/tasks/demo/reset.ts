@@ -56,12 +56,33 @@ export default defineTask({
     }
     const seed = await object.json<SeedFile>()
 
+    // Check every table and column the seed needs BEFORE deleting anything. The failure this
+    // guards against is a real one: a seed written after a schema change lands on a sandbox that
+    // never got the matching ALTER, the DELETE succeeds, the INSERT throws on the unknown
+    // column, and the table sits empty until someone notices. Checking first turns that into a
+    // no-op with a message naming the column.
+    const problems: string[] = []
+    for (const [name, table] of Object.entries(seed.tables)) {
+      const info = await db.prepare(`PRAGMA table_info(${name})`).all<{ name: string }>()
+      const columns = new Set((info.results ?? []).map(c => c.name))
+      if (!columns.size) {
+        problems.push(`${name}: table missing`)
+        continue
+      }
+      const missing = table.cols.filter(c => !columns.has(c))
+      if (missing.length) problems.push(`${name}: no column ${missing.join(', ')}`)
+    }
+    if (problems.length) {
+      const error = `demo schema is behind the seed — ${problems.join('; ')}. Apply server/database/schema.sql to the demo DB.`
+      console.error(`demo:reset skipped: ${error}`)
+      return { result: { error } }
+    }
+
     let total = 0
     for (const [name, table] of Object.entries(seed.tables)) {
       const jsonCols = new Set(table.jsonCols.map(c => table.cols.indexOf(c)))
       const rows = table.rows.map(row => row.map((v, i) => (jsonCols.has(i) ? JSON.stringify(v) : materialize(v))))
 
-      await db.prepare(`DELETE FROM ${name}`).run()
       // Multi-row inserts, sized under D1's ~100 bound-params-per-statement cap.
       const perStatement = Math.max(1, Math.floor(90 / table.cols.length))
       const statements: D1PreparedStatement[] = []
@@ -72,8 +93,13 @@ export default defineTask({
           db.prepare(`INSERT INTO ${name} (${table.cols.join(',')}) VALUES ${placeholders}`).bind(...chunk.flat())
         )
       }
-      // Batch in groups so a single oversized batch can't blow the request limits.
-      for (let i = 0; i < statements.length; i += 20) {
+
+      // The DELETE rides in the same batch as the first inserts, and a D1 batch is one
+      // transaction — so if the very first insert fails the wipe rolls back with it rather than
+      // leaving the table empty. Later chunks are batched in groups so one oversized batch can't
+      // blow the request limits; a failure there still self-heals on the next nightly run.
+      await db.batch([db.prepare(`DELETE FROM ${name}`), ...statements.slice(0, 20)])
+      for (let i = 20; i < statements.length; i += 20) {
         await db.batch(statements.slice(i, i + 20))
       }
       total += rows.length
