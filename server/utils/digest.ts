@@ -3,6 +3,7 @@ import type { ProtocolRule } from '#shared/utils/protocolRules'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
 import { localToday } from '#shared/utils/time'
 import { roundTo, shiftDays } from '#shared/utils/dates'
+import { computeTrends, formatTrendLines } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 

@@ -97,7 +97,7 @@
 import { getCompoundColor } from '~/data/journal'
 import type { Vial, JournalEntry } from '~/data/journal'
 import { computeRemaining, estimateDailyRate } from '~/utils/vialInventory'
-import { convertUnitFor } from '~/utils/peptideCalc'
+import { convertUnitFor } from '#shared/utils/peptideCalc'
 import type { DoseUnit } from '#shared/types/journal'
 import { containerNoun } from '#shared/utils/vialForm'
 import { relevantCycle, cycleStatusOn, tentativeStartLabel } from '#shared/utils/cycles'
