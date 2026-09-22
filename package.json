@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.09.22e",
+  "version": "2026.09.22f",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -11,12 +11,13 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "preview": "pnpm run build && wrangler dev",
-    "postinstall": "nuxt prepare",
+    "postinstall": "wrangler types && nuxt prepare",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "test:watch": "node --test --watch \"tests/**/*.test.mjs\"",
     "typecheck": "nuxt typecheck",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm test",
+    "types": "wrangler types",
+    "check": "pnpm run types && pnpm run lint && pnpm run typecheck && pnpm test",
     "deploy": "pnpm run check && pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "sync:local": "node scripts/sync-local.mjs",
@@ -53,7 +54,7 @@
     "vue": "3.5.43",
     "vue-echarts": "^8.3.0",
     "vue-tsc": "^3.3.11",
-    "wrangler": "^4.136.0"
+    "wrangler": "^4.136.1"
   },
   "packageManager": "pnpm@11.7.0"
 }

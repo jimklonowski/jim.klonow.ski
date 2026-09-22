@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { Role } from '#shared/utils/access'
 
@@ -152,8 +152,25 @@ export function requireUploadPin(event: H3Event) {
 
 // --- Invites ---
 
+/** The token that goes in the share URL. Shown to the owner once, never stored as-is. */
 export function newInviteToken(): string {
   return randomBytes(24).toString('base64url')
+}
+
+/**
+ * The stored form of a share token: `invites.id` holds this, not the token itself.
+ *
+ * The token IS the credential — anyone holding it can mint a friend or doctor session — and it
+ * used to sit in the database in the clear, so every copy of the data carried every live link.
+ * That includes the plaintext dump `pnpm sync:local` writes to the OS temp directory. Storing
+ * only the digest means a leaked export reveals nothing usable.
+ *
+ * Plain SHA-256 with no salt or stretching is the right primitive here (unlike a password):
+ * the input is 24 random bytes, so there is no dictionary to run and nothing to slow down, and
+ * a deterministic digest is what lets the redeem lookup be a single indexed read.
+ */
+export function hashInviteToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
 }
 
 // --- Shared-secret compare ---
