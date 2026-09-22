@@ -1,5 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
+import { isIsoDate } from '#shared/utils/time'
 
 // Builds "[YYYY-MM-DD]-[Description].pdf" from an arbitrary uploaded filename, stripping any
 // date-like text already in it first so re-running extraction never doubles up the date.
@@ -178,11 +178,6 @@ export default defineEventHandler(async (event) => {
   requireOwner(event)
   requireUploadPin(event)
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw createError({ statusCode: 500, message: 'ANTHROPIC_API_KEY is not configured' })
-  }
-
   const formData = await readMultipartFormData(event)
   if (!formData?.length) {
     throw createError({ statusCode: 400, message: 'No file uploaded' })
@@ -204,24 +199,33 @@ export default defineEventHandler(async (event) => {
 
   const base64Data = Buffer.from(pdf.data).toString('base64')
 
-  const anthropic = new Anthropic({ apiKey })
+  const startedAt = Date.now()
+  let response
+  try {
+    response = await createAnthropic({ timeout: 120_000 }).messages.create({
+      model: AI_MODELS.extract,
+      // A wide panel's JSON runs long; 2048 could truncate it mid-object, which then surfaced
+      // only as an opaque "could not parse" with the cause invisible.
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: base64Data }
+          },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  }
+  catch (err) {
+    throw aiError(err, 'extract')
+  }
+  logAiUsage('extract', AI_MODELS.extract, response.usage, response.stop_reason, startedAt)
+  assertCompleted(response.stop_reason, 'extract')
 
-  const response = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
-    max_tokens: 2048,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'document',
-          source: { type: 'base64', media_type: 'application/pdf', data: base64Data }
-        },
-        { type: 'text', text: prompt }
-      ]
-    }]
-  })
-
-  const text = response.content.find(b => b.type === 'text')?.text ?? ''
+  const text = textOf(response.content)
   const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()
 
   let extracted: Record<string, unknown>
@@ -229,21 +233,32 @@ export default defineEventHandler(async (event) => {
     extracted = JSON.parse(cleaned)
   }
   catch {
-    throw createError({ statusCode: 500, message: `Could not parse extraction result: ${text.slice(0, 200)}` })
+    throw createError({ statusCode: 502, message: 'Could not parse the extraction result — try re-running it.' })
+  }
+  if (!extracted || typeof extracted !== 'object' || Array.isArray(extracted)) {
+    throw createError({ statusCode: 502, message: 'The extraction returned an unexpected shape.' })
   }
 
-  // Belt and braces on the prompt's unit rule: CHW prints the WBC differential in K/uL and the site
-  // stores cells/uL. Normalizing here means the /labs/upload preview shows exactly what gets saved.
-  if (reportType === 'bloodwork' && extracted.markers && typeof extracted.markers === 'object') {
-    extracted.markers = normalizeAbsDifferential(extracted.markers as Record<string, unknown>)
+  // The report is third-party content sharing a turn with the extraction instructions, so what
+  // comes back is untrusted: keep only marker keys this site can store, as finite numbers, and
+  // bounded {name, result} qualitative pairs. Anything else is dropped and reported in the
+  // preview rather than silently carried into the save.
+  let dropped: string[] = []
+  if (reportType !== 'dexa') {
+    const clean = sanitizeMarkers(extracted.markers)
+    dropped = clean.dropped
+    // Belt and braces on the prompt's unit rule: CHW prints the WBC differential in K/uL and the
+    // site stores cells/uL. Normalizing here means the preview shows exactly what gets saved.
+    extracted.markers = reportType === 'bloodwork'
+      ? normalizeAbsDifferential(clean.markers)
+      : clean.markers
+    extracted.qualitative = sanitizeQualitative(extracted.qualitative)
   }
 
   // Store the PDF in R2 — sources hold bare object keys; list endpoints turn them into proxy URLs.
   // Filename is derived from the extracted (authoritative) date, not whatever the file was named on
   // upload, so every stored PDF follows "[Description]-[YYYY-MM-DD].pdf" regardless of source filename.
-  const extractedDate = typeof extracted.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(extracted.date)
-    ? extracted.date
-    : null
+  const extractedDate = isIsoDate(extracted.date) ? extracted.date : null
   const pdfFilename = extractedDate
     ? buildPdfFilename(pdf.filename ?? 'LabResult.pdf', extractedDate)
     : (pdf.filename ?? 'lab.pdf')
@@ -252,8 +267,8 @@ export default defineEventHandler(async (event) => {
     httpMetadata: { contentType: 'application/pdf' }
   })
 
-  const existingSources = Array.isArray(extracted.sources) ? extracted.sources as string[] : []
-  const sources = existingSources.includes(pdfFilename) ? existingSources : [...existingSources, pdfFilename]
-
-  return { ...extracted, sources }
+  // `sources` is built here and only here. It used to start from whatever the model returned,
+  // which meant a crafted PDF could name any object in the labs bucket and have the saved row
+  // link to it through the authenticated PDF proxy.
+  return { ...extracted, sources: [pdfFilename], ...(dropped.length ? { ignoredMarkers: dropped } : {}) }
 })

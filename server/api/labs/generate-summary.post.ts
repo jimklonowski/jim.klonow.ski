@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { PK_MODELS, drawTiming, type PkDose } from '#shared/utils/pk'
 
@@ -131,11 +130,6 @@ export default defineEventHandler(async (event) => {
   requireOwner(event)
   requireUploadPin(event)
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw createError({ statusCode: 500, message: 'ANTHROPIC_API_KEY is not configured' })
-  }
-
   const body = await readBody<{ date?: string }>(event)
   const date = body?.date
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -218,16 +212,26 @@ When a hormone-sensitive marker (total/free testosterone, estradiol, hematocrit)
 
 Be factual, specific, and concise. If everything is stable and in range, say so briefly — do not manufacture concerns. No greeting, no closing, no medical-advice disclaimers or "consult your doctor" boilerplate. Plain text only — no markdown, no headers, no bullet characters.`
 
-  const anthropic = new Anthropic({ apiKey })
-  const response = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: prompt }]
-  })
+  const startedAt = Date.now()
+  let response
+  try {
+    response = await createAnthropic().messages.create({
+      model: AI_MODELS.summary,
+      // 3-5 paragraphs of prose. The old 2048 cap could truncate a summary of a wide panel
+      // mid-sentence, and the truncated text was stored as though it were finished.
+      max_tokens: 8192,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  }
+  catch (err) {
+    throw aiError(err, 'summary')
+  }
+  logAiUsage('summary', AI_MODELS.summary, response.usage, response.stop_reason, startedAt)
+  assertCompleted(response.stop_reason, 'summary')
 
-  const summary = response.content.find(b => b.type === 'text')?.text?.trim()
+  const summary = textOf(response.content)
   if (!summary) {
-    throw createError({ statusCode: 500, message: 'Summary generation returned no text' })
+    throw createError({ statusCode: 502, message: 'Summary generation returned no text' })
   }
 
   await db.prepare('UPDATE labs_entries SET ai_summary = ?2 WHERE date = ?1')

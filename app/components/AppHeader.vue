@@ -9,7 +9,15 @@
         to="/"
         class="flex items-center gap-2.5 shrink-0 group"
       >
-        <span class="w-6 h-6 flex items-center justify-center bg-raised border border-accent text-accent text-[10px] leading-none">▲</span>
+        <!-- The afib trace from the favicon set, in currentColor. Decorative: the site name
+             beside it is the link's accessible text. -->
+        <span class="w-6 h-6 flex items-center justify-center bg-raised border border-accent text-accent">
+          <UIcon
+            name="i-jck-logo"
+            class="size-5"
+            aria-hidden="true"
+          />
+        </span>
         <span class="num-display text-[15px] tracking-tight group-hover:text-accent transition-colors">jim.klonow.ski</span>
       </NuxtLink>
 

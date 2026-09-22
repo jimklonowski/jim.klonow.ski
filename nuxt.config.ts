@@ -164,11 +164,12 @@ export default defineNuxtConfig({
   echarts: {
     renderer: 'svg',
     charts: ['LineChart', 'BarChart'],
+    // LabelLayout was registered here without any option ever setting `labelLayout`; dropped so
+    // the bundle carries only what the charts actually use.
     // Every component an option touches has to be listed: echarts drops the rest without a
     // word (a series' markLine is not a top-level key, so it never gets the "used but not
     // imported" dev warning). The lab-draw guides were invisible until MarkLine joined.
-    components: ['GridComponent', 'TooltipComponent', 'LegendComponent', 'MarkLineComponent'],
-    features: ['LabelLayout']
+    components: ['GridComponent', 'TooltipComponent', 'LegendComponent', 'MarkLineComponent']
   },
 
   eslint: {
@@ -202,9 +203,18 @@ export default defineNuxtConfig({
   },
 
   icon: {
+    // The site mark (jck:logo). Files in this directory become `i-jck-<filename>`.
     customCollections: [
       { prefix: 'jck', dir: './app/assets/icons' }
-    ]
+    ],
+    // Every icon the scanner finds is compiled into the app bundle, and nothing is fetched at
+    // runtime. `serverBundle` defaults to 'auto', which resolves to 'remote' on the cloudflare
+    // preset — under that default any icon the client scan missed was fetched from
+    // api.iconify.design during SSR, which is both a third-party request on a site that claims
+    // to self-host everything and a render that fails when that host is unreachable.
+    clientBundle: { scan: true, includeCustomCollections: true },
+    serverBundle: false,
+    fallbackToApi: false
   },
 
   image: {

@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { KNOWN_COMPOUNDS } from '../../../../app/data/journal'
 import { normalizeForm, isPillForm, type VialForm } from '#shared/utils/vialForm'
 
@@ -82,24 +81,40 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: `Text too long (${MAX_TEXT_LENGTH} char max)` })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw createError({ statusCode: 500, message: 'ANTHROPIC_API_KEY is not configured' })
+  const startedAt = Date.now()
+  let response
+  try {
+    response = await createAnthropic().messages.create({
+      model: AI_MODELS.parse,
+      // This model runs adaptive thinking by default and max_tokens caps thinking + output
+      // together: at 4096 a long stockpile could spend the whole budget reasoning and return
+      // truncated JSON, which JSON.parse then threw on as an unhandled 500. Low effort suits a
+      // mapping task, and the headroom means the cap is no longer what ends the response.
+      max_tokens: 16_000,
+      output_config: { format: { type: 'json_schema', schema: PARSE_SCHEMA }, effort: 'low' },
+      messages: [{ role: 'user', content: buildPrompt(text) }]
+    })
   }
+  catch (err) {
+    throw aiError(err, 'parse')
+  }
+  logAiUsage('parse', AI_MODELS.parse, response.usage, response.stop_reason, startedAt)
+  assertCompleted(response.stop_reason, 'parse')
 
-  const anthropic = new Anthropic({ apiKey })
-  const response = await anthropic.messages.create({
-    model: 'claude-opus-5',
-    max_tokens: 4096,
-    output_config: { format: { type: 'json_schema', schema: PARSE_SCHEMA } },
-    messages: [{ role: 'user', content: buildPrompt(text) }]
-  })
-
-  const raw = response.content.find(b => b.type === 'text')?.text
+  const raw = textOf(response.content)
   if (!raw) throw createError({ statusCode: 502, message: 'Parse produced no output — try rephrasing' })
 
   // Raw model output follows PARSE_SCHEMA (unit_count 0 = not a bottle); the response is ParsedVial.
-  const parsed = JSON.parse(raw) as { vials: (Omit<ParsedVial, 'unit_count'> & { unit_count: number })[] }
+  let parsed: { vials: (Omit<ParsedVial, 'unit_count'> & { unit_count: number })[] }
+  try {
+    parsed = JSON.parse(raw)
+  }
+  catch {
+    throw createError({ statusCode: 502, message: 'Parse returned malformed output — try rephrasing' })
+  }
+  if (!Array.isArray(parsed?.vials)) {
+    throw createError({ statusCode: 502, message: 'Parse returned no rows — try rephrasing' })
+  }
   const vials: ParsedVial[] = parsed.vials.map((v) => {
     const form = normalizeForm(v.form)
     return { ...v, form, unit_count: isPillForm(form) && v.unit_count > 0 ? v.unit_count : null }
