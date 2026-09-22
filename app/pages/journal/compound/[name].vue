@@ -380,7 +380,7 @@ import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcUnits, convertUnitFor, iuEquivalentLabel, type MixUnit } from '~/utils/peptideCalc'
-import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
+import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 
 const route = useRoute()
 const { role } = await useAuth()
@@ -599,7 +599,7 @@ const exposureChart = computed(() => {
   const win = chartWindow.value
   if (!model || !win) return []
   // The full dose history: doses before the window still contribute their tails.
-  const doses = allDoses.value.map(p => ({ date: p.date, time: p.time, amount: p.dose }))
+  const doses = pkDosesFor(entries.value, compoundName.value, model)
   const points = exposureSeries(doses, model, win.from, win.to)
   const max = Math.max(...points.map(p => p.level))
   if (max <= 0) return []

@@ -274,7 +274,7 @@
 <script setup lang="ts">
 import { getCompoundColor, COMPOUND_GROUPS, KNOWN_COMPOUNDS, STANDING_COMPOUNDS } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
-import { PK_MODELS, exposureSeries } from '#shared/utils/pk'
+import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 import { ruleActiveOn } from '#shared/utils/protocolRules'
 import type { AdherenceWeek } from '~/utils/adherence'
 import { iuEquivalentLabel } from '~/utils/peptideCalc'
@@ -433,11 +433,7 @@ const exposureSeriesRows = computed(() => {
   const from = localDaysAgo(EXPOSURE_DAYS - 1)
   const rows: Array<{ compound: string, points: Array<{ date: string, pct: number }> }> = []
   for (const [compound, model] of Object.entries(PK_MODELS)) {
-    const doses = entries.value.flatMap(e =>
-      (e.peptides ?? [])
-        .filter(p => p.compound === compound)
-        .map(p => ({ date: e.date, time: p.time, amount: p.dose }))
-    )
+    const doses = pkDosesFor(entries.value, compound, model)
     if (!doses.some(d => d.date >= from)) continue
     const points = exposureSeries(doses, model, from, today)
     const max = Math.max(...points.map(p => p.level))

@@ -16,8 +16,10 @@ export default defineEventHandler(async (event): Promise<Vaccination[]> => {
     ).all()
     return (results ?? []) as unknown as Vaccination[]
   }
-  catch {
-    // Missing table (migration not applied yet) reads as "nothing logged", not a 500.
-    return []
+  catch (err) {
+    // Missing table (migration not applied yet) reads as "nothing logged", not a 500. Any
+    // other error is a real failure and must not read as "no shots on record".
+    if (isMissingTable(err)) return []
+    throw err
   }
 })

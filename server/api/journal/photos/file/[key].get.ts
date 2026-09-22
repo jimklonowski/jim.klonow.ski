@@ -1,11 +1,7 @@
 export default defineEventHandler(async (event) => {
   const auth = requireRole(event, 'owner', 'friend', 'demo')
 
-  const rawKey = getRouterParam(event, 'key')
-  if (!rawKey) {
-    throw createError({ statusCode: 400, message: 'Missing key' })
-  }
-  const key = decodeURIComponent(rawKey)
+  const key = decodeObjectKey(getRouterParam(event, 'key'))
 
   // The photos bucket is shared between real and demo data; the demo/ prefix is the wall.
   // A demo session must never be able to fetch a real progress photo by guessing its key.

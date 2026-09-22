@@ -4,7 +4,7 @@
 // model narrates precomputed numbers instead of eyeballing raw data: protocol change-points are
 // detected from the dose log, and each metric is compared before/after the change (or against a
 // trailing baseline when no change explains it).
-import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
+import { PROTOCOL_RULES, ruleActiveOn } from '#shared/utils/protocolRules'
 
 export interface TrendJournalRow {
   date: string
@@ -88,21 +88,27 @@ const MIN_DAYS_SINCE_CHANGE = 7
 // the anchor loop below keeps the EARLIEST change that clears the bar). Standing compounds are
 // exempt — "since TRT began" is a legitimate months-long anchor.
 const ANCILLARY_ANCHOR_MAX_AGE_DAYS = 42
-const STANDING_COMPOUNDS = new Set(PROTOCOL_RULES.map(r => r.compound))
 
 // "Testosterone Cypionate (resumed)" → "Testosterone Cypionate".
 function baseCompound(name: string): string {
   return name.replace(/\s*\([^)]*\)\s*$/, '')
 }
 
-function isStandingChange(change: ProtocolChange): boolean {
-  return change.compounds.some(c => STANDING_COMPOUNDS.has(baseCompound(c)))
+// Standing means on the schedule AS OF the period being described — not merely listed in
+// PROTOCOL_RULES. Rules stay in that list after they end (their `to` keeps the history for the
+// adherence rings), so GHK-Cu, stopped 2026-09-01, still counted as standing: its stop was
+// exempt from the age-out below and kept anchoring trends for months, the exact re-headlining
+// this exemption is meant to avoid for ancillaries.
+function isStandingChange(change: ProtocolChange, endDate: string): boolean {
+  return change.compounds.some(c =>
+    PROTOCOL_RULES.some(r => r.compound === baseCompound(c) && ruleActiveOn(r, endDate))
+  )
 }
 
 // Too old to anchor a trend or to be listed on a digest fact sheet. The labs summary keeps the
 // full `changes` list — a months-old stop is still relevant across a four-month lab window.
 function isStaleAncillary(change: ProtocolChange, endDate: string): boolean {
-  return !isStandingChange(change) && dayDiff(endDate, change.date) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
+  return !isStandingChange(change, endDate) && dayDiff(endDate, change.date) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
 }
 
 interface MetricDef {

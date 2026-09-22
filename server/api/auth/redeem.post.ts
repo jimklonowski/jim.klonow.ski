@@ -38,7 +38,17 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, message: 'This share link has reached its use limit' })
   }
 
-  await db.prepare('UPDATE invites SET uses = uses + 1 WHERE id = ?1').bind(invite.id).run()
+  // The checks above give the right error message; this conditional UPDATE is what actually
+  // enforces the limit. Checking and then incrementing as two statements let two simultaneous
+  // redemptions of a one-use link both read uses = 0 and both succeed. Folding the limit into
+  // the UPDATE makes the claim atomic: exactly one of them changes a row.
+  const claim = await db.prepare(`
+    UPDATE invites SET uses = uses + 1
+    WHERE id = ?1 AND revoked = 0 AND (max_uses IS NULL OR uses < max_uses)
+  `).bind(invite.id).run()
+  if (!claim.meta.changes) {
+    throw createError({ statusCode: 410, message: 'This share link has reached its use limit' })
+  }
   // The cookie carries the digest, which is what the middleware's liveness check looks up —
   // so a session cookie never holds the share token either.
   setAuthCookie(event, invite.role as Role, invite.id)
