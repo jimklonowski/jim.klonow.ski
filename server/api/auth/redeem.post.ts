@@ -13,16 +13,19 @@ interface InviteRow {
 // in nuxt.config (tokens are 24 random bytes, so brute force is not realistic anyway).
 export default defineEventHandler(async (event) => {
   const { token } = await readBody<{ token?: string }>(event)
-  if (!token || typeof token !== 'string' || token.length > 64) {
+  if (!token || typeof token !== 'string' || !/^[\w-]{16,64}$/.test(token)) {
     throw createError({ statusCode: 400, message: 'Missing share token' })
   }
 
   // getRealDb, not getDb: invites live only in the real database, and this must keep working
   // for a visitor who currently holds a demo cookie (getDb would route them to the sandbox).
+  //
+  // The row is keyed by the token's SHA-256, not the token (see hashInviteToken) — so the lookup
+  // hashes first. Still one indexed read on the primary key.
   const db = getRealDb(event)
   const invite = await db
     .prepare('SELECT id, role, expires_at, max_uses, uses, revoked FROM invites WHERE id = ?1')
-    .bind(token)
+    .bind(hashInviteToken(token))
     .first<InviteRow>()
 
   if (!invite || invite.revoked || (invite.role !== 'friend' && invite.role !== 'doctor')) {
@@ -36,6 +39,8 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.prepare('UPDATE invites SET uses = uses + 1 WHERE id = ?1').bind(invite.id).run()
+  // The cookie carries the digest, which is what the middleware's liveness check looks up —
+  // so a session cookie never holds the share token either.
   setAuthCookie(event, invite.role as Role, invite.id)
   return { ok: true, role: invite.role }
 })

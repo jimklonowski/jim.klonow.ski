@@ -21,14 +21,16 @@ export default defineEventHandler(async (event) => {
     ? Math.floor(body.maxUses)
     : null
 
-  const id = newInviteToken()
+  // The row stores only the digest; the token itself is returned once, here, and never again —
+  // there is nothing left server-side to rebuild the URL from.
+  const token = newInviteToken()
   const now = new Date().toISOString()
   const expiresAt = expiresDays ? new Date(Date.now() + expiresDays * 86400000).toISOString() : null
 
   await getDb(event)
     .prepare('INSERT INTO invites (id, role, label, created_at, expires_at, max_uses) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
-    .bind(id, role, label, now, expiresAt, maxUses)
+    .bind(hashInviteToken(token), role, label, now, expiresAt, maxUses)
     .run()
 
-  return { ok: true, id, path: `/share/${id}` }
+  return { ok: true, token, path: `/share/${token}` }
 })

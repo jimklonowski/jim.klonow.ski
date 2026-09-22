@@ -201,7 +201,10 @@ CREATE TABLE IF NOT EXISTS cycles (
 -- invalidates every session cookie minted from the invite — the auth middleware re-checks
 -- invite liveness on each guest request.
 CREATE TABLE IF NOT EXISTS invites (
-  id TEXT PRIMARY KEY,               -- URL token (24 random bytes, base64url)
+  -- SHA-256 (hex) of the URL token, never the token itself: the token is the credential, so a
+  -- database copy (including the plaintext dump `pnpm sync:local` writes) must not carry live
+  -- links. See hashInviteToken in server/utils/auth.ts.
+  id TEXT PRIMARY KEY,               -- sha256 hex of the URL token (which is 24 random bytes, base64url)
   role TEXT NOT NULL,                -- 'friend' | 'doctor'
   label TEXT,                        -- who this link is for, e.g. "Dr. Smith"
   created_at TEXT NOT NULL,
@@ -322,3 +325,11 @@ CREATE TABLE IF NOT EXISTS profile (
 -- ALTER TABLE whoop_tokens ADD COLUMN last_synced_at TEXT;
 -- ALTER TABLE whoop_tokens ADD COLUMN last_error TEXT;
 -- ALTER TABLE whoop_tokens ADD COLUMN last_error_at TEXT;
+
+-- One-time migration (2026-09-22), main DB only — NOT expressible as SQL: `invites.id` changed
+-- from the raw share token to sha256(token), and SQLite has no sha256(). Run the script, which
+-- rehashes each existing row in place so already-issued links keep working:
+--   node scripts/hash-invite-tokens.mjs --remote
+--   node scripts/hash-invite-tokens.mjs --local
+-- It is idempotent (rows already keyed by a 64-char hex digest are skipped). Guests holding a
+-- session cookie minted before the migration are signed out and need to re-open their link.

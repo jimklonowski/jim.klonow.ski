@@ -21,7 +21,7 @@
           label="NEW SHARE LINK"
           :dashes="7"
         >
-          <span class="text-[10.5px] text-muted normal-case">copied to your clipboard on create</span>
+          <span class="text-[10.5px] text-muted normal-case">shown once on create</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-2.5">
@@ -82,6 +82,37 @@
             {{ creating ? 'CREATING…' : '+ CREATE LINK' }}
           </button>
         </div>
+
+        <!-- The only time this URL exists anywhere outside the recipient's hands: the database
+             stores a hash of it, so nothing server-side can rebuild it later. -->
+        <div
+          v-if="createdLink"
+          class="mt-3 px-3 py-2.5 border border-line-accent bg-inset"
+        >
+          <p class="tui-label text-accent">
+            Copy this now — it can't be shown again
+          </p>
+          <div class="flex flex-wrap items-center gap-2 mt-1.5">
+            <code class="flex-1 min-w-0 truncate text-[12px] text-hi">{{ createdLink }}</code>
+            <button
+              type="button"
+              class="tui-btn shrink-0"
+              @click="copyCreated"
+            >
+              {{ copied ? '✓ COPIED' : 'COPY' }}
+            </button>
+            <button
+              type="button"
+              class="tui-btn shrink-0"
+              @click="createdLink = null"
+            >
+              DONE
+            </button>
+          </div>
+          <p class="mt-1.5 text-[11px] text-muted leading-[1.6]">
+            Lost it? Revoke the link below and create a new one.
+          </p>
+        </div>
       </div>
     </section>
 
@@ -91,7 +122,7 @@
         :label="`LINKS · ${invites.length}`"
         :dashes="9"
       >
-        <span class="text-[10.5px] text-muted normal-case">/share/&lt;id&gt;</span>
+        <span class="text-[10.5px] text-muted normal-case">URLs aren't stored — revoke and reissue if one is lost</span>
       </TuiHeader>
 
       <div
@@ -125,14 +156,6 @@
             v-if="!invite.revoked"
             class="ml-auto flex items-baseline gap-2.5 shrink-0 text-[11px]"
           >
-            <button
-              type="button"
-              class="cursor-pointer"
-              :class="copiedId === invite.id ? 'text-accent' : 'text-faint hover:text-accent'"
-              :aria-label="`Copy link for ${invite.label || 'unlabeled link'}`"
-              @click="copyLink(invite.id)"
-            >{{ copiedId === invite.id ? '✓ copied' : 'copy link' }}</button>
-            <span class="text-ghost">·</span>
             <button
               type="button"
               class="text-faint hover:text-danger cursor-pointer"
@@ -192,7 +215,9 @@ const USES_OPTIONS = [
 
 const form = reactive({ role: 'friend', label: '', expiresDays: 30, maxUses: 0 })
 const creating = ref(false)
-const copiedId = ref<string | null>(null)
+// Held only in this component, only until the panel is dismissed or the page leaves.
+const createdLink = ref<string | null>(null)
+const copied = ref(false)
 const toast = useToast()
 
 const { data, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
@@ -232,7 +257,8 @@ function roleChipClass(invite: Invite) {
 async function createInvite() {
   creating.value = true
   try {
-    const res = await $fetch<{ id: string }>('/api/auth/invites', {
+    // `token` comes back exactly once — the row holds only its hash.
+    const res = await $fetch<{ token: string }>('/api/auth/invites', {
       method: 'POST',
       body: {
         role: form.role,
@@ -242,9 +268,12 @@ async function createInvite() {
       }
     })
     form.label = ''
+    createdLink.value = `${window.location.origin}/share/${res.token}`
+    copied.value = false
     await refresh()
-    await copyLink(res.id)
-    toast.add({ title: 'Share link created and copied', color: 'success' })
+    // Best-effort convenience; the URL is on screen either way, which matters now that it
+    // can't be recovered if the clipboard write is blocked.
+    await copyCreated()
   }
   catch {
     toast.add({ title: 'Could not create the link', color: 'error' })
@@ -254,13 +283,16 @@ async function createInvite() {
   }
 }
 
-async function copyLink(id: string) {
-  const url = `${window.location.origin}/share/${id}`
-  await navigator.clipboard.writeText(url)
-  copiedId.value = id
-  setTimeout(() => {
-    if (copiedId.value === id) copiedId.value = null
-  }, 2000)
+async function copyCreated() {
+  if (!createdLink.value) return
+  try {
+    await navigator.clipboard.writeText(createdLink.value)
+    copied.value = true
+    toast.add({ title: 'Link copied', description: 'It is not stored — paste it somewhere now.', color: 'success' })
+  }
+  catch {
+    toast.add({ title: 'Copy it by hand', description: 'The clipboard was blocked; the link is shown above.', color: 'warning' })
+  }
 }
 
 async function revoke(id: string) {
