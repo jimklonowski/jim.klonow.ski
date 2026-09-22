@@ -4,10 +4,15 @@
 // model narrates precomputed numbers instead of eyeballing raw data: protocol change-points are
 // detected from the dose log, and each metric is compared before/after the change (or against a
 // trailing baseline when no change explains it).
-import { PROTOCOL_RULES, ruleActiveOn } from '#shared/utils/protocolRules'
-import { diffDays, roundTo, shiftDays } from '#shared/utils/dates'
-import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from '#shared/utils/metricNoise'
-import type { HealthMetricsEntry, JournalRow } from '#shared/types/journal'
+//
+// Pure computation over rows the caller already loaded, so it lives in shared/ where the plain
+// node test runner can load it (tests/trends.test.mjs). Only the server calls it: the digests,
+// the /ask fact sheet, and the lab summary's protocol-change lines.
+import type { HealthMetricsEntry, JournalRow } from '../types/journal'
+// Explicit .ts: runtime imports the test runner must resolve without Vite.
+import { PROTOCOL_RULES, ruleActiveOn } from './protocolRules.ts'
+import { diffDays, roundTo, shiftDays } from './dates.ts'
+import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
 
 // The slices of the shared row shapes the trend engine reads.
 export type TrendJournalRow = Pick<JournalRow, 'date' | 'weight_lbs' | 'rhr' | 'hrv' | 'bp_systolic' | 'peptides'>

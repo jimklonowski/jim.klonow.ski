@@ -227,7 +227,7 @@
 <script setup lang="ts">
 import { DOSE_UNITS } from '~/data/journal'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
-import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG } from '~/utils/peptideCalc'
+import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG } from '#shared/utils/peptideCalc'
 import type { DoseUnit } from '#shared/types/journal'
 import { roundTo } from '#shared/utils/dates'
 

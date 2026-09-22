@@ -1,7 +1,7 @@
 // What counts as a real move in a vital, in one place. A change in a window average smaller
 // than these is ordinary day-to-day variance. Two engines judge vitals and must agree:
 //   - the cycle vitals watch (shared/utils/cycleSignals.ts), on the dossier and home strip;
-//   - the digest trend engine (server/utils/trends.ts), which picks what the AI recaps call a trend.
+//   - the digest trend engine (shared/utils/trends.ts), which picks what the AI recaps call a trend.
 // They used to hold separate copies of these numbers with a "keep in sync" comment, so a trend
 // could be flagged by one and dismissed by the other.
 

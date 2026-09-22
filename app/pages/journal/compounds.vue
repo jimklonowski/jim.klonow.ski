@@ -278,7 +278,7 @@ import type { PeptideEntry } from '~/data/journal'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 import { ruleActiveOn } from '#shared/utils/protocolRules'
 import type { AdherenceWeek } from '~/utils/adherence'
-import { iuEquivalentLabel } from '~/utils/peptideCalc'
+import { iuEquivalentLabel } from '#shared/utils/peptideCalc'
 
 useSeoMeta({ title: 'Journal · Compounds' })
 

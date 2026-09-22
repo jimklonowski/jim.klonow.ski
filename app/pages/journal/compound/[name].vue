@@ -380,7 +380,7 @@ import { diffDays, eachDay } from '#shared/utils/dates'
 import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
-import { calcUnits, convertUnitFor, iuEquivalentLabel } from '~/utils/peptideCalc'
+import { calcUnits, convertUnitFor, iuEquivalentLabel } from '#shared/utils/peptideCalc'
 import type { DoseUnit } from '#shared/types/journal'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 

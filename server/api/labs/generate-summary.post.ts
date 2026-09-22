@@ -1,6 +1,7 @@
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { PK_MODELS, drawTiming, pkDosesFor } from '#shared/utils/pk'
 import { shiftDays } from '#shared/utils/dates'
+import { detectProtocolChanges, type TrendJournalRow } from '#shared/utils/trends'
 
 interface LabsRow {
   date: string

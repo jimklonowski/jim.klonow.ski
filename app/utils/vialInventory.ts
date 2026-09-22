@@ -1,4 +1,4 @@
-import { convertUnitFor } from './peptideCalc'
+import { convertUnitFor } from '#shared/utils/peptideCalc'
 import type { DoseUnit } from '#shared/types/journal'
 import { getCompoundInfo } from '~/data/compoundInfo'
 import type { JournalEntry, Vial } from '~/data/journal'

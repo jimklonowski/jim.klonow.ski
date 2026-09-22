@@ -6,7 +6,7 @@
 //
 // Model: each metric's average over the last two weeks of the cycle-so-far is compared against
 // its average over the four weeks before the start. Noise thresholds come from metricNoise.ts,
-// shared with the digest trend engine (server/utils/trends.ts), so "flagged here" and "trend
+// shared with the digest trend engine (shared/utils/trends.ts), so "flagged here" and "trend
 // there" never disagree about what counts as real. Weight additionally gets a rate check —
 // fast gain is the water-retention tell long before the total looks alarming.
 //

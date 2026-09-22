@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { SCHEDULED_TASKS } from './server/schedule'
+
 export default defineNuxtConfig({
   modules: [
     '@comark/nuxt',
@@ -138,15 +140,8 @@ export default defineNuxtConfig({
     },
     compressPublicAssets: true,
     experimental: { websocket: true, tasks: true },
-    scheduledTasks: {
-      // Nightly demo-sandbox reset: discards visitor edits and re-anchors the synthetic
-      // persona's relative dates so the demo always ends "yesterday" (see server/tasks/demo).
-      '0 9 * * *': ['demo:reset'],
-      '0 11 * * *': ['whoop:sync'],
-      // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
-      '0 14 * * *': ['digest:daily'],
-      '0 15 * * 1': ['digest:weekly']
-    }
+    // Must match wrangler.jsonc triggers.crons — see server/schedule.ts.
+    scheduledTasks: SCHEDULED_TASKS
   },
 
   vite: {

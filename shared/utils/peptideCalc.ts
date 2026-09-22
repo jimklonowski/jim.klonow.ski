@@ -1,4 +1,4 @@
-import type { DoseUnit } from '#shared/types/journal'
+import type { DoseUnit } from '../types/journal'
 
 const SYRINGE_UNITS_PER_ML = 100 // U-100 insulin syringe: 1 unit = 0.01 mL
 
