@@ -153,6 +153,25 @@
     color: var(--color-faint);
   }
 
+  /* Row actions (edit / delete) that fade in when the row is hovered. A touch screen has no
+     hover, so `opacity-0 group-hover:opacity-100` left them permanently invisible on a phone —
+     the controls were there, just unreachable. Hide them only where hover actually exists, and
+     always show one that has keyboard focus. */
+  .tui-row-action {
+    transition: opacity 150ms;
+  }
+
+  @media (hover: hover) {
+    .tui-row-action {
+      opacity: 0;
+    }
+
+    .group:hover .tui-row-action,
+    .tui-row-action:focus-visible {
+      opacity: 1;
+    }
+  }
+
   /* Terminal buttons */
   .tui-btn {
     display: inline-flex;

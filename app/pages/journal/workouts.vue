@@ -88,24 +88,30 @@
               class="text-[10px] text-ghost"
             >{{ w.sources.join('+') }}</span>
           </span>
-          <span class="num-display text-muted text-right whitespace-nowrap">{{ workoutTime(w.start_time) ?? '' }}</span>
-          <span class="text-dim text-right whitespace-nowrap">{{ w.duration_min != null ? `${w.duration_min} min` : '' }}</span>
-          <span class="text-dim text-right whitespace-nowrap">{{ w.calories != null ? `${w.calories} kcal` : '' }}</span>
-          <!-- Coloured by avg, not max: max spikes on nearly every session and would light the
+          <!-- Below lg the five stats share one wrapped row spanning both columns. Dealt into
+               the 2-column grid they alternated between the date and type columns, so a
+               right-aligned "142 kcal" landed under the date — unreadable on a phone.
+               `lg:contents` dissolves this wrapper again so the 7-column grid gets its cells. -->
+          <span class="col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:contents">
+            <span class="num-display text-muted text-right whitespace-nowrap">{{ workoutTime(w.start_time) ?? '' }}</span>
+            <span class="text-dim text-right whitespace-nowrap">{{ w.duration_min != null ? `${w.duration_min} min` : '' }}</span>
+            <span class="text-dim text-right whitespace-nowrap">{{ w.calories != null ? `${w.calories} kcal` : '' }}</span>
+            <!-- Coloured by avg, not max: max spikes on nearly every session and would light the
                whole column up. The max reads dimmer so the pair stays scannable as avg-first. -->
-          <span
-            class="text-right whitespace-nowrap"
-            :class="hrClass(w.avg_hr)"
-            :title="hrZone(w.avg_hr) ?? undefined"
-          >{{ w.avg_hr != null ? `♥ ${w.avg_hr}` : w.max_hr != null ? '♥ —' : ''
-          }}<span
-            v-if="hrZone(w.avg_hr)"
-            class="sr-only"
-          > ({{ hrZone(w.avg_hr) }})</span><span
-            v-if="w.max_hr != null"
-            class="text-muted"
-          >/{{ w.max_hr }}</span></span>
-          <span class="text-muted text-right whitespace-nowrap">{{ w.distance_mi != null ? `${w.distance_mi} mi` : '' }}</span>
+            <span
+              class="text-right whitespace-nowrap"
+              :class="hrClass(w.avg_hr)"
+              :title="hrZone(w.avg_hr) ?? undefined"
+            >{{ w.avg_hr != null ? `♥ ${w.avg_hr}` : w.max_hr != null ? '♥ —' : ''
+            }}<span
+              v-if="hrZone(w.avg_hr)"
+              class="sr-only"
+            > ({{ hrZone(w.avg_hr) }})</span><span
+              v-if="w.max_hr != null"
+              class="text-muted"
+            >/{{ w.max_hr }}</span></span>
+            <span class="text-muted text-right whitespace-nowrap">{{ w.distance_mi != null ? `${w.distance_mi} mi` : '' }}</span>
+          </span>
         </div>
       </template>
 

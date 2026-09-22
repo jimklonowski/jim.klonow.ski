@@ -3,7 +3,9 @@
     class="sticky bottom-0 z-10 bg-status border-t transition-colors select-none"
     :class="scrubbed ? 'border-line-accent' : 'border-line'"
   >
-    <div class="flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-2 px-4 sm:px-6 py-2.5">
+    <!-- Tighter on a phone: stacked, this bar plus the header stack was eating a serious slice
+         of a short viewport, and it is pinned to the bottom of every scroll position. -->
+    <div class="flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-1 sm:gap-y-2 px-4 sm:px-6 py-1.5 sm:py-2.5">
       <!-- Readout: which draw the page is showing -->
       <div class="flex items-center justify-between gap-3 sm:w-65 lg:w-87.5 sm:shrink-0">
         <div class="min-w-0">
@@ -47,7 +49,7 @@
         <div class="flex-1 min-w-0 px-5">
           <div
             ref="rail"
-            class="relative h-11"
+            class="relative h-8 sm:h-11"
           >
             <!-- Ticks and flag dots. No pointer events: the slider underneath owns the drag. -->
             <div

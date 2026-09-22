@@ -85,13 +85,13 @@
               <template v-if="canEdit">
                 <button
                   type="button"
-                  class="text-[11px] text-faint hover:text-accent cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
                   :aria-label="`Edit ${s.name}`"
                   @click="openEditModal(s)"
                 >edit</button>
                 <button
                   type="button"
-                  class="text-[11px] text-faint hover:text-danger cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
                   :aria-label="`Delete ${s.name}`"
                   @click="confirmDelete(s)"
                 >✕</button>

@@ -41,10 +41,14 @@
     v-else
     class="grid gap-px bg-line border-b border-line"
     :class="isFullAccess
-      ? 'lg:grid-cols-[390px_minmax(480px,1fr)_400px]'
-      : 'lg:grid-cols-[390px_minmax(480px,1fr)]'"
+      ? 'xl:grid-cols-[minmax(0,390px)_minmax(0,1fr)_minmax(0,400px)]'
+      : 'lg:grid-cols-[minmax(0,390px)_minmax(0,1fr)]'"
   >
-    <!-- Panel dividers are the grid's own background showing through 1px gaps.
+    <!-- The three-column layout needs ~1270px of content, so it waits for xl: at lg (1024px)
+         those fixed tracks plus a 480px minimum overflowed the viewport and scrolled the whole
+         page sideways. Every track is minmax(0,…) for the same reason the note below describes.
+
+         Panel dividers are the grid's own background showing through 1px gaps.
          Every section needs min-w-0: stacked to one auto column on mobile, the track's
          automatic minimum is its widest item's min-content width, so a long unbreakable
          row (a cycle plan line, say) widens the grid past the viewport and the page
