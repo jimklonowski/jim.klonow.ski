@@ -164,7 +164,7 @@
           class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
           :class="category === c.value
             ? 'bg-nav-active text-accent'
-            : 'bg-bg text-[#6b8578] hover:text-accent'"
+            : 'bg-bg text-nav-idle hover:text-accent'"
           :aria-pressed="category === c.value"
           @click="category = c.value"
         >
@@ -199,7 +199,6 @@
           <UFormField
             label="Before"
             class="flex-1 min-w-40"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model.nullable="beforeId"
@@ -220,7 +219,6 @@
           <UFormField
             label="After"
             class="flex-1 min-w-40"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model.nullable="afterId"
@@ -362,7 +360,6 @@
             :key="opt.value"
             :items="menuItemsFor(opt.photo)"
             :disabled="!isOwner"
-            :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
           >
             <button
               type="button"
@@ -404,13 +401,11 @@
     <UModal
       v-model:open="editOpen"
       title="Edit Photo"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="space-y-4">
           <UFormField
             label="Date"
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model="editForm.date"
@@ -420,7 +415,6 @@
           </UFormField>
           <UFormField
             label="Category"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model="editForm.category"
@@ -453,7 +447,6 @@
     <UModal
       v-model:open="reframeOpen"
       title="Reframe Photo"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="space-y-4">
@@ -486,7 +479,6 @@
 
           <UFormField
             label="Zoom"
-            :ui="{ label: 'tui-label' }"
           >
             <USlider
               v-model="reframeForm.scale"

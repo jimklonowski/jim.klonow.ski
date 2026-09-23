@@ -51,7 +51,6 @@
           <UDropdownMenu
             :items="metricMenuItems"
             :content="{ align: 'end' }"
-            :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
           >
             <button
               type="button"
@@ -148,7 +147,7 @@
 
 <script setup lang="ts">
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
-import { CHART_ACCENT, CHART_DANGER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
+import { CHART_ACCENT, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
 useSeoMeta({ title: 'Journal · Trends' })
 
@@ -324,7 +323,7 @@ const metricCount = computed(() => vitalTiles.value.length + healthTiles.value.l
 // --- sleep stages ---
 // Legend + stack order from the mock: awake on top, then light (the `core` column), rem, deep.
 const SLEEP_STAGES = [
-  { key: 'sleep_awake_min', name: 'awake', color: '#e8834b' },
+  { key: 'sleep_awake_min', name: 'awake', color: CHART_EMBER },
   { key: 'sleep_core_min', name: 'light', color: CHART_ACCENT },
   { key: 'sleep_rem_min', name: 'rem', color: '#38b6d9' },
   { key: 'sleep_deep_min', name: 'deep', color: CHART_INDIGO }

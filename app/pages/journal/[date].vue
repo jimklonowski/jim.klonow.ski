@@ -705,11 +705,11 @@ import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 
 // Shared :ui overrides so every field on this long form reads the same.
-const FIELD_UI = { label: 'tui-label', hint: 'text-[10px] text-faint' }
+const FIELD_UI = { hint: 'text-[10px] text-faint' }
 // Shared by the USelects and the autocomplete UInputMenus (compound / food / soda) so every
 // popover on the form matches. Autocomplete mode keeps whatever is typed as the value and only
 // suggests from `items`, so off-list compounds and freeform meals still work.
-const SELECT_UI = { content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }
+const SELECT_UI = { item: 'text-[12px]' }
 
 /** Live "≈ 0.67 mg" hint beside the Dose label for IU compounds with a known mass factor. */
 function doseHelp(p: PeptideEntry): string | undefined {

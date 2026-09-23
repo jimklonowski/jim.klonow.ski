@@ -43,7 +43,7 @@
         />
       </div>
       <span class="shrink-0 text-[10px] text-muted">
-        <span class="text-[#1e3a2e]">▪</span> logged · <span class="text-accent">▪</span> +photos/recon
+        <span class="text-band">▪</span> logged · <span class="text-accent">▪</span> +photos/recon
       </span>
     </div>
 
@@ -65,8 +65,8 @@
         v-for="row in pageRows"
         :key="row.date"
         :to="canOpenDays ? `/journal/${row.date}` : ''"
-        class="grid gap-x-2.5 gap-y-1 items-baseline py-2 border-b border-[#10160f] last:border-0 text-[11.5px]"
-        :class="[gridCols, row.isToday ? 'bg-inset' : '', canOpenDays ? 'hover:bg-[#101a15] transition-colors' : 'pointer-events-none']"
+        class="grid gap-x-2.5 gap-y-1 items-baseline py-2 border-b border-line-row last:border-0 text-[11.5px]"
+        :class="[gridCols, row.isToday ? 'bg-inset' : '', canOpenDays ? 'hover:bg-row-hover transition-colors' : 'pointer-events-none']"
       >
         <span class="text-hi uppercase">{{ formatDate(row.date, 'monthDay') }}</span>
         <span class="text-dim truncate">{{ row.vitals }}</span>
@@ -199,7 +199,7 @@ const streakStrip = computed(() => {
     cells.push({
       date,
       logged: !!entry,
-      class: !entry ? 'bg-[#0d1310]' : extra ? 'bg-accent' : 'bg-[#1e3a2e]',
+      class: !entry ? 'bg-raised' : extra ? 'bg-accent' : 'bg-band',
       title: !entry ? `${date} · not logged` : extra ? `${date} · logged + photos/recon` : `${date} · logged`
     })
   }

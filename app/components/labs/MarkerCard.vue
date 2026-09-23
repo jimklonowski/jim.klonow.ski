@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="w-full text-left bg-raised px-3.5 py-3 border border-line-soft border-t-2 hover:bg-[#101a15] transition-colors cursor-pointer"
+    class="w-full text-left bg-raised px-3.5 py-3 border border-line-soft border-t-2 hover:bg-row-hover transition-colors cursor-pointer"
     :style="{ borderTopColor: statusColor }"
     @click="open = true"
   >
@@ -63,7 +63,6 @@
   <UModal
     v-model:open="open"
     :title="meta.label"
-    :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
   >
     <template #body>
       <div class="space-y-5">
@@ -101,7 +100,7 @@
             v-if="hasRange"
             class="flex items-center gap-2"
           >
-            <span class="inline-block w-3 h-1.5 shrink-0 bg-[#152b21]" />
+            <span class="inline-block w-3 h-1.5 shrink-0 bg-band-outer" />
             <span class="text-muted">reference</span>
             <span class="text-hi">{{ refText }} {{ meta.unit }}</span>
           </div>
@@ -109,7 +108,7 @@
             v-if="meta.optimalMin !== undefined || meta.optimalMax !== undefined"
             class="flex items-center gap-2"
           >
-            <span class="inline-block w-3 h-1.5 shrink-0 bg-[#1e3a2e]" />
+            <span class="inline-block w-3 h-1.5 shrink-0 bg-band" />
             <span class="text-muted">optimal</span>
             <span class="text-hi">{{ optText }} {{ meta.unit }}</span>
           </div>
@@ -166,6 +165,7 @@
 </template>
 
 <script setup lang="ts">
+import { STATUS_COLORS } from '~/utils/chartTheme'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, readingNoteOn } from '~/data/markerCaveats'
 
@@ -181,13 +181,6 @@ const props = defineProps<{
    */
   latestValue?: number | null
 }>()
-
-const STATUS_COLORS = {
-  optimal: '#2ce8a4',
-  low: '#e8b34b',
-  high: '#e86a5e',
-  unknown: '#5d7a6d'
-} as const
 
 const STATUS_LABELS = {
   optimal: 'OPT',

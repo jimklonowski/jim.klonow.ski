@@ -32,6 +32,7 @@
 </template>
 
 <script setup lang="ts">
+import { CHART_ACCENT } from '~/utils/chartTheme'
 // Inline SVG sparkline — echarts is overkill at this size, and the polyline keeps the stroke
 // crisp against the 1px panel borders.
 const props = withDefaults(defineProps<{
@@ -42,7 +43,7 @@ const props = withDefaults(defineProps<{
   /** Index of a value to mark with a dashed vertical guide (a boundary, e.g. a cycle start). */
   markIndex?: number | null
 }>(), {
-  color: '#2ce8a4',
+  color: CHART_ACCENT,
   height: 34,
   strokeWidth: 1.5,
   markIndex: null

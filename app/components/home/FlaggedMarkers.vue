@@ -13,7 +13,7 @@
         v-for="f in flagged"
         :key="f.key"
         :to="{ path: '/labs', query: { marker: f.key } }"
-        class="grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[190px_120px_1fr_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2.5 bg-raised border-l-2 hover:bg-[#101a15] transition-colors"
+        class="grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[190px_120px_1fr_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2.5 bg-raised border-l-2 hover:bg-row-hover transition-colors"
         :style="{ borderLeftColor: color(f) }"
       >
         <span class="text-[12.5px] text-hi truncate">{{ f.meta.label }}</span>
@@ -49,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+import { STATUS_COLORS } from '~/utils/chartTheme'
 import type { FlaggedMarker } from '~/composables/useOverview'
 
 const props = defineProps<{
@@ -66,7 +67,7 @@ const headerLabel = computed(() =>
 )
 
 function color(f: FlaggedMarker) {
-  return f.status === 'high' ? '#e86a5e' : '#e8b34b'
+  return STATUS_COLORS[f.status]
 }
 
 function format(v: number) {

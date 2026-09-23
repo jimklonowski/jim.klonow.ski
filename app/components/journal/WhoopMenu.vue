@@ -11,7 +11,6 @@
     v-else-if="status"
     :items="menuItems"
     :content="{ align: 'start' }"
-    :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
   >
     <button
       type="button"

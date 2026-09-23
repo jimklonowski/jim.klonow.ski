@@ -2,7 +2,7 @@
   <UModal
     v-model:open="open"
     title="Stock Dump"
-    :ui="{ content: 'bg-raised border border-line-accent ring-0 max-w-2xl' }"
+    :ui="{ content: 'max-w-2xl' }"
   >
     <template #body>
       <!-- Step 1: brain dump -->
@@ -62,7 +62,6 @@
               <UFormField
                 label="Compound"
                 class="col-span-12 sm:col-span-4"
-                :ui="FIELD_UI"
               >
                 <UInput
                   v-model="row.compound"
@@ -73,7 +72,6 @@
               <UFormField
                 label="Form"
                 class="col-span-4 sm:col-span-2"
-                :ui="FIELD_UI"
               >
                 <USelect
                   v-model="row.form"
@@ -86,7 +84,6 @@
               <UFormField
                 :label="amountLabel(row)"
                 class="col-span-4 sm:col-span-2"
-                :ui="FIELD_UI"
               >
                 <UInput
                   v-model.number="row.amount"
@@ -99,7 +96,6 @@
               <UFormField
                 label="Unit"
                 class="col-span-4 sm:col-span-2"
-                :ui="FIELD_UI"
               >
                 <USelect
                   v-model="row.vial_unit"
@@ -112,7 +108,6 @@
               <UFormField
                 label="Qty"
                 class="col-span-3 sm:col-span-1"
-                :ui="FIELD_UI"
               >
                 <UInput
                   v-model.number="row.quantity"
@@ -138,7 +133,6 @@
                 v-if="isPillForm(row.form)"
                 :label="`${cap(pillNoun(row.form, 2))} / bottle`"
                 class="w-28 shrink-0"
-                :ui="FIELD_UI"
               >
                 <UInput
                   v-model.number="row.unit_count"
@@ -221,8 +215,6 @@ type DumpRow = Omit<ParsedRow, 'vial_amount' | 'unit_count'> & { amount: number,
 
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ saved: [] }>()
-
-const FIELD_UI = { label: 'tui-label' }
 
 const toast = useToast()
 const text = ref('')

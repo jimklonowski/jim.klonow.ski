@@ -29,7 +29,6 @@
           <UFormField
             name="password"
             label="Password"
-            :ui="{ label: 'tui-label' }"
           >
             <div class="flex items-center gap-2">
               <span class="shrink-0 text-accent text-[13px] leading-none">❯</span>

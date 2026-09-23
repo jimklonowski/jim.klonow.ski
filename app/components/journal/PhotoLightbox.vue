@@ -18,7 +18,6 @@ const open = computed({
   <UModal
     v-model:open="open"
     :title="photo ? photoCategoryLabel(photo.category) : ''"
-    :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
   >
     <template #body>
       <img

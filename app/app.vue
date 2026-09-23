@@ -3,7 +3,7 @@
     <!-- Pages await their data in setup, so SPA navigation suspends with no feedback —
          this phosphor progress bar is the loading state for every route. -->
     <NuxtLoadingIndicator
-      color="#2ce8a4"
+      :color="CHART_ACCENT"
       :height="2"
     />
     <NuxtLayout>
@@ -13,6 +13,8 @@
 </template>
 
 <script setup>
+import { CHART_ACCENT } from '~/utils/chartTheme'
+
 useHead({
   meta: [
     // viewport-fit=cover lets the standalone PWA paint behind the iPhone notch/home bar

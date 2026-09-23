@@ -7,7 +7,7 @@
       class="py-2 text-[11px] tracking-[0.08em] uppercase whitespace-nowrap border-b-2 transition-colors"
       :class="isActive(tab)
         ? 'text-accent border-accent'
-        : 'text-[#6b8578] border-transparent hover:text-accent'"
+        : 'text-nav-idle border-transparent hover:text-accent'"
     >
       {{ tab.label }}
     </NuxtLink>

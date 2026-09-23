@@ -111,7 +111,6 @@
               <UDropdownMenu
                 :items="activeMenu(vial)"
                 :content="{ align: 'end' }"
-                :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
               >
                 <button
                   type="button"
@@ -193,7 +192,7 @@
               <div
                 v-for="(row, i) in group.batches"
                 :key="row.vial.id"
-                class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-[#101a15] transition-colors"
+                class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-row-hover transition-colors"
                 :class="i % 2 ? 'bg-inset' : ''"
               >
                 <span class="num-display text-[13px] shrink-0">{{ row.vial.quantity }}×</span>
@@ -263,7 +262,7 @@
           <div
             v-for="(vial, i) in finishedVials"
             :key="vial.id"
-            class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-[#101a15] transition-colors"
+            class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-row-hover transition-colors"
             :class="i % 2 ? 'bg-inset' : ''"
           >
             <span
@@ -305,14 +304,12 @@
     <UModal
       v-model:open="formModalOpen"
       :title="formTitle"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="space-y-4">
           <UFormField
             label="Compound"
             required
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model="form.compound"
@@ -332,7 +329,6 @@
           <div class="grid grid-cols-2 gap-3">
             <UFormField
               label="Form"
-              :ui="{ label: 'tui-label' }"
             >
               <USelect
                 v-model="form.form"
@@ -345,7 +341,6 @@
             </UFormField>
             <UFormField
               :label="quantityLabel"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model.number="form.quantity"
@@ -366,7 +361,6 @@
             <UFormField
               label="Vial size"
               required
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model.number="form.vial_amount"
@@ -378,7 +372,6 @@
             </UFormField>
             <UFormField
               label="Unit"
-              :ui="{ label: 'tui-label' }"
             >
               <USelect
                 v-model="form.vial_unit"
@@ -397,7 +390,6 @@
               <UFormField
                 :label="`Per ${pillWord}`"
                 required
-                :ui="{ label: 'tui-label' }"
               >
                 <UInput
                   :model-value="pill.strength ?? undefined"
@@ -411,7 +403,6 @@
               </UFormField>
               <UFormField
                 label="Unit"
-                :ui="{ label: 'tui-label' }"
               >
                 <USelect
                   v-model="form.vial_unit"
@@ -424,7 +415,6 @@
               <UFormField
                 :label="`${cap(pillNoun(form.form, 2))} / bottle`"
                 required
-                :ui="{ label: 'tui-label' }"
               >
                 <UInput
                   v-model.number="pill.count"
@@ -442,7 +432,6 @@
 
           <UFormField
             label="Supplier"
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               :model-value="form.supplier ?? undefined"
@@ -455,7 +444,6 @@
           <div class="grid grid-cols-2 gap-3">
             <UFormField
               label="Lot #"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 :model-value="form.lot ?? undefined"
@@ -465,7 +453,6 @@
             </UFormField>
             <UFormField
               label="Expiry"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 :model-value="form.expiry ?? undefined"
@@ -483,7 +470,6 @@
           >
             <UFormField
               label="Opened"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 :model-value="form.opened_date ?? undefined"
@@ -495,7 +481,6 @@
             <UFormField
               v-if="!isPill"
               label="BAC water (mL)"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 :model-value="form.bac_water_ml ?? undefined"
@@ -510,7 +495,6 @@
 
           <UFormField
             label="Notes"
-            :ui="{ label: 'tui-label' }"
           >
             <UTextarea
               :model-value="form.notes ?? undefined"
@@ -544,7 +528,6 @@
     <UModal
       v-model:open="openModalOpen"
       :title="openTitle"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div
@@ -565,7 +548,6 @@
           <div class="grid grid-cols-2 gap-3">
             <UFormField
               label="Opened date"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="openForm.opened_date"
@@ -576,7 +558,6 @@
             <UFormField
               v-if="!openIsPill"
               label="BAC water (mL)"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model.number="openForm.bac_water_ml"
@@ -615,6 +596,7 @@
 </template>
 
 <script setup lang="ts">
+import { CHART_ACCENT, CHART_DANGER, CHART_WARN } from '~/utils/chartTheme'
 import { diffDays } from '#shared/utils/dates'
 import { getCompoundColor, KNOWN_COMPOUNDS, DOSE_UNITS, blankVial } from '~/data/journal'
 import type { Vial } from '~/data/journal'
@@ -772,9 +754,9 @@ function finishedMeta(v: Vial): string {
 }
 
 function barColor(proj: VialProjection) {
-  if (proj.daysLeft != null && proj.daysLeft < 7) return '#e86a5e'
-  if (proj.daysLeft != null && proj.daysLeft < 14) return '#e8b34b'
-  return '#2ce8a4'
+  if (proj.daysLeft != null && proj.daysLeft < 7) return CHART_DANGER
+  if (proj.daysLeft != null && proj.daysLeft < 14) return CHART_WARN
+  return CHART_ACCENT
 }
 
 function daysLeftClass(proj: VialProjection) {

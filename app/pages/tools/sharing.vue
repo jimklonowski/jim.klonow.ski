@@ -27,7 +27,6 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-2.5">
           <UFormField
             label="Access level"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model="form.role"
@@ -39,7 +38,7 @@
           <UFormField
             label="Label"
             hint="who it's for"
-            :ui="{ label: 'tui-label', hint: 'text-[10.5px] text-faint' }"
+            :ui="{ hint: 'text-[10.5px] text-faint' }"
           >
             <UInput
               v-model="form.label"
@@ -50,7 +49,7 @@
           <UFormField
             label="Link valid for"
             hint="redemption window"
-            :ui="{ label: 'tui-label', hint: 'text-[10.5px] text-faint' }"
+            :ui="{ hint: 'text-[10.5px] text-faint' }"
           >
             <USelect
               v-model="form.expiresDays"
@@ -61,7 +60,6 @@
           </UFormField>
           <UFormField
             label="Max uses"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model="form.maxUses"

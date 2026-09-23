@@ -18,6 +18,8 @@
   --color-inset: #0a0f0c;
   --color-status: #090d0b;
   --color-nav-active: #12211a;
+  /* Row hover on clickable list rows (the entries ledger, stat tiles, marker cards). */
+  --color-row-hover: #101a15;
 
   /* Borders */
   --color-line: #1a2620;
@@ -27,12 +29,24 @@
   /* Form-field border. Brighter than the panel borders on purpose: an input has to read as
      an input on a near-black page, where --color-line-accent alone all but vanishes. */
   --color-line-field: #33503f;
+  /* Hairline between rows inside a list, dimmer than --color-line-soft so rows don't box. */
+  --color-line-row: #10160f;
 
   /* Status colors */
   --color-accent: #2ce8a4;
   --color-accent-hover: #7df0c9;
   --color-warn: #e8b34b;
   --color-danger: #e86a5e;
+  /* Between warn and danger: the workout HR over 150 bpm, the sleep chart's awake time. */
+  --color-ember: #e8834b;
+  /* A value with no reference range to judge it by; also chart axis labels. */
+  --color-mark: #5d7a6d;
+
+  /* Range bands. `band` is the range to be inside: a reference range, or the optimal target
+     when a marker has one (also the DEXA band and logged-day cells). When an optimal target
+     nests inside the reference range, the wider reference band dims to `band-outer`. */
+  --color-band: #1e3a2e;
+  --color-band-outer: #152b21;
 
   /* Text ramp (muted/dimmed also flow through the --ui-text-* overrides below).
      The bottom of the ramp was raised 2026-09-22 for contrast against --color-bg: `faint` carries
@@ -45,6 +59,8 @@
   --color-dim: #a7bcb0;
   --color-faint: #62806f;
   --color-ghost: #4a6357;
+  /* Idle nav links: between faint and dim, so the active link's accent carries the row. */
+  --color-nav-idle: #6b8578;
 
   /* Misc series colors from the handoff */
   --color-indigo-dot: #8593ea;
