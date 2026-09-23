@@ -5,17 +5,5 @@ export default defineEventHandler(async (event) => {
 
   const key = decodeObjectKey(getRouterParam(event, 'key'))
 
-  const bucket = getLabsBucket(event)
-  const object = await bucket.get(key)
-  if (!object) {
-    throw createError({ statusCode: 404, message: 'Not found' })
-  }
-
-  return new Response(object.body, {
-    headers: {
-      'Content-Type': object.httpMetadata?.contentType ?? 'application/pdf',
-      'Content-Length': String(object.size),
-      'Cache-Control': 'private, max-age=3600'
-    }
-  })
+  return serveR2Object(event, getLabsBucket(event), key, 'application/pdf')
 })

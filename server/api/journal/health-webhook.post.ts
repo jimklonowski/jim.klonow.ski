@@ -151,7 +151,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const db = getDb(event)
+  // getRealDb: this is the owner's own Apple Health data, authenticated by the bearer token, not
+  // by a session. getDb would route by whatever cookie happened to ride along (a demo one, say).
+  const db = getRealDb(event)
   const created: string[] = []
   const updated: string[] = []
 

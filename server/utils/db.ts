@@ -40,6 +40,33 @@ export function isMissingTable(err: unknown): boolean {
 }
 
 /** An R2 key from a URL segment, or a 400 — decodeURIComponent throws on a malformed escape. */
+/**
+ * The read every list endpoint does: run one SELECT on the role's database and map the rows.
+ * The handler still owns its auth check (who may read what differs per table) and anything
+ * role-specific it does to the result.
+ *
+ * `missingTableOk` is for tables an environment may not have yet (a new table before its
+ * migration reaches the demo sandbox): that one error reads as an empty list, and anything
+ * else still throws. See isMissingTable.
+ */
+export async function listRows<T = Record<string, unknown>>(
+  event: H3Event,
+  sql: string,
+  map?: (row: Record<string, unknown>) => T,
+  { missingTableOk = false }: { missingTableOk?: boolean } = {}
+): Promise<T[]> {
+  let results: Record<string, unknown>[] | undefined
+  try {
+    ({ results } = await getDb(event).prepare(sql).all())
+  }
+  catch (err) {
+    if (missingTableOk && isMissingTable(err)) return []
+    throw err
+  }
+  const rows = results ?? []
+  return map ? rows.map(map) : rows as T[]
+}
+
 export function decodeObjectKey(raw: string | undefined): string {
   if (!raw) throw createError({ statusCode: 400, message: 'Missing key' })
   try {

@@ -155,6 +155,28 @@ export const zSupplementSave = z.object({
   sort: zNumWithDefault(100, s => s.int())
 })
 
+// --- share links ---
+
+// Out-of-range values are clamped rather than rejected, as the endpoint always has: the UI only
+// offers presets, and the caps exist so a hand-crafted request can't overflow Date (an unbounded
+// expiresDays made toISOString() throw) or store a pathological row.
+const clampedCount = (cap: number) => z.preprocess(blankAsAbsent, z.number().finite().nullish())
+  .transform(v => (v != null && v > 0 ? Math.min(Math.floor(v), cap) : null))
+
+export const zInviteCreate = z.object({
+  role: z.enum(['friend', 'doctor'], 'role must be "friend" or "doctor"'),
+  // Shown on the sharing page and stored forever, so bounded; trimmed to 80 rather than refused.
+  label: z.string().nullish().transform(v => v?.trim().slice(0, 80) || null),
+  // Ten years; the UI offers 7/30/90 days or none.
+  expiresDays: clampedCount(3650),
+  maxUses: clampedCount(10_000)
+})
+
+export const zInviteRevoke = z.object({
+  // A sha256 hex digest; anything much longer isn't an invite id.
+  id: z.string().min(1).max(128)
+})
+
 // --- shared by the delete endpoints ---
 
 export const zIdOnly = z.object({ id: zId })

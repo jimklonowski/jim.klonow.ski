@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  zIdOnly, zJournalSave, zSodaAdd, zSodaRemove, zSupplementSave, zVialOpen, zVialSave
+  zIdOnly, zInviteCreate, zInviteRevoke, zJournalSave, zSodaAdd, zSodaRemove, zSupplementSave, zVialOpen, zVialSave
 } from '../shared/utils/schemas.ts'
 
 /** The first failure message, or null when the value parsed. */
@@ -124,4 +124,26 @@ test('supplements normalize their enums instead of rejecting', () => {
   assert.equal(out.sort, 100)
   assert.ok(problem(zSupplementSave, { name: '' }))
   assert.ok(problem(zSupplementSave, {}))
+})
+
+test('share links: only guest roles, and out-of-range values clamp like the endpoint always did', () => {
+  assert.deepEqual(zInviteCreate.parse({ role: 'doctor', label: '  Dr. Smith  ', expiresDays: 30, maxUses: 1 }),
+    { role: 'doctor', label: 'Dr. Smith', expiresDays: 30, maxUses: 1 })
+  // Owner and demo are never minted from a link.
+  assert.ok(problem(zInviteCreate, { role: 'owner' }))
+  assert.ok(problem(zInviteCreate, { role: 'demo' }))
+  assert.ok(problem(zInviteCreate, {}))
+  // 0 is the UI's "no deadline" / "unlimited"; absent and blank read the same way.
+  const open = zInviteCreate.parse({ role: 'friend', expiresDays: 0, maxUses: '' })
+  assert.equal(open.expiresDays, null)
+  assert.equal(open.maxUses, null)
+  assert.equal(open.label, null)
+  // 1e15 days overflowed Date and made toISOString() throw; now it's ten years.
+  assert.equal(zInviteCreate.parse({ role: 'friend', expiresDays: 1e15 }).expiresDays, 3650)
+  assert.equal(zInviteCreate.parse({ role: 'friend', maxUses: 2.7 }).maxUses, 2)
+  assert.equal(zInviteCreate.parse({ role: 'friend', label: 'x'.repeat(200) }).label.length, 80)
+  assert.ok(problem(zInviteCreate, { role: 'friend', expiresDays: 'soon' }))
+  assert.equal(zInviteRevoke.parse({ id: 'ab12' }).id, 'ab12')
+  assert.ok(problem(zInviteRevoke, {}))
+  assert.ok(problem(zInviteRevoke, { id: '' }))
 })
