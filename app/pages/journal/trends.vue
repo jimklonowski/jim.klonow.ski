@@ -162,9 +162,6 @@ function retryAll() {
 }
 const { data: labsData } = await useLabsEntries()
 
-onMounted(refresh)
-onMounted(refreshHealth)
-
 const { inRange, smoothRows } = useTrendRange()
 
 const entries = computed(() => journalData.value ?? [])

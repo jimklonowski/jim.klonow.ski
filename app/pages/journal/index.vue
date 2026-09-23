@@ -166,10 +166,6 @@ function retryAll() {
 }
 const { role, isOwner, canEdit } = await useAuth()
 
-onMounted(refresh)
-onMounted(refreshHealth)
-onMounted(refreshWorkouts)
-
 const today = localToday()
 const isFullAccess = computed(() => role.value !== 'doctor')
 

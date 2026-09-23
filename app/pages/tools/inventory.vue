@@ -639,9 +639,7 @@ const { isOwner } = await useAuth()
 const dumpOpen = ref(false)
 
 const { data: vialsData, refresh, error } = await useVials()
-const { data: journalData, refresh: refreshJournal } = await useJournalEntries()
-onMounted(refresh)
-onMounted(refreshJournal)
+const { data: journalData } = await useJournalEntries()
 
 const vials = computed(() => vialsData.value ?? [])
 const entries = computed(() => journalData.value ?? [])

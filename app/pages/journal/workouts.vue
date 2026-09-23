@@ -159,7 +159,6 @@ import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 useSeoMeta({ title: 'Journal · Workouts' })
 
 const { data, refresh, error } = await useWorkoutsEntries()
-onMounted(refresh)
 
 // Newest first — the log reads backwards from today. Sorting on date alone left a day's
 // sessions in whatever order the API returned, so a morning lift could sit above an evening

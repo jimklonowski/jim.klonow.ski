@@ -287,8 +287,6 @@ const { data: labsData } = await useLabsEntries()
 const { data: cyclesData } = await useCycles()
 const { canEdit, role } = await useAuth()
 
-onMounted(refresh)
-
 const entries = computed(() => data.value ?? [])
 const today = localToday()
 

@@ -397,7 +397,6 @@ const info = computed(() => getCompoundInfo(compoundName.value))
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
-onMounted(refresh)
 
 const entries = computed(() => data.value ?? [])
 

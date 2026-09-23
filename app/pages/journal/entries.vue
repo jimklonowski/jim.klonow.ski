@@ -170,14 +170,10 @@ import { getCompoundColor } from '~/data/journal'
 useSeoMeta({ title: 'Journal · Entries' })
 
 const { data, refresh, error } = await useJournalEntries()
-const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
-const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
+const { data: workoutsData } = await useWorkoutsEntries()
+const { data: photosData } = await usePhotoEntries()
 const { data: labsData } = await useLabsEntries()
 const { role, canEdit } = await useAuth()
-
-onMounted(refresh)
-onMounted(refreshWorkouts)
-onMounted(refreshPhotos)
 
 const paletteOpen = useState('command-palette-open', () => false)
 const today = localToday()

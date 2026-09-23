@@ -8,11 +8,7 @@ export interface Digest {
   created_at: string | null
 }
 
-// Lazy: only fetched when the digest panel is first opened (immediate: false → call execute()).
+// Lazy: only fetched when the digest panel is first opened (call execute()).
 export function useDigests() {
-  const requestFetch = useRequestFetch()
-  return useAsyncData('digests', () => requestFetch<Digest[]>('/api/journal/digest/list'), {
-    immediate: false,
-    default: () => [] as Digest[]
-  })
+  return useListResource<Digest[]>('digests', '/api/journal/digest/list', { lazy: true })
 }

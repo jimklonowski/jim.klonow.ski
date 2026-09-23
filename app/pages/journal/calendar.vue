@@ -236,9 +236,9 @@ useSeoMeta({ title: 'Journal · Calendar' })
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const { data, refresh, error } = await useJournalEntries()
-const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
+const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
-const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
+const { data: photosData } = await usePhotoEntries()
 const { data: cyclesData } = await useCycles()
 const { role, canEdit } = await useAuth()
 
@@ -252,10 +252,6 @@ const canOpenDays = computed(() => isFullAccessRole(role.value))
 // the rings would flag misses that aren't real — hidden for demo sessions.
 const showSchedule = computed(() => role.value !== 'demo')
 const scheduleRules = computed(() => effectiveRules(cyclesData.value ?? []))
-
-onMounted(refresh)
-onMounted(refreshWorkouts)
-onMounted(refreshPhotos)
 
 const entries = computed(() => data.value ?? [])
 

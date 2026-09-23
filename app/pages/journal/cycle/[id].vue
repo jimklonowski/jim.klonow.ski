@@ -396,7 +396,6 @@ const { data, refresh, error } = await useCycles()
 const { data: journalData } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: healthData } = await useHealthMetricsEntries()
-onMounted(() => refresh())
 
 const cycleForm = useTemplateRef('cycleForm')
 

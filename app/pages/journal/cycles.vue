@@ -140,7 +140,6 @@ const { isOwner } = await useAuth()
 
 const { data, refresh, error } = await useCycles()
 const { data: journalData } = await useJournalEntries()
-onMounted(() => refresh())
 
 const cycleForm = useTemplateRef('cycleForm')
 

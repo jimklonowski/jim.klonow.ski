@@ -550,7 +550,6 @@ useSeoMeta({ title: 'Journal · Photos' })
 
 const { data: photosData, refresh, error } = await usePhotoEntries()
 const { isOwner } = await useAuth()
-onMounted(refresh)
 
 // --- One-time thumbnail backfill for photos uploaded before thumbnails existed ---
 // Re-fetches each already-uploaded original through the authenticated proxy, regenerates a

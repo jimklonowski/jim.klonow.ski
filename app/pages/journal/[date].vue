@@ -756,12 +756,8 @@ useSeoMeta({ title: () => `Journal · ${dateParam.value}` })
 
 const { data: allEntries, error: entriesError, refresh } = await useJournalEntries()
 const { isOwner, canEdit } = await useAuth()
-const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
+const { data: workoutsData } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
-
-onMounted(refresh)
-onMounted(refreshWorkouts)
-onMounted(refreshPhotos)
 
 const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
 
