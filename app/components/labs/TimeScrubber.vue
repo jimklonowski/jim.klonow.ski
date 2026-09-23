@@ -1,8 +1,10 @@
 <template>
   <div
-    class="sticky bottom-0 z-10 bg-status border-t transition-colors select-none"
+    class="sticky bottom-0 z-10 bg-status border-t transition-colors select-none pb-[env(safe-area-inset-bottom)]"
     :class="scrubbed ? 'border-line-accent' : 'border-line'"
   >
+    <!-- Safe-area padding: viewport-fit=cover puts the standalone PWA's bottom edge under the
+         iPhone home bar, which would otherwise sit on top of the rail. Zero in a browser tab. -->
     <!-- Tighter on a phone: stacked, this bar plus the header stack was eating a serious slice
          of a short viewport, and it is pinned to the bottom of every scroll position. -->
     <div class="flex flex-col sm:flex-row sm:items-center gap-x-6 gap-y-1 sm:gap-y-2 px-4 sm:px-6 py-1.5 sm:py-2.5">
@@ -47,9 +49,12 @@
         </button>
 
         <div class="flex-1 min-w-0 px-5">
+          <!-- Full height on a phone too: the first/last/active labels still show there, and a
+               shorter rail left them hanging out of the dock — clipped by the viewport while
+               pinned, and cut by the footer's rule once it settled. -->
           <div
             ref="rail"
-            class="relative h-8 sm:h-11"
+            class="relative h-11"
           >
             <!-- Ticks and flag dots. No pointer events: the slider underneath owns the drag. -->
             <div
@@ -106,7 +111,7 @@
                 </template>
                 <button
                   type="button"
-                  class="absolute -translate-x-1/2 pointer-events-auto text-[10px] tracking-[0.06em] uppercase whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
+                  class="absolute -translate-x-1/2 pointer-events-auto text-[10px] leading-3 tracking-[0.06em] uppercase whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
                   :class="[
                     t.active ? 'text-accent font-medium' : t.reached ? 'text-[#5d7a6d]' : 'text-ghost',
                     t.keyLabel ? '' : t.showLabel ? 'max-sm:hidden' : 'hidden'
