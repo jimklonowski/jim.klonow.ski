@@ -135,7 +135,6 @@ import { diffDays } from '#shared/utils/dates'
 
 useSeoMeta({ title: 'Journal · Cycles' })
 
-const toast = useToast()
 const { isOwner } = await useAuth()
 
 const { data, refresh, error } = await useCycles()
@@ -224,13 +223,11 @@ function itemSpan(c: Cycle, item: CyclePlanItem): string {
 
 async function confirmDelete(c: Cycle) {
   if (!confirm(`Delete ${c.name}? A cycle that actually ran should keep its history — set an off-plan end date instead.`)) return
-  try {
-    await $fetch('/api/journal/cycles/delete', { method: 'POST', body: { id: c.id } })
-    await refresh()
-    toast.add({ title: 'Deleted', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
+  await deleteCycle(c)
 }
+
+const { run: deleteCycle } = useSaveAction(async (c: Cycle) => {
+  await $fetch('/api/journal/cycles/delete', { method: 'POST', body: { id: c.id } })
+  await refresh()
+}, { success: 'Deleted', error: 'Delete failed' })
 </script>

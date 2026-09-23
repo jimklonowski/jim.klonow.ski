@@ -1,5 +1,7 @@
 <template>
-  <footer class="bg-status border-t border-line">
+  <!-- Safe-area padding keeps the last row clear of the iPhone home bar in the standalone PWA
+       (viewport-fit=cover); it's zero in a browser tab. -->
+  <footer class="bg-status border-t border-line pb-[env(safe-area-inset-bottom)]">
     <!-- Same wrap-below-sm treatment as StatusLine: sign in / sign out sat off the right
          edge of a phone screen behind a horizontal scroll nobody would find. -->
     <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-[10.5px] text-ghost whitespace-nowrap overflow-x-auto">

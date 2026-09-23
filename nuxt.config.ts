@@ -50,6 +50,12 @@ export default defineNuxtConfig({
     '/journal/import': { redirect: { to: '/tools/import', statusCode: 301 } },
     '/labs/sharing': { redirect: { to: '/tools/sharing', statusCode: 301 } },
     '/tools': { redirect: { to: '/tools/calculator', statusCode: 302 } },
+    // X-Robots-Tag: noindex + sitemap exclusion for the private sections (see `robots` below).
+    '/labs/**': { robots: false },
+    '/journal/**': { robots: false },
+    '/tools/**': { robots: false },
+    '/ask': { robots: false },
+    '/share/**': { robots: false },
     // Rate limiting is off everywhere except the two credential endpoints below (the '/**'
     // rule disables the module's default global limiter, which would otherwise write to KV on
     // every request). Counters live in the RATE_LIMIT KV namespace so they survive Worker
@@ -226,6 +232,17 @@ export default defineNuxtConfig({
   // alone was 1.6 MiB gzipped, over half the free-plan Worker size limit.
   ogImage: {
     enabled: false
+  },
+
+  // Everything behind auth (isProtectedPage in shared/utils/access.ts) plus share links and /demo
+  // — crawlers only ever get login redirects there, and a crawled /demo mints a session. /api is
+  // deliberately absent: the module warns that blocking it can break Google's render of pages
+  // that fetch client-side, and it's JSON-only anyway. Plain prefixes rather than
+  // disallowNonIndexableRoutes: that option emits '/labs/*', which doesn't cover the bare '/labs'.
+  // The robots: false route rules above add the noindex header and keep these pages out of the
+  // sitemap; this list is only the robots.txt half.
+  robots: {
+    disallow: ['/labs', '/journal', '/tools', '/ask', '/share', '/demo']
   },
 
   // Deliberately OFF: xssValidator (regex input filter would false-positive on freeform journal

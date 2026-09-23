@@ -236,7 +236,6 @@ import type { Supplement, SupplementCategory, SupplementStatus } from '~/data/jo
 
 useSeoMeta({ title: 'Journal · Supplements' })
 
-const toast = useToast()
 const { canEdit } = await useAuth()
 
 const { data, refresh, error } = await useSupplements()
@@ -309,8 +308,7 @@ const STATUS_OPTIONS = [
   { label: 'Discontinued', value: 'stopped' }
 ]
 
-const formModalOpen = ref(false)
-const saving = ref(false)
+const formModalRaw = ref(false)
 
 // UInput v-models want strings, so the form uses '' where the API uses null — the save
 // endpoint normalizes '' back to null.
@@ -333,9 +331,13 @@ function emptyForm(): SupplementForm {
 }
 
 const form = reactive<SupplementForm>(emptyForm())
+// Closing the modal (Escape, backdrop, Cancel) asks first when the form has unsaved edits.
+const formGuard = useDirtyGuard(() => form)
+const formModalOpen = formGuard.guardOpen(formModalRaw)
 
 function openAddModal() {
   Object.assign(form, emptyForm())
+  formGuard.markClean()
   formModalOpen.value = true
 }
 
@@ -352,34 +354,24 @@ function openEditModal(s: Supplement) {
     notes: s.notes ?? '',
     sort: s.sort
   })
+  formGuard.markClean()
   formModalOpen.value = true
 }
 
-async function saveSupplement() {
-  saving.value = true
-  try {
-    await $fetch('/api/journal/supplements/save', { method: 'POST', body: { ...form } })
-    await refresh()
-    formModalOpen.value = false
-    toast.add({ title: form.id ? 'Supplement updated' : 'Supplement added', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    saving.value = false
-  }
-}
+const { run: saveSupplement, pending: saving } = useSaveAction(async () => {
+  await $fetch('/api/journal/supplements/save', { method: 'POST', body: { ...form } })
+  await refresh()
+  formGuard.markClean()
+  formModalOpen.value = false
+}, { success: () => form.id ? 'Supplement updated' : 'Supplement added' })
+
+const { run: deleteSupplement } = useSaveAction(async (s: Supplement) => {
+  await $fetch('/api/journal/supplements/delete', { method: 'POST', body: { id: s.id } })
+  await refresh()
+}, { success: 'Deleted', error: 'Delete failed' })
 
 async function confirmDelete(s: Supplement) {
   if (!confirm(`Delete ${s.name}? If you stopped taking it, set status to Discontinued instead so it stays visible to the AI as history.`)) return
-  try {
-    await $fetch('/api/journal/supplements/delete', { method: 'POST', body: { id: s.id } })
-    await refresh()
-    toast.add({ title: 'Deleted', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
+  await deleteSupplement(s)
 }
 </script>
