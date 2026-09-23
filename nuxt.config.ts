@@ -241,8 +241,18 @@ export default defineNuxtConfig({
   // disallowNonIndexableRoutes: that option emits '/labs/*', which doesn't cover the bare '/labs'.
   // The robots: false route rules above add the noindex header and keep these pages out of the
   // sitemap; this list is only the robots.txt half.
+  // The '*' group carries the AI-usage preferences (the top-level disallow merges into it). They
+  // state what Cloudflare's "Block AI bots" rule already enforces at the edge: search indexing
+  // yes, training and live AI-answer fetching no. Advisory only — the edge rule is the teeth.
   robots: {
-    disallow: ['/labs', '/journal', '/tools', '/ask', '/share', '/demo']
+    disallow: ['/labs', '/journal', '/tools', '/ask', '/share', '/demo'],
+    groups: [
+      {
+        userAgent: '*',
+        contentUsage: { 'train-ai': 'n', 'search': 'y' },
+        contentSignal: { 'search': 'yes', 'ai-train': 'no', 'ai-input': 'no' }
+      }
+    ]
   },
 
   // Deliberately OFF: xssValidator (regex input filter would false-positive on freeform journal
