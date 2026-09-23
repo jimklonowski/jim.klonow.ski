@@ -1,3 +1,4 @@
+import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { PK_MODELS, drawTiming, pkDosesFor } from '#shared/utils/pk'
 import { shiftDays } from '#shared/utils/dates'
@@ -119,11 +120,7 @@ export default defineEventHandler(async (event) => {
   requireOwner(event)
   requireUploadPin(event)
 
-  const body = await readBody<{ date?: string }>(event)
-  const date = body?.date
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw createError({ statusCode: 400, message: 'Missing or invalid date field' })
-  }
+  const { date } = await readValidatedJson(event, zSummaryGenerate)
 
   const db = getDb(event)
   // Fetch only the target draw + comparison window. This endpoint runs inside the Workers

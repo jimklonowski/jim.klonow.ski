@@ -1,9 +1,7 @@
 export default defineEventHandler(async (event) => {
   const auth = requireLabsAuth(event)
 
-  const db = getDb(event)
-  const { results } = await db.prepare('SELECT * FROM journal_entries ORDER BY date ASC').all()
-  const entries = (results ?? []).map(parseJournalRow)
+  const entries = await listRows(event, 'SELECT * FROM journal_entries ORDER BY date ASC', parseJournalRow)
 
   // The doctor view is vitals + protocol. Projected as an allowlist rather than nulling named
   // fields, so a column added later is private by default: dates, watch vitals, and the dose /

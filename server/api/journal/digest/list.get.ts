@@ -1,10 +1,5 @@
 export default defineEventHandler(async (event) => {
   requireRole(event, 'owner', 'friend', 'demo')
 
-  const db = getDb(event)
-  const { results } = await db.prepare(
-    'SELECT * FROM digests ORDER BY period_end DESC, id DESC LIMIT 60'
-  ).all()
-
-  return (results ?? []).map(parseDigestRow)
+  return listRows(event, 'SELECT * FROM digests ORDER BY period_end DESC, id DESC LIMIT 60', parseDigestRow)
 })

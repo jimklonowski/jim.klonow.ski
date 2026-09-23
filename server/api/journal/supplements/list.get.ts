@@ -3,10 +3,5 @@
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
 
-  const db = getDb(event)
-  const { results } = await db.prepare(
-    'SELECT * FROM supplements ORDER BY sort ASC, name ASC'
-  ).all()
-
-  return results ?? []
+  return listRows(event, 'SELECT * FROM supplements ORDER BY sort ASC, name ASC')
 })

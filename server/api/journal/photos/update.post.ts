@@ -1,19 +1,10 @@
+import { zPhotoUpdate } from '#shared/utils/schemas'
 import { isPhotoCategory } from '#shared/utils/photoCategories'
 
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
-  const body = await readBody<{
-    id?: number
-    date?: string
-    category?: string
-    frameOffsetX?: number
-    frameOffsetY?: number
-    frameScale?: number
-  }>(event)
-  if (body?.id == null) {
-    throw createError({ statusCode: 400, message: 'Missing photo id' })
-  }
+  const body = await readValidatedJson(event, zPhotoUpdate)
 
   const sets: string[] = []
   const values: unknown[] = []
@@ -23,9 +14,6 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.date !== undefined) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
-      throw createError({ statusCode: 400, message: 'Invalid date' })
-    }
     addSet('date', body.date)
   }
   if (body.category !== undefined) {

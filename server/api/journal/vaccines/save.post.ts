@@ -1,31 +1,21 @@
+import { zVaccinationSave } from '#shared/utils/schemas'
+
 // Insert a new dose (no id) or update an existing one (id present). Owner-only rather than
-// requireWriteAccess: the demo sandbox has no vaccinations table, so a demo session has
-// nothing to write into (the list endpoint returns [] for it for the same reason).
+// requireWriteAccess: the demo sandbox's shots are seeded read-only showcase data.
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
-  const body = await readBody<Record<string, unknown>>(event)
-  const date = typeof body?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : null
-  if (!date) {
-    throw createError({ statusCode: 400, message: 'Missing or invalid date field' })
-  }
-  const vaccine = typeof body.vaccine === 'string' ? body.vaccine.trim() : ''
-  if (!vaccine) {
-    throw createError({ statusCode: 400, message: 'Missing vaccine field' })
-  }
-
-  // UInput v-models send '' for an empty field; store NULL so the prompts can skip it.
-  const text = (v: unknown) => (typeof v === 'string' && v.trim()) ? v.trim() : null
-  const fields = { date, vaccine, product: text(body.product), notes: text(body.notes) }
+  // Blank product/notes store NULL so the prompts can skip them (zOptText).
+  const { id, ...fields } = await readValidatedJson(event, zVaccinationSave)
 
   const db = getDb(event)
 
-  if (body.id != null) {
+  if (id != null) {
     await db.prepare(`
       UPDATE vaccinations SET date = ?2, vaccine = ?3, product = ?4, notes = ?5
       WHERE id = ?1
-    `).bind(body.id, fields.date, fields.vaccine, fields.product, fields.notes).run()
-    return { ok: true, id: body.id }
+    `).bind(id, fields.date, fields.vaccine, fields.product, fields.notes).run()
+    return { ok: true, id }
   }
 
   const result = await db.prepare(`

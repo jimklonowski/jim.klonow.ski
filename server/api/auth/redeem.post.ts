@@ -1,3 +1,4 @@
+import { zRedeem } from '#shared/utils/schemas'
 import type { Role } from '#shared/utils/access'
 
 interface InviteRow {
@@ -12,10 +13,7 @@ interface InviteRow {
 // Public: exchanges a share-link token for a role session cookie. Rate-limited via routeRules
 // in nuxt.config (tokens are 24 random bytes, so brute force is not realistic anyway).
 export default defineEventHandler(async (event) => {
-  const { token } = await readBody<{ token?: string }>(event)
-  if (!token || typeof token !== 'string' || !/^[\w-]{16,64}$/.test(token)) {
-    throw createError({ statusCode: 400, message: 'Missing share token' })
-  }
+  const { token } = await readValidatedJson(event, zRedeem)
 
   // getRealDb, not getDb: invites live only in the real database, and this must keep working
   // for a visitor who currently holds a demo cookie (getDb would route them to the sandbox).

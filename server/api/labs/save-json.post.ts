@@ -1,5 +1,5 @@
 import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
-import { isIsoDate } from '#shared/utils/time'
+import { zLabsSave } from '#shared/utils/schemas'
 
 // Writes an extraction (or a hand-edited copy of one) into labs_entries / dexa_entries.
 //
@@ -11,14 +11,8 @@ export default defineEventHandler(async (event) => {
   requireOwner(event)
   requireUploadPin(event)
 
-  const body = await readBody<Record<string, unknown> | null>(event)
-  if (!body || typeof body !== 'object') {
-    throw createError({ statusCode: 400, message: 'Expected a JSON body' })
-  }
-  const date = body.date
-  if (!isIsoDate(date)) {
-    throw createError({ statusCode: 400, message: 'date must be a YYYY-MM-DD calendar date' })
-  }
+  const body = await readValidatedJson(event, zLabsSave)
+  const { date } = body
 
   const db = getDb(event)
   const reportType = body._type
@@ -27,7 +21,7 @@ export default defineEventHandler(async (event) => {
   if (reportType === 'dexa') {
     // A DEXA row's weight column is NOT NULL, so a scan that extracted without one used to fail
     // deep in the bind as a 500 rather than saying which field was missing.
-    const weight = typeof body.weight_lbs === 'number' && Number.isFinite(body.weight_lbs) ? body.weight_lbs : null
+    const weight = body.weight_lbs
     if (weight == null) {
       throw createError({ statusCode: 400, message: 'DEXA scans need a numeric weight_lbs' })
     }
@@ -50,7 +44,7 @@ export default defineEventHandler(async (event) => {
       JSON.stringify(body.total ?? {}),
       JSON.stringify(body.regions ?? {}),
       body.vat ? JSON.stringify(body.vat) : null,
-      typeof body.ag_ratio === 'number' && Number.isFinite(body.ag_ratio) ? body.ag_ratio : null,
+      body.ag_ratio ?? null,
       body.bone_density ? JSON.stringify(body.bone_density) : null,
       body.symmetry ? JSON.stringify(body.symmetry) : null
     ).run()
