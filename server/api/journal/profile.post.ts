@@ -1,4 +1,5 @@
 import { PROFILE_FIELDS } from '#shared/utils/profile'
+import { zProfileSave } from '#shared/utils/schemas'
 
 // Set (upsert) or clear (empty value → delete) one profile fact. Owner-only: the demo sandbox
 // has no profile table to write into. Keys are limited to PROFILE_FIELDS so the table can't
@@ -6,12 +7,11 @@ import { PROFILE_FIELDS } from '#shared/utils/profile'
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
-  const body = await readBody<{ key?: unknown, value?: unknown }>(event)
-  const field = PROFILE_FIELDS.find(f => f.key === body?.key)
+  const { key, value } = await readValidatedJson(event, zProfileSave)
+  const field = PROFILE_FIELDS.find(f => f.key === key)
   if (!field) {
     throw createError({ statusCode: 400, message: 'Unknown profile field' })
   }
-  const value = typeof body.value === 'string' ? body.value.trim() : ''
   if (value && field.kind === 'select' && !field.options?.includes(value)) {
     throw createError({ statusCode: 400, message: `Invalid value for ${field.label}` })
   }

@@ -1,3 +1,5 @@
+import { zHealthWebhook } from '#shared/utils/schemas'
+
 interface Vitals {
   weight_lbs?: number
   rhr?: number
@@ -56,10 +58,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 
-  const body = await readBody(event)
-  const metrics: Array<{ name: string, units?: string, data: Array<Record<string, unknown>> }>
-    = body?.data?.metrics ?? []
-  const workoutsIn: Array<Record<string, unknown>> = body?.data?.workouts ?? []
+  // zHealthWebhook keeps every well-formed metric and workout and drops the rest, so one odd item
+  // in a batch can't fail the sync (a metric without a data array used to throw mid-loop).
+  const { data: { metrics, workouts: workoutsIn } } = await readValidatedJson(event, zHealthWebhook)
 
   const byDate: Record<string, Vitals> = {}
   const healthByDate: Record<string, HealthMetrics> = {}

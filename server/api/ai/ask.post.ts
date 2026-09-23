@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { checkAskHistory } from '#shared/utils/askHistory'
-import { isIsoDate, localToday } from '#shared/utils/time'
+import { localToday } from '#shared/utils/time'
+import { zAsk } from '#shared/utils/schemas'
 import { READER_CONTEXT } from '../../utils/digest'
 
 // Ask-the-data chat: answers freeform questions over the full tracked history (labs, DEXA,
@@ -27,14 +28,14 @@ function textDelta(event: Anthropic.MessageStreamEvent): string | null {
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
-  const body = await readBody(event)
+  const body = await readValidatedJson(event, zAsk)
   // Shape, length, and turn-order rules live in shared/utils/askHistory.ts alongside the trim
   // the page applies before sending, so a history the page produces is one this accepts.
-  const history = checkAskHistory(body?.messages)
+  const history = checkAskHistory(body.messages)
   if (!history.ok) throw createError({ statusCode: 400, message: history.problem })
   const messages: Anthropic.MessageParam[] = history.messages
   // The client sends its local date so "this week" means Jim's week, not UTC's.
-  const today = isIsoDate(body?.today) ? body.today : localToday()
+  const today = body.today ?? localToday()
 
   const context = await buildAskContext(getDb(event), today)
 

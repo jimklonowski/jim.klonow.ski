@@ -1,11 +1,10 @@
+import { zVialParse } from '#shared/utils/schemas'
 import { KNOWN_COMPOUNDS } from '../../../../app/data/journal'
 import { normalizeForm, isPillForm } from '#shared/utils/vialForm'
 import type { ParsedVial } from '#shared/types/journal'
 
 // Freeform stockpile text -> proposed sealed rows for the inventory confirm table.
 // Owner-only like every Claude-spending endpoint (digests, lab summaries).
-
-const MAX_TEXT_LENGTH = 4000
 
 // Structured-output schema — the API guarantees the response text is JSON matching this.
 // unit_count is a plain integer (0 = not a pill bottle) rather than nullable to stay inside the
@@ -61,12 +60,7 @@ ${text}`
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
-  const body = await readBody<{ text?: string }>(event)
-  const text = body?.text?.trim()
-  if (!text) throw createError({ statusCode: 400, message: 'Nothing to parse' })
-  if (text.length > MAX_TEXT_LENGTH) {
-    throw createError({ statusCode: 400, message: `Text too long (${MAX_TEXT_LENGTH} char max)` })
-  }
+  const { text } = await readValidatedJson(event, zVialParse)
 
   const startedAt = Date.now()
   let response
