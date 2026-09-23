@@ -3,10 +3,5 @@ export default defineEventHandler(async (event) => {
   // query lands in the sandbox DB. friend/doctor never had this page.
   requireRole(event, 'owner', 'demo')
 
-  const db = getDb(event)
-  const { results } = await db.prepare(
-    'SELECT * FROM vials ORDER BY status ASC, compound ASC, id ASC'
-  ).all()
-
-  return (results ?? []).map(parseVialRow)
+  return listRows(event, 'SELECT * FROM vials ORDER BY status ASC, compound ASC, id ASC', parseVialRow)
 })

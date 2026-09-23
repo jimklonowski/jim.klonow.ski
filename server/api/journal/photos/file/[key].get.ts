@@ -9,17 +9,5 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Not found' })
   }
 
-  const bucket = getPhotosBucket(event)
-  const object = await bucket.get(key)
-  if (!object) {
-    throw createError({ statusCode: 404, message: 'Not found' })
-  }
-
-  return new Response(object.body, {
-    headers: {
-      'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
-      'Content-Length': String(object.size),
-      'Cache-Control': 'private, max-age=3600'
-    }
-  })
+  return serveR2Object(event, getPhotosBucket(event), key, 'application/octet-stream')
 })

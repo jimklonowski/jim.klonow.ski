@@ -8,20 +8,10 @@ export default defineEventHandler(async (event): Promise<Cycle[]> => {
   const auth = requireLabsAuth(event)
   if (auth.role === 'demo') return []
 
-  const db = getDb(event)
-  let results: Record<string, unknown>[]
-  try {
-    ({ results } = await db.prepare('SELECT * FROM cycles ORDER BY start_date DESC').all())
-  }
-  catch (err) {
-    // Missing table (migration not applied yet) reads as "no cycles", not a 500 — every
-    // consumer of this list (home strip, adherence merge, calendar) degrades cleanly. Any
-    // other error is a real failure and must not masquerade as an empty planner.
-    if (isMissingTable(err)) return []
-    throw err
-  }
-
-  return (results ?? []).map(row => ({
+  // Missing table (migration not applied yet) reads as "no cycles", not a 500 — every consumer
+  // of this list (home strip, adherence merge, calendar) degrades cleanly. Any other error is a
+  // real failure and must not masquerade as an empty planner.
+  return listRows(event, 'SELECT * FROM cycles ORDER BY start_date DESC', row => ({
     id: row.id as number,
     name: row.name as string,
     goal: (row.goal as string | null) ?? null,
@@ -37,5 +27,5 @@ export default defineEventHandler(async (event): Promise<Cycle[]> => {
     compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
     notes: (row.notes as string | null) ?? null,
     created_at: row.created_at as string
-  }))
+  }), { missingTableOk: true })
 })

@@ -10,7 +10,10 @@
     <div class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-dashed border-line-input bg-inset text-[12px] leading-[1.7] text-dim">
       Share links grant read-only access without handing out your password.
       <span class="text-hi">FRIEND</span> sees the whole site;
-      <span class="text-hi">DOCTOR</span> sees labs, body composition, and vitals/protocol trends only.
+      <!-- Mirrors DOCTOR_PAGES in shared/utils/access.ts; keep the two in step. -->
+      <span class="text-hi">DOCTOR</span> sees the clinical record: labs, body composition, vitals and
+      protocol trends, compounds, supplements, vaccines and planned cycles, but no daily entries,
+      notes or photos.
       Revoking a link also signs out everyone who used it.
     </div>
 
@@ -182,22 +185,13 @@
 </template>
 
 <script setup lang="ts">
-useSeoMeta({ title: 'Tools · Sharing' })
+import type { Invite } from '#shared/types/invites'
 
-interface Invite {
-  id: string
-  role: string
-  label: string | null
-  created_at: string
-  expires_at: string | null
-  max_uses: number | null
-  uses: number
-  revoked: boolean
-}
+useSeoMeta({ title: 'Tools · Sharing' })
 
 const ROLE_OPTIONS = [
   { label: 'Friend — everything, read-only', value: 'friend' },
-  { label: 'Doctor — labs, DEXA, vitals & protocol', value: 'doctor' }
+  { label: 'Doctor — clinical record, no daily log', value: 'doctor' }
 ]
 const EXPIRY_OPTIONS = [
   { label: '7 days', value: 7 },

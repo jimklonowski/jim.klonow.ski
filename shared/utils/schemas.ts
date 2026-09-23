@@ -155,6 +155,150 @@ export const zSupplementSave = z.object({
   sort: zNumWithDefault(100, s => s.int())
 })
 
+// --- credentials ---
+
+// A wrong type reads as a wrong credential (401 from safeEqual), not a 400: the endpoint's only
+// answer to anything that isn't the password is "no", and saying which field was malformed
+// would hand a prober the shape. The cap just bounds what the constant-time compare reads.
+export const zPasswordLogin = z.object({ password: z.string().max(256).catch('') })
+export const zPinLogin = z.object({ pin: z.string().max(64).catch('') })
+
+// Share tokens are 32 base64url chars (newInviteToken); the range leaves room for older links.
+export const zRedeem = z.object({ token: z.string().regex(/^[\w-]{16,64}$/, 'Missing share token') })
+
+// --- AI ---
+
+export const zDigestGenerate = z.object({
+  kind: z.enum(['daily', 'weekly'], 'kind must be \'daily\' or \'weekly\''),
+  endDate: zIsoDate.optional()
+})
+
+export const zSummaryGenerate = z.object({ date: zIsoDate })
+
+// Stockpile text for the vials parser: the same 4,000-character cap the model prompt is sized for.
+export const zVialParse = z.object({ text: zText(4000).min(1, 'Nothing to parse') })
+
+// `messages` is checked by checkAskHistory (shared/utils/askHistory.ts), which the page's own
+// trim is built against; this only makes sure the body is an object. `today` falls back to the
+// server's local day when absent or malformed, as before.
+export const zAsk = z.object({
+  messages: z.unknown().optional(),
+  today: zIsoDate.optional().catch(undefined)
+})
+
+// --- photos, vaccinations, profile ---
+
+export const zPhotoUpdate = z.object({
+  id: zId,
+  date: zIsoDate.optional(),
+  category: z.string().max(40).optional(),
+  // The reframe tool's pan is a percentage and its zoom a multiplier; the caps are far outside
+  // anything the UI can produce and only stop a hand-made request storing an absurd transform.
+  frameOffsetX: z.number().finite().min(-1000).max(1000).optional(),
+  frameOffsetY: z.number().finite().min(-1000).max(1000).optional(),
+  frameScale: z.number().finite().positive().max(100).optional()
+})
+
+export const zVaccinationSave = z.object({
+  id: zId.optional(),
+  date: zIsoDate,
+  vaccine: zText(120).min(1, 'Missing vaccine field'),
+  product: zOptText(120),
+  notes: zOptText(2000)
+})
+
+// The key is checked against PROFILE_FIELDS in the handler (a select field also checks its
+// options there); '' or a missing value clears the fact.
+export const zProfileSave = z.object({
+  key: z.string().max(40),
+  value: zText(200).nullish().transform(v => v ?? '')
+})
+
+// --- cycles ---
+
+// Types and bounds only. The cross-field rules (a week within the plan's span, planned_days
+// within planned_weeks × 7, actual_end after the start) stay in the handler, where each can name
+// the plan row it's about ("Bad dose for Primo") instead of a zod path.
+export const zCycleSave = z.object({
+  id: zId.optional(),
+  name: zText(120).min(1, 'Missing name field'),
+  goal: zOptText(500),
+  start_date: zIsoDate,
+  // Absent means an older client, or the dossier's END TODAY round-trip posting the cycle back as-is.
+  start_precision: z.enum(['day', 'month', 'quarter'], 'Bad start_precision').default('day'),
+  planned_weeks: z.number().int().min(1).max(52),
+  planned_days: z.preprocess(blankAsAbsent, z.number().int().positive().nullish()).transform(v => v ?? null),
+  actual_end: zOptDate,
+  compounds: z.array(z.record(z.string(), z.unknown())).min(1, 'A cycle needs at least one compound').max(40),
+  notes: zOptText(5000)
+})
+
+// --- lab / DEXA saves (hand-edited extraction JSON) ---
+
+// The marker, qualitative and source lists stay `unknown` here on purpose: sanitizeMarkers /
+// sanitizeQualitative / sanitizeSources (server/utils/labs.ts) whitelist them field by field,
+// which is stricter than any shape zod could state. The DEXA blocks are stored as JSON, so they
+// only have to be objects.
+const zJsonBlock = z.record(z.string(), z.unknown()).nullish()
+export const zLabsSave = z.object({
+  date: zIsoDate,
+  _type: z.enum(['bloodwork', 'dexa', 'echo']).optional(),
+  fasting: z.boolean().optional().catch(undefined),
+  markers: z.unknown().optional(),
+  qualitative: z.unknown().optional(),
+  sources: z.unknown().optional(),
+  weight_lbs: z.number().finite().nullish().catch(null),
+  ag_ratio: z.number().finite().nullish().catch(null),
+  total: zJsonBlock,
+  regions: zJsonBlock,
+  vat: zJsonBlock,
+  bone_density: zJsonBlock,
+  symmetry: zJsonBlock
+})
+
+// --- Apple Health webhook (Health Auto Export) ---
+
+// A third-party payload, so malformed items are skipped rather than failing the batch: a metric
+// without a data array used to throw mid-loop and lose every good reading after it.
+const zHealthMetric = z.object({
+  name: z.string(),
+  units: z.string().optional(),
+  data: z.array(z.record(z.string(), z.unknown())).default([])
+})
+const keepValid = <T>(item: z.ZodType<T>) => z.array(z.unknown()).default([])
+  .transform(items => items.flatMap((x) => {
+    const r = item.safeParse(x)
+    return r.success ? [r.data] : []
+  }))
+export const zHealthWebhook = z.object({
+  data: z.object({
+    metrics: keepValid(zHealthMetric),
+    workouts: keepValid(z.record(z.string(), z.unknown()))
+  }).default({ metrics: [], workouts: [] })
+})
+
+// --- share links ---
+
+// Out-of-range values are clamped rather than rejected, as the endpoint always has: the UI only
+// offers presets, and the caps exist so a hand-crafted request can't overflow Date (an unbounded
+// expiresDays made toISOString() throw) or store a pathological row.
+const clampedCount = (cap: number) => z.preprocess(blankAsAbsent, z.number().finite().nullish())
+  .transform(v => (v != null && v > 0 ? Math.min(Math.floor(v), cap) : null))
+
+export const zInviteCreate = z.object({
+  role: z.enum(['friend', 'doctor'], 'role must be "friend" or "doctor"'),
+  // Shown on the sharing page and stored forever, so bounded; trimmed to 80 rather than refused.
+  label: z.string().nullish().transform(v => v?.trim().slice(0, 80) || null),
+  // Ten years; the UI offers 7/30/90 days or none.
+  expiresDays: clampedCount(3650),
+  maxUses: clampedCount(10_000)
+})
+
+export const zInviteRevoke = z.object({
+  // A sha256 hex digest; anything much longer isn't an invite id.
+  id: z.string().min(1).max(128)
+})
+
 // --- shared by the delete endpoints ---
 
 export const zIdOnly = z.object({ id: zId })

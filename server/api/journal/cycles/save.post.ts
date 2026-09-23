@@ -1,17 +1,14 @@
-import type { CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
+import type { CyclePlanItem } from '#shared/utils/cycles'
 import { startAnchor } from '#shared/utils/cycles'
+import { zCycleSave } from '#shared/utils/schemas'
+import { DOSE_UNIT_VALUES } from '#shared/types/journal'
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const UNITS = new Set(['mg', 'mcg', 'iu'])
-const PRECISIONS = new Set<StartPrecision>(['day', 'month', 'quarter'])
+const UNITS = new Set<string>(DOSE_UNIT_VALUES)
 
 // The plan drives adherence scoring, calendar rings, and AI prompt context, so a malformed
 // item would quietly poison all three — validate the whole shape and 400 loudly instead.
-function parseItems(raw: unknown, weeks: number): CyclePlanItem[] {
-  if (!Array.isArray(raw) || !raw.length) {
-    throw createError({ statusCode: 400, message: 'A cycle needs at least one compound' })
-  }
-  return raw.map((item: Record<string, unknown>) => {
+function parseItems(raw: Record<string, unknown>[], weeks: number): CyclePlanItem[] {
+  return raw.map((item) => {
     const compound = typeof item.compound === 'string' ? item.compound.trim() : ''
     const dose = Number(item.dose)
     const unit = item.unit as string
@@ -40,38 +37,22 @@ function parseItems(raw: unknown, weeks: number): CyclePlanItem[] {
 export default defineEventHandler(async (event) => {
   requireOwner(event)
 
-  const body = await readBody<Record<string, unknown>>(event)
-  const name = typeof body?.name === 'string' ? body.name.trim() : ''
-  if (!name) throw createError({ statusCode: 400, message: 'Missing name field' })
-
-  const rawStart = body.start_date as string
-  if (!DATE_RE.test(rawStart ?? '')) throw createError({ statusCode: 400, message: 'Bad start_date' })
-
-  // Absent precision means an older client (or the dossier's END TODAY round-trip, which posts
-  // the cycle back as-is) — 'day' keeps those saves behaving exactly as before.
-  const precision = (body.start_precision ?? 'day') as StartPrecision
-  if (!PRECISIONS.has(precision)) throw createError({ statusCode: 400, message: 'Bad start_precision' })
+  // zCycleSave types and bounds every field; the checks below are the cross-field ones.
+  const body = await readValidatedJson(event, zCycleSave)
+  const { name, start_precision: precision, planned_weeks: weeks, planned_days: days, actual_end: actualEnd, goal, notes } = body
 
   // Re-derive rather than trust: a month/quarter start is stored only as its anchor, so a
   // stray day-of-month can't survive to be read back as a commitment.
-  const startDate = startAnchor(rawStart, precision)
-
-  const weeks = Number(body.planned_weeks)
-  if (!Number.isInteger(weeks) || weeks < 1 || weeks > 52) {
-    throw createError({ statusCode: 400, message: 'planned_weeks must be 1-52' })
-  }
+  const startDate = startAnchor(body.start_date, precision)
 
   // A day-exact span for plans that are not whole weeks. Null keeps the old meaning (weeks × 7).
   // It must fit inside the week count it was derived from, so week-relative item windows can
   // never point past the end of the cycle.
-  const rawDays = body.planned_days
-  const days = rawDays == null || rawDays === '' ? null : Number(rawDays)
-  if (days != null && (!Number.isInteger(days) || days < 1 || days > weeks * 7)) {
+  if (days != null && days > weeks * 7) {
     throw createError({ statusCode: 400, message: `planned_days must be 1-${weeks * 7}` })
   }
 
-  const actualEnd = body.actual_end == null || body.actual_end === '' ? null : body.actual_end as string
-  if (actualEnd != null && (!DATE_RE.test(actualEnd) || actualEnd < startDate)) {
+  if (actualEnd != null && actualEnd < startDate) {
     throw createError({ statusCode: 400, message: 'Bad actual_end' })
   }
   // A cycle with no committed start can't have ended: it never began, and cycleStatusOn keeps
@@ -81,8 +62,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const compounds = JSON.stringify(parseItems(body.compounds, weeks))
-  const goal = (typeof body.goal === 'string' && body.goal.trim()) || null
-  const notes = (typeof body.notes === 'string' && body.notes.trim()) || null
 
   const db = getDb(event)
 
