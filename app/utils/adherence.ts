@@ -49,6 +49,14 @@ export interface AdherenceRow {
   status: { kind: 'done' | 'due' | 'overdue' | 'next', label: string }
 }
 
+/** Colour for an adherence %: the row figures and the cycle dossier's headline stat. */
+export function adherencePctClass(pct: number | null): string {
+  if (pct == null) return 'text-muted'
+  if (pct >= 90) return 'text-accent'
+  if (pct >= 70) return 'text-dim'
+  return 'text-warn'
+}
+
 function statusOf(rule: ProtocolRule, logged: Set<string>, today: string): AdherenceRow['status'] {
   const dueToday = ruleActiveOn(rule, today) && rule.weekdays.includes(weekdayOf(today))
   if (dueToday && logged.has(today)) return { kind: 'done', label: '✓ TODAY' }

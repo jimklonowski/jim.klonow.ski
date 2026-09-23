@@ -46,33 +46,7 @@
         <p class="mt-2.5 text-[12px] text-muted leading-[1.7]">
           Saving results is a write, so it needs your 9-digit upload PIN.
         </p>
-        <div class="flex items-center gap-2 mt-3">
-          <span class="shrink-0 text-accent text-[13px] leading-none">❯</span>
-          <UInput
-            v-model="pin"
-            type="password"
-            inputmode="numeric"
-            maxlength="9"
-            placeholder="9-digit PIN"
-            autofocus
-            class="w-full text-center tracking-widest"
-            @keydown.enter="submitPin"
-          />
-        </div>
-        <UButton
-          class="w-full justify-center mt-3"
-          :loading="pinLoading"
-          :disabled="pin.length !== 9"
-          @click="submitPin"
-        >
-          Unlock
-        </UButton>
-        <p
-          v-if="pinError"
-          class="mt-2.5 text-[12px] text-danger"
-        >
-          ✕ {{ pinError }}
-        </p>
+        <LabsPinForm @unlocked="uploadAuthed = true" />
       </div>
     </section>
 
@@ -385,9 +359,6 @@ interface LabResult {
 
 // PIN gate — validated server-side (httpOnly cookie, not readable by JS)
 const uploadAuthed = ref(false)
-const pin = ref('')
-const pinLoading = ref(false)
-const pinError = ref('')
 
 onMounted(async () => {
   try {
@@ -398,23 +369,6 @@ onMounted(async () => {
     uploadAuthed.value = false
   }
 })
-
-async function submitPin() {
-  if (pin.value.length !== 9) return
-  pinLoading.value = true
-  pinError.value = ''
-  try {
-    await $fetch('/api/labs/upload-auth', { method: 'POST', body: { pin: pin.value } })
-    uploadAuthed.value = true
-  }
-  catch {
-    pinError.value = 'Incorrect PIN. Try again.'
-    pin.value = ''
-  }
-  finally {
-    pinLoading.value = false
-  }
-}
 
 // Report type
 const REPORT_TYPES = [

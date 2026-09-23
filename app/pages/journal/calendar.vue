@@ -143,93 +143,21 @@
 
     <!-- Protocol timeline -->
     <section class="px-4 sm:px-6 py-4">
-      <TuiHeader :label="timelineLabel">
-        <span class="flex gap-2.5 text-[11px]">
-          <button
-            v-for="opt in ZOOM_OPTS"
-            :key="opt.value"
-            type="button"
-            class="cursor-pointer uppercase tracking-[0.12em]"
-            :class="zoom === opt.value ? 'text-accent' : 'text-faint hover:text-accent'"
-            :aria-pressed="zoom === opt.value"
-            @click="zoom = opt.value"
-          >{{ zoom === opt.value ? `[${opt.label}]` : opt.label }}</button>
-        </span>
-      </TuiHeader>
-
-      <p
-        v-if="!timelineRows.length"
-        class="mt-2.5 text-[12px] text-muted"
-      >
-        No compound data yet.
-      </p>
-
-      <div
-        v-else
-        class="mt-3 space-y-1"
-      >
-        <div
-          v-for="compound in timelineRows"
-          :key="compound.name"
-          class="flex items-center gap-3"
-        >
-          <NuxtLink
-            :to="`/journal/compound/${encodeURIComponent(compound.name)}`"
-            class="shrink-0 w-30 sm:w-38 text-[11px] text-right truncate hover:opacity-70 transition-opacity"
-            :style="{ color: getCompoundColor(compound.name) }"
-          >
-            {{ compound.name }}
-          </NuxtLink>
-
-          <div class="relative flex-1 h-2.75 bg-raised min-w-0">
-            <div
-              v-for="(run, i) in compound.runs"
-              :key="i"
-              class="absolute inset-y-0"
-              :style="{
-                left: `${run.left}%`,
-                width: `${run.width}%`,
-                background: getCompoundColor(compound.name),
-                opacity: 0.75
-              }"
-              :title="run.title"
-            />
-          </div>
-
-          <span class="shrink-0 w-9 text-[11px] text-muted text-right">
-            {{ compound.count }}{{ zoom === 'week' ? 'w' : 'mo' }}
-          </span>
-        </div>
-
-        <!-- Lab draws + now line -->
-        <div class="flex items-center gap-3 pt-1.5">
-          <span class="shrink-0 w-30 sm:w-38 text-[11px] text-muted text-right">lab draws</span>
-          <div class="relative flex-1 h-2.75 min-w-0">
-            <NuxtLink
-              v-for="mark in labMarks"
-              :key="mark.slot"
-              to="/labs"
-              class="absolute top-0 -translate-x-1/2 text-[10px] text-accent leading-none hover:text-accent-hover"
-              :style="{ left: `${mark.left}%` }"
-              :title="mark.title"
-            >▲</NuxtLink>
-            <span
-              v-if="nowLeft != null"
-              class="absolute inset-y-0 w-px bg-accent"
-              :style="{ left: `${nowLeft}%` }"
-              title="now"
-            />
-          </div>
-          <span class="shrink-0 w-9" />
-        </div>
-      </div>
+      <JournalProtocolTimeline
+        v-model:zoom="zoom"
+        :label="timelineLabel"
+        :entries="entries"
+        :lab-dates="labDates"
+        :from="firstPeptideDate"
+        :today="todayDate"
+        size="md"
+      />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { eachDay, weekStartOf } from '#shared/utils/dates'
-import { getCompoundColor, STANDING_COMPOUNDS } from '~/data/journal'
+import { getCompoundColor } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Calendar' })
 
@@ -416,10 +344,7 @@ function shortCompound(name: string): string {
 
 // --- Timeline ---
 
-const ZOOM_OPTS = [
-  { label: 'week', value: 'week' as const },
-  { label: 'month', value: 'month' as const }
-]
+// Timeline gantt (engine: shared/utils/timeline.ts); week zoom here, month on the compounds page.
 const zoom = ref<'week' | 'month'>('week')
 
 const firstPeptideDate = computed(() =>
@@ -433,135 +358,5 @@ const timelineLabel = computed(() => {
   return `PROTOCOL TIMELINE · ${from} → ${to}`
 })
 
-function slotKey(dateStr: string): string {
-  return zoom.value === 'week' ? weekStartOf(dateStr) : dateStr.slice(0, 7)
-}
-
-const slots = computed((): string[] => {
-  const first = firstPeptideDate.value
-  if (!first) return []
-  const result: string[] = []
-  if (zoom.value === 'week') {
-    result.push(...eachDay(weekStartOf(first), weekStartOf(todayDate), 7))
-  }
-  else {
-    let [y, m] = first.split('-').map(Number) as [number, number]
-    const [ey, em] = todayDate.split('-').map(Number) as [number, number]
-    while (y < ey || (y === ey && m <= em)) {
-      result.push(`${y}-${String(m).padStart(2, '0')}`)
-      m++
-      if (m > 12) {
-        m = 1
-        y++
-      }
-    }
-  }
-  return result
-})
-
-function slotLabel(slot: string): string {
-  if (zoom.value === 'month') {
-    const [y, m] = slot.split('-').map(Number) as [number, number]
-    return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-  }
-  return `week of ${formatDate(slot, 'monthDay')}`
-}
-
-interface Run { left: number, width: number, title: string }
-
-// Contiguous stretches of active slots become one bar each, so a compound that ran Feb-Apr
-// reads as a single duration rather than a row of disconnected ticks.
-function toRuns(active: Set<string>, name: string): Run[] {
-  const all = slots.value
-  if (!all.length) return []
-  const unit = 100 / all.length
-  const runs: Run[] = []
-  let start = -1
-  for (let i = 0; i <= all.length; i++) {
-    const on = i < all.length && active.has(all[i]!)
-    if (on && start < 0) start = i
-    if (!on && start >= 0) {
-      runs.push({
-        left: start * unit,
-        width: (i - start) * unit,
-        title: `${name} · ${slotLabel(all[start]!)} → ${slotLabel(all[i - 1]!)}`
-      })
-      start = -1
-    }
-  }
-  return runs
-}
-
-const timelineCompounds = computed(() => {
-  const usage: Record<string, Set<string>> = {}
-  const firstUse: Record<string, string> = {}
-
-  for (const entry of entries.value) {
-    const key = slotKey(entry.date)
-    for (const p of entry.peptides ?? []) {
-      if (!p.compound) continue
-      ;(usage[p.compound] ??= new Set()).add(key)
-      firstUse[p.compound] ??= entry.date
-    }
-  }
-
-  return Object.entries(usage)
-    .sort(([a], [b]) => (firstUse[a] ?? '').localeCompare(firstUse[b] ?? ''))
-    .map(([name, activeSlots]) => ({ name, count: activeSlots.size, runs: toRuns(activeSlots, name) }))
-})
-
-// Standing meds (STANDING_COMPOUNDS) as backfilled rows: date ranges → bars, clamped to the
-// log window. These never appear in the dose log, so they're merged in here rather than
-// derived from entries — the tooltip carries the real dates and dose form.
-const standingRows = computed(() => {
-  const all = slots.value
-  if (!all.length) return []
-  const unit = 100 / all.length
-  // `covered` is a set because adjacent ranges (a dose-form switch mid-week) can land their
-  // boundary in the same slot — counting per-range would tally that week twice.
-  const byName = new Map<string, { name: string, covered: Set<number>, runs: Run[] }>()
-  for (const s of STANDING_COMPOUNDS) {
-    const endDate = s.to != null && s.to < todayDate ? s.to : todayDate
-    const startKey = slotKey(s.from)
-    const endKey = slotKey(endDate)
-    if (endKey < all[0]!) continue // range ended before the log window
-    const startIdx = all.indexOf(startKey) >= 0 ? all.indexOf(startKey) : 0
-    const endIdx = all.indexOf(endKey) >= 0 ? all.indexOf(endKey) : all.length - 1
-    const row = byName.get(s.compound) ?? { name: s.compound, covered: new Set<number>(), runs: [] }
-    for (let i = startIdx; i <= endIdx; i++) row.covered.add(i)
-    row.runs.push({
-      left: startIdx * unit,
-      width: (endIdx - startIdx + 1) * unit,
-      title: `${s.compound} ${s.label} · ${formatDate(s.from)} → ${s.to ? formatDate(s.to) : 'now'}`
-    })
-    byName.set(s.compound, row)
-  }
-  return [...byName.values()].map(r => ({ name: r.name, count: r.covered.size, runs: r.runs }))
-})
-
-/** Standing meds first (they predate the log), then logged compounds by first use. */
-const timelineRows = computed(() => [...standingRows.value, ...timelineCompounds.value])
-
-const labMarks = computed(() => {
-  const all = slots.value
-  if (!all.length) return []
-  const unit = 100 / all.length
-  const byslot = new Map<string, string[]>()
-  for (const lab of labsData.value ?? []) {
-    const key = slotKey(lab.date)
-    if (!all.includes(key)) continue
-    byslot.set(key, [...(byslot.get(key) ?? []), lab.date])
-  }
-  return [...byslot.entries()].map(([slot, dates]) => ({
-    slot,
-    left: (all.indexOf(slot) + 0.5) * unit,
-    title: `lab draw · ${dates.map(d => formatDate(d)).join(', ')}`
-  }))
-})
-
-const nowLeft = computed(() => {
-  const all = slots.value
-  const idx = all.indexOf(slotKey(todayDate))
-  return idx < 0 ? null : (idx + 1) * (100 / all.length)
-})
+const labDates = computed(() => (labsData.value ?? []).map(l => l.date))
 </script>
