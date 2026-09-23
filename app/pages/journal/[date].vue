@@ -809,11 +809,12 @@ async function confirmUploadPhoto() {
   }
 }
 
-async function deletePhoto(id: number) {
+// No catch used to mean a failed delete was an unhandled rejection with nothing on screen.
+const { run: deletePhoto } = useSaveAction(async (id: number) => {
   await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })
   if (lightboxPhoto.value?.id === id) lightboxPhoto.value = null
   await refreshPhotos()
-}
+}, { error: 'Delete failed' })
 
 const lightboxPhoto = ref<ProgressPhoto | null>(null)
 
@@ -874,16 +875,18 @@ const form = reactive<{
   notes: string
 }>(buildForm())
 
-// Snapshot of the form as last built from the server row. The mounted revalidation (and any
-// refresh triggered elsewhere) replaces the list a few hundred ms after the page renders, which
-// gives `existingEntry` a new identity — rebuilding unconditionally wiped whatever had been
-// typed in that window. Rebuild only while the form still matches what it was built from.
-let builtSnapshot = JSON.stringify(form)
+// "Clean" = the form still matches what it was last built from (or saved as). The guard also
+// asks before leaving the page, or closing the tab, with unsaved edits.
+//
+// The mounted revalidation (and any refresh triggered elsewhere) replaces the list a few hundred
+// ms after the page renders, which gives `existingEntry` a new identity. Rebuilding
+// unconditionally wiped whatever had been typed in that window, so it rebuilds only while clean.
+const formGuard = useDirtyGuard(() => form)
 
 watch(existingEntry, () => {
-  if (JSON.stringify(form) !== builtSnapshot) return
+  if (formGuard.isDirty.value) return
   Object.assign(form, buildForm())
-  builtSnapshot = JSON.stringify(form)
+  formGuard.markClean()
 })
 
 function buildForm() {
@@ -948,31 +951,17 @@ function removeSoda(i: number) {
   form.sodas.splice(i, 1)
 }
 
-const saving = ref(false)
-
-async function save() {
-  saving.value = true
-  try {
-    const payload = {
-      ...form,
-      food: Object.fromEntries(
-        Object.entries(form.food).filter(([, v]) => v !== '')
-      )
-    }
-    await $fetch('/api/journal/save', { method: 'POST', body: payload })
-
-    toast.add({ title: 'Entry saved', color: 'success', icon: 'i-lucide-check' })
-    // What was just saved is now the baseline, so the refresh below may rebuild from the row.
-    builtSnapshot = JSON.stringify(form)
-    // The shell's streak / logged / soda figures come from the scalar summary, not this list.
-    await Promise.all([refresh(), refreshNuxtData('overview')])
+const { run: save, pending: saving } = useSaveAction(async () => {
+  const payload = {
+    ...form,
+    food: Object.fromEntries(
+      Object.entries(form.food).filter(([, v]) => v !== '')
+    )
   }
-  catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    toast.add({ title: 'Save failed', description: msg, color: 'error' })
-  }
-  finally {
-    saving.value = false
-  }
-}
+  await $fetch('/api/journal/save', { method: 'POST', body: payload })
+  // What was just saved is now the baseline, so the refresh below may rebuild from the row.
+  formGuard.markClean()
+  // The shell's streak / logged / soda figures come from the scalar summary, not this list.
+  await Promise.all([refresh(), refreshNuxtData('overview')])
+}, { success: 'Entry saved' })
 </script>

@@ -338,7 +338,6 @@ import { computeCycleSignals } from '#shared/utils/cycleSignals'
 import { adherencePctClass } from '~/utils/adherence'
 
 const route = useRoute()
-const toast = useToast()
 const { isOwner } = await useAuth()
 
 const { data, refresh, error } = await useCycles()
@@ -674,20 +673,13 @@ function plannedEndOf(c: Cycle): string {
   return shiftDays(c.start_date, cycleSpanDays(c) - 1)
 }
 
-async function saveEnd(actualEnd: string | null) {
-  const c = cycle.value!
-  try {
-    await $fetch('/api/journal/cycles/save', {
-      method: 'POST',
-      body: { ...c, actual_end: actualEnd }
-    })
-    await refresh()
-    toast.add({ title: actualEnd ? 'Cycle ended' : 'Back on plan', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Update failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-}
+const { run: saveEnd } = useSaveAction(async (actualEnd: string | null) => {
+  await $fetch('/api/journal/cycles/save', {
+    method: 'POST',
+    body: { ...cycle.value!, actual_end: actualEnd }
+  })
+  await refresh()
+}, { error: 'Update failed', success: (_, actualEnd) => actualEnd ? 'Cycle ended' : 'Back on plan' })
 
 useSeoMeta({ title: () => `Cycle · ${cycle.value?.name ?? ''}` })
 </script>

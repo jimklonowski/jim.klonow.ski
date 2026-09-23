@@ -305,7 +305,6 @@ import { VACCINE_NAMES, vaccineCoverage } from '#shared/utils/vaccines'
 
 useSeoMeta({ title: 'Journal · Vaccines' })
 
-const toast = useToast()
 // Owner-only edits (not canEdit): the demo sandbox has neither table to write into.
 const { isOwner } = await useAuth()
 
@@ -335,7 +334,6 @@ const meta = computed(() => {
 // --- card facts ---
 
 const profileModalOpen = ref(false)
-const profileSaving = ref(false)
 const profileField = ref<ProfileField | null>(null)
 const profileValue = ref('')
 
@@ -346,22 +344,14 @@ function openProfileModal(f: ProfileField) {
 }
 
 /** '' clears the fact (the API deletes the row) — the CLEAR button passes that explicitly. */
+const { run: runSaveProfile, pending: profileSaving } = useSaveAction(async (field: ProfileField, value: string) => {
+  await $fetch('/api/journal/profile', { method: 'POST', body: { key: field.key, value } })
+  await refreshProfile()
+  profileModalOpen.value = false
+}, { success: (_, field, value) => value ? `${field.label} saved` : `${field.label} cleared` })
+
 async function saveProfile(value: string) {
-  const field = profileField.value
-  if (!field) return
-  profileSaving.value = true
-  try {
-    await $fetch('/api/journal/profile', { method: 'POST', body: { key: field.key, value } })
-    await refreshProfile()
-    profileModalOpen.value = false
-    toast.add({ title: value ? `${field.label} saved` : `${field.label} cleared`, color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    profileSaving.value = false
-  }
+  if (profileField.value) await runSaveProfile(profileField.value, value)
 }
 
 // --- shots ---
@@ -377,8 +367,7 @@ function dueChip(c: VaccineCoverage): { text: string, class: string } | null {
 
 const SELECT_UI = { content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }
 
-const formModalOpen = ref(false)
-const saving = ref(false)
+const formModalRaw = ref(false)
 
 // UInput v-models want strings, so the form uses '' where the API uses null — the save
 // endpoint normalizes '' back to null.
@@ -395,9 +384,13 @@ function emptyForm(): VaccinationForm {
 }
 
 const form = reactive<VaccinationForm>(emptyForm())
+// Closing the modal (Escape, backdrop, Cancel) asks first when the form has unsaved edits.
+const formGuard = useDirtyGuard(() => form)
+const formModalOpen = formGuard.guardOpen(formModalRaw)
 
 function openAddModal() {
   Object.assign(form, emptyForm())
+  formGuard.markClean()
   formModalOpen.value = true
 }
 
@@ -409,34 +402,24 @@ function openEditModal(v: Vaccination) {
     product: v.product ?? '',
     notes: v.notes ?? ''
   })
+  formGuard.markClean()
   formModalOpen.value = true
 }
 
-async function saveVaccination() {
-  saving.value = true
-  try {
-    await $fetch('/api/journal/vaccines/save', { method: 'POST', body: { ...form } })
-    await refresh()
-    formModalOpen.value = false
-    toast.add({ title: form.id ? 'Shot updated' : 'Shot logged', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    saving.value = false
-  }
-}
+const { run: saveVaccination, pending: saving } = useSaveAction(async () => {
+  await $fetch('/api/journal/vaccines/save', { method: 'POST', body: { ...form } })
+  await refresh()
+  formGuard.markClean()
+  formModalOpen.value = false
+}, { success: () => form.id ? 'Shot updated' : 'Shot logged' })
+
+const { run: deleteVaccination } = useSaveAction(async (v: Vaccination) => {
+  await $fetch('/api/journal/vaccines/delete', { method: 'POST', body: { id: v.id } })
+  await refresh()
+}, { success: 'Deleted', error: 'Delete failed' })
 
 async function confirmDelete(v: Vaccination) {
   if (!confirm(`Delete ${v.vaccine} on ${formatDate(v.date)}?`)) return
-  try {
-    await $fetch('/api/journal/vaccines/delete', { method: 'POST', body: { id: v.id } })
-    await refresh()
-    toast.add({ title: 'Deleted', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
+  await deleteVaccination(v)
 }
 </script>

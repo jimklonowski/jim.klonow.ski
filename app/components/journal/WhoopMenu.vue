@@ -98,7 +98,7 @@ async function syncNow() {
     toast.add({ title: 'Whoop synced', description: parts.join(' · '), color: 'success', icon: 'i-lucide-check' })
   }
   catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
+    const msg = extractErrorMessage(err, 'Unknown error')
     await loadStatus()
     toast.add({ title: 'Sync failed', description: msg, color: 'error' })
   }

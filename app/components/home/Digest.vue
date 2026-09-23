@@ -140,7 +140,6 @@ const emit = defineEmits<{ refresh: [] }>()
 
 const digestOpen = useState('digest-panel-open', () => false)
 const toast = useToast()
-const generating = ref(false)
 
 function newest(type: 'daily' | 'weekly') {
   return [...props.digests]
@@ -173,29 +172,21 @@ function relative(date: string) {
   return formatDate(date, 'monthDay').toLowerCase()
 }
 
-async function regenerate() {
-  generating.value = true
-  try {
-    const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', {
-      method: 'POST',
-      body: { kind: 'daily', endDate: localToday() }
-    })
-    if (res.skipped) {
-      toast.add({ title: 'Nothing to summarize', description: 'No data logged for today yet.', color: 'warning' })
-    }
-    else {
-      emit('refresh')
-      toast.add({ title: 'Digest ready', description: 'Today\'s recap regenerated.', color: 'success' })
-    }
+const { run: regenerate, pending: generating } = useSaveAction(async () => {
+  const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', {
+    method: 'POST',
+    body: { kind: 'daily', endDate: localToday() }
+  })
+  if (res.skipped) {
+    toast.add({ title: 'Nothing to summarize', description: 'No data logged for today yet.', color: 'warning' })
+    return false
   }
-  catch (err) {
-    const e = err as { data?: { message?: string } }
-    toast.add({ title: 'Generation failed', description: e.data?.message ?? 'Try again in a moment.', color: 'error' })
-  }
-  finally {
-    generating.value = false
-  }
-}
+  emit('refresh')
+  return true
+}, {
+  error: 'Generation failed',
+  success: generated => generated ? { title: 'Digest ready', description: 'Today\'s recap regenerated.' } : null
+})
 
 // --- TICKER event wiring (design_handoff_ticker screen 04) ------------------
 // One-shots are triggered here where the data lives; the companion itself

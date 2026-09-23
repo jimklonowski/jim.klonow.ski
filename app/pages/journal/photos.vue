@@ -770,13 +770,15 @@ function swapBeforeAfter() {
 
 const lightboxPhoto = ref<ProgressPhoto | null>(null)
 
-async function deletePhoto(id: number) {
+// These four had no catch at all: a failed request was an unhandled rejection and the photo
+// just silently stayed as it was.
+const { run: deletePhoto } = useSaveAction(async (id: number) => {
   await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })
   if (beforeId.value === id) beforeId.value = null
   if (afterId.value === id) afterId.value = null
   if (lightboxPhoto.value?.id === id) lightboxPhoto.value = null
   await refresh()
-}
+}, { error: 'Delete failed' })
 
 const editingPhoto = ref<ProgressPhoto | null>(null)
 const editForm = reactive<{ date: string, category: PhotoCategory }>({ date: '', category: 'chest' })
@@ -784,7 +786,6 @@ const editOpen = computed({
   get: () => !!editingPhoto.value,
   set: (v: boolean) => { if (!v) editingPhoto.value = null }
 })
-const savingEdit = ref(false)
 
 function openEdit(photo: ProgressPhoto) {
   editingPhoto.value = photo
@@ -792,21 +793,17 @@ function openEdit(photo: ProgressPhoto) {
   editForm.category = photo.category
 }
 
+const { run: runSaveEdit, pending: savingEdit } = useSaveAction(async (photo: ProgressPhoto) => {
+  await $fetch('/api/journal/photos/update', {
+    method: 'POST',
+    body: { id: photo.id, date: editForm.date, category: editForm.category }
+  })
+  editingPhoto.value = null
+  await refresh()
+})
+
 async function saveEdit() {
-  const photo = editingPhoto.value
-  if (!photo) return
-  savingEdit.value = true
-  try {
-    await $fetch('/api/journal/photos/update', {
-      method: 'POST',
-      body: { id: photo.id, date: editForm.date, category: editForm.category }
-    })
-    editingPhoto.value = null
-    await refresh()
-  }
-  finally {
-    savingEdit.value = false
-  }
+  if (editingPhoto.value) await runSaveEdit(editingPhoto.value)
 }
 
 function isReframed(photo: ProgressPhoto) {
@@ -854,7 +851,6 @@ const reframeOpen = computed({
   get: () => !!reframingPhoto.value,
   set: (v: boolean) => { if (!v) reframingPhoto.value = null }
 })
-const savingReframe = ref(false)
 const reframeContainerRef = ref<HTMLElement | null>(null)
 const reframeDragging = ref(false)
 let reframeLastPointer = { x: 0, y: 0 }
@@ -898,33 +894,29 @@ function onReframePointerUp() {
   reframeDragging.value = false
 }
 
+const { run: runSaveReframe, pending: savingReframe } = useSaveAction(async (photo: ProgressPhoto) => {
+  await $fetch('/api/journal/photos/update', {
+    method: 'POST',
+    body: {
+      id: photo.id,
+      frameOffsetX: reframeForm.offsetX,
+      frameOffsetY: reframeForm.offsetY,
+      frameScale: reframeForm.scale
+    }
+  })
+  reframingPhoto.value = null
+  await refresh()
+})
+
 async function saveReframe() {
-  const photo = reframingPhoto.value
-  if (!photo) return
-  savingReframe.value = true
-  try {
-    await $fetch('/api/journal/photos/update', {
-      method: 'POST',
-      body: {
-        id: photo.id,
-        frameOffsetX: reframeForm.offsetX,
-        frameOffsetY: reframeForm.offsetY,
-        frameScale: reframeForm.scale
-      }
-    })
-    reframingPhoto.value = null
-    await refresh()
-  }
-  finally {
-    savingReframe.value = false
-  }
+  if (reframingPhoto.value) await runSaveReframe(reframingPhoto.value)
 }
 
-async function resetFraming(photo: ProgressPhoto) {
+const { run: resetFraming } = useSaveAction(async (photo: ProgressPhoto) => {
   await $fetch('/api/journal/photos/update', {
     method: 'POST',
     body: { id: photo.id, frameOffsetX: 0, frameOffsetY: 0, frameScale: 1 }
   })
   await refresh()
-}
+}, { error: 'Reset failed' })
 </script>

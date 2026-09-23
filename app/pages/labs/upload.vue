@@ -497,8 +497,7 @@ async function upload(file: File) {
     result.value = await $fetch<LabResult>('/api/labs/process-pdf', { method: 'POST', body: form })
   }
   catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    error.value = msg || 'Something went wrong. Please try again.'
+    error.value = extractErrorMessage(e, 'Something went wrong. Please try again.')
     processing.value = false
   }
   finally {
@@ -555,8 +554,7 @@ async function saveToSite() {
     if (res.table === 'labs_entries') generateSummary(res.date)
   }
   catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Failed to save. Please try again.'
-    saveResult.value = { ok: false, message: msg }
+    saveResult.value = { ok: false, message: extractErrorMessage(e, 'Failed to save. Please try again.') }
   }
   finally {
     saving.value = false
