@@ -399,20 +399,7 @@
       </section>
     </template>
 
-    <UModal
-      v-model:open="lightboxOpen"
-      :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
-    >
-      <template #body>
-        <img
-          v-if="lightboxPhoto"
-          :src="lightboxPhoto.url"
-          :alt="`${photoCategoryLabel(lightboxPhoto.category)} progress photo, ${formatDate(lightboxPhoto.date)}`"
-          class="w-full h-auto"
-        >
-      </template>
-    </UModal>
+    <JournalPhotoLightbox v-model:photo="lightboxPhoto" />
 
     <UModal
       v-model:open="editOpen"
@@ -541,7 +528,6 @@
 
 <script setup lang="ts">
 import { diffDays } from '#shared/utils/dates'
-import exifr from 'exifr'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
@@ -550,7 +536,6 @@ useSeoMeta({ title: 'Journal · Photos' })
 
 const { data: photosData, refresh, error } = await usePhotoEntries()
 const { isOwner } = await useAuth()
-onMounted(refresh)
 
 // --- One-time thumbnail backfill for photos uploaded before thumbnails existed ---
 // Re-fetches each already-uploaded original through the authenticated proxy, regenerates a
@@ -655,25 +640,6 @@ const fileMeta = reactive(new Map<File, PhotoMeta>())
 const previewUrls = new Map<File, string>()
 const uploadingAll = ref(false)
 
-function toLocalDateStr(d: Date) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-async function resolveExifDate(file: File): Promise<string> {
-  let exifDate: unknown = null
-  try {
-    const tags = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])
-    exifDate = tags?.DateTimeOriginal ?? tags?.CreateDate ?? null
-  }
-  catch {
-    exifDate = null
-  }
-  return exifDate instanceof Date ? toLocalDateStr(exifDate) : toLocalDateStr(new Date(file.lastModified))
-}
-
 watch(files, (newFiles, oldFiles) => {
   for (const f of oldFiles ?? []) {
     if (newFiles.includes(f)) continue
@@ -687,7 +653,7 @@ watch(files, (newFiles, oldFiles) => {
     previewUrls.set(f, URL.createObjectURL(f))
     const meta = reactive<PhotoMeta>({ date: '', category: category.value, status: 'pending' })
     fileMeta.set(f, meta)
-    resolveExifDate(f).then((d) => {
+    photoDateOf(f).then((d) => {
       meta.date = d
     })
   }
@@ -710,16 +676,6 @@ const uploadLabel = computed(() => {
   return `↑ UPLOAD ${n} PHOTO${n === 1 ? '' : 'S'}`
 })
 
-// ofetch wraps failures as "[POST] \"/api/...\": <status> <text>" with the server's actual
-// error (from h3's createError) tucked away in `.data.message` - surface that instead so
-// upload failures are actually diagnosable from the UI.
-function extractErrorMessage(err: unknown): string {
-  const e = err as { data?: { message?: string, statusMessage?: string }, statusCode?: number, message?: string }
-  const serverMsg = e?.data?.message ?? e?.data?.statusMessage
-  if (serverMsg) return e.statusCode ? `${serverMsg} (${e.statusCode})` : serverMsg
-  return e?.message ?? 'Upload failed'
-}
-
 async function uploadAllPending() {
   uploadingAll.value = true
   const toUpload = files.value.filter((f) => {
@@ -731,20 +687,12 @@ async function uploadAllPending() {
     meta.status = 'uploading'
     meta.error = undefined
     try {
-      const params = new URLSearchParams({ category: meta.category, date: meta.date })
-      const created = await $fetch<{ id: number }>(`/api/journal/photos/upload?${params}`, { method: 'POST', body: f })
-      try {
-        const thumb = await createPhotoThumbnail(f)
-        await $fetch(`/api/journal/photos/thumbnail?id=${created.id}`, { method: 'POST', body: thumb })
-      }
-      catch {
-        // Best-effort - the grid just falls back to the full-size image for this photo.
-      }
+      await uploadProgressPhoto(f, meta.category, meta.date)
       meta.status = 'done'
     }
     catch (err: unknown) {
       meta.status = 'error'
-      meta.error = extractErrorMessage(err)
+      meta.error = extractErrorMessage(err, 'Upload failed')
     }
   }
   uploadingAll.value = false
@@ -821,10 +769,6 @@ function swapBeforeAfter() {
 // --- Lightbox + per-photo context menu ---
 
 const lightboxPhoto = ref<ProgressPhoto | null>(null)
-const lightboxOpen = computed({
-  get: () => !!lightboxPhoto.value,
-  set: (v: boolean) => { if (!v) lightboxPhoto.value = null }
-})
 
 async function deletePhoto(id: number) {
   await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })

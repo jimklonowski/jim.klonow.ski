@@ -692,20 +692,7 @@
       </div>
     </div>
 
-    <UModal
-      v-model:open="lightboxOpen"
-      :title="lightboxPhoto ? photoCategoryLabel(lightboxPhoto.category) : ''"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
-    >
-      <template #body>
-        <img
-          v-if="lightboxPhoto"
-          :src="lightboxPhoto.url"
-          :alt="`${photoCategoryLabel(lightboxPhoto.category)} progress photo, ${dateParam}`"
-          class="w-full h-auto"
-        >
-      </template>
-    </UModal>
+    <JournalPhotoLightbox v-model:photo="lightboxPhoto" />
   </div>
 </template>
 
@@ -716,7 +703,6 @@ import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '#shared/types/journal'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
-import exifr from 'exifr'
 
 // Shared :ui overrides so every field on this long form reads the same.
 const FIELD_UI = { label: 'tui-label', hint: 'text-[10px] text-faint' }
@@ -756,12 +742,8 @@ useSeoMeta({ title: () => `Journal · ${dateParam.value}` })
 
 const { data: allEntries, error: entriesError, refresh } = await useJournalEntries()
 const { isOwner, canEdit } = await useAuth()
-const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
+const { data: workoutsData } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
-
-onMounted(refresh)
-onMounted(refreshWorkouts)
-onMounted(refreshPhotos)
 
 const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
 
@@ -795,10 +777,6 @@ const pendingDate = ref(dateParam.value)
 const photoUploading = ref(false)
 const photoError = ref('')
 
-function toLocalDateStr(d: Date) {
-  return d.toLocaleDateString('en-CA')
-}
-
 // UFileUpload owns selection/drag-drop via its v-model - react to the file it hands us instead
 // of wiring up input/drop events ourselves.
 watch(pendingFile, async (file) => {
@@ -810,47 +788,21 @@ watch(pendingFile, async (file) => {
   if (!file) return
 
   pendingPreviewUrl.value = URL.createObjectURL(file)
-
-  let exifDate: unknown = null
-  try {
-    const tags = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])
-    exifDate = tags?.DateTimeOriginal ?? tags?.CreateDate ?? null
-  }
-  catch {
-    exifDate = null
-  }
-  pendingDate.value = exifDate instanceof Date ? toLocalDateStr(exifDate) : toLocalDateStr(new Date(file.lastModified))
+  pendingDate.value = await photoDateOf(file)
 })
-
-// ofetch wraps failures as "[POST] \"/api/...\": <status> <text>" with the server's actual
-// error (from h3's createError) tucked away in `.data.message` - surface that instead.
-function extractErrorMessage(err: unknown): string {
-  const e = err as { data?: { message?: string, statusMessage?: string }, statusCode?: number, message?: string }
-  const serverMsg = e?.data?.message ?? e?.data?.statusMessage
-  if (serverMsg) return e.statusCode ? `${serverMsg} (${e.statusCode})` : serverMsg
-  return e?.message ?? 'Upload failed'
-}
 
 async function confirmUploadPhoto() {
   if (!pendingFile.value) return
   photoUploading.value = true
   photoError.value = ''
   try {
-    const params = new URLSearchParams({ category: uploadCategory.value, date: pendingDate.value })
-    const created = await $fetch<{ id: number }>(`/api/journal/photos/upload?${params}`, { method: 'POST', body: pendingFile.value })
-    try {
-      const thumb = await createPhotoThumbnail(pendingFile.value)
-      await $fetch(`/api/journal/photos/thumbnail?id=${created.id}`, { method: 'POST', body: thumb })
-    }
-    catch {
-      // Best-effort - the gallery just falls back to the full-size image for this photo.
-    }
+    await uploadProgressPhoto(pendingFile.value, uploadCategory.value, pendingDate.value)
     pendingFile.value = null
     await refreshPhotos()
     toast.add({ title: 'Photo uploaded', color: 'success', icon: 'i-lucide-check' })
   }
   catch (err: unknown) {
-    photoError.value = extractErrorMessage(err)
+    photoError.value = extractErrorMessage(err, 'Upload failed')
   }
   finally {
     photoUploading.value = false
@@ -864,12 +816,6 @@ async function deletePhoto(id: number) {
 }
 
 const lightboxPhoto = ref<ProgressPhoto | null>(null)
-const lightboxOpen = computed({
-  get: () => !!lightboxPhoto.value,
-  set: (v: boolean) => {
-    if (!v) lightboxPhoto.value = null
-  }
-})
 
 const existingEntry = computed(() =>
   allEntries.value?.find(e => e.date === dateParam.value) ?? null

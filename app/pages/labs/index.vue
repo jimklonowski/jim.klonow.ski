@@ -273,32 +273,11 @@
       :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
-        <div class="space-y-3">
-          <UInput
-            v-model="pin"
-            type="password"
-            inputmode="numeric"
-            maxlength="9"
-            placeholder="9-digit PIN"
-            autofocus
-            class="w-full text-center tracking-widest"
-            @keydown.enter="submitPin"
-          />
-          <UButton
-            class="w-full justify-center"
-            :loading="pinLoading"
-            :disabled="pin.length !== 9"
-            @click="submitPin"
-          >
-            Unlock &amp; regenerate
-          </UButton>
-          <p
-            v-if="pinError"
-            class="text-[12px] text-danger text-center"
-          >
-            {{ pinError }}
-          </p>
-        </div>
+        <LabsPinForm
+          variant="modal"
+          button-label="Unlock & regenerate"
+          @unlocked="onPinUnlocked"
+        />
       </template>
     </UModal>
   </div>
@@ -316,11 +295,6 @@ const { data, refresh, error } = await useLabsEntries()
 const { isOwner } = await useAuth()
 const route = useRoute()
 const router = useRouter()
-
-// Re-fetch on every mount so back-navigation doesn't show stale/empty data
-if (import.meta.client) {
-  onMounted(refresh)
-}
 
 const entries = computed(() => data.value ?? [])
 
@@ -417,9 +391,6 @@ const isRecentDraw = computed(() => {
 const summaryOpen = ref(isRecentDraw.value)
 const regenerating = ref(false)
 const pinModalOpen = ref(false)
-const pin = ref('')
-const pinLoading = ref(false)
-const pinError = ref('')
 const toast = useToast()
 
 async function regenerateSummary() {
@@ -445,23 +416,9 @@ async function regenerateSummary() {
   }
 }
 
-async function submitPin() {
-  if (pin.value.length !== 9) return
-  pinLoading.value = true
-  pinError.value = ''
-  try {
-    await $fetch('/api/labs/upload-auth', { method: 'POST', body: { pin: pin.value } })
-    pinModalOpen.value = false
-    pin.value = ''
-    await regenerateSummary()
-  }
-  catch {
-    pinError.value = 'Incorrect PIN. Try again.'
-    pin.value = ''
-  }
-  finally {
-    pinLoading.value = false
-  }
+async function onPinUnlocked() {
+  pinModalOpen.value = false
+  await regenerateSummary()
 }
 
 // --- sources ---

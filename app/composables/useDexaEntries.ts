@@ -30,6 +30,5 @@ export interface DexaEntry {
 }
 
 export function useDexaEntries() {
-  const requestFetch = useRequestFetch()
-  return useAsyncData('dexa', () => requestFetch<DexaEntry[]>('/api/dexa/list'))
+  return useListResource<DexaEntry[]>('dexa', '/api/dexa/list')
 }

@@ -123,31 +123,11 @@
       </p>
     </div>
 
-    <!-- Pagination -->
-    <div
-      v-if="totalPages > 1"
-      class="flex items-center px-4 sm:px-6 py-2.5 mt-1 border-t border-line text-[11px]"
-    >
-      <button
-        type="button"
-        class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-        :class="page > 1 ? 'text-accent hover:text-accent-hover' : 'text-faint'"
-        :disabled="page <= 1"
-        @click="page--"
-      >
-        ‹ PREV
-      </button>
-      <span class="mx-auto text-muted uppercase tracking-[0.06em]">page {{ page }} / {{ totalPages }}</span>
-      <button
-        type="button"
-        class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-        :class="page < totalPages ? 'text-accent hover:text-accent-hover' : 'text-faint'"
-        :disabled="page >= totalPages"
-        @click="page++"
-      >
-        NEXT ›
-      </button>
-    </div>
+    <TuiPager
+      v-model:page="page"
+      :total-pages="totalPages"
+      class="mt-1"
+    />
   </div>
 </template>
 
@@ -159,7 +139,6 @@ import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 useSeoMeta({ title: 'Journal · Workouts' })
 
 const { data, refresh, error } = await useWorkoutsEntries()
-onMounted(refresh)
 
 // Newest first — the log reads backwards from today. Sorting on date alone left a day's
 // sessions in whatever order the API returned, so a morning lift could sit above an evening
@@ -231,13 +210,7 @@ const typeMix = computed(() => {
 })
 
 // --- paginated log, grouped by week ---
-const PAGE_SIZE = 40
-const page = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(workouts.value.length / PAGE_SIZE)))
-
-const pageRows = computed(() =>
-  workouts.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE)
-)
+const { page, totalPages, pageRows } = usePagination(workouts, 40)
 
 const weekGroups = computed(() => {
   const groups: Array<{ weekStart: string, label: string, count: number, minutes: number, rows: WorkoutEntry[] }> = []

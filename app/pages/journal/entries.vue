@@ -128,38 +128,18 @@
       </p>
     </div>
 
-    <!-- Pagination -->
-    <div
-      v-if="totalPages > 1"
-      class="flex items-center px-4 sm:px-6 py-2.5 border-t border-line text-[11px]"
+    <TuiPager
+      v-model:page="page"
+      :total-pages="totalPages"
     >
       <button
         type="button"
-        class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-        :class="page > 1 ? 'text-accent hover:text-accent-hover' : 'text-faint'"
-        :disabled="page <= 1"
-        @click="page--"
+        class="ml-2 text-accent hover:text-accent-hover cursor-pointer"
+        @click="paletteOpen = true"
       >
-        ‹ PREV
+        · jump to date ⌘K
       </button>
-      <span class="mx-auto text-muted">
-        <span class="uppercase tracking-[0.06em]">page {{ page }} / {{ totalPages }}</span>
-        <button
-          type="button"
-          class="ml-2 text-accent hover:text-accent-hover cursor-pointer"
-          @click="paletteOpen = true"
-        >· jump to date ⌘K</button>
-      </span>
-      <button
-        type="button"
-        class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-        :class="page < totalPages ? 'text-accent hover:text-accent-hover' : 'text-faint'"
-        :disabled="page >= totalPages"
-        @click="page++"
-      >
-        NEXT ›
-      </button>
-    </div>
+    </TuiPager>
   </div>
 </template>
 
@@ -170,14 +150,10 @@ import { getCompoundColor } from '~/data/journal'
 useSeoMeta({ title: 'Journal · Entries' })
 
 const { data, refresh, error } = await useJournalEntries()
-const { data: workoutsData, refresh: refreshWorkouts } = await useWorkoutsEntries()
-const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
+const { data: workoutsData } = await useWorkoutsEntries()
+const { data: photosData } = await usePhotoEntries()
 const { data: labsData } = await useLabsEntries()
 const { role, canEdit } = await useAuth()
-
-onMounted(refresh)
-onMounted(refreshWorkouts)
-onMounted(refreshPhotos)
 
 const paletteOpen = useState('command-palette-open', () => false)
 const today = localToday()
@@ -231,9 +207,7 @@ const streakStrip = computed(() => {
 })
 
 // --- ledger rows ---
-const PAGE_SIZE = 15
-const page = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(entries.value.length / PAGE_SIZE)))
+const { page, totalPages, pageRows: pagedEntries } = usePagination(entries, 15)
 
 /** "167.8lb · 125/74 · ♥60 · HRV 52", skipping whatever wasn't recorded. */
 function vitalsLine(e: typeof entries.value[number]) {
@@ -256,7 +230,7 @@ function flagsFor(e: typeof entries.value[number], isDraw: boolean) {
 }
 
 const pageRows = computed(() =>
-  entries.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE).map((e) => {
+  pagedEntries.value.map((e) => {
     const isDraw = drawDates.value.has(e.date)
     return {
       date: e.date,

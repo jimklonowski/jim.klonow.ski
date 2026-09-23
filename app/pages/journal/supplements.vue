@@ -240,7 +240,6 @@ const toast = useToast()
 const { canEdit } = await useAuth()
 
 const { data, refresh, error } = await useSupplements()
-onMounted(() => refresh())
 
 const supplements = computed(() => data.value ?? [])
 const activeCount = computed(() => supplements.value.filter(s => s.status === 'active').length)

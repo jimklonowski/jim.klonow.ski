@@ -194,11 +194,6 @@ useSeoMeta({ title: () => 'Labs · DEXA' })
 const { data, refresh, error } = await useDexaEntries()
 const { isOwner } = await useAuth()
 
-// Re-fetch on every mount so back-navigation doesn't show stale/empty data
-if (import.meta.client) {
-  onMounted(refresh)
-}
-
 const entries = computed(() => data.value ?? [])
 const latest = computed(() => entries.value.at(-1) ?? null)
 

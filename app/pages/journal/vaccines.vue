@@ -313,10 +313,6 @@ const [{ data, refresh, error }, { data: profileData, refresh: refreshProfile }]
   useVaccinations(),
   useProfile()
 ])
-onMounted(() => {
-  refresh()
-  refreshProfile()
-})
 
 const today = localToday()
 const vaccinations = computed(() => data.value ?? [])
