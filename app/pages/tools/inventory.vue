@@ -311,19 +311,15 @@
             label="Compound"
             required
           >
-            <UInput
+            <UInputMenu
               v-model="form.compound"
-              list="inv-compounds"
+              mode="autocomplete"
+              :items="KNOWN_COMPOUNDS"
+              open-on-click
               placeholder="BPC-157"
               class="w-full"
+              :ui="{ item: 'text-[12px]' }"
             />
-            <datalist id="inv-compounds">
-              <option
-                v-for="c in KNOWN_COMPOUNDS"
-                :key="c"
-                :value="c"
-              />
-            </datalist>
           </UFormField>
 
           <div class="grid grid-cols-2 gap-3">
@@ -342,11 +338,10 @@
             <UFormField
               :label="quantityLabel"
             >
-              <UInput
-                v-model.number="form.quantity"
-                type="number"
-                min="1"
-                step="1"
+              <UInputNumber
+                v-model="form.quantity"
+                :min="1"
+                :step="1"
                 class="w-full"
               />
             </UFormField>
@@ -416,11 +411,10 @@
                 :label="`${cap(pillNoun(form.form, 2))} / bottle`"
                 required
               >
-                <UInput
-                  v-model.number="pill.count"
-                  type="number"
-                  min="1"
-                  step="1"
+                <UInputNumber
+                  v-model="pill.count"
+                  :min="1"
+                  :step="1"
                   class="w-full"
                 />
               </UFormField>

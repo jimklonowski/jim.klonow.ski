@@ -91,57 +91,35 @@
             label="VITALS · ON DAYS VS OFF"
             :dashes="4"
           />
-          <!-- Four columns of numbers inside a 380px track: without a scroll container this
-               overflowed the page on a phone instead of scrolling itself. -->
-          <div class="overflow-x-auto">
-            <table class="w-full mt-2.5 text-[12.5px]">
-              <thead>
-                <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-                  <th class="text-left font-medium py-1.5">
-                    Metric
-                  </th>
-                  <th class="text-right font-medium py-1.5">
-                    <span class="inline-flex items-center gap-1.5">
-                      <span
-                        class="w-1.5 h-1.5 rounded-full"
-                        :style="{ background: compoundColor }"
-                      />
-                      On
-                    </span>
-                  </th>
-                  <th class="text-right font-medium py-1.5">
-                    Off
-                  </th>
-                  <th class="text-right font-medium py-1.5">
-                    Diff
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="row in vitalsRows"
-                  :key="row.label"
-                  class="border-t border-line-soft"
-                >
-                  <td class="py-2 text-muted uppercase text-[11px] tracking-[0.08em]">
-                    {{ row.label }}
-                  </td>
-                  <td class="py-2 text-right text-hi">
-                    {{ row.on ?? '—' }}
-                  </td>
-                  <td class="py-2 text-right text-muted">
-                    {{ row.off ?? '—' }}
-                  </td>
-                  <td
-                    class="py-2 text-right"
-                    :class="row.deltaClass"
-                  >
-                    {{ row.deltaText }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- Four columns of numbers inside a 380px track: UTable scrolls itself sideways, which
+               a plain table didn't (it overflowed the page on a phone). -->
+          <UTable
+            :data="vitalsRows"
+            :columns="VITALS_COLUMNS"
+            class="mt-2.5"
+          >
+            <template #on-header>
+              <span class="inline-flex items-center gap-1.5">
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :style="{ background: compoundColor }"
+                />
+                On
+              </span>
+            </template>
+            <template #label-cell="{ row }">
+              <span class="text-muted uppercase text-[11px] tracking-[0.08em]">{{ row.original.label }}</span>
+            </template>
+            <template #on-cell="{ row }">
+              <span class="text-hi">{{ row.original.on ?? '—' }}</span>
+            </template>
+            <template #off-cell="{ row }">
+              <span class="text-muted">{{ row.original.off ?? '—' }}</span>
+            </template>
+            <template #deltaText-cell="{ row }">
+              <span :class="row.original.deltaClass">{{ row.original.deltaText }}</span>
+            </template>
+          </UTable>
           <p class="mt-2 text-[11px] text-faint leading-[1.6]">
             {{ onDaysWithVitals }} on-day vs {{ offDaysWithVitals.toLocaleString('en-US') }} off-day readings · correlation only — not causal
           </p>
@@ -281,57 +259,34 @@
             :label="isInjected ? 'RECENT INJECTIONS' : 'RECENT DOSES'"
             :dashes="10"
           />
-          <!-- Four columns of numbers inside a 380px track: without a scroll container this
-               overflowed the page on a phone instead of scrolling itself. -->
-          <div class="overflow-x-auto">
-            <table class="w-full mt-2.5 text-[12.5px]">
-              <thead>
-                <tr class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
-                  <th class="text-left font-medium py-1.5">
-                    Date
-                  </th>
-                  <th class="text-left font-medium py-1.5">
-                    Time
-                  </th>
-                  <th class="text-right font-medium py-1.5">
-                    Dose
-                  </th>
-                  <th class="text-right font-medium py-1.5">
-                    {{ isInjected ? 'Site' : 'Route' }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- The date is a real link (keyboard / middle-click work) and only for roles that
-                   can open the day; the doctor sees the dose history without a dead-end jump. -->
-                <tr
-                  v-for="(inj, i) in recentDoses"
-                  :key="`${inj.date}-${inj.time}-${i}`"
-                  :class="[i % 2 ? 'bg-inset' : '', canOpenDays ? 'hover:bg-row-hover transition-colors' : '']"
-                >
-                  <td class="py-1.5 text-body">
-                    <NuxtLink
-                      v-if="canOpenDays"
-                      :to="`/journal/${inj.date}`"
-                      class="hover:text-accent"
-                    >{{ inj.date }}</NuxtLink>
-                    <template v-else>
-                      {{ inj.date }}
-                    </template>
-                  </td>
-                  <td class="py-1.5 text-muted">
-                    {{ inj.time || '—' }}
-                  </td>
-                  <td class="py-1.5 text-right text-hi">
-                    {{ inj.dose }} <span class="text-muted">{{ inj.unit }}</span>
-                  </td>
-                  <td class="py-1.5 text-right text-muted uppercase">
-                    {{ shortSite(inj.site) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <UTable
+            :data="recentDoses"
+            :columns="doseColumns"
+            :meta="doseTableMeta"
+            class="mt-2.5"
+          >
+            <!-- The date is a real link (keyboard / middle-click work) and only for roles that
+                 can open the day; the doctor sees the dose history without a dead-end jump. -->
+            <template #date-cell="{ row }">
+              <NuxtLink
+                v-if="canOpenDays"
+                :to="`/journal/${row.original.date}`"
+                class="hover:text-accent"
+              >{{ row.original.date }}</NuxtLink>
+              <template v-else>
+                {{ row.original.date }}
+              </template>
+            </template>
+            <template #time-cell="{ row }">
+              <span class="text-muted">{{ row.original.time || '—' }}</span>
+            </template>
+            <template #dose-cell="{ row }">
+              <span class="text-hi">{{ row.original.dose }}</span> <span class="text-muted">{{ row.original.unit }}</span>
+            </template>
+            <template #site-cell="{ row }">
+              <span class="text-muted uppercase">{{ shortSite(row.original.site) }}</span>
+            </template>
+          </UTable>
         </div>
 
         <!-- Syringe units for the current mix -->
@@ -376,6 +331,7 @@
 </template>
 
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { diffDays, eachDay } from '#shared/utils/dates'
 import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
@@ -510,6 +466,22 @@ const vitalsRows = computed(() =>
     return { label: r.label, on, off, deltaText: `${delta > 0 ? '+' : ''}${delta}`, deltaClass }
   })
 )
+
+const RIGHT = { class: { th: 'text-right', td: 'text-right' } }
+const doseColumns = computed<TableColumn<(typeof recentDoses.value)[number]>[]>(() => [
+  { accessorKey: 'date', header: 'Date' },
+  { accessorKey: 'time', header: 'Time' },
+  { accessorKey: 'dose', header: 'Dose', meta: RIGHT },
+  { accessorKey: 'site', header: isInjected.value ? 'Site' : 'Route', meta: RIGHT }
+])
+// Rows that open their day get the row hover; the doctor's read-only rows don't.
+const doseTableMeta = computed(() => ({ class: { tr: canOpenDays.value ? 'hover:bg-row-hover transition-colors' : '' } }))
+const VITALS_COLUMNS: TableColumn<(typeof vitalsRows.value)[number]>[] = [
+  { accessorKey: 'label', header: 'Metric' },
+  { accessorKey: 'on', header: 'On', meta: RIGHT },
+  { accessorKey: 'off', header: 'Off', meta: RIGHT },
+  { accessorKey: 'deltaText', header: 'Diff', meta: RIGHT }
+]
 
 // --- Shared chart window ---
 // Only compounds with multi-day kinetics get a modeled curve (PK_MODELS); everything else clears

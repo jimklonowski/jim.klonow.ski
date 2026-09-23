@@ -492,22 +492,14 @@
           >{{ dayPhotos.length }} on file</span>
         </TuiHeader>
 
-        <div
+        <!-- Same category strip as the photos page, so a photo is filed the same way from either. -->
+        <TuiTabs
           v-if="isOwner"
-          class="flex flex-wrap gap-2 mt-2.5"
-        >
-          <button
-            v-for="c in PHOTO_CATEGORIES"
-            :key="c.value"
-            type="button"
-            class="tui-btn"
-            :class="uploadCategory === c.value ? 'tui-btn-accent' : ''"
-            :aria-pressed="uploadCategory === c.value"
-            @click="uploadCategory = c.value"
-          >
-            {{ c.label }}
-          </button>
-        </div>
+          v-model="uploadCategory"
+          :items="PHOTO_CATEGORIES"
+          cols="grid-cols-3 md:grid-cols-6"
+          class="mt-2.5"
+        />
 
         <UFileUpload
           v-if="isOwner"
