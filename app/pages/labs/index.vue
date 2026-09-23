@@ -408,7 +408,7 @@ async function regenerateSummary() {
       pinModalOpen.value = true
     }
     else {
-      toast.add({ title: 'Summary generation failed', description: e.data?.message ?? 'Try again in a moment.', color: 'error' })
+      toast.add({ title: 'Summary generation failed', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })
     }
   }
   finally {

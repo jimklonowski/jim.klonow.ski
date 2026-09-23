@@ -267,7 +267,7 @@ async function quickAdd(useCustom = false) {
     }
   }
   catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
+    const msg = extractErrorMessage(err, 'Unknown error')
     toast.add({ title: 'Failed to log soda', description: msg, color: 'error' })
   }
   finally {
@@ -290,7 +290,7 @@ async function remove(index: number) {
     await refreshNuxtData('overview')
   }
   catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
+    const msg = extractErrorMessage(err, 'Unknown error')
     toast.add({ title: 'Failed to remove', description: msg, color: 'error' })
   }
   finally {

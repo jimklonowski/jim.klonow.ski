@@ -226,8 +226,6 @@ const FIELD_UI = { label: 'tui-label' }
 
 const toast = useToast()
 const text = ref('')
-const parsing = ref(false)
-const saving = ref(false)
 const rows = ref<DumpRow[]>([])
 
 function toDumpRow(v: ParsedRow): DumpRow {
@@ -261,57 +259,40 @@ function backToText() {
   rows.value = []
 }
 
-async function parse() {
-  parsing.value = true
-  try {
-    const result = await $fetch<{ vials: ParsedRow[] }>('/api/journal/vials/parse', {
-      method: 'POST',
-      body: { text: text.value }
-    })
-    rows.value = result.vials.map(toDumpRow)
-    if (!rows.value.length) {
-      toast.add({ title: 'Nothing recognized', description: 'Try naming compounds and sizes', color: 'warning' })
-    }
+const { run: parse, pending: parsing } = useSaveAction(async () => {
+  const result = await $fetch<{ vials: ParsedRow[] }>('/api/journal/vials/parse', {
+    method: 'POST',
+    body: { text: text.value }
+  })
+  rows.value = result.vials.map(toDumpRow)
+  if (!rows.value.length) {
+    toast.add({ title: 'Nothing recognized', description: 'Try naming compounds and sizes', color: 'warning' })
   }
-  catch (err) {
-    toast.add({ title: 'Parse failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    parsing.value = false
-  }
-}
+}, { error: 'Parse failed' })
 
-async function saveAll() {
-  saving.value = true
-  try {
-    for (const row of rows.value) {
-      const pill = isPillForm(row.form)
-      await $fetch('/api/journal/vials/save', {
-        method: 'POST',
-        body: {
-          compound: row.compound.trim(),
-          form: row.form,
-          vial_amount: pill ? pillTotal(row.amount, row.unit_count) : row.amount,
-          unit_count: pill ? row.unit_count : null,
-          vial_unit: row.vial_unit,
-          quantity: row.quantity,
-          status: 'sealed',
-          // An uncorrected guess stays visible on the DB row, not just in this modal.
-          notes: [row.notes, row.assumption && `assumed: ${row.assumption}`].filter(Boolean).join(' · ') || null
-        }
-      })
-    }
-    toast.add({ title: 'Stockpile logged', description: `${rows.value.length} products added`, color: 'success', icon: 'i-lucide-check' })
-    rows.value = []
-    text.value = ''
-    open.value = false
-    emit('saved')
+const { run: saveAll, pending: saving } = useSaveAction(async () => {
+  const count = rows.value.length
+  for (const row of rows.value) {
+    const pill = isPillForm(row.form)
+    await $fetch('/api/journal/vials/save', {
+      method: 'POST',
+      body: {
+        compound: row.compound.trim(),
+        form: row.form,
+        vial_amount: pill ? pillTotal(row.amount, row.unit_count) : row.amount,
+        unit_count: pill ? row.unit_count : null,
+        vial_unit: row.vial_unit,
+        quantity: row.quantity,
+        status: 'sealed',
+        // An uncorrected guess stays visible on the DB row, not just in this modal.
+        notes: [row.notes, row.assumption && `assumed: ${row.assumption}`].filter(Boolean).join(' · ') || null
+      }
+    })
   }
-  catch (err) {
-    toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    saving.value = false
-  }
-}
+  rows.value = []
+  text.value = ''
+  open.value = false
+  emit('saved')
+  return count
+}, { success: count => ({ title: 'Stockpile logged', description: `${count} products added` }) })
 </script>

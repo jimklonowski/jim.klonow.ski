@@ -138,7 +138,6 @@ const filtered = computed(() =>
 )
 
 // --- generation ---
-const generating = ref(false)
 
 const generateItems = [
   [
@@ -147,25 +146,20 @@ const generateItems = [
   ]
 ]
 
-async function generate(kind: 'daily' | 'weekly', endDate?: string) {
-  generating.value = true
-  try {
-    const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', { method: 'POST', body: { kind, endDate } })
-    if (res.skipped) {
-      toast.add({ title: 'Nothing to summarize', description: `No data logged for that ${kind === 'weekly' ? 'week' : 'day'}.`, color: 'warning', icon: 'i-lucide-info' })
-    }
-    else {
-      await refresh()
-      toast.add({ title: 'Digest ready', description: `${kind === 'weekly' ? 'Weekly' : 'Daily'} digest generated.`, color: 'success', icon: 'i-lucide-check' })
-    }
+const { run: generate, pending: generating } = useSaveAction(async (kind: 'daily' | 'weekly', endDate?: string) => {
+  const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', { method: 'POST', body: { kind, endDate } })
+  if (res.skipped) {
+    toast.add({ title: 'Nothing to summarize', description: `No data logged for that ${kind === 'weekly' ? 'week' : 'day'}.`, color: 'warning', icon: 'i-lucide-info' })
+    return false
   }
-  catch (err) {
-    toast.add({ title: 'Generation failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    generating.value = false
-  }
-}
+  await refresh()
+  return true
+}, {
+  error: 'Generation failed',
+  success: (generated, kind) => generated
+    ? { title: 'Digest ready', description: `${kind === 'weekly' ? 'Weekly' : 'Daily'} digest generated.` }
+    : null
+})
 
 // --- display helpers ---
 function fmt(d: string) {

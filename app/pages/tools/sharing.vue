@@ -214,7 +214,6 @@ const USES_OPTIONS = [
 ]
 
 const form = reactive({ role: 'friend', label: '', expiresDays: 30, maxUses: 0 })
-const creating = ref(false)
 // Held only in this component, only until the panel is dismissed or the page leaves.
 const createdLink = ref<string | null>(null)
 const copied = ref(false)
@@ -254,34 +253,25 @@ function roleChipClass(invite: Invite) {
     : 'text-accent border-line-accent'
 }
 
-async function createInvite() {
-  creating.value = true
-  try {
-    // `token` comes back exactly once — the row holds only its hash.
-    const res = await $fetch<{ token: string }>('/api/auth/invites', {
-      method: 'POST',
-      body: {
-        role: form.role,
-        label: form.label,
-        expiresDays: form.expiresDays || null,
-        maxUses: form.maxUses || null
-      }
-    })
-    form.label = ''
-    createdLink.value = `${window.location.origin}/share/${res.token}`
-    copied.value = false
-    await refresh()
-    // Best-effort convenience; the URL is on screen either way, which matters now that it
-    // can't be recovered if the clipboard write is blocked.
-    await copyCreated()
-  }
-  catch {
-    toast.add({ title: 'Could not create the link', color: 'error' })
-  }
-  finally {
-    creating.value = false
-  }
-}
+const { run: createInvite, pending: creating } = useSaveAction(async () => {
+  // `token` comes back exactly once — the row holds only its hash.
+  const res = await $fetch<{ token: string }>('/api/auth/invites', {
+    method: 'POST',
+    body: {
+      role: form.role,
+      label: form.label,
+      expiresDays: form.expiresDays || null,
+      maxUses: form.maxUses || null
+    }
+  })
+  form.label = ''
+  createdLink.value = `${window.location.origin}/share/${res.token}`
+  copied.value = false
+  await refresh()
+  // Best-effort convenience; the URL is on screen either way, which matters now that it
+  // can't be recovered if the clipboard write is blocked.
+  await copyCreated()
+}, { error: 'Could not create the link' })
 
 async function copyCreated() {
   if (!createdLink.value) return
@@ -295,16 +285,13 @@ async function copyCreated() {
   }
 }
 
-async function revoke(id: string) {
-  try {
-    await $fetch('/api/auth/invites/revoke', { method: 'POST', body: { id } })
-    await refresh()
-    toast.add({ title: 'Link revoked', description: 'Sessions from this link are signed out.', color: 'success' })
-  }
-  catch {
-    toast.add({ title: 'Could not revoke the link', color: 'error' })
-  }
-}
+const { run: revoke } = useSaveAction(async (id: string) => {
+  await $fetch('/api/auth/invites/revoke', { method: 'POST', body: { id } })
+  await refresh()
+}, {
+  error: 'Could not revoke the link',
+  success: () => ({ title: 'Link revoked', description: 'Sessions from this link are signed out.' })
+})
 
 function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

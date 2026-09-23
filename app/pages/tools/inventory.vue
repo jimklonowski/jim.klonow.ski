@@ -629,7 +629,6 @@ import {
 
 useSeoMeta({ title: 'Tools · Inventory' })
 
-const toast = useToast()
 // Home-timezone day (shared/utils/time.ts) — the UTC slice this used to be made every vial's
 // days-open, expiry and run-out math, and the open-vial default date, roll over at 7pm Central.
 const today: string = localToday()
@@ -796,14 +795,16 @@ function cap(s: string): string {
 }
 
 // --- add / edit ---
-const formModalOpen = ref(false)
-const saving = ref(false)
+const formModalRaw = ref(false)
 const form = reactive<Vial>(blankVial())
 // Pill bottles are entered in label terms (strength × count) and stored as the bottle total in
 // vial_amount, so the depletion/runway math never has to know about tablets.
 const pill = reactive<{ strength: number | null, count: number }>({ strength: null, count: 100 })
 // Once the form is picked by hand, the compound-based suggestion stops overriding it.
 const formTouched = ref(false)
+// Closing the modal (Escape, backdrop, Cancel) asks first when the form has unsaved edits.
+const formGuard = useDirtyGuard(() => ({ form, pill }))
+const formModalOpen = formGuard.guardOpen(formModalRaw)
 
 const isPill = computed(() => isPillForm(form.form))
 const pillWord = computed(() => pillNoun(form.form))
@@ -838,12 +839,14 @@ function openAddModal() {
   delete form.id
   Object.assign(pill, { strength: null, count: 100 })
   formTouched.value = false
+  formGuard.markClean()
   formModalOpen.value = true
 }
 function openEditModal(v: Vial) {
   Object.assign(form, { ...blankVial(), ...v })
   Object.assign(pill, { strength: pillStrength(v) ?? v.vial_amount, count: v.unit_count ?? 1 })
   formTouched.value = true
+  formGuard.markClean()
   formModalOpen.value = true
 }
 
@@ -858,29 +861,15 @@ function formPayload(): Vial {
   }
 }
 
-async function saveVial() {
-  saving.value = true
-  try {
-    await $fetch('/api/journal/vials/save', { method: 'POST', body: formPayload() })
-    await refresh()
-    formModalOpen.value = false
-    toast.add({
-      title: form.id ? `${cap(containerNoun(form.form))} updated` : 'Stock added',
-      color: 'success',
-      icon: 'i-lucide-check'
-    })
-  }
-  catch (err) {
-    toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    saving.value = false
-  }
-}
+const { run: saveVial, pending: saving } = useSaveAction(async () => {
+  await $fetch('/api/journal/vials/save', { method: 'POST', body: formPayload() })
+  await refresh()
+  formGuard.markClean()
+  formModalOpen.value = false
+}, { success: () => form.id ? `${cap(containerNoun(form.form))} updated` : 'Stock added' })
 
 // --- open / reconstitute ---
 const openModalOpen = ref(false)
-const opening = ref(false)
 const openTarget = ref<Vial | null>(null)
 const openForm = reactive<{ opened_date: string, bac_water_ml: number | null }>({ opened_date: today, bac_water_ml: 2 })
 
@@ -926,33 +915,28 @@ function openReconstituteModal(v: Vial) {
   openModalOpen.value = true
 }
 
+const { run: openVial, pending: opening } = useSaveAction(async (target: Vial) => {
+  await $fetch('/api/journal/vials/open', {
+    method: 'POST',
+    body: {
+      id: target.id,
+      opened_date: openForm.opened_date,
+      bac_water_ml: isPillForm(target.form) ? null : openForm.bac_water_ml
+    }
+  })
+  await refresh()
+  openModalOpen.value = false
+}, {
+  error: 'Open failed',
+  success: (_, target) => ({
+    title: `${cap(containerNoun(target.form))} opened`,
+    description: `${target.compound} is now active`,
+    icon: isPillForm(target.form) ? 'i-lucide-pill' : 'i-lucide-flask-conical'
+  })
+})
+
 async function doOpen() {
-  if (!openTarget.value) return
-  opening.value = true
-  try {
-    await $fetch('/api/journal/vials/open', {
-      method: 'POST',
-      body: {
-        id: openTarget.value.id,
-        opened_date: openForm.opened_date,
-        bac_water_ml: openIsPill.value ? null : openForm.bac_water_ml
-      }
-    })
-    await refresh()
-    openModalOpen.value = false
-    toast.add({
-      title: `${cap(containerNoun(openTarget.value.form))} opened`,
-      description: `${openTarget.value.compound} is now active`,
-      color: 'success',
-      icon: openIsPill.value ? 'i-lucide-pill' : 'i-lucide-flask-conical'
-    })
-  }
-  catch (err) {
-    toast.add({ title: 'Open failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    opening.value = false
-  }
+  if (openTarget.value) await openVial(openTarget.value)
 }
 
 // --- status actions ---
@@ -975,16 +959,10 @@ function calculatorLink(v: Vial) {
   }
 }
 
-async function setStatus(v: Vial, status: Vial['status']) {
-  try {
-    await $fetch('/api/journal/vials/save', { method: 'POST', body: { ...v, status } })
-    await refresh()
-    toast.add({ title: status === 'finished' ? 'Marked finished' : 'Updated', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Update failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-}
+const { run: setStatus } = useSaveAction(async (v: Vial, status: Vial['status']) => {
+  await $fetch('/api/journal/vials/save', { method: 'POST', body: { ...v, status } })
+  await refresh()
+}, { error: 'Update failed', success: (_, __, status) => status === 'finished' ? 'Marked finished' : 'Updated' })
 
 function reactivate(v: Vial) {
   setStatus(v, 'active')
@@ -992,13 +970,11 @@ function reactivate(v: Vial) {
 
 async function confirmDelete(v: Vial) {
   if (!confirm(`Delete this ${v.compound} ${containerNoun(v.form)}? This can't be undone.`)) return
-  try {
-    await $fetch('/api/journal/vials/delete', { method: 'POST', body: { id: v.id } })
-    await refresh()
-    toast.add({ title: 'Deleted', color: 'success', icon: 'i-lucide-check' })
-  }
-  catch (err) {
-    toast.add({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
+  await deleteVial(v)
 }
+
+const { run: deleteVial } = useSaveAction(async (v: Vial) => {
+  await $fetch('/api/journal/vials/delete', { method: 'POST', body: { id: v.id } })
+  await refresh()
+}, { success: 'Deleted', error: 'Delete failed' })
 </script>

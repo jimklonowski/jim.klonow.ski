@@ -1,6 +1,6 @@
 <template>
   <UModal
-    v-model:open="open"
+    v-model:open="modalOpen"
     :title="form.id ? 'Edit Cycle' : 'Plan Cycle'"
     :ui="{ content: 'bg-raised border border-line-accent ring-0 max-w-2xl' }"
   >
@@ -228,7 +228,7 @@
           <button
             type="button"
             class="tui-btn"
-            @click="open = false"
+            @click="modalOpen = false"
           >
             CANCEL
           </button>
@@ -251,8 +251,6 @@ import type { Cycle, CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
 import { periodLabel, startAnchor, startPrecisionOf } from '#shared/utils/cycles'
 
 const emit = defineEmits<{ saved: [] }>()
-
-const toast = useToast()
 
 // Monday-first, the way a dosing week reads (MON+THU); indices stay the stored 0=Sun form.
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
@@ -319,8 +317,10 @@ function emptyForm(): CycleFormState {
 }
 
 const open = ref(false)
-const saving = ref(false)
 const form = reactive<CycleFormState>(emptyForm())
+// A plan takes a while to build; closing over unsaved edits (Escape, backdrop, Cancel) asks first.
+const formGuard = useDirtyGuard(() => form)
+const modalOpen = formGuard.guardOpen(open)
 
 /** Open blank, prefilled from an existing cycle, or as a duplicate (same plan, no id). */
 function openForm(cycle?: Cycle, { duplicate = false, precision }: { duplicate?: boolean, precision?: StartPrecision } = {}) {
@@ -344,6 +344,7 @@ function openForm(cycle?: Cycle, { duplicate = false, precision }: { duplicate?:
     // Duplicating into a tentative start needs an anchor the period list actually contains.
     if (duplicate) form.start_date = startAnchor(localToday(), form.start_precision)
   }
+  formGuard.markClean()
   open.value = true
 }
 
@@ -415,40 +416,31 @@ function addItem() {
   form.compounds.push(blankItem())
 }
 
-async function save() {
-  saving.value = true
-  try {
-    await $fetch('/api/journal/cycles/save', {
-      method: 'POST',
-      body: {
-        id: form.id,
-        name: form.name,
-        goal: form.goal,
-        start_date: form.start_date,
-        start_precision: form.start_precision,
-        planned_weeks: plannedWeeks.value,
-        planned_days: form.duration_unit === 'days' ? Math.trunc(form.duration) : null,
-        actual_end: form.actual_end || null,
-        compounds: form.compounds.map(c => ({
-          compound: c.compound,
-          dose: c.dose,
-          unit: c.unit,
-          weekdays: c.weekdays,
-          fromWeek: c.fromWeek,
-          toWeek: c.toWeek === '' || c.toWeek == null ? null : Number(c.toWeek)
-        })),
-        notes: form.notes
-      }
-    })
-    open.value = false
-    toast.add({ title: form.id ? 'Cycle updated' : 'Cycle planned', color: 'success', icon: 'i-lucide-check' })
-    emit('saved')
-  }
-  catch (err) {
-    toast.add({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', color: 'error' })
-  }
-  finally {
-    saving.value = false
-  }
-}
+const { run: save, pending: saving } = useSaveAction(async () => {
+  await $fetch('/api/journal/cycles/save', {
+    method: 'POST',
+    body: {
+      id: form.id,
+      name: form.name,
+      goal: form.goal,
+      start_date: form.start_date,
+      start_precision: form.start_precision,
+      planned_weeks: plannedWeeks.value,
+      planned_days: form.duration_unit === 'days' ? Math.trunc(form.duration) : null,
+      actual_end: form.actual_end || null,
+      compounds: form.compounds.map(c => ({
+        compound: c.compound,
+        dose: c.dose,
+        unit: c.unit,
+        weekdays: c.weekdays,
+        fromWeek: c.fromWeek,
+        toWeek: c.toWeek === '' || c.toWeek == null ? null : Number(c.toWeek)
+      })),
+      notes: form.notes
+    }
+  })
+  formGuard.markClean()
+  open.value = false
+  emit('saved')
+}, { success: () => form.id ? 'Cycle updated' : 'Cycle planned' })
 </script>

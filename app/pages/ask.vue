@@ -221,7 +221,7 @@ async function send(preset?: string) {
     const question_ = messages.value[messages.value.indexOf(assistant) - 1]
     messages.value = messages.value.filter(m => m !== assistant && m !== question_)
     draft.value = question
-    toast.add({ title: 'Ask failed', description: err instanceof Error ? err.message : 'Try again in a moment.', color: 'error' })
+    toast.add({ title: 'Ask failed', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })
   }
   finally {
     stopThinking()
