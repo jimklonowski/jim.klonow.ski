@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { CHART_AXIS, CHART_GRID, CHART_TEXT, CHART_TOOLTIP_Z } from '~/utils/chartTheme'
+import { CHART_TOOLTIP_Z, chartFrame } from '~/utils/chartTheme'
 
 export interface BarTooltipPoint {
   seriesName?: string
@@ -91,11 +91,15 @@ const describedChart = computed(() => {
 })
 
 const option = computed<ECOption>(() => ({
-  backgroundColor: 'transparent',
-  textStyle: CHART_TEXT,
-  grid: props.hideXAxis && props.hideYAxis
-    ? { top: 2, left: 2, right: 2, bottom: 2, containLabel: false }
-    : { ...CHART_GRID, top: props.showLegend ? 26 : 8 },
+  ...chartFrame({
+    labels: props.data.map(d => d[props.xAxisKey] as string),
+    showLegend: props.showLegend,
+    legendItem: { width: 10, height: 10 },
+    grid: props.hideXAxis && props.hideYAxis ? 'bare' : 'normal',
+    bareTop: 2,
+    xAxis: { show: !props.hideXAxis },
+    yAxis: { show: !props.hideYAxis }
+  }),
   tooltip: {
     trigger: 'axis',
     axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(44,232,164,0.06)' } },
@@ -103,29 +107,6 @@ const option = computed<ECOption>(() => ({
     borderWidth: 0,
     backgroundColor: 'transparent',
     extraCssText: `${CHART_TOOLTIP_Z}box-shadow:none;`
-  },
-  legend: {
-    show: props.showLegend,
-    top: 0,
-    itemWidth: 10,
-    itemHeight: 10,
-    icon: 'rect',
-    textStyle: { ...CHART_TEXT, color: CHART_AXIS.label }
-  },
-  xAxis: {
-    type: 'category',
-    data: props.data.map(d => d[props.xAxisKey] as string),
-    show: !props.hideXAxis,
-    axisLabel: { color: CHART_AXIS.label, fontSize: 10 },
-    axisLine: { lineStyle: { color: CHART_AXIS.line } },
-    axisTick: { show: false }
-  },
-  yAxis: {
-    type: 'value',
-    show: !props.hideYAxis,
-    axisLabel: { color: CHART_AXIS.label, fontSize: 10 },
-    axisLine: { show: false },
-    splitLine: { lineStyle: { color: CHART_AXIS.split } }
   },
   series: props.yAxisKeys.map(key => ({
     type: 'bar',

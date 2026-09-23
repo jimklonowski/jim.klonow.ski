@@ -324,6 +324,7 @@
 </template>
 
 <script setup lang="ts">
+import { CHART_ACCENT, CHART_DANGER, CHART_WARN } from '~/utils/chartTheme'
 import { getCompoundColor } from '~/data/journal'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
@@ -627,7 +628,7 @@ const signalRows = computed(() => {
       label: s.label,
       spark: s.spark,
       sparkStartIdx: s.sparkStartIdx,
-      sparkColor: s.state === 'flagged' ? '#e86a5e' : s.state === 'watch' && s.adverse ? '#e8b34b' : '#2ce8a4',
+      sparkColor: s.state === 'flagged' ? CHART_DANGER : s.state === 'watch' && s.adverse ? CHART_WARN : CHART_ACCENT,
       reading,
       deltaText,
       deltaClass: chip.cls,

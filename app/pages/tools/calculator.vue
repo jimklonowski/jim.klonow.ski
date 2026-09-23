@@ -23,7 +23,6 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-2.5">
           <UFormField
             label="Vial Amount"
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model.number="vialAmount"
@@ -35,7 +34,6 @@
           </UFormField>
           <UFormField
             label="Unit"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model="vialUnit"
@@ -47,7 +45,6 @@
           </UFormField>
           <UFormField
             label="BAC Water (mL)"
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model.number="bacWaterMl"
@@ -88,7 +85,6 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
           <UFormField
             label="Dose Amount"
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model.number="dose"
@@ -100,7 +96,6 @@
           </UFormField>
           <UFormField
             label="Unit"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-model="doseUnit"

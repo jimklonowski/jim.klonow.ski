@@ -3,7 +3,7 @@
     :is="to ? 'NuxtLink' : 'div'"
     :to="to"
     class="block bg-raised border border-line-soft px-3 py-2.5"
-    :class="to ? 'hover:bg-[#101a15] transition-colors' : ''"
+    :class="to ? 'hover:bg-row-hover transition-colors' : ''"
   >
     <div class="flex items-baseline gap-2 text-[10px] text-muted">
       <span class="uppercase tracking-widest truncate">{{ label }}</span>

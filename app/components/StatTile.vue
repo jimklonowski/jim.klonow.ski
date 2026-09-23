@@ -3,7 +3,7 @@
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
     class="bg-raised border border-line-soft px-3.5 py-3 text-left w-full"
-    :class="clickable ? 'cursor-pointer hover:bg-[#101a15] transition-colors' : ''"
+    :class="clickable ? 'cursor-pointer hover:bg-row-hover transition-colors' : ''"
     @click="clickable && emit('click')"
   >
     <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">

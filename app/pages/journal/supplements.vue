@@ -59,7 +59,7 @@
           <div
             v-for="s in group.items"
             :key="s.id"
-            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-[#10160f] last:border-0 group"
+            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
           >
             <span
               class="text-[13px]"
@@ -106,14 +106,12 @@
     <UModal
       v-model:open="formModalOpen"
       :title="form.id ? 'Edit Supplement' : 'Add Supplement'"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="space-y-4">
           <UFormField
             label="Name"
             required
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model="form.name"
@@ -125,7 +123,6 @@
           <div class="grid grid-cols-2 gap-3">
             <UFormField
               label="Dose"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.dose"
@@ -135,7 +132,6 @@
             </UFormField>
             <UFormField
               label="Schedule"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.schedule"
@@ -148,7 +144,6 @@
           <div class="grid grid-cols-2 gap-3">
             <UFormField
               label="Category"
-              :ui="{ label: 'tui-label' }"
             >
               <USelect
                 v-model="form.category"
@@ -160,7 +155,6 @@
             </UFormField>
             <UFormField
               label="Status"
-              :ui="{ label: 'tui-label' }"
             >
               <USelect
                 v-model="form.status"
@@ -176,7 +170,6 @@
             <UFormField
               label="Started"
               help="Blank = long-standing"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.started"
@@ -187,7 +180,6 @@
             <UFormField
               v-if="form.status === 'stopped'"
               label="Stopped"
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.stopped"
@@ -200,7 +192,6 @@
           <UFormField
             label="Notes"
             help="Included in AI context — dose-change history goes here"
-            :ui="{ label: 'tui-label' }"
           >
             <UTextarea
               v-model="form.notes"

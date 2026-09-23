@@ -102,7 +102,6 @@
     >
       <UFormField
         label="DRINK"
-        :ui="{ label: 'tui-label' }"
       >
         <UInput
           v-model="customDrink"
@@ -120,7 +119,6 @@
       </UFormField>
       <UFormField
         label="SIZE"
-        :ui="{ label: 'tui-label' }"
       >
         <UInput
           v-model="customSize"

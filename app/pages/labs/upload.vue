@@ -67,7 +67,7 @@
           class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
           :class="reportType === t.value
             ? 'bg-nav-active text-accent'
-            : 'bg-bg text-[#6b8578] hover:text-accent'"
+            : 'bg-bg text-nav-idle hover:text-accent'"
           :aria-pressed="reportType === t.value"
           @click="reportType = t.value"
         >
