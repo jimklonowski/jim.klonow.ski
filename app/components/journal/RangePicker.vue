@@ -8,17 +8,11 @@
       @click="smooth = !smooth"
     >7d avg <span :class="smooth ? 'text-accent' : 'text-faint'">[{{ smooth ? 'on' : 'off' }}]</span></button>
     <span class="text-ghost">·</span>
-    <span class="flex gap-2">
-      <button
-        v-for="opt in TREND_RANGES"
-        :key="opt.days"
-        type="button"
-        class="cursor-pointer"
-        :class="days === opt.days ? 'text-accent' : 'text-faint hover:text-accent'"
-        :aria-pressed="days === opt.days"
-        @click="days = opt.days"
-      >{{ days === opt.days ? `[${opt.label}]` : opt.label }}</button>
-    </span>
+    <TuiToggle
+      v-model="days"
+      :options="TREND_RANGES.map(r => ({ label: r.label, value: r.days }))"
+      class="gap-2"
+    />
   </span>
 </template>
 

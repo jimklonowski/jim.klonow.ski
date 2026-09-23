@@ -112,21 +112,11 @@
 
     <div class="px-4 sm:px-6 py-4 space-y-2.5">
       <!-- Category tabs: equal-width segmented row with per-category counts -->
-      <div class="grid grid-cols-3 md:grid-cols-6 gap-px bg-line border border-line">
-        <button
-          v-for="cat in categories"
-          :key="cat.key"
-          type="button"
-          class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
-          :class="activeCategory === cat.key
-            ? 'bg-nav-active text-accent'
-            : 'bg-bg text-nav-idle hover:text-accent'"
-          :aria-pressed="activeCategory === cat.key"
-          @click="activeCategory = cat.key"
-        >
-          {{ cat.short }} <span class="text-faint">{{ cat.count }}</span>
-        </button>
-      </div>
+      <TuiTabs
+        v-model="activeCategory"
+        :items="categories.map(c => ({ label: c.short, value: c.key, count: c.count }))"
+        cols="grid-cols-3 md:grid-cols-6"
+      />
 
       <!-- Marker cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">

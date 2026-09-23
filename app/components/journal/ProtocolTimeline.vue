@@ -24,7 +24,7 @@ const props = withDefaults(defineProps<{
 })
 
 const zoom = defineModel<TimelineZoom>('zoom', { default: 'month' })
-const ZOOM_OPTS: TimelineZoom[] = ['week', 'month']
+const ZOOM_OPTS = [{ label: 'week', value: 'week' }, { label: 'month', value: 'month' }] as const satisfies readonly { label: string, value: TimelineZoom }[]
 const md = computed(() => props.size === 'md')
 
 const timeline = computed(() => props.from
@@ -55,20 +55,13 @@ const unitSuffix = computed(() => zoom.value === 'week' ? 'w' : 'mo')
 <template>
   <div>
     <TuiHeader :label="label">
-      <span
-        class="flex gap-2.5"
+      <TuiToggle
+        v-model="zoom"
+        :options="ZOOM_OPTS"
+        class="gap-2.5"
         :class="md ? 'text-[11px]' : 'text-[10px]'"
-      >
-        <button
-          v-for="opt in ZOOM_OPTS"
-          :key="opt"
-          type="button"
-          class="cursor-pointer"
-          :class="[md ? 'uppercase tracking-[0.12em]' : 'normal-case', zoom === opt ? 'text-accent' : 'text-faint hover:text-accent']"
-          :aria-pressed="zoom === opt"
-          @click="zoom = opt"
-        >{{ zoom === opt ? `[${opt}]` : opt }}</button>
-      </span>
+        :button-class="md ? 'uppercase tracking-[0.12em]' : 'normal-case'"
+      />
     </TuiHeader>
 
     <p

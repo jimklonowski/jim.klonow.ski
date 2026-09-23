@@ -156,21 +156,11 @@
     <!-- Category selector -->
     <div class="px-4 sm:px-6 pt-4">
       <!-- Six buckets: 3×2 up to md, one row above. sm would squeeze "RIGHT BICEP n" into ~106px. -->
-      <div class="grid grid-cols-3 md:grid-cols-6 gap-px bg-line border border-line">
-        <button
-          v-for="c in PHOTO_CATEGORIES"
-          :key="c.value"
-          type="button"
-          class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
-          :class="category === c.value
-            ? 'bg-nav-active text-accent'
-            : 'bg-bg text-nav-idle hover:text-accent'"
-          :aria-pressed="category === c.value"
-          @click="category = c.value"
-        >
-          {{ c.label }} <span class="text-faint">{{ countByCategory[c.value] ?? 0 }}</span>
-        </button>
-      </div>
+      <TuiTabs
+        v-model="category"
+        :items="PHOTO_CATEGORIES.map(c => ({ label: c.label, value: c.value, count: countByCategory[c.value] ?? 0 }))"
+        cols="grid-cols-3 md:grid-cols-6"
+      />
     </div>
 
     <UEmpty

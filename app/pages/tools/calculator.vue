@@ -46,11 +46,12 @@
           <UFormField
             label="BAC Water (mL)"
           >
-            <UInput
-              v-model.number="bacWaterMl"
-              type="number"
-              min="0.1"
-              step="0.5"
+            <!-- No step snapping: with min 0.1 it snaps to 0.1 + n×0.5, so + from 2 went to 2.1. -->
+            <UInputNumber
+              v-model="bacWaterMl"
+              :min="0.1"
+              :step="0.5"
+              :step-snapping="false"
               class="w-full"
             />
           </UFormField>
@@ -177,40 +178,22 @@
         <span class="text-[10.5px] text-muted normal-case">{{ mixSummary }}</span>
       </TuiHeader>
 
-      <div class="overflow-x-auto mt-2.5">
-        <table class="w-full text-[12.5px] min-w-80">
-          <thead>
-            <tr class="border-b border-line">
-              <th class="text-left py-2 pr-4 tui-label">
-                Units
-              </th>
-              <th class="text-right py-2 px-4 tui-label">
-                mL
-              </th>
-              <th class="text-right py-2 pl-4 tui-label">
-                Dose ({{ doseUnit }})
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(row, i) in referenceTable"
-              :key="row.units"
-              :class="i % 2 ? 'bg-inset' : ''"
-            >
-              <td class="py-1.5 pr-4 num-display text-[14px]">
-                {{ row.units }}
-              </td>
-              <td class="py-1.5 px-4 text-right text-muted">
-                {{ row.ml }}
-              </td>
-              <td class="py-1.5 pl-4 text-right text-hi">
-                {{ row.dose ?? '—' }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <UTable
+        :data="referenceTable"
+        :columns="referenceColumns"
+        class="mt-2.5"
+        :ui="{ base: 'min-w-80' }"
+      >
+        <template #units-cell="{ row }">
+          <span class="num-display text-[14px]">{{ row.original.units }}</span>
+        </template>
+        <template #ml-cell="{ row }">
+          <span class="text-muted">{{ row.original.ml }}</span>
+        </template>
+        <template #dose-cell="{ row }">
+          <span class="text-hi">{{ row.original.dose ?? '—' }}</span>
+        </template>
+      </UTable>
     </section>
 
     <p class="px-4 sm:px-6 py-3 border-t border-line text-[11px] text-faint">
@@ -220,6 +203,7 @@
 </template>
 
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { DOSE_UNITS } from '~/data/journal'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcConcentration, calcUnits, calcDoseForUnits, IU_PER_MG } from '#shared/utils/peptideCalc'
@@ -294,4 +278,10 @@ const referenceTable = computed(() => {
     }
   })
 })
+
+const referenceColumns = computed<TableColumn<(typeof referenceTable.value)[number]>[]>(() => [
+  { accessorKey: 'units', header: 'Units' },
+  { accessorKey: 'ml', header: 'mL', meta: { class: { th: 'text-right', td: 'text-right' } } },
+  { accessorKey: 'dose', header: `Dose (${doseUnit.value})`, meta: { class: { th: 'text-right', td: 'text-right' } } }
+])
 </script>

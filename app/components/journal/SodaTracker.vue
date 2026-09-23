@@ -103,36 +103,28 @@
       <UFormField
         label="DRINK"
       >
-        <UInput
+        <UInputMenu
           v-model="customDrink"
-          list="soda-drinks"
+          mode="autocomplete"
+          :items="SODA_DRINKS"
+          open-on-click
           placeholder="Dr Pepper"
           class="w-full"
+          :ui="{ item: 'text-[12px]' }"
         />
-        <datalist id="soda-drinks">
-          <option
-            v-for="d in SODA_DRINKS"
-            :key="d"
-            :value="d"
-          />
-        </datalist>
       </UFormField>
       <UFormField
         label="SIZE"
       >
-        <UInput
+        <UInputMenu
           v-model="customSize"
-          list="soda-sizes"
+          mode="autocomplete"
+          :items="SODA_SIZES"
+          open-on-click
           placeholder="12oz can"
           class="w-full"
+          :ui="{ item: 'text-[12px]' }"
         />
-        <datalist id="soda-sizes">
-          <option
-            v-for="s in SODA_SIZES"
-            :key="s"
-            :value="s"
-          />
-        </datalist>
       </UFormField>
       <div class="col-span-2">
         <button

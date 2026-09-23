@@ -15,17 +15,12 @@
         <div class="space-y-3">
           <!-- Generate + filter controls -->
           <div class="flex items-center justify-between gap-2">
-            <span class="flex gap-2.5 text-[11px]">
-              <button
-                v-for="opt in FILTERS"
-                :key="opt.value"
-                type="button"
-                class="cursor-pointer uppercase tracking-[0.12em]"
-                :class="filter === opt.value ? 'text-accent' : 'text-faint hover:text-accent'"
-                :aria-pressed="filter === opt.value"
-                @click="filter = opt.value"
-              >{{ filter === opt.value ? `[${opt.label}]` : opt.label }}</button>
-            </span>
+            <TuiToggle
+              v-model="filter"
+              :options="FILTERS"
+              class="gap-2.5 text-[11px]"
+              button-class="uppercase tracking-[0.12em]"
+            />
             <UDropdownMenu
               v-if="isOwner"
               :items="generateItems"

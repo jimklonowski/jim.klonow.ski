@@ -63,10 +63,13 @@
                 label="Compound"
                 class="col-span-12 sm:col-span-4"
               >
-                <UInput
+                <UInputMenu
                   v-model="row.compound"
-                  list="dump-compounds"
+                  mode="autocomplete"
+                  :items="KNOWN_COMPOUNDS"
+                  open-on-click
                   class="w-full"
+                  :ui="{ item: 'text-[12px]' }"
                 />
               </UFormField>
               <UFormField
@@ -109,11 +112,12 @@
                 label="Qty"
                 class="col-span-3 sm:col-span-1"
               >
-                <UInput
-                  v-model.number="row.quantity"
-                  type="number"
-                  min="1"
-                  step="1"
+                <!-- Vertical steppers: this is a one-column cell, too narrow for − and + either side. -->
+                <UInputNumber
+                  v-model="row.quantity"
+                  :min="1"
+                  :step="1"
+                  orientation="vertical"
                   class="w-full"
                 />
               </UFormField>
@@ -134,11 +138,10 @@
                 :label="`${cap(pillNoun(row.form, 2))} / bottle`"
                 class="w-28 shrink-0"
               >
-                <UInput
-                  v-model.number="row.unit_count"
-                  type="number"
-                  min="1"
-                  step="1"
+                <UInputNumber
+                  v-model="row.unit_count"
+                  :min="1"
+                  :step="1"
                   size="sm"
                   class="w-full"
                 />
@@ -164,13 +167,6 @@
             </p>
           </div>
         </div>
-        <datalist id="dump-compounds">
-          <option
-            v-for="c in KNOWN_COMPOUNDS"
-            :key="c"
-            :value="c"
-          />
-        </datalist>
 
         <div class="flex items-center justify-between gap-2">
           <button
