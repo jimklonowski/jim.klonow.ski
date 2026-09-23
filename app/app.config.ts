@@ -33,6 +33,18 @@ export default defineAppConfig({
     popover: { slots: { content: PANEL } },
     select: { slots: { content: PANEL }, variants: { variant: { outline: FIELD_OUTLINE } } },
     selectMenu: { slots: { content: PANEL }, variants: { variant: { outline: FIELD_OUTLINE } } },
+    // Terminal tables: tui-label headers, compact 12.5px rows, zebra striping on the inset
+    // surface. The header look is spelled out as utilities rather than `tui-label`: that class
+    // sits in the components layer, where the theme's own `text-sm` would outrank it.
+    table: {
+      slots: {
+        th: 'px-2.5 py-1.5 text-start text-[10.5px] font-medium tracking-[0.14em] uppercase text-faint [&:has([role=checkbox])]:pe-0',
+        td: 'px-2.5 py-1.5 text-[12.5px] text-body whitespace-nowrap [&:has([role=checkbox])]:pe-0',
+        tbody: 'divide-y divide-line-soft [&>tr:nth-child(even)]:bg-inset',
+        separator: 'bg-line'
+      },
+      variants: { sticky: { true: { thead: 'bg-inset backdrop-blur-none' } } }
+    },
     textarea: { variants: { variant: { outline: FIELD_OUTLINE } } }
   }
 })

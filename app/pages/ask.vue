@@ -83,15 +83,17 @@
         @submit.prevent="send()"
       >
         <span class="text-accent text-[13px] leading-[2.2]">❯</span>
-        <textarea
-          ref="inputEl"
+        <!-- Grows with the question up to ~7 lines, then scrolls; Enter sends, Shift+Enter breaks. -->
+        <UTextarea
           v-model="draft"
-          rows="1"
+          :rows="1"
+          :maxrows="7"
+          autoresize
           placeholder="ask about your data…"
-          class="flex-1 resize-none bg-inset border border-line-field px-3 py-2 text-[12.5px] text-body placeholder:text-ghost focus:outline-none focus:border-line-accent max-h-40"
+          class="flex-1"
+          :ui="{ base: 'resize-none text-[12.5px] placeholder:text-ghost' }"
           :disabled="streaming"
           @keydown.enter.exact.prevent="send()"
-          @input="autosize"
         />
         <button
           type="submit"
@@ -122,7 +124,6 @@ const SAMPLE_QUESTIONS = [
 const messages = useState<ChatMessage[]>('ask-messages', () => [])
 const draft = ref('')
 const streaming = ref(false)
-const inputEl = ref<HTMLTextAreaElement | null>(null)
 const bottomAnchor = ref<HTMLElement | null>(null)
 const toast = useToast()
 
@@ -159,13 +160,6 @@ function stopThinking() {
 
 onUnmounted(stopThinking)
 
-function autosize() {
-  const el = inputEl.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-}
-
 function scrollToBottom() {
   nextTick(() => bottomAnchor.value?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
 }
@@ -177,8 +171,8 @@ function clear() {
 async function send(preset?: string) {
   const question = (preset ?? draft.value).trim()
   if (!question || streaming.value) return
+  // UTextarea's autoresize watches the model, so clearing the draft shrinks it back too.
   draft.value = ''
-  autosize()
 
   messages.value.push({ role: 'user', content: question })
   const assistant = reactive<ChatMessage>({ role: 'assistant', content: '' })

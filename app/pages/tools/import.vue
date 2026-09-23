@@ -87,71 +87,59 @@
             <span class="ml-auto text-muted">{{ selectedCount }} selected</span>
           </div>
 
-          <!-- Preview table -->
-          <div class="mt-2.5 border border-line-soft max-h-104 overflow-auto">
-            <table class="w-full text-[12px]">
-              <thead class="sticky top-0 z-10">
-                <tr class="bg-inset border-b border-line">
-                  <th class="py-1.5 px-2.5 w-8">
-                    <UCheckbox
-                      :model-value="allSelected"
-                      :indeterminate="someSelected && !allSelected"
-                      size="xs"
-                      @update:model-value="toggleAll"
-                    />
-                  </th>
-                  <th
-                    v-for="col in COLUMNS"
-                    :key="col.key"
-                    class="py-1.5 px-2.5 text-[10.5px] tracking-[0.12em] uppercase text-faint font-medium"
-                    :class="col.align === 'right' ? 'text-right' : 'text-left'"
-                  >
-                    {{ col.label }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(row, i) in rows"
-                  :key="row.date"
-                  class="border-b border-line-soft last:border-0 hover:bg-row-hover transition-colors"
-                  :class="[i % 2 ? 'bg-inset' : '', row.selected ? '' : 'opacity-45']"
-                >
-                  <td class="py-1.5 px-2.5">
-                    <UCheckbox
-                      v-model="row.selected"
-                      size="xs"
-                    />
-                  </td>
-                  <td class="py-1.5 px-2.5 text-muted whitespace-nowrap">
-                    {{ row.date }}
-                  </td>
-                  <td class="py-1.5 px-2.5 text-right">
-                    <span :class="valueClass(row, 'weight_lbs')">{{ row.weight_lbs ?? '—' }}</span>
-                  </td>
-                  <td class="py-1.5 px-2.5 text-right whitespace-nowrap">
-                    <span :class="valueClass(row, 'bp_systolic')">{{ bpText(row) }}</span>
-                  </td>
-                  <td class="py-1.5 px-2.5 text-right">
-                    <span :class="valueClass(row, 'rhr')">{{ row.rhr ?? '—' }}</span>
-                  </td>
-                  <td class="py-1.5 px-2.5 text-right">
-                    <span :class="valueClass(row, 'hrv')">{{ row.hrv ?? '—' }}</span>
-                  </td>
-                  <td class="py-1.5 px-2.5">
-                    <span
-                      class="text-[10.5px] tracking-widest uppercase border px-1.5 py-0.5 whitespace-nowrap"
-                      :class="row.action === 'create'
-                        ? 'text-accent border-line-accent'
-                        : 'text-dim border-line-input'"
-                    >
-                      {{ row.action === 'create' ? 'new' : 'fill' }}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- Preview table. An export reaches back years (1,000+ days), so past a few hundred rows
+               it virtualizes; striping then comes from the row index, since recycled rows would
+               break nth-child. -->
+          <UTable
+            :data="rows"
+            :columns="PREVIEW_COLUMNS"
+            :meta="previewMeta"
+            sticky
+            :virtualize="rows.length > 200 ? { estimateSize: 31 } : false"
+            class="mt-2.5 border border-line-soft max-h-104"
+            :ui="{ td: 'text-[12px]', tbody: '[&>tr:nth-child(even)]:bg-transparent' }"
+          >
+            <template #select-header>
+              <UCheckbox
+                :model-value="allSelected ? true : someSelected ? 'indeterminate' : false"
+                size="xs"
+                aria-label="Select all rows"
+                @update:model-value="toggleAll"
+              />
+            </template>
+            <template #select-cell="{ row }">
+              <UCheckbox
+                v-model="row.original.selected"
+                size="xs"
+                :aria-label="`Import ${row.original.date}`"
+              />
+            </template>
+            <template #date-cell="{ row }">
+              <span class="text-muted">{{ row.original.date }}</span>
+            </template>
+            <template #weight-cell="{ row }">
+              <span :class="valueClass(row.original, 'weight_lbs')">{{ row.original.weight_lbs ?? '—' }}</span>
+            </template>
+            <template #bp-cell="{ row }">
+              <span :class="valueClass(row.original, 'bp_systolic')">{{ bpText(row.original) }}</span>
+            </template>
+            <template #rhr-cell="{ row }">
+              <span :class="valueClass(row.original, 'rhr')">{{ row.original.rhr ?? '—' }}</span>
+            </template>
+            <template #hrv-cell="{ row }">
+              <span :class="valueClass(row.original, 'hrv')">{{ row.original.hrv ?? '—' }}</span>
+            </template>
+            <template #status-cell="{ row }">
+              <span
+                class="text-[10.5px] tracking-widest uppercase border px-1.5 py-0.5"
+                :class="row.original.action === 'create'
+                  ? 'text-accent border-line-accent'
+                  : 'text-dim border-line-input'"
+              >
+                {{ row.original.action === 'create' ? 'new' : 'fill' }}
+              </span>
+            </template>
+          </UTable>
 
           <!-- Import -->
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3">
@@ -288,20 +276,33 @@
 </template>
 
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { blankEntry } from '~/data/journal'
 
 useSeoMeta({ title: 'Tools · Data Import' })
 
 const METRICS = ['Body Mass', 'Resting Heart Rate', 'Heart Rate Variability', 'Blood Pressure']
 
-const COLUMNS = [
-  { key: 'date', label: 'Date', align: 'left' },
-  { key: 'weight', label: 'Weight', align: 'right' },
-  { key: 'bp', label: 'BP', align: 'right' },
-  { key: 'rhr', label: 'RHR', align: 'right' },
-  { key: 'hrv', label: 'HRV', align: 'right' },
-  { key: 'status', label: 'Status', align: 'left' }
+const RIGHT = { class: { th: 'text-right', td: 'text-right' } }
+const PREVIEW_COLUMNS: TableColumn<ParsedRow>[] = [
+  { id: 'select', meta: { class: { th: 'w-8' } } },
+  { id: 'date', header: 'Date' },
+  { id: 'weight', header: 'Weight', meta: RIGHT },
+  { id: 'bp', header: 'BP', meta: RIGHT },
+  { id: 'rhr', header: 'RHR', meta: RIGHT },
+  { id: 'hrv', header: 'HRV', meta: RIGHT },
+  { id: 'status', header: 'Status' }
 ]
+// Striped by index (see the template), hovered, and dimmed when left out of the import.
+const previewMeta = {
+  class: {
+    tr: (row: { index: number, original: ParsedRow }) => [
+      'hover:bg-row-hover transition-colors',
+      row.index % 2 ? 'bg-inset' : '',
+      row.original.selected ? '' : 'opacity-45'
+    ].join(' ')
+  }
+}
 
 const RECORD_TYPES: Record<string, string> = {
   HKQuantityTypeIdentifierBodyMass: 'weight',

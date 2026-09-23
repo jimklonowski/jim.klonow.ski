@@ -59,57 +59,38 @@
         label="REPORT TYPE"
         :dashes="9"
       />
-      <div class="grid grid-cols-3 gap-px bg-line border border-line mt-2">
-        <button
-          v-for="t in REPORT_TYPES"
-          :key="t.value"
-          type="button"
-          class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
-          :class="reportType === t.value
-            ? 'bg-nav-active text-accent'
-            : 'bg-bg text-nav-idle hover:text-accent'"
-          :aria-pressed="reportType === t.value"
-          @click="reportType = t.value"
-        >
-          {{ t.label }}
-        </button>
-      </div>
+      <TuiTabs
+        v-model="reportType"
+        :items="REPORT_TYPES"
+        class="mt-2"
+      />
 
       <TuiHeader
         label="SOURCE PDF"
         :dashes="10"
         class="mt-4"
       />
-      <div
-        class="mt-2 border border-dashed cursor-pointer transition-colors"
-        :class="dragging
-          ? 'border-accent bg-nav-active'
-          : 'border-line-input bg-inset hover:border-line-accent'"
-        @click="fileInput?.click()"
-        @dragover.prevent="dragging = true"
-        @dragleave="dragging = false"
-        @drop.prevent="onDrop"
+      <UFileUpload
+        v-model="pdf"
+        accept=".pdf,application/pdf"
+        :preview="false"
+        reset
+        class="mt-2 w-full"
+        :ui="{
+          base: 'group border border-dashed border-line-input bg-inset hover:border-line-accent transition-colors data-[dragging=true]:border-accent data-[dragging=true]:bg-nav-active',
+          wrapper: 'gap-1.5'
+        }"
       >
-        <div class="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
-          <span
-            class="num-display text-[28px] leading-none"
-            :class="dragging ? 'text-accent' : 'text-faint'"
-          >↑</span>
-          <p class="text-[12.5px] text-hi tracking-[0.06em] uppercase">
-            drop your {{ dropZoneLabel }} pdf here
-          </p>
-          <p class="text-[11px] text-muted">
-            or click to browse · Claude reads the PDF, values land in D1
-          </p>
-        </div>
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".pdf,application/pdf"
-          class="hidden"
-          @change="onFileSelect"
-        >
-      </div>
+        <template #leading>
+          <span class="num-display text-[28px] leading-none text-faint group-data-[dragging=true]:text-accent">↑</span>
+        </template>
+        <template #label>
+          <span class="text-[12.5px] text-hi tracking-[0.06em] uppercase">drop your {{ dropZoneLabel }} pdf here</span>
+        </template>
+        <template #description>
+          <span class="text-[11px] text-muted">or click to browse · Claude reads the PDF, values land in D1</span>
+        </template>
+      </UFileUpload>
     </section>
 
     <!-- Processing -->
@@ -392,8 +373,11 @@ const DROP_ZONE_LABELS: Record<ReportType, string> = {
 const dropZoneLabel = computed(() => DROP_ZONE_LABELS[reportType.value])
 
 // Upload state
-const fileInput = ref<HTMLInputElement | null>(null)
-const dragging = ref(false)
+// The picked PDF; UFileUpload handles click, drag-and-drop and the dragging state.
+const pdf = ref<File | null>(null)
+watch(pdf, (file) => {
+  if (file) upload(file)
+})
 const processing = ref(false)
 const error = ref('')
 const filename = ref('')
@@ -505,17 +489,6 @@ async function upload(file: File) {
   }
 }
 
-function onFileSelect(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) upload(file)
-}
-
-function onDrop(e: DragEvent) {
-  dragging.value = false
-  const file = e.dataTransfer?.files?.[0]
-  if (file) upload(file)
-}
-
 function reset() {
   result.value = null
   error.value = ''
@@ -524,7 +497,7 @@ function reset() {
   summarizing.value = false
   summary.value = ''
   summaryError.value = ''
-  if (fileInput.value) fileInput.value.value = ''
+  pdf.value = null
 }
 
 function downloadJson() {
