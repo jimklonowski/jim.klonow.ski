@@ -43,7 +43,7 @@
           <div class="h-1.5 bg-inset mt-2">
             <div
               class="h-full transition-all"
-              :style="{ width: `${Math.max(2, row.pct * 100)}%`, background: row.short > 0 ? '#e8b34b' : '#2ce8a4' }"
+              :style="{ width: `${Math.max(2, row.pct * 100)}%`, background: row.short > 0 ? CHART_WARN : CHART_ACCENT }"
             />
           </div>
         </div>
@@ -94,6 +94,7 @@
 </template>
 
 <script setup lang="ts">
+import { CHART_ACCENT, CHART_WARN } from '~/utils/chartTheme'
 import { getCompoundColor } from '~/data/journal'
 import type { Vial, JournalEntry } from '~/data/journal'
 import { computeRemaining, estimateDailyRate } from '~/utils/vialInventory'

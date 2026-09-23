@@ -78,7 +78,7 @@
         <div
           v-for="w in group.rows"
           :key="w.id"
-          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_54px_90px_80px_88px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-[#10160f] last:border-0 text-[11.5px]"
+          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_54px_90px_80px_88px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-line-row last:border-0 text-[11.5px]"
         >
           <span class="text-muted uppercase">{{ formatDate(w.date, 'monthDay') }}</span>
           <span class="text-hi truncate">
@@ -234,11 +234,11 @@ const weekGroups = computed(() => {
   return groups
 })
 
-/** Amber over 150 bpm, red over 180 — the effort bands from the mock. */
+/** Ember (orange) over 150 bpm, danger red over 180: the effort bands from the mock. */
 function hrClass(hr: number | null) {
   if (hr == null) return 'text-dim'
   if (hr > 180) return 'text-danger'
-  if (hr > 150) return 'text-[#e8834b]'
+  if (hr > 150) return 'text-ember'
   return 'text-dim'
 }
 

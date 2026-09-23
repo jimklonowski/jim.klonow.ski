@@ -37,7 +37,7 @@
           <div
             v-for="f in PROFILE_FIELDS"
             :key="f.key"
-            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-[#10160f] last:border-0"
+            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
           >
             <span class="text-[13px] text-hi">{{ f.label }}</span>
             <span
@@ -84,7 +84,7 @@
           <div
             v-for="c in coverage"
             :key="c.family"
-            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-[#10160f] last:border-0"
+            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
           >
             <span class="text-[13px] text-hi">{{ c.label }}</span>
             <span
@@ -119,7 +119,7 @@
           <div
             v-for="v in vaccinations"
             :key="v.id"
-            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-[#10160f] last:border-0 group"
+            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
           >
             <span class="text-[12px] text-muted tabular-nums w-[92px] shrink-0">{{ formatDate(v.date) }}</span>
             <span class="text-[13px] text-hi">{{ v.vaccine }}</span>
@@ -158,7 +158,6 @@
     <UModal
       v-model:open="profileModalOpen"
       :title="profileField?.label ?? ''"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div
@@ -168,7 +167,6 @@
           <UFormField
             :label="profileField.label"
             :help="profileField.hint"
-            :ui="{ label: 'tui-label' }"
           >
             <USelect
               v-if="profileField.kind === 'select'"
@@ -217,7 +215,6 @@
     <UModal
       v-model:open="formModalOpen"
       :title="form.id ? 'Edit Shot' : 'Log Shot'"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="space-y-4">
@@ -225,7 +222,6 @@
             <UFormField
               label="Date"
               required
-              :ui="{ label: 'tui-label' }"
             >
               <UInput
                 v-model="form.date"
@@ -237,7 +233,6 @@
               label="Vaccine"
               required
               help="Pick from the list or type your own"
-              :ui="{ label: 'tui-label' }"
             >
               <UInputMenu
                 v-model="form.vaccine"
@@ -254,7 +249,6 @@
           <UFormField
             label="Product / brand"
             help="Optional — Boostrix, Spikevax 2026-27, Fluzone High-Dose…"
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model="form.product"
@@ -266,7 +260,6 @@
           <UFormField
             label="Notes"
             help="Included in AI context — timing vs a blood draw, arm, reactions"
-            :ui="{ label: 'tui-label' }"
           >
             <UTextarea
               v-model="form.notes"
@@ -365,7 +358,7 @@ function dueChip(c: VaccineCoverage): { text: string, class: string } | null {
   return { text: `next ${when}`, class: 'text-accent border-line-accent' }
 }
 
-const SELECT_UI = { content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }
+const SELECT_UI = { item: 'text-[12px]' }
 
 const formModalRaw = ref(false)
 

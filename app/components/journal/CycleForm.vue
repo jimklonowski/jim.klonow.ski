@@ -2,7 +2,7 @@
   <UModal
     v-model:open="modalOpen"
     :title="form.id ? 'Edit Cycle' : 'Plan Cycle'"
-    :ui="{ content: 'bg-raised border border-line-accent ring-0 max-w-2xl' }"
+    :ui="{ content: 'max-w-2xl' }"
   >
     <template #body>
       <div class="space-y-4">
@@ -10,7 +10,6 @@
           <UFormField
             label="Name"
             required
-            :ui="{ label: 'tui-label' }"
           >
             <UInput
               v-model="form.name"
@@ -24,7 +23,6 @@
           <UFormField
             label="Start"
             required
-            :ui="{ label: 'tui-label' }"
           >
             <div class="flex gap-2">
               <USelect
@@ -58,7 +56,6 @@
           <UFormField
             label="Duration"
             required
-            :ui="{ label: 'tui-label' }"
           >
             <div class="flex gap-2">
               <UInput
@@ -87,7 +84,6 @@
 
         <UFormField
           label="Goal"
-          :ui="{ label: 'tui-label' }"
         >
           <UInput
             v-model="form.goal"
@@ -101,7 +97,6 @@
         <UFormField
           label="Compounds"
           required
-          :ui="{ label: 'tui-label' }"
         >
           <div class="space-y-3">
             <div
@@ -204,7 +199,6 @@
           v-if="form.id && form.start_precision === 'day'"
           label="Ended off-plan"
           help="Set only when the cycle was cut short or extended — blank means it ran (or runs) as planned"
-          :ui="{ label: 'tui-label' }"
         >
           <UInput
             v-model="form.actual_end"
@@ -215,7 +209,6 @@
         <UFormField
           label="Notes"
           help="Included in AI context — support-stack plan, what would make you stop early"
-          :ui="{ label: 'tui-label' }"
         >
           <UTextarea
             v-model="form.notes"

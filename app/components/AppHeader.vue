@@ -55,7 +55,7 @@
           :key="item.to"
           :to="item.to"
           class="shrink-0 px-2.5 py-1.5 text-[11px] font-medium tracking-[0.08em] uppercase whitespace-nowrap border transition-colors"
-          :class="isActive(item) ? 'bg-nav-active text-accent border-line-accent' : 'text-[#6b8578] border-transparent hover:text-accent'"
+          :class="isActive(item) ? 'bg-nav-active text-accent border-line-accent' : 'text-nav-idle border-transparent hover:text-accent'"
         >
           {{ item.label }}
         </NuxtLink>

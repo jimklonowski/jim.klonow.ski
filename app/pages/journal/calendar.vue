@@ -79,7 +79,7 @@
         :type="cell.date && canOpenDays ? 'button' : undefined"
         class="bg-bg px-2 py-2 min-h-22 text-left align-top"
         :class="[
-          cell.date && canOpenDays ? 'cursor-pointer hover:bg-[#101a15] transition-colors' : '',
+          cell.date && canOpenDays ? 'cursor-pointer hover:bg-row-hover transition-colors' : '',
           cell.isToday ? 'outline outline-accent -outline-offset-1' : '',
           cell.isFuture ? 'opacity-40' : ''
         ]"

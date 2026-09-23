@@ -30,7 +30,6 @@
               v-if="isOwner"
               :items="generateItems"
               :content="{ align: 'end' }"
-              :ui="{ content: 'bg-raised border border-line-accent ring-0', item: 'text-[12px]' }"
             >
               <button
                 type="button"

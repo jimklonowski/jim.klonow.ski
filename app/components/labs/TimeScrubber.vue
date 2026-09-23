@@ -76,7 +76,7 @@
                   class="absolute -left-px w-0.5 transition-[top,height,background-color] duration-200"
                   :class="t.active
                     ? 'top-3.5 h-4 bg-accent glow-dot'
-                    : t.reached ? 'top-4.25 h-2.5 bg-[#5d7a6d]' : 'top-4.25 h-2.5 bg-line-field'"
+                    : t.reached ? 'top-4.25 h-2.5 bg-mark' : 'top-4.25 h-2.5 bg-line-field'"
                 />
               </div>
             </div>
@@ -113,7 +113,7 @@
                   type="button"
                   class="absolute -translate-x-1/2 pointer-events-auto text-[10px] leading-3 tracking-[0.06em] uppercase whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
                   :class="[
-                    t.active ? 'text-accent font-medium' : t.reached ? 'text-[#5d7a6d]' : 'text-ghost',
+                    t.active ? 'text-accent font-medium' : t.reached ? 'text-mark' : 'text-ghost',
                     t.keyLabel ? '' : t.showLabel ? 'max-sm:hidden' : 'hidden'
                   ]"
                   :style="{ left: `${t.left}%` }"
@@ -172,6 +172,7 @@
 </template>
 
 <script setup lang="ts">
+import { STATUS_COLORS } from '~/utils/chartTheme'
 import type { LabsEntry } from '#shared/types/labs'
 import { BIOMARKERS } from '~/data/biomarkers'
 import { drawFlags } from '#shared/utils/labsTimeline'
@@ -268,7 +269,7 @@ const ticks = computed(() => dates.value.map((date, index) => {
       && last.value - index >= stride.value
       && !nearActive
     ),
-    flagColor: flags.high ? '#e86a5e' : flags.low ? '#e8b34b' : null
+    flagColor: flags.high ? STATUS_COLORS.high : flags.low ? STATUS_COLORS.low : null
   }
 }))
 

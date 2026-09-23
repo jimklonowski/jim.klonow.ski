@@ -44,7 +44,7 @@
             v-for="c in active"
             :key="c.compound"
             :to="`/journal/compound/${encodeURIComponent(c.compound)}`"
-            class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_60px_100px_minmax(0,1fr)_140px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised hover:bg-[#101a15] transition-colors text-[12px]"
+            class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_60px_100px_minmax(0,1fr)_140px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised hover:bg-row-hover transition-colors text-[12px]"
           >
             <span class="text-hi flex items-center gap-2 min-w-0">
               <span
@@ -146,7 +146,7 @@
           :key="group.label"
           :items="group.items"
           :content="{ align: 'start' }"
-          :ui="{ content: 'bg-raised border border-line-accent ring-0 max-h-80 overflow-y-auto', item: 'text-[12px]' }"
+          :ui="{ content: 'max-h-80 overflow-y-auto' }"
         >
           <button
             type="button"

@@ -120,7 +120,7 @@
           class="px-3 py-2.5 text-[11px] tracking-widest uppercase cursor-pointer transition-colors"
           :class="activeCategory === cat.key
             ? 'bg-nav-active text-accent'
-            : 'bg-bg text-[#6b8578] hover:text-accent'"
+            : 'bg-bg text-nav-idle hover:text-accent'"
           :aria-pressed="activeCategory === cat.key"
           @click="activeCategory = cat.key"
         >
@@ -245,7 +245,6 @@
       v-model:open="echoOpen"
       title="Echocardiogram"
       description="Findings from your most recent echo report"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div class="text-[12px]">
@@ -270,7 +269,6 @@
       v-model:open="pinModalOpen"
       title="Upload PIN required"
       description="Regenerating the AI summary is a write, so it needs your 9-digit upload PIN."
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <LabsPinForm

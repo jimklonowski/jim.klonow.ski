@@ -208,7 +208,7 @@
           :key="t.label"
           to="/journal/trends"
           :aria-label="`${t.label} — open 90-day trends`"
-          class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-[#101a15] hover:border-line-input transition-colors"
+          class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-row-hover hover:border-line-input transition-colors"
         >
           <div class="flex justify-between text-[10.5px] text-muted">
             <span>{{ t.label }}</span>

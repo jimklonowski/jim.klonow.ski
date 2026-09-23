@@ -8,18 +8,18 @@
     <div
       v-if="refStyle"
       class="absolute h-full"
-      :style="{ ...refStyle, background: optimalStyle ? '#152b21' : '#1e3a2e' }"
+      :style="{ ...refStyle, background: optimalStyle ? BAND_COLORS.outer : BAND_COLORS.band }"
     />
     <!-- Optimal target, nested inside the reference band -->
     <div
       v-if="optimalStyle"
-      class="absolute h-full bg-[#1e3a2e]"
+      class="absolute h-full bg-band"
       :style="optimalStyle"
     />
     <!-- Where the newest reading sits, while an older draw is being viewed -->
     <div
       v-if="ghostStyle"
-      class="absolute rounded-full -translate-x-1/2 border-[1.5px] border-[#5d7a6d] bg-raised"
+      class="absolute rounded-full -translate-x-1/2 border-[1.5px] border-mark bg-raised"
       :style="ghostStyle"
     />
     <!-- Value marker -->
@@ -33,6 +33,7 @@
 
 <script setup lang="ts">
 import { getStatus } from '~/data/biomarkers'
+import { BAND_COLORS, STATUS_COLORS } from '~/utils/chartTheme'
 import type { BiomarkerMeta } from '~/data/biomarkers'
 
 const props = withDefaults(defineProps<{
@@ -52,13 +53,6 @@ const props = withDefaults(defineProps<{
   dotSize: 8,
   ghost: null
 })
-
-const STATUS_COLORS = {
-  optimal: '#2ce8a4',
-  low: '#e8b34b',
-  high: '#e86a5e',
-  unknown: '#5d7a6d'
-} as const
 
 // Pad the visible track 25% of the reference span beyond each end, so an
 // out-of-range value still lands inside the bar instead of clamping to the edge.

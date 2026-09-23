@@ -50,7 +50,7 @@
           v-for="cell in statCells"
           :key="cell.key"
           type="button"
-          class="bg-bg px-4 py-3.5 text-left cursor-pointer transition-colors hover:bg-[#101a15]"
+          class="bg-bg px-4 py-3.5 text-left cursor-pointer transition-colors hover:bg-row-hover"
           @click="openModal(cell.key)"
         >
           <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
@@ -93,7 +93,7 @@
                 :style="{ width: row.fatWidth }"
               />
               <div
-                class="absolute inset-y-0 bg-[#1e3a2e]"
+                class="absolute inset-y-0 bg-band"
                 :style="{ left: row.fatWidth, width: row.leanWidth }"
               />
             </div>
@@ -160,7 +160,6 @@
       v-model:open="modalOpen"
       :title="modalMeta?.label ?? 'Scan history'"
       :description="modalMeta?.description"
-      :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
     >
       <template #body>
         <div>

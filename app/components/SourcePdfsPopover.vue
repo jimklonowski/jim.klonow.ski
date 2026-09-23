@@ -2,7 +2,6 @@
   <UPopover
     v-if="sources.length"
     :content="{ side: 'bottom', align }"
-    :ui="{ content: 'bg-raised border border-line-accent ring-0' }"
   >
     <button
       type="button"

@@ -114,7 +114,7 @@
                 <tr
                   v-for="(row, i) in rows"
                   :key="row.date"
-                  class="border-b border-line-soft last:border-0 hover:bg-[#101a15] transition-colors"
+                  class="border-b border-line-soft last:border-0 hover:bg-row-hover transition-colors"
                   :class="[i % 2 ? 'bg-inset' : '', row.selected ? '' : 'opacity-45']"
                 >
                   <td class="py-1.5 px-2.5">

@@ -38,7 +38,7 @@
           v-for="tile in vitalTiles"
           :key="tile.label"
           to="/journal/trends"
-          class="bg-raised border border-line-soft px-4 py-3.5 hover:bg-[#101a15] transition-colors"
+          class="bg-raised border border-line-soft px-4 py-3.5 hover:bg-row-hover transition-colors"
         >
           <p class="text-[10px] text-muted uppercase tracking-widest">
             {{ tile.label }}
@@ -133,7 +133,7 @@
           v-for="card in spokeCards"
           :key="card.to"
           :to="card.to"
-          class="bg-inset border border-line-input px-4 py-3 hover:border-line-accent hover:bg-[#101a15] transition-colors"
+          class="bg-inset border border-line-input px-4 py-3 hover:border-line-accent hover:bg-row-hover transition-colors"
         >
           <p class="text-[11.5px] text-accent tracking-[0.08em]">
             {{ card.label }} →

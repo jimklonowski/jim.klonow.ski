@@ -307,7 +307,7 @@
                 <tr
                   v-for="(inj, i) in recentDoses"
                   :key="`${inj.date}-${inj.time}-${i}`"
-                  :class="[i % 2 ? 'bg-inset' : '', canOpenDays ? 'hover:bg-[#101a15] transition-colors' : '']"
+                  :class="[i % 2 ? 'bg-inset' : '', canOpenDays ? 'hover:bg-row-hover transition-colors' : '']"
                 >
                   <td class="py-1.5 text-body">
                     <NuxtLink
