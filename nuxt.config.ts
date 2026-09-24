@@ -5,11 +5,9 @@ export default defineNuxtConfig({
   modules: [
     '@comark/nuxt',
     '@nuxt/eslint',
-    '@nuxt/image',
     '@nuxt/ui',
     '@nuxtjs/seo',
     '@vueuse/nuxt',
-    '@nuxt/scripts',
     'nitro-cloudflare-dev',
     'nuxt-echarts',
     'nuxt-security'
@@ -218,18 +216,8 @@ export default defineNuxtConfig({
     fallbackToApi: false
   },
 
-  image: {
-    provider: 'ipx',
-    ipx: {
-      maxAge: 60 * 60 * 24 * 365
-    },
-    domains: [
-      'jim.klonow.ski'
-    ]
-  },
-
   // Static og.png in /public instead of runtime generation — the takumi WASM renderer
-  // alone was 1.6 MiB gzipped, over half the free-plan Worker size limit.
+  // alone was 1.6 MiB gzipped, for one site-wide image that never changes.
   ogImage: {
     enabled: false
   },

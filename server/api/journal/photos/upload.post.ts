@@ -1,5 +1,5 @@
-import { isPhotoCategory } from '#shared/utils/photoCategories'
 import { localToday } from '#shared/utils/time'
+import { zPhotoUploadQuery } from '#shared/utils/schemas'
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -16,11 +16,7 @@ export default defineEventHandler(async (event) => {
   // parser has to scan the whole body for boundary markers, which is real CPU work on a
   // multi-MB photo and was itself enough to trip Workers' tight per-request CPU time limit even
   // after removing the redundant server-side EXIF parse below.
-  const query = getQuery(event)
-  const category = query.category
-  if (!isPhotoCategory(category)) {
-    throw createError({ statusCode: 400, message: 'Invalid or missing category' })
-  }
+  const { category, date: suppliedDate } = validatedQuery(event, zPhotoUploadQuery)
 
   const contentType = getHeader(event, 'content-type') ?? 'application/octet-stream'
   const data = await readRawBody(event, false)
@@ -31,10 +27,7 @@ export default defineEventHandler(async (event) => {
   // The client already parses EXIF and sends a resolved date on the common path - only pay for
   // a server-side EXIF parse (real CPU cost on a full-res photo, and Workers CPU time is tight)
   // when it didn't, e.g. a non-JS client or a request that raced ahead of the client-side parse.
-  const suppliedDate = typeof query.date === 'string' ? query.date : undefined
-  const hasValidSuppliedDate = !!suppliedDate && /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
-
-  const taken_at = hasValidSuppliedDate ? suppliedDate! : await extractPhotoDate(data)
+  const taken_at = suppliedDate ?? await extractPhotoDate(data)
   const date = taken_at ?? localToday()
 
   const ext = EXT_BY_MIME[contentType] ?? 'jpg'

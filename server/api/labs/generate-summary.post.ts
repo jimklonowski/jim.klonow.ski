@@ -125,9 +125,8 @@ export default defineEventHandler(async (event) => {
   const { date } = await readValidatedJson(event, zSummaryGenerate)
 
   const db = getDb(event)
-  // Fetch only the target draw + comparison window. This endpoint runs inside the Workers
-  // free-plan 10ms CPU budget, so materializing and JSON-parsing every historical draw is
-  // real money — LIMIT in SQL instead of slicing in JS.
+  // Fetch only the target draw + comparison window — LIMIT in SQL rather than materializing and
+  // JSON-parsing every historical draw only to slice it in JS.
   const { results } = await db.prepare(
     `SELECT date, fasting, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date DESC LIMIT ${MAX_PRIOR_DRAWS + 1}`
   ).bind(date).all<LabsRow>()

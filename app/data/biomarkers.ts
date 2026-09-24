@@ -18,7 +18,6 @@ export interface BiomarkerMeta {
   refMin?: number
   refMax?: number
   higherIsBetter?: boolean
-  pinned?: boolean
   description?: string
   // Set on markers derived from other markers rather than read off a report.
   computed?: boolean
@@ -31,10 +30,10 @@ export interface BiomarkerMeta {
 
 export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   // Hormones
-  testosterone_total: { label: 'Testosterone (Total)', unit: 'ng/dL', category: 'hormones', refMin: 250, refMax: 1100, optimalMin: 600, optimalMax: 1000, pinned: true, description: 'Primary male sex hormone. Key indicator of hormonal health, muscle mass, energy, and libido. Declines naturally with age.' },
+  testosterone_total: { label: 'Testosterone (Total)', unit: 'ng/dL', category: 'hormones', refMin: 250, refMax: 1100, optimalMin: 600, optimalMax: 1000, description: 'Primary male sex hormone. Key indicator of hormonal health, muscle mass, energy, and libido. Declines naturally with age.' },
   testosterone_free: { label: 'Testosterone (Free)', unit: 'pg/mL', category: 'hormones', refMin: 35.0, refMax: 155.0, description: 'Biologically active testosterone not bound to carrier proteins. More directly reflects hormonal activity than total testosterone.' },
   shbg: { label: 'SHBG', unit: 'nmol/L', category: 'hormones', refMin: 10, refMax: 50, description: 'Sex Hormone Binding Globulin — a protein that binds testosterone. High SHBG reduces free testosterone availability even when total testosterone looks normal.' },
-  igf1: { label: 'IGF-1', unit: 'ng/mL', category: 'hormones', refMin: 53, refMax: 331, optimalMin: 150, optimalMax: 250, pinned: true, description: 'Insulin-like Growth Factor 1 — produced in response to growth hormone. Reflects GH axis function; important for muscle synthesis, bone density, and cellular repair.' },
+  igf1: { label: 'IGF-1', unit: 'ng/mL', category: 'hormones', refMin: 53, refMax: 331, optimalMin: 150, optimalMax: 250, description: 'Insulin-like Growth Factor 1 — produced in response to growth hormone. Reflects GH axis function; important for muscle synthesis, bone density, and cellular repair.' },
   dhea_sulfate: { label: 'DHEA-S', unit: 'mcg/dL', category: 'hormones', refMin: 93, refMax: 415, description: 'DHEA Sulfate — a precursor hormone produced by the adrenal glands. Declines steadily with age and serves as a building block for sex hormones.' },
   cortisol: { label: 'Cortisol', unit: 'mcg/dL', category: 'hormones', refMin: 4.0, refMax: 22.0, description: 'Primary stress hormone released by the adrenal glands. Chronically elevated cortisol impairs sleep, metabolism, immune function, and testosterone production.' },
   tsh: { label: 'TSH', unit: 'mIU/L', category: 'hormones', refMin: 0.40, refMax: 4.50, description: 'Thyroid Stimulating Hormone — signals the thyroid to produce T3 and T4. High TSH suggests an underactive thyroid; low TSH suggests an overactive one.' },
@@ -44,8 +43,8 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   psa: { label: 'PSA', unit: 'ng/mL', category: 'hormones', refMax: 4.0, description: 'Prostate-Specific Antigen — the prostate screening marker, run on the annual CHW panel. Testosterone therapy can nudge it up; a rise of more than ~1.4 ng/mL within a year, or a level above 4.0, is the conventional trigger for urology follow-up.' },
 
   // Metabolic
-  glucose: { label: 'Glucose', unit: 'mg/dL', category: 'metabolic', refMin: 65, refMax: 99, optimalMin: 70, optimalMax: 85, pinned: true, description: 'Fasting blood sugar level. Elevated readings indicate insulin resistance or pre-diabetes. Optimal fasting glucose is typically 70–85 mg/dL.' },
-  hba1c: { label: 'HbA1c', unit: '%', category: 'metabolic', refMax: 5.7, optimalMax: 5.4, pinned: true, description: 'Glycated hemoglobin — reflects average blood sugar over the past 3 months. More reliable than a single glucose reading for assessing diabetes risk.' },
+  glucose: { label: 'Glucose', unit: 'mg/dL', category: 'metabolic', refMin: 65, refMax: 99, optimalMin: 70, optimalMax: 85, description: 'Fasting blood sugar level. Elevated readings indicate insulin resistance or pre-diabetes. Optimal fasting glucose is typically 70–85 mg/dL.' },
+  hba1c: { label: 'HbA1c', unit: '%', category: 'metabolic', refMax: 5.7, optimalMax: 5.4, description: 'Glycated hemoglobin — reflects average blood sugar over the past 3 months. More reliable than a single glucose reading for assessing diabetes risk.' },
   insulin: { label: 'Insulin', unit: 'uIU/mL', category: 'metabolic', refMax: 18.4, optimalMax: 5, description: 'Fasting insulin level. Elevated fasting insulin is an early sign of insulin resistance, often before glucose rises. Optimal is typically below 5 uIU/mL.' },
   bun: { label: 'BUN', unit: 'mg/dL', category: 'metabolic', refMin: 7, refMax: 25, description: 'Blood Urea Nitrogen — a waste product of protein metabolism filtered by the kidneys. Reflects both kidney function and dietary protein intake.' },
   creatinine: { label: 'Creatinine', unit: 'mg/dL', category: 'metabolic', refMin: 0.60, refMax: 1.26, description: 'Waste product from muscle metabolism, filtered by the kidneys. Used with eGFR to assess kidney filtration efficiency. Can be elevated with high muscle mass.' },
@@ -78,7 +77,7 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   triglycerides: { label: 'Triglycerides', unit: 'mg/dL', category: 'lipids', refMax: 150, optimalMax: 80, description: 'Blood fats used for energy storage. Elevated levels — often driven by refined carbs, sugar, and alcohol — are linked to insulin resistance and cardiovascular risk.' },
   non_hdl: { label: 'Non-HDL Cholesterol', unit: 'mg/dL', category: 'lipids', refMax: 130, description: 'All cholesterol except HDL (total minus HDL). Captures all atherogenic particles and is a better cardiovascular predictor than LDL alone.' },
   chol_hdl_ratio: { label: 'Chol/HDL Ratio', unit: '', category: 'lipids', refMax: 5.0, description: 'Ratio of total cholesterol to HDL. A useful risk ratio — lower is better. Above 5.0 indicates elevated cardiovascular risk.' },
-  apob: { label: 'ApoB', unit: 'mg/dL', category: 'lipids', refMax: 90, optimalMax: 70, pinned: true, description: 'Apolipoprotein B — the protein on every LDL, VLDL, and IDL particle. Counts the actual number of atherogenic particles. Considered the single most accurate cardiovascular risk marker in the lipid panel.' },
+  apob: { label: 'ApoB', unit: 'mg/dL', category: 'lipids', refMax: 90, optimalMax: 70, description: 'Apolipoprotein B — the protein on every LDL, VLDL, and IDL particle. Counts the actual number of atherogenic particles. Considered the single most accurate cardiovascular risk marker in the lipid panel.' },
   lipoprotein_a: { label: 'Lipoprotein(a)', unit: 'nmol/L', category: 'lipids', refMax: 75, description: 'An inherited, genetically determined lipoprotein. Elevated Lp(a) significantly increases cardiovascular risk independent of LDL, and does not respond well to lifestyle changes.' },
 
   // CBC
@@ -104,19 +103,19 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   basophils_pct: { label: 'Basophils %', unit: '%', category: 'cbc', description: 'Percentage of total white blood cells that are basophils.' },
 
   // Inflammation & Nutrients
-  hs_crp: { label: 'hs-CRP', unit: 'mg/L', category: 'inflammation', refMax: 1.0, optimalMax: 0.5, pinned: true, description: 'High-sensitivity C-Reactive Protein — a marker of systemic inflammation produced by the liver. Elevated levels predict cardiovascular events independent of cholesterol. Optimal is below 0.5 mg/L.' },
+  hs_crp: { label: 'hs-CRP', unit: 'mg/L', category: 'inflammation', refMax: 1.0, optimalMax: 0.5, description: 'High-sensitivity C-Reactive Protein — a marker of systemic inflammation produced by the liver. Elevated levels predict cardiovascular events independent of cholesterol. Optimal is below 0.5 mg/L.' },
   homocysteine: { label: 'Homocysteine', unit: 'umol/L', category: 'inflammation', refMax: 13.5, optimalMax: 8, description: 'An amino acid tied to B-vitamin (B6, B12, folate) status. Elevated homocysteine damages blood vessel walls and independently increases risk of heart disease and cognitive decline.' },
-  vitamin_d: { label: 'Vitamin D', unit: 'ng/mL', category: 'inflammation', refMin: 30, refMax: 100, optimalMin: 50, optimalMax: 80, pinned: true, description: 'Fat-soluble vitamin critical for bone health, immune function, mood regulation, and testosterone production. Most people are deficient; optimal levels are typically 50–80 ng/mL.' },
+  vitamin_d: { label: 'Vitamin D', unit: 'ng/mL', category: 'inflammation', refMin: 30, refMax: 100, optimalMin: 50, optimalMax: 80, description: 'Fat-soluble vitamin critical for bone health, immune function, mood regulation, and testosterone production. Most people are deficient; optimal levels are typically 50–80 ng/mL.' },
   iron: { label: 'Iron', unit: 'mcg/dL', category: 'inflammation', refMin: 50, refMax: 180, description: 'Serum iron — the amount of iron circulating in the blood. A single snapshot; interpret alongside ferritin and TIBC for a complete picture of iron status.' },
   tibc: { label: 'Iron Binding Capacity', unit: 'mcg/dL', category: 'inflammation', refMin: 250, refMax: 425, description: 'Total Iron Binding Capacity — measures how much iron the blood could carry. High TIBC with low ferritin strongly indicates iron deficiency.' },
   iron_saturation: { label: 'Iron Saturation', unit: '%', category: 'inflammation', refMin: 20, refMax: 48, description: 'Percentage of iron-binding capacity that is currently filled with iron. Below 20% with low ferritin confirms iron deficiency; above 50% may suggest iron overload.' },
-  ferritin: { label: 'Ferritin', unit: 'ng/mL', category: 'inflammation', refMin: 38, refMax: 380, optimalMin: 50, optimalMax: 150, pinned: true, description: 'Protein that stores iron in cells — the best single test for body iron stores. Low ferritin confirms iron deficiency before anemia develops. Also an acute-phase reactant, so can be falsely elevated during inflammation.' },
+  ferritin: { label: 'Ferritin', unit: 'ng/mL', category: 'inflammation', refMin: 38, refMax: 380, optimalMin: 50, optimalMax: 150, description: 'Protein that stores iron in cells — the best single test for body iron stores. Low ferritin confirms iron deficiency before anemia develops. Also an acute-phase reactant, so can be falsely elevated during inflammation.' },
   // Annual CHW panel only (LabCorp reference ranges).
   vitamin_b12: { label: 'Vitamin B12', unit: 'pg/mL', category: 'inflammation', refMin: 232, refMax: 1245, description: 'Cobalamin — needed for red cell production, nerve myelin, and clearing homocysteine. A low-normal value alongside high homocysteine or a rising MCV suggests functional deficiency.' },
   folate: { label: 'Folate', unit: 'ng/mL', category: 'inflammation', refMin: 3.0, higherIsBetter: true, description: 'Folic acid status — pairs with B12 in DNA synthesis, red cell production, and homocysteine clearance. The lab only sets a floor, so any value above 3.0 is in range.' },
 
   // Cardiac (from echocardiogram)
-  la_volume_index: { label: 'LA Volume Index', unit: 'ml/m²', category: 'cardiac', refMin: 16, refMax: 34, pinned: true, description: 'Left atrial volume indexed to body surface area. The strongest echocardiographic predictor of future atrial fibrillation — an enlarged left atrium reflects chronic pressure/volume overload and remodeling that predisposes to AFib.' },
+  la_volume_index: { label: 'LA Volume Index', unit: 'ml/m²', category: 'cardiac', refMin: 16, refMax: 34, description: 'Left atrial volume indexed to body surface area. The strongest echocardiographic predictor of future atrial fibrillation — an enlarged left atrium reflects chronic pressure/volume overload and remodeling that predisposes to AFib.' },
   ejection_fraction: { label: 'Ejection Fraction', unit: '%', category: 'cardiac', refMin: 55, refMax: 70, description: 'Percentage of blood pumped out of the left ventricle with each contraction. The primary measure of LV systolic (pumping) function. Often reported as a range on echo; the midpoint is used here for trending.' },
   e_e_prime_ratio: { label: 'E/e\' Ratio', unit: '', category: 'cardiac', refMax: 14, description: 'Ratio comparing mitral inflow velocity (E) to tissue Doppler annular velocity (e\'). A key non-invasive marker of left ventricular diastolic function and filling pressures — elevated values suggest diastolic dysfunction.' },
   lv_mass_index: { label: 'LV Mass Index', unit: 'g/m²', category: 'cardiac', refMin: 50, refMax: 102, description: 'Left ventricular mass indexed to body surface area. Elevated values indicate left ventricular hypertrophy, often driven by chronic high blood pressure, and is itself an independent risk factor for atrial fibrillation.' },
@@ -168,10 +167,6 @@ export function computeMarkers(markers: Record<string, number | null>): Record<s
 // Merge derived markers in so every consumer treats them like report-sourced markers.
 Object.assign(BIOMARKERS, COMPUTED_MARKERS)
 
-export const PINNED_MARKERS = Object.entries(BIOMARKERS)
-  .filter(([, m]) => m.pinned)
-  .map(([key]) => key)
-
 export function getStatus(value: number | null, meta: BiomarkerMeta): 'optimal' | 'low' | 'high' | 'unknown' {
   if (value === null || value === undefined) return 'unknown'
   if (meta.refMin !== undefined && value < meta.refMin) return 'low'
@@ -189,19 +184,4 @@ export function countFlags(markers: Record<string, number | null>): { high: numb
     if (status !== 'unknown') counts[status]++
   }
   return counts
-}
-
-export function getStatusColor(status: ReturnType<typeof getStatus>) {
-  return {
-    optimal: 'success' as const,
-    low: 'warning' as const,
-    high: 'error' as const,
-    unknown: 'neutral' as const
-  }[status]
-}
-
-export function formatValue(value: number | null, meta: BiomarkerMeta): string {
-  if (value === null || value === undefined) return '—'
-  if (meta.unit === '%' || meta.unit === '') return value.toString()
-  return value.toString()
 }

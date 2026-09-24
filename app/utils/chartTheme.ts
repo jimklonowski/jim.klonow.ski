@@ -17,7 +17,6 @@ export const THEME = {
   'ember': '#e8834b',
   'mark': '#5d7a6d',
   'indigo-dot': '#8593ea',
-  'soda': '#7a2e35',
   'raised': '#0d1310',
   'line': '#1a2620',
   'line-soft': '#16211b',
@@ -32,7 +31,6 @@ export const CHART_WARN = THEME.warn
 export const CHART_DANGER = THEME.danger
 export const CHART_EMBER = THEME.ember
 export const CHART_INDIGO = THEME['indigo-dot']
-export const CHART_SODA = THEME.soda
 
 /** A lab value's status (getStatus in app/data/biomarkers.ts) as a color: marker dots, card
  * accents, flagged rows. Was hand-copied into five components. */
