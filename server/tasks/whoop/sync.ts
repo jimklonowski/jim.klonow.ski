@@ -117,98 +117,102 @@ export default defineTask({
     name: 'whoop:sync',
     description: 'Refresh Whoop OAuth token and sync Recovery/Strain/Sleep Performance into health_metrics'
   },
-  async run(event) {
-    const db = ((event.context as unknown as { cloudflare: { env: Env } }).cloudflare.env).DB
+  // Logged to task_runs. A disconnected account or any collection that failed is a failed run:
+  // there is no retry until tomorrow's cron, so it has to show up somewhere other than a
+  // console.error nobody reads.
+  run: event => runLoggedTask(event, 'whoop:sync', env => syncWhoop(env.DB))
+})
 
-    const status = await getWhoopStatus(db)
-    if (!status.connected) {
-      const message = status.lastError ?? 'Whoop is not connected'
-      console.error('Whoop sync skipped:', message)
-      return { result: { touched: 0, workouts: 0, dates: [], errors: [message] } }
-    }
-    const start = syncStart(status.lastSyncedAt)
+async function syncWhoop(db: D1Database) {
+  const status = await getWhoopStatus(db)
+  if (!status.connected) {
+    throw new TaskFailure(status.lastError ?? 'Whoop is not connected')
+  }
+  const start = syncStart(status.lastSyncedAt)
 
-    // Each collection is fetched independently: a Whoop 5xx on one endpoint shouldn't cost the
-    // day's data from the others (there's no retry until tomorrow's cron).
-    const [recoveryRes, sleepRes, cyclesRes] = await Promise.allSettled([
-      whoopFetchAll<WhoopRecoveryRecord>(db, '/v2/recovery', { start }),
-      whoopFetchAll<WhoopSleepRecord>(db, '/v2/activity/sleep', { start }),
-      whoopFetchAll<WhoopCycleRecord>(db, '/v2/cycle', { start })
-    ])
+  // Each collection is fetched independently: a Whoop 5xx on one endpoint shouldn't cost the
+  // day's data from the others (there's no retry until tomorrow's cron).
+  const [recoveryRes, sleepRes, cyclesRes] = await Promise.allSettled([
+    whoopFetchAll<WhoopRecoveryRecord>(db, '/v2/recovery', { start }),
+    whoopFetchAll<WhoopSleepRecord>(db, '/v2/activity/sleep', { start }),
+    whoopFetchAll<WhoopCycleRecord>(db, '/v2/cycle', { start })
+  ])
 
-    const errors: string[] = []
-    function settled<T>(res: PromiseSettledResult<T[]>, label: string): T[] {
-      if (res.status === 'fulfilled') return res.value
-      const message = res.reason instanceof Error ? res.reason.message : String(res.reason)
-      errors.push(`${label}: ${message}`)
-      console.error(`Whoop ${label} sync skipped:`, message)
-      return []
-    }
+  const errors: string[] = []
+  function settled<T>(res: PromiseSettledResult<T[]>, label: string): T[] {
+    if (res.status === 'fulfilled') return res.value
+    const message = res.reason instanceof Error ? res.reason.message : String(res.reason)
+    errors.push(`${label}: ${message}`)
+    console.error(`Whoop ${label} sync skipped:`, message)
+    return []
+  }
 
-    const recovery = settled(recoveryRes, 'recovery')
-    const sleep = settled(sleepRes, 'sleep')
-    const cycles = settled(cyclesRes, 'cycle')
+  const recovery = settled(recoveryRes, 'recovery')
+  const sleep = settled(sleepRes, 'sleep')
+  const cycles = settled(cyclesRes, 'cycle')
 
-    const byDate: Record<string, Partial<Record<HealthMetricField, number>>> = {}
+  const byDate: Record<string, Partial<Record<HealthMetricField, number>>> = {}
 
-    // Recovery records have no start/end of their own (tied to a sleep/cycle id) - created_at is
-    // the closest approximation to "the day this recovery is for", needs confirming live.
-    for (const r of oldestFirst(recovery, r => r.created_at)) {
-      if (r.score_state !== SCORED) continue
-      const date = dateFromTimestamp(r.created_at)
-      const score = r.score?.recovery_score
-      if (date && typeof score === 'number') byDate[date] = { ...byDate[date], recovery_score: score }
-    }
+  // Recovery records have no start/end of their own (tied to a sleep/cycle id) - created_at is
+  // the closest approximation to "the day this recovery is for", needs confirming live.
+  for (const r of oldestFirst(recovery, r => r.created_at)) {
+    if (r.score_state !== SCORED) continue
+    const date = dateFromTimestamp(r.created_at)
+    const score = r.score?.recovery_score
+    if (date && typeof score === 'number') byDate[date] = { ...byDate[date], recovery_score: score }
+  }
 
-    for (const s of oldestFirst(sleep, s => s.end)) {
-      // A nap is a second sleep record for the same day, scored against a nap's own (much
-      // shorter) need — letting one land would overwrite the night's performance with ~10%.
-      if (s.nap || s.score_state !== SCORED) continue
-      const date = dateFromTimestamp(s.end)
-      const score = s.score?.sleep_performance_percentage
-      if (date && typeof score === 'number') byDate[date] = { ...byDate[date], sleep_performance_pct: score }
-    }
+  for (const s of oldestFirst(sleep, s => s.end)) {
+    // A nap is a second sleep record for the same day, scored against a nap's own (much
+    // shorter) need — letting one land would overwrite the night's performance with ~10%.
+    if (s.nap || s.score_state !== SCORED) continue
+    const date = dateFromTimestamp(s.end)
+    const score = s.score?.sleep_performance_percentage
+    if (date && typeof score === 'number') byDate[date] = { ...byDate[date], sleep_performance_pct: score }
+  }
 
-    for (const c of oldestFirst(cycles, c => c.start)) {
-      // Bucket strain on the day the cycle STARTED. Whoop cycles run wake-to-wake, so a cycle
-      // beginning Monday morning ends Tuesday morning — keying off `end` filed Monday's strain
-      // under Tuesday, one day later than the sleep and recovery beside it, and every digest
-      // then narrated the previous day's number as today's.
-      if (c.score_state !== SCORED) continue
-      const date = dateFromTimestamp(c.start)
-      const score = c.score?.strain
-      if (date && typeof score === 'number') byDate[date] = { ...byDate[date], strain: score }
-    }
+  for (const c of oldestFirst(cycles, c => c.start)) {
+    // Bucket strain on the day the cycle STARTED. Whoop cycles run wake-to-wake, so a cycle
+    // beginning Monday morning ends Tuesday morning — keying off `end` filed Monday's strain
+    // under Tuesday, one day later than the sleep and recovery beside it, and every digest
+    // then narrated the previous day's number as today's.
+    if (c.score_state !== SCORED) continue
+    const date = dateFromTimestamp(c.start)
+    const score = c.score?.strain
+    if (date && typeof score === 'number') byDate[date] = { ...byDate[date], strain: score }
+  }
 
-    let touched = 0
-    for (const [date, fields] of Object.entries(byDate)) {
-      if (await upsertHealthMetrics(db, date, fields)) touched++
-    }
+  let touched = 0
+  for (const [date, fields] of Object.entries(byDate)) {
+    if (await upsertHealthMetrics(db, date, fields)) touched++
+  }
 
-    // Workouts are fetched separately and tolerantly: a token granted before read:workout was
-    // added will 403 here, and that must not abort the recovery/sleep/strain sync above. The
-    // connection keeps working; workouts start flowing once the user reconnects to grant the scope.
-    let workouts = 0
-    try {
-      for (const record of await whoopFetchAll<WhoopWorkoutRecord>(db, '/v2/activity/workout', { start })) {
-        const row = mapWhoopWorkout(record)
-        if (row) {
-          await upsertWorkout(db, row)
-          workouts++
-        }
+  // Workouts are fetched separately and tolerantly: a token granted before read:workout was
+  // added will 403 here, and that must not abort the recovery/sleep/strain sync above. The
+  // connection keeps working; workouts start flowing once the user reconnects to grant the scope.
+  let workouts = 0
+  try {
+    for (const record of await whoopFetchAll<WhoopWorkoutRecord>(db, '/v2/activity/workout', { start })) {
+      const row = mapWhoopWorkout(record)
+      if (row) {
+        await upsertWorkout(db, row)
+        workouts++
       }
     }
-    catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      errors.push(`workout: ${message}`)
-      console.error('Whoop workout sync skipped:', message)
-    }
-
-    // Only a clean run advances the watermark — a partial failure has to be re-fetched tomorrow,
-    // and the recorded error is what the journal header shows instead of a bare green check.
-    if (errors.length) await markWhoopError(db, errors.join(' · '))
-    else await markWhoopSynced(db)
-
-    return { result: { touched, workouts, dates: Object.keys(byDate).sort(), ...(errors.length ? { errors } : {}) } }
   }
-})
+  catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    errors.push(`workout: ${message}`)
+    console.error('Whoop workout sync skipped:', message)
+  }
+
+  // Only a clean run advances the watermark — a partial failure has to be re-fetched tomorrow,
+  // and the recorded error is what the journal header shows instead of a bare green check.
+  const result = { touched, workouts, dates: Object.keys(byDate).sort() }
+  if (errors.length) {
+    await markWhoopError(db, errors.join(' · '))
+    throw new TaskFailure(errors.join(' · '), result)
+  }
+  await markWhoopSynced(db)
+  return result
+}

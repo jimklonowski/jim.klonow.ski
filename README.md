@@ -161,3 +161,9 @@ pnpm db:migrate:remote   # main + demo; each database records what it has applie
 ```
 
 The one-off files applied by hand before the ledger existed are in `server/database/archive`.
+
+### Monitoring and backups
+
+- Every cron task records each run in the `task_runs` table, and a failed run also fails the cron invocation in Cloudflare's log.
+- `GET /api/health` returns `{ ok }` with 200 or 503, for an uptime monitor. It fails when a task is overdue against its cadence (`TASK_STALE_AFTER_HOURS` in `server/schedule.ts`), when a task's latest run failed, or when the Apple Health or Whoop feeds stop arriving. The owner sees the per-check detail.
+- `db:backup` runs Sundays at 08:00 UTC. It writes the main database as gzipped JSON to `backups/d1/` in the labs bucket and keeps 12 copies. OAuth tokens are left out. To restore, run `scripts/restore-backup.mjs`; its header has the steps. Rehearse on `--local` first.

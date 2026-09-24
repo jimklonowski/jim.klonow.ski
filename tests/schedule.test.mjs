@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
-import { SCHEDULED_TASKS } from '../server/schedule.ts'
+import { SCHEDULED_TASKS, TASK_STALE_AFTER_HOURS } from '../server/schedule.ts'
 
 const root = new URL('../', import.meta.url)
 
@@ -67,4 +67,12 @@ test('every scheduled task name has a task file', () => {
 
 test('crons are five-field expressions', () => {
   for (const cron of scheduled) assert.equal(cron.trim().split(/\s+/).length, 5, cron)
+})
+
+test('every scheduled task has a staleness window for /api/health, and nothing else does', () => {
+  const tasks = [...new Set(Object.values(SCHEDULED_TASKS).flat())].sort()
+  assert.deepEqual(Object.keys(TASK_STALE_AFTER_HOURS).sort(), tasks)
+  for (const [name, hours] of Object.entries(TASK_STALE_AFTER_HOURS)) {
+    assert.ok(Number.isFinite(hours) && hours >= 24, `${name}: ${hours}h is shorter than any cron cadence here`)
+  }
 })

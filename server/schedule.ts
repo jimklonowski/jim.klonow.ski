@@ -15,5 +15,20 @@ export const SCHEDULED_TASKS: Record<string, string[]> = {
   '0 11 * * *': ['whoop:sync'],
   // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
   '0 14 * * *': ['digest:daily'],
-  '0 15 * * 1': ['digest:weekly']
+  '0 15 * * 1': ['digest:weekly'],
+  // Weekly D1 backup to R2, Sunday 08:00 UTC (the small hours in Chicago, nothing else running).
+  '0 8 * * 0': ['db:backup']
+}
+
+/**
+ * How long after its last clean run each task counts as stale on /api/health: its cadence plus
+ * a couple of hours' grace for a slow or late invocation. Every scheduled task needs an entry —
+ * tests/schedule.test.mjs checks both directions.
+ */
+export const TASK_STALE_AFTER_HOURS: Record<string, number> = {
+  'demo:reset': 26,
+  'whoop:sync': 26,
+  'digest:daily': 26,
+  'digest:weekly': 7 * 24 + 2,
+  'db:backup': 7 * 24 + 2
 }
