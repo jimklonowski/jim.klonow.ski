@@ -7,8 +7,9 @@
 // House rules for these schemas:
 //   - every free-text field is length-bounded (an unbounded string is a free row-size attack,
 //     and the demo sandbox is writable by anyone on the internet);
-//   - every number is finite (JSON `NaN`/`Infinity` arrive as null, but a string "12" or an
-//     object would otherwise bind straight into a REAL column);
+//   - every number is finite — zod 4's z.number() already refuses NaN/Infinity, so there's no
+//     `.finite()` (JSON `NaN`/`Infinity` arrive as null anyway, but a string "12" or an object
+//     would otherwise bind straight into a REAL column);
 //   - dates are real calendar days, so `ORDER BY date` and every `date >= ?` window hold;
 //   - unknown keys are stripped rather than rejected, so an older client that still sends a
 //     retired field keeps working.
@@ -39,11 +40,11 @@ const zOptText = (max: number) => zText(max).nullish().transform(v => v || null)
 const blankAsAbsent = (v: unknown) => (v === '' ? undefined : v)
 
 /** A finite number, or null when absent/blank. Still rejects "abc", NaN, objects. */
-const zOptNum = z.preprocess(blankAsAbsent, z.number().finite().nullish()).transform(v => v ?? null)
+const zOptNum = z.preprocess(blankAsAbsent, z.number().nullish()).transform(v => v ?? null)
 
 /** A finite number with a fallback when absent/blank. */
 const zNumWithDefault = (fallback: number, refine?: (s: z.ZodNumber) => z.ZodNumber) => {
-  const base = z.number().finite()
+  const base = z.number()
   return z.preprocess(blankAsAbsent, (refine ? refine(base) : base).default(fallback))
 }
 
@@ -120,11 +121,11 @@ export const zVialSave = z.object({
   id: zId.optional(),
   compound: zText(80).min(1, 'compound is required'),
   supplier: zOptText(80),
-  vial_amount: z.number().finite().positive(),
+  vial_amount: z.number().positive(),
   vial_unit: zDoseUnit.default('mg'),
   // Free-form on the wire; normalizeForm() maps it onto the VialForm union.
   form: z.string().max(20).nullish(),
-  unit_count: z.preprocess(blankAsAbsent, z.number().finite().int().positive().nullish()).transform(v => v ?? null),
+  unit_count: z.preprocess(blankAsAbsent, z.number().int().positive().nullish()).transform(v => v ?? null),
   quantity: zNumWithDefault(1, s => s.int().min(0)),
   status: z.enum(['sealed', 'active', 'finished']).default('sealed'),
   opened_date: zOptDate,
@@ -195,9 +196,9 @@ export const zPhotoUpdate = z.object({
   category: z.string().max(40).optional(),
   // The reframe tool's pan is a percentage and its zoom a multiplier; the caps are far outside
   // anything the UI can produce and only stop a hand-made request storing an absurd transform.
-  frameOffsetX: z.number().finite().min(-1000).max(1000).optional(),
-  frameOffsetY: z.number().finite().min(-1000).max(1000).optional(),
-  frameScale: z.number().finite().positive().max(100).optional()
+  frameOffsetX: z.number().min(-1000).max(1000).optional(),
+  frameOffsetY: z.number().min(-1000).max(1000).optional(),
+  frameScale: z.number().positive().max(100).optional()
 })
 
 const PHOTO_CATEGORY_VALUES = PHOTO_CATEGORIES.map(c => c.value) as [PhotoCategory, ...PhotoCategory[]]
@@ -263,8 +264,8 @@ export const zLabsSave = z.object({
   markers: z.unknown().optional(),
   qualitative: z.unknown().optional(),
   sources: z.unknown().optional(),
-  weight_lbs: z.number().finite().nullish().catch(null),
-  ag_ratio: z.number().finite().nullish().catch(null),
+  weight_lbs: z.number().nullish().catch(null),
+  ag_ratio: z.number().nullish().catch(null),
   total: zJsonBlock,
   regions: zJsonBlock,
   vat: zJsonBlock,
@@ -298,7 +299,7 @@ export const zHealthWebhook = z.object({
 // Out-of-range values are clamped rather than rejected, as the endpoint always has: the UI only
 // offers presets, and the caps exist so a hand-crafted request can't overflow Date (an unbounded
 // expiresDays made toISOString() throw) or store a pathological row.
-const clampedCount = (cap: number) => z.preprocess(blankAsAbsent, z.number().finite().nullish())
+const clampedCount = (cap: number) => z.preprocess(blankAsAbsent, z.number().nullish())
   .transform(v => (v != null && v > 0 ? Math.min(Math.floor(v), cap) : null))
 
 export const zInviteCreate = z.object({

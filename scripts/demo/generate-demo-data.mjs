@@ -12,7 +12,7 @@
 //
 // The seed is uploaded to R2 (demo/seed.json in LABS_BUCKET) by scripts/demo/seed-demo.mjs and
 // re-read nightly by the demo:reset task. It must NEVER be imported by server code — the seed
-// riding along in the Worker bundle would eat the free-plan size budget for nothing.
+// riding along in the Worker bundle would bloat every cold start for nothing.
 
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
