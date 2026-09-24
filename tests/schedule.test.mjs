@@ -69,6 +69,15 @@ test('crons are five-field expressions', () => {
   for (const cron of scheduled) assert.equal(cron.trim().split(/\s+/).length, 5, cron)
 })
 
+test('day-of-week is a name, never a number', () => {
+  // Cloudflare counts 1 = Sunday … 7 = Saturday, so a digit means something other than it does
+  // in every other cron: `1` fired on Sundays for months, and `0` failed a deploy outright.
+  for (const cron of scheduled) {
+    const dow = cron.trim().split(/\s+/)[4]
+    assert.match(dow, /^(\*|(SUN|MON|TUE|WED|THU|FRI|SAT)([-,](SUN|MON|TUE|WED|THU|FRI|SAT))*)$/, `${cron}: write the day as SUN…SAT`)
+  }
+})
+
 test('every scheduled task has a staleness window for /api/health, and nothing else does', () => {
   const tasks = [...new Set(Object.values(SCHEDULED_TASKS).flat())].sort()
   assert.deepEqual(Object.keys(TASK_STALE_AFTER_HOURS).sort(), tasks)
