@@ -99,7 +99,7 @@ export interface ParsedVial {
 // --- supplements ---
 // The standing vitamin/supplement/skin-routine stack: the regimen itself, not day-by-day dose
 // logs. 'on_hand' rows are owned but not being taken. 'stopped' rows are kept as history, since
-// recent stops stay relevant to lab trends. The stack feeds the AI prompts via server/utils/protocol.ts.
+// recent stops stay relevant to lab trends. The stack feeds the AI prompts via server/utils/supplementContext.ts.
 
 export type SupplementCategory = 'supplement' | 'skin'
 export type SupplementStatus = 'active' | 'on_hand' | 'stopped'

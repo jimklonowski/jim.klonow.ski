@@ -11,7 +11,7 @@
 // fast gain is the water-retention tell long before the total looks alarming.
 //
 // Shared (app + server): the cycle dossier and home strip render these, and cycleContext
-// (server/utils/protocol.ts) folds flagged ones into the AI prompts.
+// (server/utils/cycleContext.ts) folds flagged ones into the AI prompts.
 
 import type { Cycle } from './cycles'
 // Explicit .ts extension: runtime values, and the plain-node test runner can't resolve the

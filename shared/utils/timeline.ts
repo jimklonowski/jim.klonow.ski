@@ -27,7 +27,7 @@ export interface GanttRow {
   count: number
 }
 
-/** A daily med that predates the dose log (app/data/journal.ts STANDING_COMPOUNDS). */
+/** A daily med that predates the dose log (STANDING_COMPOUNDS in ./protocolRules.ts). */
 export interface StandingRange {
   compound: string
   from: string

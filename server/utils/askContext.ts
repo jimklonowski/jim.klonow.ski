@@ -8,6 +8,7 @@ import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
 import type { JournalRow, SodaEntry } from '#shared/types/journal'
 import { roundTo, shiftDays } from '#shared/utils/dates'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
+import { eventContext } from '#shared/utils/protocolEvents'
 
 function avg(vals: Array<number | null | undefined>): number | null {
   const nums = vals.filter((v): v is number => v != null && !Number.isNaN(v))

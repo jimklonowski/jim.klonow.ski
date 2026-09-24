@@ -2,13 +2,15 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { checkAskHistory } from '#shared/utils/askHistory'
 import { localToday } from '#shared/utils/time'
 import { zAsk } from '#shared/utils/schemas'
-import { READER_CONTEXT } from '../../utils/digest'
+import { readerContext } from '../../utils/digestPrompts'
 
 // Ask-the-data chat: answers freeform questions over the full tracked history (labs, DEXA,
 // journal, Whoop, protocol). Owner-only — same policy as digest generation: nobody else gets
 // to spend Anthropic tokens. Streams plain-text deltas; the client renders them as they land.
 
-const SYSTEM_RULES = `You are the analysis console on a personal health dashboard, answering the owner's questions about his own data. ${READER_CONTEXT}
+// The schedule inside readerContext is as of `today`, which the client pins for the whole
+// conversation, so the rules stay byte-identical across turns and the prompt cache still hits.
+const systemRules = (today: string) => `You are the analysis console on a personal health dashboard, answering the owner's questions about his own data. ${readerContext(today)}
 
 Ground rules:
 - Answer from the fact sheet below. Cite the dates and numbers you're reasoning from so answers are checkable against the dashboard.
@@ -49,7 +51,7 @@ export default defineEventHandler(async (event) => {
     // sheet at ~10% of input price instead of re-paying for it (5-minute TTL, refreshed by each
     // hit — a question more than five minutes after the last answer re-warms it at 1.25×).
     // Usage is logged below; cache_read should be non-zero from the second turn on.
-    system: [{ type: 'text', text: `${SYSTEM_RULES}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: `${systemRules(today)}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
     messages
   })
 

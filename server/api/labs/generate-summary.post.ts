@@ -3,6 +3,8 @@ import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { PK_MODELS, drawTiming, pkDosesFor } from '#shared/utils/pk'
 import { shiftDays } from '#shared/utils/dates'
 import { detectProtocolChanges, type TrendJournalRow } from '#shared/utils/trends'
+import { eventContext } from '#shared/utils/protocolEvents'
+import { protocolSchedule } from '#shared/utils/protocolProse'
 
 interface LabsRow {
   date: string
@@ -176,9 +178,9 @@ export default defineEventHandler(async (event) => {
   const vaccineBlock = await vaccineContext(db, date)
   const eventBlock = eventContext(date)
 
-  const prompt = `You are writing a trend summary for a personal bloodwork dashboard. The reader is the person whose labs these are — address them as "you". They track their own biomarkers closely and understand them well. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH, and hCG — currently the only injectables they are running, with ancillary peptides rotating around that core (GHK-Cu, the last standing one, was discontinued 2026-09-01) — and they are weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals — so markers that gate that decision (lipids, especially HDL; liver enzymes; hematocrit/hemoglobin; iron/ferritin; blood pressure proxies) deserve extra attention when present. They are not currently taking an aromatase inhibitor but keep Anastrozole on hand from their TRT clinic for symptomatic use; estradiol has been climbing and may read over 100 pg/mL on new draws. Treat elevated estradiol as a known, watched issue: quantify the trend against prior draws, name the specific symptoms and risks worth monitoring at that level, and frame the on-hand Anastrozole as the discussion point for symptom-driven use — not something to start reflexively.
+  const prompt = `You are writing a trend summary for a personal bloodwork dashboard. The reader is the person whose labs these are — address them as "you". They track their own biomarkers closely and understand them well. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH, and hCG, with ancillary peptides rotating around that core (the schedule below says what was running as of this draw) — and they are weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals — so markers that gate that decision (lipids, especially HDL; liver enzymes; hematocrit/hemoglobin; iron/ferritin; blood pressure proxies) deserve extra attention when present. They are not currently taking an aromatase inhibitor but keep Anastrozole on hand from their TRT clinic for symptomatic use; estradiol has been climbing and may read over 100 pg/mL on new draws. Treat elevated estradiol as a known, watched issue: quantify the trend against prior draws, name the specific symptoms and risks worth monitoring at that level, and frame the on-hand Anastrozole as the discussion point for symptom-driven use — not something to start reflexively.
 
-${PROTOCOL_SCHEDULE}
+${protocolSchedule(date)}
 ${supplementBlock ? `\n${supplementBlock}\n` : ''}${cycleBlock ? `\n${cycleBlock}\n` : ''}${vaccineBlock ? `\n${vaccineBlock}\n` : ''}${eventBlock ? `\n${eventBlock}\n` : ''}
 The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT and roughly halve PSA once 6–12 months in, so double an on-treatment PSA before comparing it with pre-treatment draws; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
 

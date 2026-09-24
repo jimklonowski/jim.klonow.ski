@@ -4,7 +4,7 @@
 // The compounds page shows it compact with a collapsed preview; the calendar shows it roomier
 // and in full. The slot math lives in shared/utils/timeline.ts.
 import { buildTimeline, type TimelineZoom } from '#shared/utils/timeline'
-import { STANDING_COMPOUNDS } from '~/data/journal'
+import { STANDING_COMPOUNDS } from '#shared/utils/protocolRules'
 
 const props = withDefaults(defineProps<{
   label: string

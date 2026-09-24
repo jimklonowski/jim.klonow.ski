@@ -1,10 +1,11 @@
-// The intended weekly cadence of the standing protocol, as data: which compounds are due on
-// which weekdays, and since when. Hand-maintained, like its prose twin PROTOCOL_SCHEDULE in
-// server/utils/protocol.ts (which carries the intent and nuance the AI prompts read) and
-// STANDING_COMPOUNDS in app/data/journal.ts — keep the three in sync when the protocol changes.
+// The standing protocol, as data — the one place to edit when it changes. Three lists:
+// PROTOCOL_RULES (logged, weekday-scheduled compounds), STANDING_COMPOUNDS (daily meds that are
+// deliberately not in the dose log), and AS_NEEDED_COMPOUNDS. The AI prompts' schedule prose is
+// generated from all three (protocolSchedule in ./protocolProse.ts), so the notes on each entry
+// are prompt text: pronoun-free, and written to say how to read the data, not just what changed.
 //
-// Shared because both sides score against it: the adherence panel and calendar rings in the
-// app (app/utils/adherence.ts), and the digest prompts on the server, which precompute "what
+// Shared because both sides score against the rules: the adherence panel and calendar rings in
+// the app (app/utils/adherence.ts), and the digest prompts on the server, which precompute "what
 // was due today / this week, what was logged" (tallySchedule) so the model never has to work
 // out weekdays from dates itself — it was guessing at them before.
 //
@@ -27,20 +28,65 @@ export interface ProtocolRule {
   from: string
   /** Set when a compound leaves the schedule; keep the row for history. */
   to?: string | null
+  /** Given by injection: "per injection" wording, and the prompts' "only injectables" line. */
+  injected?: boolean
+  /** Prompt clause after the dose while it runs — dose history, reasons. */
+  note?: string
+  /** Prompt clause once `to` has passed: why it stopped. */
+  stopNote?: string
 }
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 
+// doseLabel is the current dose and display-only, so a dose change edits it in place (with the
+// history in `note`) and the row keeps its `from`.
 export const PROTOCOL_RULES: ProtocolRule[] = [
-  { compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18' },
-  // 300 IU since 2026-09-08 (250 IU before that); doseLabel is display-only so the row keeps its from.
-  { compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18' },
-  // 2.5 IU since 2026-09-03 (2 IU before, 2.25 IU on 09-02/03 while stepping up).
-  { compound: 'HGH', doseLabel: '2.5 IU', weekdays: EVERY_DAY, from: '2026-06-13' },
-  // Discontinued 2026-09-01 (vial finished, not reconstituting another for now). `to` is
-  // inclusive, so the rings stop expecting a dose from 2026-09-02 on.
-  { compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01', to: '2026-09-01' },
+  {
+    compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18', injected: true,
+    note: 'reduced from 100 mg per injection, 200 mg/week, in late August 2026'
+  },
+  {
+    compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18', injected: true,
+    note: 'raised from 250 IU on 2026-09-08'
+  },
+  {
+    compound: 'HGH', doseLabel: '2.5 IU', weekdays: EVERY_DAY, from: '2026-06-13', injected: true,
+    note: 'raised from 2 IU on 2026-09-03, via 2.25 IU on 2026-09-02'
+  },
+  // `to` is inclusive, so the rings stop expecting a dose from 2026-09-02 on.
+  {
+    compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01', to: '2026-09-01', injected: true,
+    stopNote: 'the vial finished and another is not being reconstituted for the time being'
+  },
   { compound: 'Finasteride', doseLabel: '1 mg', weekdays: EVERY_DAY, from: '2026-07-29' }
+]
+
+export interface StandingCompound {
+  compound: string
+  /** First day of the range (may predate the dose log — the timeline clamps it). */
+  from: string
+  /** Last day of the range, or null while ongoing. */
+  to: string | null
+  /** Dose/form for the timeline tooltip and the prompts, e.g. "7 mg gummy". */
+  label: string
+  /** Prompt clause: what it is for and how it bears on the data. */
+  note?: string
+}
+
+const TADALAFIL_SINCE = 'daily-protocol Cialis, taken each morning for endothelial/BP support since about June 2025'
+const TADALAFIL_BP = 'Its mild BP-lowering effect is standing context when interpreting blood-pressure trends'
+
+// Daily meds running since before the dose log existed — too routine to log per-day, but real
+// protocol. Rendered as extra rows on the calendar's protocol timeline (not stored in D1), and
+// named in the prompts' schedule so their absence from the dose log never reads as a miss.
+export const STANDING_COMPOUNDS: StandingCompound[] = [
+  { compound: 'Tadalafil', from: '2025-06-01', to: '2026-06-01', label: '7 mg gummy', note: `${TADALAFIL_SINCE}. ${TADALAFIL_BP}` },
+  { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet', note: `${TADALAFIL_SINCE}; 7 mg gummies until 2026-06-01, 5 mg tablets since. ${TADALAFIL_BP}` }
+]
+
+/** Taken when something calls for it, so gaps in the log are the plan. No rule, no rings. */
+export const AS_NEEDED_COMPOUNDS: Array<{ compound: string, note: string }> = [
+  { compound: 'BPC-157', note: 'for soreness/tightness' }
 ]
 
 export function ruleActiveOn(rule: ProtocolRule, date: string): boolean {
