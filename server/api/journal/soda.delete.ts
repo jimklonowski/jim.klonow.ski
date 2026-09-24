@@ -19,9 +19,11 @@ export default defineEventHandler(async (event) => {
   const { date, index } = validatedQuery(event, zSodaRemove)
 
   const db = getDb(event)
+  const before = await auditBefore(event, 'journal_entries', date)
   await db.prepare(`
     UPDATE journal_entries SET sodas = json_remove(sodas, '$[' || CAST(?2 AS INTEGER) || ']') WHERE date = ?1
   `).bind(date, index).run()
+  if (before) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− soda on ${date}` })
 
   const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
   const sodas = JSON.parse(row?.sodas ?? '[]') as Array<{ time: string, drink?: string, size?: string }>

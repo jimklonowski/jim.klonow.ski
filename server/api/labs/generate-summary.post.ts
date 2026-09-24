@@ -120,7 +120,7 @@ function refRange(key: string): string {
 
 export default defineEventHandler(async (event) => {
   requireOwner(event)
-  requireUploadPin(event)
+  await requireUploadPin(event)
 
   const { date } = await readValidatedJson(event, zSummaryGenerate)
 

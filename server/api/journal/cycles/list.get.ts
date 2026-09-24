@@ -11,7 +11,7 @@ export default defineEventHandler(async (event): Promise<Cycle[]> => {
   // Missing table (migration not applied yet) reads as "no cycles", not a 500 — every consumer
   // of this list (home strip, adherence merge, calendar) degrades cleanly. Any other error is a
   // real failure and must not masquerade as an empty planner.
-  return listRows(event, 'SELECT * FROM cycles ORDER BY start_date DESC', row => ({
+  return withEtag(event, await listRows(event, 'SELECT * FROM cycles ORDER BY start_date DESC', row => ({
     id: row.id as number,
     name: row.name as string,
     goal: (row.goal as string | null) ?? null,
@@ -27,5 +27,5 @@ export default defineEventHandler(async (event): Promise<Cycle[]> => {
     compounds: JSON.parse((row.compounds as string) || '[]') as CyclePlanItem[],
     notes: (row.notes as string | null) ?? null,
     created_at: row.created_at as string
-  }), { missingTableOk: true })
+  }), { missingTableOk: true }))
 })

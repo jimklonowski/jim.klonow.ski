@@ -16,6 +16,8 @@ const DEMO_BLOCKED_PAGES = [
   /^\/labs\/upload$/,
   /^\/tools\/import$/,
   /^\/tools\/sharing$/,
+  // Export and change history read the real database, whatever the session.
+  /^\/tools\/data$/,
   /^\/ask$/
 ]
 

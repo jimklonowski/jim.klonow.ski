@@ -3,5 +3,5 @@ export default defineEventHandler(async (event) => {
   // query lands in the sandbox DB. friend/doctor never had this page.
   requireRole(event, 'owner', 'demo')
 
-  return listRows(event, 'SELECT * FROM vials ORDER BY status ASC, compound ASC, id ASC', parseVialRow)
+  return withEtag(event, await listRows(event, 'SELECT * FROM vials ORDER BY status ASC, compound ASC, id ASC', parseVialRow))
 })

@@ -8,7 +8,9 @@ export default defineEventHandler(async (event) => {
   const { id } = await readValidatedJson(event, zIdOnly)
 
   const db = getDb(event)
+  const before = await auditBefore(event, 'vaccinations', id)
   await db.prepare('DELETE FROM vaccinations WHERE id = ?1').bind(id).run()
+  if (before) await recordAudit(event, { table: 'vaccinations', key: id, before, deleted: true, summary: `${before.date} ${before.vaccine}` })
 
   return { ok: true }
 })

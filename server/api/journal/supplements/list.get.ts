@@ -3,5 +3,5 @@
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
 
-  return listRows(event, 'SELECT * FROM supplements ORDER BY sort ASC, name ASC')
+  return withEtag(event, await listRows(event, 'SELECT * FROM supplements ORDER BY sort ASC, name ASC'))
 })

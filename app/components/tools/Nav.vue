@@ -23,6 +23,7 @@ const ALL_TABS = [
   { label: 'Calculator', to: '/tools/calculator' },
   { label: 'Inventory', to: '/tools/inventory' },
   { label: 'Import', to: '/tools/import' },
+  { label: 'Data', to: '/tools/data' },
   { label: 'Sharing', to: '/tools/sharing' }
 ]
 

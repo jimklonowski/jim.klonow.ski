@@ -1,4 +1,4 @@
-export default defineEventHandler((event) => {
-  requireUploadPin(event)
+export default defineEventHandler(async (event) => {
+  await requireUploadPin(event)
   return { ok: true }
 })

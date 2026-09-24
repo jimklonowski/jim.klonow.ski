@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  zAsk, zCycleSave, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalSave, zLabsSave,
+  zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalSave, zLabsSave,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zProfileSave, zRedeem, zSodaAdd,
   zSodaRemove, zSupplementSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
@@ -243,4 +243,19 @@ test('whoop callback query: a declined grant (error, no code) is refused', () =>
   assert.deepEqual(zWhoopCallbackQuery.parse({ code: 'abc', state: 'uuid', scope: 'x' }), { code: 'abc', state: 'uuid' })
   assert.match(problem(zWhoopCallbackQuery, { error: 'access_denied', state: 'uuid' }), /^code:/)
   assert.match(problem(zWhoopCallbackQuery, { code: ['a', 'b'], state: 'uuid' }), /^code:/)
+})
+
+test('list date ranges: optional, inclusive, and never reversed', () => {
+  assert.deepEqual(zDateRange.parse({}), {})
+  assert.deepEqual(zDateRange.parse({ from: '2026-09-01', to: '2026-09-01' }), { from: '2026-09-01', to: '2026-09-01' })
+  assert.equal(problem(zDateRange, { from: '2026-09-02', to: '2026-09-01' }), 'from: from must not be after to')
+  assert.match(problem(zDateRange, { from: '2026-02-30' }), /^from:/)
+})
+
+test('audit history paging and restore ids', () => {
+  assert.equal(zAuditList.parse({}).limit, 100)
+  assert.equal(zAuditList.parse({ limit: '25' }).limit, 25)
+  assert.ok(problem(zAuditList, { limit: '5000' }))
+  assert.deepEqual(zAuditRestore.parse({ id: 4 }), { id: 4 })
+  assert.ok(problem(zAuditRestore, { id: '4' }), 'a JSON body sends a real number')
 })

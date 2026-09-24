@@ -1,5 +1,6 @@
 export default defineEventHandler(async (event) => {
   requireLabsAuth(event)
 
-  return listRows(event, 'SELECT * FROM dexa_entries ORDER BY date ASC', parseDexaRow)
+  const range = dateRange(event, 'date')
+  return withEtag(event, await listRows(event, `SELECT * FROM dexa_entries ${range.where} ORDER BY date ASC`, parseDexaRow, { binds: range.binds }))
 })

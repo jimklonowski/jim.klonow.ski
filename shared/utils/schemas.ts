@@ -325,6 +325,23 @@ export const zWhoopCallbackQuery = z.object({
   state: z.string().min(1).max(256)
 })
 
+// --- list reads ---
+
+// ?from / ?to on the date-keyed list endpoints. Both optional and inclusive; a reversed range is
+// a client mistake worth naming rather than an empty list that looks like missing data.
+export const zDateRange = z.object({
+  from: zIsoDate.optional(),
+  to: zIsoDate.optional()
+}).refine(r => !r.from || !r.to || r.from <= r.to, { message: 'from must not be after to', path: ['from'] })
+
+// --- audit log ---
+
+export const zAuditList = z.object({
+  limit: z.coerce.number().int().min(1).max(500).default(100)
+})
+
+export const zAuditRestore = z.object({ id: zId })
+
 // --- shared by the delete endpoints ---
 
 export const zIdOnly = z.object({ id: zId })

@@ -11,5 +11,6 @@ export default defineEventHandler(async (event): Promise<Vaccination[]> => {
 
   // Missing table (migration not applied yet) reads as "nothing logged", not a 500. Any other
   // error is a real failure and must not read as "no shots on record".
-  return listRows(event, 'SELECT * FROM vaccinations ORDER BY date DESC, id DESC', row => row as unknown as Vaccination, { missingTableOk: true })
+  const range = dateRange(event, 'date')
+  return withEtag(event, await listRows(event, `SELECT * FROM vaccinations ${range.where} ORDER BY date DESC, id DESC`, row => row as unknown as Vaccination, { missingTableOk: true, binds: range.binds }))
 })

@@ -269,3 +269,25 @@ CREATE TABLE IF NOT EXISTS task_runs (
   error TEXT                  -- the error message on failure
 );
 CREATE INDEX IF NOT EXISTS idx_task_runs_task_started ON task_runs(task, started_at);
+
+-- Write audit log (2026-09-24, migration 0003). Every owner write to the tracked tables (journal
+-- days and sodas, supplements, vials, vaccinations, cycles, photos, profile, lab/DEXA saves) logs
+-- the row as it was BEFORE the write, keyed by table + primary key (server/utils/audit.ts). That
+-- before-image is what makes a delete or an overwrite recoverable from /tools/data: restoring
+-- puts it back (and is itself logged, so a restore can be undone). Demo-sandbox writes and
+-- automated ones (Health Auto Export webhook, Whoop sync, digests) are not logged. The weekly
+-- audit:purge task drops entries after a year and, for photo deletes 30+ days old, removes the
+-- R2 files that the delete deliberately left in place (purged_at; no restore after that).
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at TEXT NOT NULL,             -- ISO timestamp
+  action TEXT NOT NULL,         -- 'create' | 'update' | 'delete' | 'restore'
+  table_name TEXT NOT NULL,
+  row_key TEXT NOT NULL,        -- the primary key value (date, id, or profile key), as text
+  summary TEXT,                 -- a short label for the history list ("Magnesium 400 mg")
+  before TEXT,                  -- JSON of the whole row before the write; NULL for a create
+  restored_at TEXT,             -- set once this entry has been restored
+  purged_at TEXT                -- photo deletes: set when the R2 files were finally removed
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_row ON audit_log(table_name, row_key);

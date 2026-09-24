@@ -22,12 +22,16 @@ const ROLES: readonly Role[] = ['owner', 'friend', 'doctor', 'demo'] as const
 export interface AuthContext {
   role: Role
   inviteId: string | null
+  /** When the token was minted (unix seconds); 0 for tokens from before `iat` existed. */
+  issuedAt: number
 }
 
 interface TokenPayload {
   r: string
   i?: string
   exp: number // unix seconds
+  /** Issued-at, unix seconds. Checked against the owner session cutoff (sign out everywhere). */
+  iat?: number
 }
 
 function signingKey(): string {
@@ -67,12 +71,13 @@ function verifyToken(token: string | undefined): TokenPayload | null {
 export function readAuthCookie(event: H3Event): AuthContext | null {
   const payload = verifyToken(getCookie(event, AUTH_COOKIE))
   if (!payload || !ROLES.includes(payload.r as Role)) return null
-  return { role: payload.r as Role, inviteId: payload.i ?? null }
+  return { role: payload.r as Role, inviteId: payload.i ?? null, issuedAt: payload.iat ?? 0 }
 }
 
 export function setAuthCookie(event: H3Event, role: Role, inviteId?: string, maxAge = SESSION_DAYS * 86400) {
-  const exp = Math.floor(Date.now() / 1000) + maxAge
-  setCookie(event, AUTH_COOKIE, mintToken({ r: role, ...(inviteId ? { i: inviteId } : {}), exp }), {
+  const iat = Math.floor(Date.now() / 1000)
+  const exp = iat + maxAge
+  setCookie(event, AUTH_COOKIE, mintToken({ r: role, ...(inviteId ? { i: inviteId } : {}), exp, iat }), {
     httpOnly: true,
     secure: true,
     maxAge,
@@ -134,8 +139,8 @@ export function requireRole(event: H3Event, ...roles: Role[]): AuthContext {
 // --- Upload PIN second factor: a signed session token (12h), not the PIN itself ---
 
 export function setUploadCookie(event: H3Event) {
-  const exp = Math.floor(Date.now() / 1000) + UPLOAD_SESSION_HOURS * 3600
-  setCookie(event, UPLOAD_COOKIE, mintToken({ r: 'upload', exp }), {
+  const iat = Math.floor(Date.now() / 1000)
+  setCookie(event, UPLOAD_COOKIE, mintToken({ r: 'upload', exp: iat + UPLOAD_SESSION_HOURS * 3600, iat }), {
     httpOnly: true,
     secure: true,
     path: '/',
@@ -143,11 +148,61 @@ export function setUploadCookie(event: H3Event) {
   })
 }
 
-export function requireUploadPin(event: H3Event) {
+/** Async since it reads the session cutoff: a PIN unlocked before "sign out everywhere" is dead too. */
+export async function requireUploadPin(event: H3Event) {
   const payload = verifyToken(getCookie(event, UPLOAD_COOKIE))
-  if (!payload || payload.r !== 'upload') {
+  if (!payload || payload.r !== 'upload' || (payload.iat ?? 0) < await ownerSessionCutoff(event)) {
     throw createError({ statusCode: 403, message: 'Upload PIN required' })
   }
+}
+
+// --- Sign out everywhere ---
+
+// Owner sessions are self-contained signed tokens, so there was no way to end one before its
+// 30 days ran out — a lost laptop stayed signed in. "Sign out everywhere" stores a cutoff time,
+// and any owner or upload token minted before it is refused (the middleware checks owner
+// sessions; requireUploadPin checks its own). Guests don't need this: revoking their invite
+// already ends every session it minted. Tokens from before `iat` existed read as issued at 0,
+// so the first cutoff signs them all out too.
+//
+// The cutoff lives in the RATE_LIMIT KV namespace under its own key rather than in D1: KV is read
+// at the edge, so an owner request pays microseconds for the check instead of a database round
+// trip. KV is eventually consistent (up to about a minute across locations), which is fine for a
+// panic button; the device that pressed it gets a fresh token at once.
+const CUTOFF_KEY = 'auth:owner-session-cutoff'
+// Per-isolate memo so a page's burst of API calls reads KV once, not per request.
+const CUTOFF_MEMO_MS = 15_000
+let cutoffMemo: { value: number, at: number } | null = null
+
+function sessionKv(event: H3Event): KVNamespace {
+  return (event.context.cloudflare.env as unknown as Env).RATE_LIMIT
+}
+
+/** Owner and upload tokens issued before this (unix seconds) are refused. 0 = no cutoff set. */
+export async function ownerSessionCutoff(event: H3Event): Promise<number> {
+  if (cutoffMemo && Date.now() - cutoffMemo.at < CUTOFF_MEMO_MS) return cutoffMemo.value
+  let value = 0
+  try {
+    value = Number(await sessionKv(event).get(CUTOFF_KEY)) || 0
+  }
+  catch (err) {
+    // An unreadable KV must not lock the owner out of their own site; log and allow.
+    console.error('session cutoff: KV read failed:', err instanceof Error ? err.message : err)
+  }
+  cutoffMemo = { value, at: Date.now() }
+  return value
+}
+
+/**
+ * Ends every owner session and upload unlock issued before now, on every device, then signs
+ * this device back in with a fresh token — so "sign out everywhere else" is one click.
+ */
+export async function signOutEverywhereElse(event: H3Event) {
+  const now = Math.floor(Date.now() / 1000)
+  await sessionKv(event).put(CUTOFF_KEY, String(now))
+  cutoffMemo = { value: now, at: Date.now() }
+  setAuthCookie(event, 'owner')
+  deleteCookie(event, UPLOAD_COOKIE, { path: '/' })
 }
 
 // --- Invites ---
