@@ -15,6 +15,7 @@
 import { z } from 'zod'
 import { isIsoDate } from './time.ts'
 import { DOSE_UNIT_VALUES } from '../types/journal.ts'
+import { PHOTO_CATEGORIES, type PhotoCategory } from './photoCategories.ts'
 
 /** A real YYYY-MM-DD calendar day (rejects 2026-13-40, which `new Date()` would roll forward). */
 export const zIsoDate = z.string().refine(isIsoDate, 'expected a YYYY-MM-DD date')
@@ -199,6 +200,21 @@ export const zPhotoUpdate = z.object({
   frameScale: z.number().finite().positive().max(100).optional()
 })
 
+const PHOTO_CATEGORY_VALUES = PHOTO_CATEGORIES.map(c => c.value) as [PhotoCategory, ...PhotoCategory[]]
+
+// The upload endpoints take raw image bytes as the body (multipart parsing is real CPU on a
+// multi-MB photo), so their metadata rides in the query string — strings, hence z.coerce.
+export const zPhotoUploadQuery = z.object({
+  category: z.enum(PHOTO_CATEGORY_VALUES, 'Invalid or missing category'),
+  // The client's EXIF-resolved date. Optional, and a malformed one is dropped rather than
+  // refused: the handler falls back to parsing EXIF itself.
+  date: zIsoDate.optional().catch(undefined)
+})
+
+export const zPhotoThumbnailQuery = z.object({
+  id: z.coerce.number('Missing or invalid id').int('Missing or invalid id').positive('Missing or invalid id')
+})
+
 export const zVaccinationSave = z.object({
   id: zId.optional(),
   date: zIsoDate,
@@ -297,6 +313,15 @@ export const zInviteCreate = z.object({
 export const zInviteRevoke = z.object({
   // A sha256 hex digest; anything much longer isn't an invite id.
   id: z.string().min(1).max(128)
+})
+
+// --- Whoop OAuth ---
+
+// Whoop redirects back with ?code&state, or with ?error=… when the grant was declined — which
+// has no code and fails here as the 400 it always was.
+export const zWhoopCallbackQuery = z.object({
+  code: z.string().min(1).max(2048),
+  state: z.string().min(1).max(256)
 })
 
 // --- shared by the delete endpoints ---

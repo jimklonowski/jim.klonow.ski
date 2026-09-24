@@ -4,8 +4,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   zAsk, zCycleSave, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalSave, zLabsSave,
-  zPasswordLogin, zPhotoUpdate, zPinLogin, zProfileSave, zRedeem, zSodaAdd, zSodaRemove, zSupplementSave,
-  zVaccinationSave, zVialOpen, zVialParse, zVialSave
+  zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zProfileSave, zRedeem, zSodaAdd,
+  zSodaRemove, zSupplementSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
 
 /** The first failure message, or null when the value parsed. */
@@ -223,4 +223,24 @@ test('Health Auto Export webhook keeps good items and drops malformed ones inste
   assert.deepEqual(out.data.metrics.map(m => [m.name, m.data.length]), [['body_mass', 1], ['resting_heart_rate', 0]])
   assert.equal(out.data.workouts.length, 1)
   assert.deepEqual(zHealthWebhook.parse({}), { data: { metrics: [], workouts: [] } })
+})
+
+test('photo upload query: a known category, and a bad client date falls back to EXIF', () => {
+  assert.deepEqual(zPhotoUploadQuery.parse({ category: 'crown', date: '2026-09-22' }), { category: 'crown', date: '2026-09-22' })
+  assert.deepEqual(zPhotoUploadQuery.parse({ category: 'chest', date: '2026-02-30' }), { category: 'chest', date: undefined })
+  assert.equal(problem(zPhotoUploadQuery, { category: 'legs' }), 'category: Invalid or missing category')
+  assert.equal(problem(zPhotoUploadQuery, {}), 'category: Invalid or missing category')
+})
+
+test('photo thumbnail query: the id arrives as a string and must be a row id', () => {
+  assert.deepEqual(zPhotoThumbnailQuery.parse({ id: '42' }), { id: 42 })
+  for (const id of [undefined, '', 'abc', '1.5', '0', '-3']) {
+    assert.equal(problem(zPhotoThumbnailQuery, { id }), 'id: Missing or invalid id', `id=${id}`)
+  }
+})
+
+test('whoop callback query: a declined grant (error, no code) is refused', () => {
+  assert.deepEqual(zWhoopCallbackQuery.parse({ code: 'abc', state: 'uuid', scope: 'x' }), { code: 'abc', state: 'uuid' })
+  assert.match(problem(zWhoopCallbackQuery, { error: 'access_denied', state: 'uuid' }), /^code:/)
+  assert.match(problem(zWhoopCallbackQuery, { code: ['a', 'b'], state: 'uuid' }), /^code:/)
 })
