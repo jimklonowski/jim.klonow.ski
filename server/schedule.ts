@@ -15,9 +15,13 @@ export const SCHEDULED_TASKS: Record<string, string[]> = {
   '0 11 * * *': ['whoop:sync'],
   // Digests run after the morning Whoop sync (11:00) and Apple Health export have landed.
   '0 14 * * *': ['digest:daily'],
-  '0 15 * * 1': ['digest:weekly'],
+  // Day-of-week is always a three-letter name here. Cloudflare numbers the days 1 = Sunday … 7 =
+  // Saturday, not the usual 0 = Sunday: this cron was written `* * 1` meaning Monday and has fired
+  // on Sundays all along (which is the week the digests have always covered, Sun–Sat, so SUN
+  // keeps it), and a `0` for Sunday is rejected outright and fails the deploy.
+  '0 15 * * SUN': ['digest:weekly'],
   // Weekly D1 backup to R2, Sunday 08:00 UTC (the small hours in Chicago, nothing else running).
-  '0 8 * * 0': ['db:backup']
+  '0 8 * * SUN': ['db:backup']
 }
 
 /**
