@@ -1,8 +1,8 @@
 -- One-time seed for the supplements table — the stack as of 2026-08-24. Do NOT re-run after it
 -- lands on an environment: rows are plain INSERTs and would duplicate.
 --
---   npx wrangler d1 execute jim-klonow-ski-db --local  --file server/database/seed-supplements.sql
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/seed-supplements.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --local  --file server/database/archive/seed-supplements.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/seed-supplements.sql
 INSERT INTO supplements (name, dose, category, status, schedule, started, stopped, notes, sort, created_at) VALUES
   -- Daily oral stack
   ('Vitamin D3 + K2',             NULL,                 'supplement', 'active', 'daily',    NULL, NULL, NULL, 10, '2026-08-24T00:00:00.000Z'),

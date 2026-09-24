@@ -73,7 +73,7 @@ export default defineTask({
       if (missing.length) problems.push(`${name}: no column ${missing.join(', ')}`)
     }
     if (problems.length) {
-      const error = `demo schema is behind the seed — ${problems.join('; ')}. Apply server/database/schema.sql to the demo DB.`
+      const error = `demo schema is behind the seed — ${problems.join('; ')}. Run pnpm db:migrate:remote.`
       console.error(`demo:reset skipped: ${error}`)
       return { result: { error } }
     }

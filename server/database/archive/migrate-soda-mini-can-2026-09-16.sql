@@ -4,7 +4,7 @@
 -- on journal_entries, so the rows logged under the old spelling are rewritten here to match —
 -- otherwise the quick-add header and today's list would show two spellings of the same can.
 --
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/migrate-soda-mini-can-2026-09-16.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/migrate-soda-mini-can-2026-09-16.sql
 --
 -- Idempotent: the WHERE clause only matches rows still holding the old spelling, so a re-run is a
 -- no-op. Both write paths store minified JSON (soda.post.ts goes through json()/json_insert,

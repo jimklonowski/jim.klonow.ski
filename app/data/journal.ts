@@ -32,7 +32,7 @@ export const SODA_DRINKS = [
 ]
 
 // Sizes are stored as freeform strings on each soda entry, so renaming one here means migrating
-// the rows that already hold the old spelling (see server/database/migrate-soda-mini-can-2026-09-16.sql).
+// the rows that already hold the old spelling (see server/database/archive/migrate-soda-mini-can-2026-09-16.sql).
 export const SODA_SIZES = [
   '7.5oz mini can', '12oz can', '20oz bottle', 'Fountain - small', 'Fountain - medium', 'Fountain - large'
 ]

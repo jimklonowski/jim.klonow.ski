@@ -5,7 +5,7 @@
 -- hairline rows stay put. r2_key is the match column because it embeds the upload timestamp and
 -- is identical locally and remote, unlike anything a re-import could renumber.
 --
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/migrate-photo-crown-2026-09-17.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/migrate-photo-crown-2026-09-17.sql
 --
 -- Expected: 8 changes. Idempotent: rows already moved no longer match category = 'hairline'.
 -- The R2 objects are untouched — their '-hairline-' filename segment is an opaque handle, nothing

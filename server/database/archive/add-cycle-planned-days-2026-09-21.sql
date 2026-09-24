@@ -5,5 +5,5 @@
 -- shared/utils/cycles.ts.
 --
 -- Main DB only: the demo DB has no cycles table (api/journal/cycles/list.get.ts).
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/add-cycle-planned-days-2026-09-21.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/add-cycle-planned-days-2026-09-21.sql
 ALTER TABLE cycles ADD COLUMN planned_days INTEGER;

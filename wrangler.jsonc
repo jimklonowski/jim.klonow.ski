@@ -14,16 +14,20 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  // Both databases share one migrations folder, so the demo sandbox's schema can never fall
+  // behind the real one (pnpm db:migrate applies to both; each keeps its own d1_migrations ledger).
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "jim-klonow-ski-db",
-      "database_id": "03e6065f-e6e1-4a3d-ad03-d70d675a0bf3"
+      "database_id": "03e6065f-e6e1-4a3d-ad03-d70d675a0bf3",
+      "migrations_dir": "server/database/migrations"
     },
     {
       "binding": "DEMO_DB",
       "database_name": "jim-klonow-ski-demo",
-      "database_id": "9e257a44-de08-4422-888d-f4d92e81f720"
+      "database_id": "9e257a44-de08-4422-888d-f4d92e81f720",
+      "migrations_dir": "server/database/migrations"
     }
   ],
   "r2_buckets": [

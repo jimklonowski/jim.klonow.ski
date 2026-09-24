@@ -9,8 +9,8 @@
 -- Existing rows are a live connection that has never errored — the defaults backfill exactly
 -- that, so applying this changes nothing about the current connection.
 --
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/add-whoop-sync-state-2026-09-22.sql -y
---   npx wrangler d1 execute jim-klonow-ski-db --local  --file server/database/add-whoop-sync-state-2026-09-22.sql -y
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/add-whoop-sync-state-2026-09-22.sql -y
+--   npx wrangler d1 execute jim-klonow-ski-db --local  --file server/database/archive/add-whoop-sync-state-2026-09-22.sql -y
 
 ALTER TABLE whoop_tokens ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE whoop_tokens ADD COLUMN last_synced_at TEXT;
