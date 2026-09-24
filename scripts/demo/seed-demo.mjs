@@ -8,7 +8,8 @@
 //   pnpm demo:seed:remote    — the real Cloudflare resources (requires wrangler login)
 //
 // NOTE: `pnpm sync:local` deletes ALL of .wrangler/state/v3/d1 (demo DB included) when it
-// re-baselines from prod — re-run the local schema commands + `pnpm demo:seed:local` after it.
+// re-baselines from prod — run `pnpm db:migrate` (builds the empty demo DB) and then
+// `pnpm demo:seed:local` after it.
 //
 // The date-materialization logic here is duplicated in server/tasks/demo/reset.ts (the task
 // can't import from scripts/) — keep the two in sync.

@@ -4,8 +4,8 @@
 // Hashing each existing id IN PLACE keeps every already-issued link working: the URL still
 // carries the token, and /api/auth/redeem hashes what it receives before looking the row up.
 //
-//   node scripts/hash-invite-tokens.mjs --local
-//   node scripts/hash-invite-tokens.mjs --remote
+//   node server/database/archive/hash-invite-tokens.mjs --local
+//   node server/database/archive/hash-invite-tokens.mjs --remote
 //
 // Idempotent — a row whose id is already 64 hex characters is left alone, so re-running is a
 // no-op. SQLite has no sha256(), which is why this is a script rather than a .sql migration.

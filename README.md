@@ -117,7 +117,7 @@ Deliberately not enabled — with reasoning in the config comments: `xssValidato
 
 ## Data & integrations
 
-- All entries (journal, labs, DEXA, health metrics, workouts, vials, cycles, digests, invites) live in **D1** — see `server/database/schema.sql`.
+- All entries (journal, labs, DEXA, health metrics, workouts, vials, cycles, digests, invites) live in **D1**. `server/database/schema.sql` is the commented schema. The databases themselves are built and changed by the numbered wrangler migrations in `server/database/migrations`.
 - Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary.
 - **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/workout data on a schedule into `health_metrics` and `workouts`.
 - **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/tools/import`).
@@ -140,9 +140,12 @@ pnpm sync:local:r2  # top up local R2 objects only (PDFs/photos referenced by lo
 pnpm demo:generate    # regenerate the synthetic demo persona (scripts/demo/demo-seed.json)
 pnpm demo:seed:local  # wipe + reseed the local demo sandbox DB and R2 objects
 pnpm demo:seed:remote # same against the production DEMO_DB + buckets
+pnpm db:new <name>    # new numbered migration in server/database/migrations
+pnpm db:migrate       # apply pending migrations to both local DBs (main + demo)
+pnpm db:status        # applied/pending per local DB (db:status:remote for the real ones)
 ```
 
-`pnpm sync:local` clears all local D1 state (the demo DB included) — re-apply `server/database/schema.sql` to `jim-klonow-ski-demo --local` and re-run `pnpm demo:seed:local` afterwards.
+`pnpm sync:local` clears all local D1 state, the demo DB included. Afterwards run `pnpm db:migrate`, which rebuilds the empty demo DB and applies anything newer than prod, then `pnpm demo:seed:local`.
 
 ## Deploy
 
@@ -151,8 +154,10 @@ pnpm deploy     # nuxt build + wrangler deploy
 pnpm preview    # local Wrangler Workers emulator
 ```
 
-Schema changes (new tables in `server/database/schema.sql`, plus any one-time `ALTER TABLE` migrations noted at the bottom of that file — run those by hand, once) must be applied to remote D1 before deploying:
+Schema changes are numbered migrations (`pnpm db:new <name>`), mirrored into `server/database/schema.sql` in the same change. `pnpm test` fails if replaying the migrations doesn't reproduce that file. Apply them to both remote databases before deploying code that needs them:
 
 ```bash
-npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/schema.sql
+pnpm db:migrate:remote   # main + demo; each database records what it has applied in d1_migrations
 ```
+
+The one-off files applied by hand before the ledger existed are in `server/database/archive`.

@@ -1,7 +1,7 @@
 -- One-time data fix, 2026-09-15. Every statement re-checks its own precondition, so the file is
 -- idempotent — safe to run against local and remote, and harmless if run twice.
 --
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/fix-labs-units-2026-09-15.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/fix-labs-units-2026-09-15.sql
 --
 -- Three parts: the fasting flag on the CHW draws, the K/uL → cells/uL differential, and a backfill
 -- of the CHW-only markers on all three CHW rows. After running it on remote, hit "regen" on the 2026-09-09 AI

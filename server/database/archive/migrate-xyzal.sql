@@ -4,8 +4,8 @@
 -- Mirrors seed-supplements.sql. Equivalent to doing it by hand on /journal/supplements — run
 -- one or the other, not both, and do NOT re-run (the INSERT would duplicate).
 --
---   npx wrangler d1 execute jim-klonow-ski-db --local  --file server/database/migrate-xyzal.sql
---   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/migrate-xyzal.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --local  --file server/database/archive/migrate-xyzal.sql
+--   npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/archive/migrate-xyzal.sql
 UPDATE supplements
 SET name = 'Allergy pill (OTC antihistamine)', status = 'stopped', stopped = '2026-09-01', sort = 150,
     notes = 'Daily for a long stretch; the 300-count bottle ran out and was replaced by Xyzal'

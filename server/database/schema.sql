@@ -1,3 +1,16 @@
+-- The current schema, with the reasoning behind each table — a snapshot for reading, NOT what
+-- builds a database. Databases are built and changed by the numbered files in ./migrations,
+-- applied by wrangler and recorded in each database's d1_migrations ledger:
+--
+--   pnpm db:new <name>        new migration file (next number) in ./migrations
+--   pnpm db:migrate           apply pending migrations to both local databases (main + demo)
+--   pnpm db:migrate:remote    the same against the real ones — before deploying code that needs it
+--   pnpm db:status[:remote]   what each database has applied
+--
+-- A schema change is a migration AND the matching edit here, in the same change:
+-- tests/migrations.test.mjs replays every migration and fails if the result differs from this file.
+-- The one-off files applied by hand before the ledger existed (2026-09-24) are in ./archive.
+
 CREATE TABLE IF NOT EXISTS journal_entries (
   date TEXT PRIMARY KEY,
   day INTEGER,
@@ -238,98 +251,3 @@ CREATE TABLE IF NOT EXISTS profile (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-
--- One-time migration, do not re-run after it lands on an environment:
--- ALTER TABLE labs_entries ADD COLUMN ai_summary TEXT;
-
--- One-time migration, do not re-run after it lands on an environment:
--- ALTER TABLE progress_photos ADD COLUMN thumb_r2_key TEXT;
-
--- One-time migration, do not re-run after it lands on an environment:
--- ALTER TABLE progress_photos ADD COLUMN frame_offset_x REAL NOT NULL DEFAULT 0;
--- ALTER TABLE progress_photos ADD COLUMN frame_offset_y REAL NOT NULL DEFAULT 0;
--- ALTER TABLE progress_photos ADD COLUMN frame_scale REAL NOT NULL DEFAULT 1;
-
--- One-time migration, do not re-run after it lands on an environment:
--- ALTER TABLE health_metrics ADD COLUMN recovery_score REAL;
--- ALTER TABLE health_metrics ADD COLUMN strain REAL;
--- ALTER TABLE health_metrics ADD COLUMN sleep_performance_pct REAL;
-
--- One-time migration, do not re-run after it lands on an environment:
--- ALTER TABLE journal_entries ADD COLUMN sodas TEXT NOT NULL DEFAULT '[]';
-
--- One-time seed, do not re-run after it lands on an environment (plain INSERTs, would duplicate):
--- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/seed-supplements.sql
-
--- One-time migration, do not re-run after it lands on an environment.
--- Folds the retired freehand `workout` field into `notes` (structured workouts now come from
--- the `workouts` table via Whoop sync) before dropping the column, so no historical text is lost:
--- UPDATE journal_entries
--- SET notes = CASE
---   WHEN notes IS NOT NULL AND notes != '' THEN notes || char(10) || char(10) || 'Workout: ' || workout
---   ELSE 'Workout: ' || workout
--- END
--- WHERE workout IS NOT NULL AND workout != '';
--- ALTER TABLE journal_entries DROP COLUMN workout;
-
--- One-time migration, do not re-run after it lands on an environment.
--- Allergy-pill switch (2026-09-01): the old OTC bottle ran out and was replaced by Xyzal.
--- Retires the generic row rather than renaming it, so the "recently discontinued" context the
--- digest and labs prompts read still shows the changeover. Mirrors seed-supplements.sql.
--- Equivalent to doing it by hand on /journal/supplements — run one or the other, not both:
--- UPDATE supplements
--- SET name = 'Allergy pill (OTC antihistamine)', status = 'stopped', stopped = '2026-09-01', sort = 150,
---     notes = 'Daily for a long stretch; the 300-count bottle ran out and was replaced by Xyzal'
--- WHERE name = 'Allergy pill';
--- INSERT INTO supplements (name, dose, category, status, schedule, started, stopped, notes, sort, created_at) VALUES
---   ('Xyzal (levocetirizine)', '5 mg', 'supplement', 'active', 'daily', '2026-09-01', NULL,
---    'Replaced the prior OTC allergy pill when that bottle ran out. Levocetirizine can be mildly sedating — worth weighing when sleep or HRV shifts',
---    120, '2026-09-01T00:00:00.000Z');
-
--- One-time migration, do not re-run after it lands on an environment:
--- Tentative cycle starts (2026-09-03). Existing rows all have real picked dates, so the
--- 'day' default backfills them correctly and nothing changes for them.
--- ALTER TABLE cycles ADD COLUMN start_precision TEXT NOT NULL DEFAULT 'day';
-
--- One-time migration, do not re-run after it lands on an environment.
--- Pill bottles in the inventory (2026-09-04). Every existing row is a vial, which is what the
--- 'vial' default backfills. Run it against the demo DB too (jim-klonow-ski-demo, remote and
--- local) — its nightly reset re-inserts the seed into the existing table, it doesn't recreate it:
--- ALTER TABLE vials ADD COLUMN form TEXT NOT NULL DEFAULT 'vial';
--- ALTER TABLE vials ADD COLUMN unit_count INTEGER;
-
--- One-time migration (2026-09-09): the vaccinations and profile tables above are created by
--- running this file (CREATE TABLE IF NOT EXISTS); the three shots that prompted the log are a
--- separate one-time seed — plain INSERTs, equivalent to adding them by hand on /journal/vaccines,
--- so do one or the other:
--- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/schema.sql
--- npx wrangler d1 execute jim-klonow-ski-db --remote --file server/database/seed-vaccinations.sql
-
--- One-time migration, do not re-run after it lands on an environment.
--- Day-exact cycle spans (2026-09-21). Some protocols are not a whole number of weeks — a 10-day
--- iron load, say — and weeks could not express them (10 days is 1.43 weeks, not 1.5). NULL means
--- "span is planned_weeks * 7", which is how every existing row already reads, so the backfill is
--- a no-op. planned_weeks stays authoritative for week-relative item windows and is rounded up to
--- cover the days. The demo DB has no cycles table (see api/journal/cycles/list.get.ts), so this
--- one is main-DB only:
--- ALTER TABLE cycles ADD COLUMN planned_days INTEGER;
-
--- One-time migration, do not re-run after it lands on an environment.
--- Whoop sync state (2026-09-22). Makes a broken connection visible: `revoked` is set when Whoop
--- rejects the refresh token (only a reconnect clears it), and last_synced_at/last_error let the
--- journal header say "last synced 3 days ago" instead of a bare green check. Existing rows are a
--- live connection that has never errored, which is exactly what the defaults backfill. The demo DB
--- has no Whoop connection, so this one is main-DB only — but the file is also in schema.sql above,
--- so a fresh database gets the columns without running this:
--- ALTER TABLE whoop_tokens ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0;
--- ALTER TABLE whoop_tokens ADD COLUMN last_synced_at TEXT;
--- ALTER TABLE whoop_tokens ADD COLUMN last_error TEXT;
--- ALTER TABLE whoop_tokens ADD COLUMN last_error_at TEXT;
-
--- One-time migration (2026-09-22), main DB only — NOT expressible as SQL: `invites.id` changed
--- from the raw share token to sha256(token), and SQLite has no sha256(). Run the script, which
--- rehashes each existing row in place so already-issued links keep working:
---   node scripts/hash-invite-tokens.mjs --remote
---   node scripts/hash-invite-tokens.mjs --local
--- It is idempotent (rows already keyed by a 64-char hex digest are skipped). Guests holding a
--- session cookie minted before the migration are signed out and need to re-open their link.

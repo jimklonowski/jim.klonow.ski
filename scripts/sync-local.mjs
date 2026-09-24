@@ -46,4 +46,7 @@ finally {
 console.log('\n[4/4] Mirroring R2 objects (PDFs/photos) to local...')
 run('node scripts/sync-r2-local.mjs')
 
-console.log('\nLocal environment now mirrors prod. Restart `pnpm dev`.')
+// The dump carries prod's d1_migrations ledger, so the local main DB reports exactly what prod has
+// applied; the demo DB was wiped with the rest of the local state and starts empty.
+console.log('\nLocal environment now mirrors prod. Next: `pnpm db:migrate` (applies anything newer than prod,')
+console.log('and rebuilds the empty local demo DB), `pnpm demo:seed:local`, then restart `pnpm dev`.')

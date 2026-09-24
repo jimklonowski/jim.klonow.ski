@@ -4,7 +4,7 @@
 //
 // 'hairline' and 'crown' were a single 'hairline' bucket until 2026-09-17: the front/forehead
 // shots stayed 'hairline', the straight-down top-of-head shots moved to 'crown'
-// (server/database/migrate-photo-crown-2026-09-17.sql). R2 object keys embed the category the
+// (server/database/archive/migrate-photo-crown-2026-09-17.sql). R2 object keys embed the category the
 // photo was uploaded under and are never rewritten — the key is an opaque handle.
 export const PHOTO_CATEGORIES = [
   { value: 'chest', label: 'Chest' },
