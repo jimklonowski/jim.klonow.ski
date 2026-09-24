@@ -60,9 +60,17 @@ export function sanitizeQualitative(input: unknown): Array<{ name: string, resul
  * handed to an authenticated reader, so an attacker-supplied `sources` entry would turn a lab row
  * into a link to some other object in the bucket.
  */
+/**
+ * A lab PDF's object key: a flat "[Description]-[YYYY-MM-DD].pdf"-style name. Nothing else in the
+ * labs bucket may leave through the PDF proxy — it also holds prefixed objects (demo/seed.json,
+ * backups/d1/…), and the proxy's single path segment decodes %2F, so without this check any
+ * friend or doctor session could fetch the weekly database backup by guessing its name.
+ */
+export function isLabPdfKey(key: string): boolean {
+  return SAFE_PDF_NAME.test(key) && !key.includes('/') && !key.includes('\\')
+}
+
 export function sanitizeSources(input: unknown): string[] {
   if (!Array.isArray(input)) return []
-  return [...new Set(
-    input.filter((s): s is string => typeof s === 'string' && SAFE_PDF_NAME.test(s) && !s.includes('/') && !s.includes('\\'))
-  )].slice(0, 20)
+  return [...new Set(input.filter((s): s is string => typeof s === 'string' && isLabPdfKey(s)))].slice(0, 20)
 }

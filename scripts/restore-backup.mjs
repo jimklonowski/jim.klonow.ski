@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+// Turns a weekly D1 backup (server/tasks/db/backup.ts) back into SQL:
+//
+//   npx wrangler r2 object get jim-klonow-ski-labs/backups/d1/jim-klonow-ski-db/<date>.json.gz --remote --file <tmp>/backup.json.gz
+//   node scripts/restore-backup.mjs <tmp>/backup.json.gz <tmp>/restore.sql
+//   npx wrangler d1 execute jim-klonow-ski-db --local --file <tmp>/restore.sql
+//
+// The SQL replaces each backed-up table's rows (DELETE + INSERT), so run it against a database
+// already at the backup's schema: `pnpm db:migrate` builds one, and the header of the output
+// names the migrations the source had applied. Rehearse on --local before ever pointing it at
+// --remote. The backup is the whole health history in plaintext once unzipped — keep both files
+// out of the repo (it's public) and delete them when done.
+import { readFileSync, writeFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
+import { backupToSql } from '../shared/utils/backup.ts'
+
+const [input, output] = process.argv.slice(2)
+if (!input || !output) {
+  console.error('Usage: node scripts/restore-backup.mjs <backup.json.gz> <restore.sql>')
+  process.exit(1)
+}
+
+const backup = JSON.parse(gunzipSync(readFileSync(input)).toString('utf8'))
+writeFileSync(output, backupToSql(backup))
+
+const counts = Object.entries(backup.tables).map(([name, t]) => `${name} ${t.rows.length}`).join(', ')
+console.log(`${backup.database} as of ${backup.created_at} → ${output}`)
+console.log(`  ${counts}`)
+console.log(`  schema: ${backup.migrations.join(', ') || 'unknown'}`)

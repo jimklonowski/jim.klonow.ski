@@ -251,3 +251,21 @@ CREATE TABLE IF NOT EXISTS profile (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+-- Scheduled-task run log (2026-09-24, migration 0002). One row per run of every cron task —
+-- demo:reset, whoop:sync, digest:daily/weekly, db:backup — written by runLoggedTask
+-- (server/utils/taskRuns.ts). The tasks rethrow after logging, so a failure is both a row here
+-- and a failed invocation in Cloudflare's cron log. /api/health reads each task's last good run
+-- against its cadence. `result` is the task's small JSON summary; rows older than 90 days are
+-- pruned as new runs land. Written to the main DB only (the demo DB has the table, unused).
+CREATE TABLE IF NOT EXISTS task_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task TEXT NOT NULL,
+  started_at TEXT NOT NULL,   -- ISO timestamp
+  finished_at TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  ok INTEGER NOT NULL,        -- 1 = finished cleanly, 0 = threw
+  result TEXT,                -- JSON summary on success
+  error TEXT                  -- the error message on failure
+);
+CREATE INDEX IF NOT EXISTS idx_task_runs_task_started ON task_runs(task, started_at);
