@@ -6,7 +6,7 @@
     "enabled": true
   },
   "packageRules": [{
-    "matchDepTypes": ["resolutions"],
+    "matchDepTypes": ["pnpm-workspace.overrides"],
     "enabled": false
   }],
   "postUpdateOptions": ["pnpmDedupe"]

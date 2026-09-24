@@ -2,7 +2,6 @@ allowBuilds:
   '@parcel/watcher': true
   better-sqlite3: true
   esbuild: true
-  maplibre-gl: true
   sharp: true
   unrs-resolver: true
   vue-demi: true
@@ -19,14 +18,22 @@ minimumReleaseAgeExclude:
 # multiple Vue patch releases (3.5.38/39/40) side by side, which made Nuxt UI's ULink /
 # vue-router `custom` slot receive undefined props during production SSR — crashing every
 # page with a header/link on hard reload ("Cannot destructure property 'href' of undefined").
+# The version lives once, in the catalog below: package.json's vue is `catalog:`, and the
+# overrides reuse the same value through the YAML anchor, so bumping that one line moves the
+# whole tree. These used to be literal versions and drifted (vue 3.5.43 over @vue/* 3.5.41,
+# plus a stray vue 3.5.42 copy).
+catalog:
+  vue: &vue 3.5.43
+
 overrides:
   tslib: 2.8.1
-  '@vue/shared': 3.5.41
-  '@vue/reactivity': 3.5.41
-  '@vue/runtime-core': 3.5.41
-  '@vue/runtime-dom': 3.5.41
-  '@vue/server-renderer': 3.5.41
-  '@vue/compiler-core': 3.5.41
-  '@vue/compiler-dom': 3.5.41
-  '@vue/compiler-sfc': 3.5.41
-  '@vue/compiler-ssr': 3.5.41
+  vue: *vue
+  '@vue/shared': *vue
+  '@vue/reactivity': *vue
+  '@vue/runtime-core': *vue
+  '@vue/runtime-dom': *vue
+  '@vue/server-renderer': *vue
+  '@vue/compiler-core': *vue
+  '@vue/compiler-dom': *vue
+  '@vue/compiler-sfc': *vue
+  '@vue/compiler-ssr': *vue

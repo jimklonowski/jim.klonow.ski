@@ -9,6 +9,11 @@ const FIELD_OUTLINE = 'text-highlighted bg-raised ring ring-inset ring-accented'
 // components one `:ui` prop at a time; 17 selects never got it and still had the flat look.
 const PANEL = 'bg-raised border border-line-accent ring-0'
 
+// The .tui-label look (main.css) spelled out as utilities for component themes. The class itself
+// sits in the components layer, so the theme's own utilities outrank it: on form labels Nuxt UI's
+// `text-default` won and every label rendered in body color instead of faint.
+const TUI_LABEL = 'text-[10.5px] font-medium tracking-[0.14em] uppercase text-faint'
+
 export default defineAppConfig({
   ui: {
     colors: {
@@ -23,7 +28,7 @@ export default defineAppConfig({
     // Menus read at 12px across the site; the md size's text-sm lives in the size variant.
     dropdownMenu: { slots: { content: PANEL }, variants: { size: { md: { item: 'text-[12px]' } } } },
     // Every form label is the uppercase TUI label.
-    formField: { slots: { label: 'tui-label' } },
+    formField: { slots: { label: TUI_LABEL } },
     input: { variants: { variant: { outline: FIELD_OUTLINE } } },
     inputMenu: { slots: { content: PANEL }, variants: { variant: { outline: FIELD_OUTLINE } } },
     inputNumber: { variants: { variant: { outline: FIELD_OUTLINE } } },
@@ -33,12 +38,10 @@ export default defineAppConfig({
     popover: { slots: { content: PANEL } },
     select: { slots: { content: PANEL }, variants: { variant: { outline: FIELD_OUTLINE } } },
     selectMenu: { slots: { content: PANEL }, variants: { variant: { outline: FIELD_OUTLINE } } },
-    // Terminal tables: tui-label headers, compact 12.5px rows, zebra striping on the inset
-    // surface. The header look is spelled out as utilities rather than `tui-label`: that class
-    // sits in the components layer, where the theme's own `text-sm` would outrank it.
+    // Terminal tables: TUI-label headers, compact 12.5px rows, zebra striping on the inset surface.
     table: {
       slots: {
-        th: 'px-2.5 py-1.5 text-start text-[10.5px] font-medium tracking-[0.14em] uppercase text-faint [&:has([role=checkbox])]:pe-0',
+        th: `px-2.5 py-1.5 text-start ${TUI_LABEL} [&:has([role=checkbox])]:pe-0`,
         td: 'px-2.5 py-1.5 text-[12.5px] text-body whitespace-nowrap [&:has([role=checkbox])]:pe-0',
         tbody: 'divide-y divide-line-soft [&>tr:nth-child(even)]:bg-inset',
         separator: 'bg-line'

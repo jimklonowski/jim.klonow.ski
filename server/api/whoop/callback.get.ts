@@ -1,3 +1,5 @@
+import { zWhoopCallbackQuery } from '#shared/utils/schemas'
+
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 
 export default defineEventHandler(async (event) => {
@@ -5,14 +7,12 @@ export default defineEventHandler(async (event) => {
   // shouldn't be the only gate on storing new tokens.
   requireOwner(event)
 
-  const query = getQuery(event)
-  const code = typeof query.code === 'string' ? query.code : null
-  const state = typeof query.state === 'string' ? query.state : null
-
+  // The state cookie is single-use: cleared before anything can reject the callback.
   const expectedState = getCookie(event, 'whoop-oauth-state')
   deleteCookie(event, 'whoop-oauth-state', { path: '/' })
 
-  if (!code || !state || !expectedState || state !== expectedState) {
+  const { code, state } = validatedQuery(event, zWhoopCallbackQuery)
+  if (!expectedState || state !== expectedState) {
     throw createError({ statusCode: 400, message: 'Invalid Whoop OAuth callback' })
   }
 

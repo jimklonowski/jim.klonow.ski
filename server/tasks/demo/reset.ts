@@ -8,7 +8,7 @@ import { localDaysAgo } from '#shared/utils/time'
 // alive without the seed ever going stale.
 //
 // The seed lives in R2 instead of the bundle so ~180 KB of fixture JSON doesn't ride along
-// in the Worker (free-plan size ceiling). Bindings come straight off the env — never
+// in the Worker bundle. Bindings come straight off the env — never
 // getDb(), which is role-routed and has no auth context in a cron anyway.
 //
 // The @D<n> materialization below mirrors scripts/demo/seed-demo.mjs — keep the two in sync.
