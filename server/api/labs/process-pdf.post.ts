@@ -176,7 +176,7 @@ Rules:
 
 export default defineEventHandler(async (event) => {
   requireOwner(event)
-  requireUploadPin(event)
+  await requireUploadPin(event)
 
   const formData = await readMultipartFormData(event)
   if (!formData?.length) {

@@ -21,6 +21,9 @@ export default defineEventHandler(async (event) => {
       .first<{ revoked: number }>()
     if (!row || row.revoked) auth = null
   }
+  // Owner sessions die with the "sign out everywhere" cutoff (server/utils/auth.ts). Only owner
+  // tokens pay for the check; guests are covered by invite liveness above, demo by its 24h life.
+  if (auth?.role === 'owner' && auth.issuedAt < await ownerSessionCutoff(event)) auth = null
   event.context.auth = auth
 
   if (isApi) return // endpoints enforce their own requirements

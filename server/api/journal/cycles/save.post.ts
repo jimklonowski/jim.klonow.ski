@@ -66,12 +66,14 @@ export default defineEventHandler(async (event) => {
   const db = getDb(event)
 
   if (body.id != null) {
+    const before = await auditBefore(event, 'cycles', body.id)
     await db.prepare(`
       UPDATE cycles SET
         name = ?2, goal = ?3, start_date = ?4, start_precision = ?5, planned_weeks = ?6,
         planned_days = ?7, actual_end = ?8, compounds = ?9, notes = ?10
       WHERE id = ?1
     `).bind(body.id, name, goal, startDate, precision, weeks, days, actualEnd, compounds, notes).run()
+    await recordAudit(event, { table: 'cycles', key: body.id, before, summary: name })
     return { ok: true, id: body.id }
   }
 
@@ -79,6 +81,7 @@ export default defineEventHandler(async (event) => {
     INSERT INTO cycles (name, goal, start_date, start_precision, planned_weeks, planned_days, actual_end, compounds, notes, created_at)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
   `).bind(name, goal, startDate, precision, weeks, days, actualEnd, compounds, notes, new Date().toISOString()).run()
+  await recordAudit(event, { table: 'cycles', key: result.meta.last_row_id, before: null, summary: name })
 
   return { ok: true, id: result.meta.last_row_id }
 })

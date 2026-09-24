@@ -9,7 +9,7 @@ import { zLabsSave } from '#shared/utils/schemas'
 // key a row names, so an attacker-chosen entry would point a lab row at another bucket object.
 export default defineEventHandler(async (event) => {
   requireOwner(event)
-  requireUploadPin(event)
+  await requireUploadPin(event)
 
   const body = await readValidatedJson(event, zLabsSave)
   const { date } = body
@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
     if (weight == null) {
       throw createError({ statusCode: 400, message: 'DEXA scans need a numeric weight_lbs' })
     }
+    const before = await auditBefore(event, 'dexa_entries', date)
     await db.prepare(`
       INSERT INTO dexa_entries (date, weight_lbs, sources, total, regions, vat, ag_ratio, bone_density, symmetry)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
@@ -48,12 +49,14 @@ export default defineEventHandler(async (event) => {
       body.bone_density ? JSON.stringify(body.bone_density) : null,
       body.symmetry ? JSON.stringify(body.symmetry) : null
     ).run()
+    await recordAudit(event, { table: 'dexa_entries', key: date, before, summary: `DEXA ${date}` })
 
     return { ok: true, table: 'dexa_entries', date }
   }
 
   // Merge with any existing row for this date rather than replacing it outright —
   // lets multiple one-off single-result uploads for the same date add up instead of clobbering each other.
+  const before = await auditBefore(event, 'labs_entries', date)
   const existing = await db.prepare('SELECT fasting, sources, markers, qualitative FROM labs_entries WHERE date = ?1')
     .bind(date).first<{ fasting: number, sources: string, markers: string, qualitative: string }>()
 
@@ -95,6 +98,7 @@ export default defineEventHandler(async (event) => {
     JSON.stringify(mergedMarkers),
     JSON.stringify(mergedQualitative)
   ).run()
+  await recordAudit(event, { table: 'labs_entries', key: date, before, summary: `${reportType ?? 'bloodwork'} ${date}` })
 
   if (dropped.length) console.warn(`[labs] ${date}: ignored unrecognized marker keys — ${dropped.join(', ')}`)
 

@@ -7,7 +7,7 @@
 // No imports, and not under server/tasks/ (Nitro would treat it as a task there), so both
 // nuxt.config.ts and the plain node test runner can load it.
 
-/** Cron expression (UTC) → the Nitro tasks it runs, in order. */
+/** Cron expression (UTC) → the Nitro tasks it runs (concurrently — Nitro starts them all at once). */
 export const SCHEDULED_TASKS: Record<string, string[]> = {
   // Nightly demo-sandbox reset: discards visitor edits and re-anchors the synthetic persona's
   // relative dates so the demo always ends "yesterday" (see server/tasks/demo).
@@ -20,8 +20,9 @@ export const SCHEDULED_TASKS: Record<string, string[]> = {
   // on Sundays all along (which is the week the digests have always covered, Sun–Sat, so SUN
   // keeps it), and a `0` for Sunday is rejected outright and fails the deploy.
   '0 15 * * SUN': ['digest:weekly'],
-  // Weekly D1 backup to R2, Sunday 08:00 UTC (the small hours in Chicago, nothing else running).
-  '0 8 * * SUN': ['db:backup']
+  // Weekly D1 backup to R2 and the audit log's housekeeping, Sunday 08:00 UTC (the small hours in
+  // Chicago). Nitro runs a cron's tasks in parallel, not in list order; neither depends on the other.
+  '0 8 * * SUN': ['db:backup', 'audit:purge']
 }
 
 /**
@@ -34,5 +35,6 @@ export const TASK_STALE_AFTER_HOURS: Record<string, number> = {
   'whoop:sync': 26,
   'digest:daily': 26,
   'digest:weekly': 7 * 24 + 2,
-  'db:backup': 7 * 24 + 2
+  'db:backup': 7 * 24 + 2,
+  'audit:purge': 7 * 24 + 2
 }

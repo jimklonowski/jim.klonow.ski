@@ -35,7 +35,9 @@ export default defineEventHandler(async (event) => {
     notes: body.notes
   }
 
+  const summary = `${fields.compound} ${fields.vial_amount} ${fields.vial_unit}`
   if (body.id != null) {
+    const before = await auditBefore(event, 'vials', body.id)
     await db.prepare(`
       UPDATE vials SET
         compound = ?2, supplier = ?3, vial_amount = ?4, vial_unit = ?5, quantity = ?6,
@@ -47,6 +49,7 @@ export default defineEventHandler(async (event) => {
       fields.quantity, fields.status, fields.opened_date, fields.bac_water_ml, fields.lot,
       fields.expiry, fields.cost, fields.notes, fields.form, fields.unit_count
     ).run()
+    await recordAudit(event, { table: 'vials', key: body.id, before, summary })
     return { ok: true, id: body.id }
   }
 
@@ -59,6 +62,7 @@ export default defineEventHandler(async (event) => {
     fields.status, fields.opened_date, fields.bac_water_ml, fields.lot, fields.expiry,
     fields.cost, fields.notes, fields.form, fields.unit_count, new Date().toISOString()
   ).run()
+  await recordAudit(event, { table: 'vials', key: result.meta.last_row_id, before: null, summary })
 
   return { ok: true, id: result.meta.last_row_id }
 })

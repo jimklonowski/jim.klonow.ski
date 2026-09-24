@@ -2,6 +2,7 @@
 import type { H3Event } from 'h3'
 import type { AuthContext } from './auth'
 import { normalizeForm } from '#shared/utils/vialForm'
+import { zDateRange } from '#shared/utils/schemas'
 
 // nitro-cloudflare-dev types `context.cloudflare.env` as PlatformProxy["env"] (unknown) since it
 // isn't parameterized with our Env — cast through the generated global Env from worker-configuration.d.ts.
@@ -39,7 +40,6 @@ export function isMissingTable(err: unknown): boolean {
   return err instanceof Error && /no such table/i.test(err.message)
 }
 
-/** An R2 key from a URL segment, or a 400 — decodeURIComponent throws on a malformed escape. */
 /**
  * The read every list endpoint does: run one SELECT on the role's database and map the rows.
  * The handler still owns its auth check (who may read what differs per table) and anything
@@ -47,17 +47,18 @@ export function isMissingTable(err: unknown): boolean {
  *
  * `missingTableOk` is for tables an environment may not have yet (a new table before its
  * migration reaches the demo sandbox): that one error reads as an empty list, and anything
- * else still throws. See isMissingTable.
+ * else still throws. See isMissingTable. `binds` are the statement's ?1, ?2… values (the
+ * dateRange clause below uses them).
  */
 export async function listRows<T = Record<string, unknown>>(
   event: H3Event,
   sql: string,
   map?: (row: Record<string, unknown>) => T,
-  { missingTableOk = false }: { missingTableOk?: boolean } = {}
+  { missingTableOk = false, binds = [] }: { missingTableOk?: boolean, binds?: unknown[] } = {}
 ): Promise<T[]> {
   let results: Record<string, unknown>[] | undefined
   try {
-    ({ results } = await getDb(event).prepare(sql).all())
+    ({ results } = await getDb(event).prepare(sql).bind(...binds).all())
   }
   catch (err) {
     if (missingTableOk && isMissingTable(err)) return []
@@ -67,6 +68,28 @@ export async function listRows<T = Record<string, unknown>>(
   return map ? rows.map(map) : rows as T[]
 }
 
+/**
+ * `?from=YYYY-MM-DD&to=YYYY-MM-DD` on a date-keyed list, as a WHERE clause over `column` plus
+ * its binds. Both ends are optional and inclusive; without either, the list is whole — which is
+ * what every chart asks for, since they draw the full history. `column` is always a code
+ * constant, never request input.
+ */
+export function dateRange(event: H3Event, column: string): { where: string, binds: string[] } {
+  const { from, to } = validatedQuery(event, zDateRange)
+  const parts: string[] = []
+  const binds: string[] = []
+  if (from) {
+    binds.push(from)
+    parts.push(`${column} >= ?${binds.length}`)
+  }
+  if (to) {
+    binds.push(to)
+    parts.push(`${column} <= ?${binds.length}`)
+  }
+  return { where: parts.length ? `WHERE ${parts.join(' AND ')}` : '', binds }
+}
+
+/** An R2 key from a URL segment, or a 400 — decodeURIComponent throws on a malformed escape. */
 export function decodeObjectKey(raw: string | undefined): string {
   if (!raw) throw createError({ statusCode: 400, message: 'Missing key' })
   try {

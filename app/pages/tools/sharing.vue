@@ -181,6 +181,32 @@
         }"
       />
     </section>
+
+    <!-- Owner sessions -->
+    <section class="px-4 sm:px-6 pb-6">
+      <div class="bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="YOUR SESSIONS"
+          :dashes="7"
+        >
+          <span class="text-[10.5px] text-muted normal-case">a lost or shared device</span>
+        </TuiHeader>
+        <p class="mt-2 text-[12px] leading-[1.7] text-dim">
+          Signs you out on every other device and browser, and locks lab uploads until the PIN is
+          entered again. This device stays signed in. Share links aren't affected; revoke those above.
+        </p>
+        <div class="mt-3 pt-3 border-t border-line-soft">
+          <button
+            type="button"
+            class="tui-btn disabled:opacity-50"
+            :disabled="signingOut"
+            @click="confirmSignOutElsewhere"
+          >
+            {{ signingOut ? 'SIGNING OUT…' : 'SIGN OUT OTHER DEVICES' }}
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -284,6 +310,17 @@ const { run: revoke } = useSaveAction(async (id: string) => {
   error: 'Could not revoke the link',
   success: () => ({ title: 'Link revoked', description: 'Sessions from this link are signed out.' })
 })
+
+const { run: signOutElsewhere, pending: signingOut } = useSaveAction(async () => {
+  await $fetch('/api/auth/sign-out-everywhere', { method: 'POST' })
+}, {
+  error: 'Could not sign out other devices',
+  success: () => ({ title: 'Other devices signed out', description: 'It can take up to a minute to reach every location.' })
+})
+
+function confirmSignOutElsewhere() {
+  if (window.confirm('Sign out every other device? You stay signed in here.')) signOutElsewhere()
+}
 
 function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

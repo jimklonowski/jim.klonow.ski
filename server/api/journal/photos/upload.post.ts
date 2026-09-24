@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
     INSERT INTO progress_photos (date, category, r2_key, taken_at, created_at)
     VALUES (?1, ?2, ?3, ?4, ?5)
   `).bind(date, category, r2Key, taken_at, created_at).run()
+  await recordAudit(event, { table: 'progress_photos', key: result.meta.last_row_id, before: null, summary: `photo ${date} ${category}` })
 
   return parseProgressPhotoRow({
     id: result.meta.last_row_id,

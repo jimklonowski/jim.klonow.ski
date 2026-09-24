@@ -56,7 +56,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   // /api/journal/list and shared/utils/access.ts).
   const fullAccess = isFullAccessRole(auth.role)
 
-  return {
+  return withEtag<OverviewSummary>(event, {
     today,
     loggedDays: entries.filter(isLoggedDay).length,
     streak: loggedStreak(entries, today),
@@ -72,5 +72,5 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     recentDays: fullAccess
       ? entries.slice(-RECENT_DAYS).reverse().map(e => ({ date: e.date, weight_lbs: e.weight_lbs }))
       : []
-  }
+  })
 })

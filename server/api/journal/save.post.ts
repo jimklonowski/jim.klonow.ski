@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
   const body = await readValidatedJson(event, zJournalSave)
 
   const db = getDb(event)
+  const before = await auditBefore(event, 'journal_entries', body.date)
   // The `day` column (a hand-typed notebook index) is no longer read or written. It stays in the
   // schema holding its historical values, and is deliberately absent from this statement so a
   // re-save doesn't null out what's already recorded.
@@ -38,6 +39,7 @@ export default defineEventHandler(async (event) => {
     JSON.stringify(body.sodas),
     body.notes
   ).run()
+  await recordAudit(event, { table: 'journal_entries', key: body.date, before, summary: `day ${body.date}` })
 
   return { ok: true, date: body.date }
 })

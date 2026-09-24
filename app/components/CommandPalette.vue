@@ -123,7 +123,8 @@ const manageItems = computed(() => {
   if (isOwner.value) {
     items.unshift(
       { label: 'sharing · invite links', suffix: 'share with friends + doctor', onSelect: () => go('/tools/sharing') },
-      { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/tools/import') }
+      { label: 'import', suffix: 'apple health export.xml', onSelect: () => go('/tools/import') },
+      { label: 'data · export + history', suffix: 'download, undo a delete', onSelect: () => go('/tools/data') }
     )
   }
   return items

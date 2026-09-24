@@ -31,8 +31,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb(event)
+  const before = await auditBefore(event, 'progress_photos', body.id)
   values.push(body.id)
   await db.prepare(`UPDATE progress_photos SET ${sets.join(', ')} WHERE id = ?${sets.length + 1}`).bind(...values).run()
+  if (before) await recordAudit(event, { table: 'progress_photos', key: body.id, before, summary: `photo ${before.date} ${before.category}` })
 
   return { ok: true }
 })

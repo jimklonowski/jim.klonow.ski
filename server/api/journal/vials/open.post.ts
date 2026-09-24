@@ -48,7 +48,15 @@ export default defineEventHandler(async (event) => {
     new Date().toISOString()
   )
 
-  await db.batch([batchStatement, insertActive])
+  const [, inserted] = await db.batch([batchStatement, insertActive])
+
+  // Two rows change: the sealed batch (decremented, or deleted when it was the last one) and the
+  // new active vial. `row` was read above, so it doubles as the batch's before-image.
+  const summary = `opened ${row.compound} ${row.vial_amount} ${row.vial_unit}`
+  await recordAudit(event, { table: 'vials', key: body.id, before: row, deleted: remainingQty <= 0, summary })
+  if (inserted?.meta.last_row_id) {
+    await recordAudit(event, { table: 'vials', key: inserted.meta.last_row_id, before: null, summary })
+  }
 
   return { ok: true }
 })

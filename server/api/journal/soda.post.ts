@@ -21,10 +21,12 @@ export default defineEventHandler(async (event) => {
   const entry = JSON.stringify({ time, drink: body.drink || undefined, size: body.size || undefined })
 
   const db = getDb(event)
+  const before = await auditBefore(event, 'journal_entries', date)
   await db.prepare(`
     INSERT INTO journal_entries (date, sodas) VALUES (?1, json_array(json(?2)))
     ON CONFLICT(date) DO UPDATE SET sodas = json_insert(sodas, '$[#]', json(?2))
   `).bind(date, entry).run()
+  await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ soda on ${date}${body.drink ? ` (${body.drink})` : ''}` })
 
   const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
   const sodas = JSON.parse(row!.sodas) as Array<{ time: string, drink?: string, size?: string }>

@@ -11,5 +11,5 @@ export default defineEventHandler(async (event): Promise<Profile> => {
   // Missing table (migration not applied yet) reads as "nothing recorded", not a 500. Any other
   // error is a real failure and must not read as "no blood type on file".
   const rows = await listRows(event, 'SELECT key, value FROM profile', r => [r.key as string, r.value as string] as const, { missingTableOk: true })
-  return Object.fromEntries(rows)
+  return withEtag(event, Object.fromEntries(rows))
 })

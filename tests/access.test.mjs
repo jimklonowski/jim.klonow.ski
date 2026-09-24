@@ -33,6 +33,7 @@ const MATRIX = {
   // Spends money, uploads binaries, or manages access.
   '/tools/import': ['owner'],
   '/tools/sharing': ['owner'],
+  '/tools/data': ['owner'],
   '/ask': ['owner'],
   // Demo gets the inventory (it edits the sandbox); friend and doctor do not.
   '/tools/inventory': ['owner', 'demo']

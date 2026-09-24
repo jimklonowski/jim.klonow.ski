@@ -15,7 +15,9 @@ export default defineEventHandler(async (event) => {
     stopped: body.status === 'stopped' ? body.stopped : null
   }
 
+  const summary = [fields.name, fields.dose].filter(Boolean).join(' ')
   if (body.id != null) {
+    const before = await auditBefore(event, 'supplements', body.id)
     await db.prepare(`
       UPDATE supplements SET
         name = ?2, dose = ?3, category = ?4, status = ?5, schedule = ?6, started = ?7,
@@ -25,6 +27,7 @@ export default defineEventHandler(async (event) => {
       body.id, fields.name, fields.dose, fields.category, fields.status, fields.schedule,
       fields.started, fields.stopped, fields.notes, fields.sort
     ).run()
+    await recordAudit(event, { table: 'supplements', key: body.id, before, summary })
     return { ok: true, id: body.id }
   }
 
@@ -35,6 +38,7 @@ export default defineEventHandler(async (event) => {
     fields.name, fields.dose, fields.category, fields.status, fields.schedule, fields.started,
     fields.stopped, fields.notes, fields.sort, new Date().toISOString()
   ).run()
+  await recordAudit(event, { table: 'supplements', key: result.meta.last_row_id, before: null, summary })
 
   return { ok: true, id: result.meta.last_row_id }
 })
