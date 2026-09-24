@@ -15,7 +15,7 @@
 // commitment — which is why start_date stays non-null and all the math below stays total.
 //
 // Shared (app + server) because the pages and the AI prompt context (cycleContext in
-// server/utils/protocol.ts) must agree on the same status/day/window math.
+// server/utils/cycleContext.ts) must agree on the same status/day/window math.
 
 import type { PkDose } from './pk'
 import type { ProtocolRule } from './protocolRules'

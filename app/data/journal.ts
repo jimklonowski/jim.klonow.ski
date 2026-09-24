@@ -112,26 +112,6 @@ export const COMPOUND_GROUPS = {
   ]
 } as const satisfies Record<string, readonly string[]>
 
-export interface StandingCompound {
-  compound: string
-  /** First day of the range (may predate the dose log — the timeline clamps it). */
-  from: string
-  /** Last day of the range, or null while ongoing. */
-  to: string | null
-  /** Dose/form note for the timeline tooltip, e.g. "7 mg gummy". */
-  label: string
-}
-
-// Daily meds running since before the dose log existed — too routine to log per-day, but real
-// protocol. Rendered as extra rows on the calendar's protocol timeline (not stored in D1);
-// hand-maintained like the server's PROTOCOL_SCHEDULE prose and the PROTOCOL_RULES cadence
-// (shared/utils/protocolRules.ts — shared so the digest prompts score against the same
-// weekdays as the adherence panel), edit here to update.
-export const STANDING_COMPOUNDS: StandingCompound[] = [
-  { compound: 'Tadalafil', from: '2025-06-01', to: '2026-06-01', label: '7 mg gummy' },
-  { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet' }
-]
-
 /** Every name in COMPOUND_GROUPS, as a union — the key set COMPOUND_COLORS must cover. */
 export type KnownCompound = (typeof COMPOUND_GROUPS)[keyof typeof COMPOUND_GROUPS][number]
 

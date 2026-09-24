@@ -1,6 +1,14 @@
+import type { DoseUnit } from '#shared/types/journal'
+
 export interface CompoundDosing {
   range: string
   frequency: string
+  /**
+   * Average amount used per day at a typical dose, for the stock runway before there's logged
+   * history (weekly protocols written as the weekly total / 7). Omitted where no typical dose
+   * exists — as-needed use, unestablished dosing, or a unit the inventory doesn't track.
+   */
+  typicalDaily?: { amount: number, unit: DoseUnit }
   timing?: string
   notes?: string
 }
@@ -33,6 +41,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '250–500 mcg',
       frequency: '1–2x daily',
+      typicalDaily: { amount: 500, unit: 'mcg' },
       timing: 'Away from food; can be dosed systemically or near the injury site',
       notes: 'Total daily dose commonly kept under ~1000 mcg in educational protocols.'
     },
@@ -52,6 +61,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '2–2.5 mg',
       frequency: '2x weekly (loading), then weekly for maintenance',
+      typicalDaily: { amount: 4.5 / 7, unit: 'mg' },
       timing: 'Systemic subcutaneous injection; site does not need to be local to the injury.'
     },
     reconstitution: {
@@ -70,6 +80,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '500 mcg (blend, i.e. 250 mcg BPC-157 + 250 mcg TB-500 per injection)',
       frequency: '1x daily, sometimes 2x during a loading phase',
+      typicalDaily: { amount: 500, unit: 'mcg' },
       timing: 'Subcutaneous injection; can be dosed near an injury site or systemically.'
     },
     reconstitution: {
@@ -87,6 +98,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–300 mcg',
       frequency: 'Once or twice daily',
+      typicalDaily: { amount: 375, unit: 'mcg' },
       timing: 'On an empty stomach, often before bed and/or upon waking to align with natural GH pulses.'
     },
     reconstitution: {
@@ -104,6 +116,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '100–300 mcg (non-DAC) or 1–2 mg weekly (DAC)',
       frequency: 'Daily (non-DAC) or weekly (DAC)',
+      typicalDaily: { amount: 200, unit: 'mcg' },
       timing: 'Non-DAC: empty stomach, before bed. DAC: timing is less critical due to long half-life.'
     },
     reconstitution: {
@@ -121,6 +134,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '100 mcg of each (1:1 blend commonly dosed together)',
       frequency: 'Once daily, sometimes twice',
+      typicalDaily: { amount: 200, unit: 'mcg' },
       timing: 'Empty stomach, typically 20–30 minutes before bed to align with the largest natural GH pulse.'
     },
     reconstitution: {
@@ -138,6 +152,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '5–10 mg weekly, split into 2–3 doses (e.g., ~1.5–2 mg per dose)',
       frequency: '2–3x weekly',
+      typicalDaily: { amount: 7.5 / 7, unit: 'mg' },
       timing: 'Often dosed prior to exercise in educational protocols.'
     },
     reconstitution: {
@@ -156,6 +171,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '50–100 mg per injection (subQ/IM); much higher for IV protocols',
       frequency: '2–3x weekly',
+      typicalDaily: { amount: 75 * 2.5 / 7, unit: 'mg' },
       notes: 'Injections can cause transient flushing, warmth, or nausea if pushed too quickly — slow administration reduces this.'
     },
     reconstitution: {
@@ -171,6 +187,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '1–2 mg',
       frequency: 'Daily or every other day',
+      typicalDaily: { amount: 1.5, unit: 'mg' },
       timing: 'Often stacked with GH secretagogues; also used topically for skin applications.'
     },
     reconstitution: {
@@ -188,6 +205,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–500 mcg',
       frequency: 'Daily',
+      typicalDaily: { amount: 350, unit: 'mcg' },
       notes: 'Can be dosed subcutaneously or taken orally (oral bioavailability is lower, so oral doses are often higher).'
     },
     reconstitution: {
@@ -205,6 +223,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '4–10 mg',
       frequency: 'Daily or every other day',
+      typicalDaily: { amount: 5, unit: 'mg' },
       timing: 'Subcutaneous injection.'
     },
     reconstitution: {
@@ -222,6 +241,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '5–10 mg daily',
       frequency: 'Daily for a short course',
+      typicalDaily: { amount: 7.5, unit: 'mg' },
       timing: 'Often dosed in the evening given its link to melatonin/pineal regulation.'
     },
     reconstitution: {
@@ -236,7 +256,8 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     summary: 'A small peptide encoded within the mitochondrial genome, studied for cytoprotective and anti-apoptotic effects, with early research interest in metabolic and neuroprotective applications.',
     dosing: {
       range: '5–10 mg weekly, split into 2–3 doses',
-      frequency: '2–3x weekly'
+      frequency: '2–3x weekly',
+      typicalDaily: { amount: 7.5 / 7, unit: 'mg' }
     },
     reconstitution: {
       instructions: '10 mg vial + 2 mL bacteriostatic water → 5 mg/mL',
@@ -252,6 +273,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '1.6 mg',
       frequency: '2x weekly (some protocols use daily dosing during acute immune support)',
+      typicalDaily: { amount: 3.2 / 7, unit: 'mg' },
       timing: 'Subcutaneous injection.'
     },
     reconstitution: {
@@ -268,6 +290,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '2–2.5 mg',
       frequency: '2x weekly (loading), then weekly maintenance',
+      typicalDaily: { amount: 4.5 / 7, unit: 'mg' },
       timing: 'Subcutaneous injection.'
     },
     reconstitution: {
@@ -324,6 +347,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '100–200 mg weekly total (highly individualized based on labs)',
       frequency: 'Typically split into 1–2 injections per week to smooth out peaks/troughs',
+      typicalDaily: { amount: 150 / 7, unit: 'mg' },
       timing: 'Time of day is less important than consistency between doses.'
     },
     cycling: 'TRT is generally continuous rather than cycled; dose adjustments are made based on follow-up labs (total/free T, estradiol, hematocrit) and symptoms.',
@@ -337,7 +361,8 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     summary: 'A long-acting testosterone ester very similar in profile to cypionate, delivered in oil for TRT.',
     dosing: {
       range: '100–200 mg weekly total (individualized based on labs)',
-      frequency: 'Typically split into 1–2 injections per week'
+      frequency: 'Typically split into 1–2 injections per week',
+      typicalDaily: { amount: 150 / 7, unit: 'mg' }
     },
     cycling: 'Continuous TRT with dose adjusted by follow-up labs rather than on/off cycling.',
     storage: 'Room temperature, away from light and heat.',
@@ -350,7 +375,8 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     summary: 'A short-acting testosterone ester requiring more frequent injections but producing more stable day-to-day levels than long esters.',
     dosing: {
       range: '~30–50 mg per injection, 2–3x weekly',
-      frequency: 'Every 2–3 days due to short half-life'
+      frequency: 'Every 2–3 days due to short half-life',
+      typicalDaily: { amount: 40 * 2.5 / 7, unit: 'mg' }
     },
     cycling: 'Continuous TRT with dose adjusted by follow-up labs.',
     storage: 'Room temperature, away from light and heat.',
@@ -365,6 +391,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '125–250 mg every 7–14 days (clinical TRT); enhanced educational protocols run 250–750 mg weekly',
       frequency: 'Despite the "long-acting blend" design, 2x weekly injections give far more stable levels than the labeled every-3-weeks schedule',
+      typicalDaily: { amount: 187.5 / 10.5, unit: 'mg' },
       timing: 'Intramuscular injection; consistency between doses matters more than time of day.'
     },
     cycling: 'Same as any testosterone base — continuous for TRT with lab-guided adjustments, or defined blocks in enhanced protocols.',
@@ -380,6 +407,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '1–2 IU daily (general use); higher in fitness-focused protocols',
       frequency: 'Daily',
+      typicalDaily: { amount: 1.5, unit: 'iu' },
       timing: 'Often dosed in the morning or pre-workout; some protocols use before bed to mimic nocturnal GH pulses.'
     },
     reconstitution: {
@@ -399,6 +427,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '250–500 IU',
       frequency: '2–3x weekly',
+      typicalDaily: { amount: 375 * 2.5 / 7, unit: 'iu' },
       timing: 'Often timed with (or between) testosterone injections.'
     },
     reconstitution: {
@@ -416,6 +445,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '0.25–1 mg',
       frequency: '1–2x weekly, adjusted to labs and symptoms',
+      typicalDaily: { amount: 0.625 * 1.5 / 7, unit: 'mg' },
       notes: 'Often dosed in small "micro" amounts (e.g., 0.25 mg) rather than the higher doses used in oncology.'
     },
     cycling: 'Dosed only as needed based on estradiol labs and symptoms — over-suppression of estrogen can cause its own problems (joint pain, low libido, poor lipids, low bone density).',
@@ -429,6 +459,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '12.5–25 mg',
       frequency: 'Daily',
+      typicalDaily: { amount: 18.75, unit: 'mg' },
       timing: 'Oral, with or without food per supplier instructions.'
     },
     cycling: 'Used either as a standalone way to raise natural testosterone, or as part of post-TRT / fertility-preserving protocols.',
@@ -443,6 +474,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '25–50 mg/day (PCT protocols commonly start at 50 mg for 2 weeks, then taper to 25 mg)',
       frequency: 'Once daily for 4–6 weeks in PCT contexts',
+      typicalDaily: { amount: 37.5, unit: 'mg' },
       timing: 'Oral, any time of day; consistency matters more than timing.'
     },
     cycling: 'Used as a defined 4–6 week PCT block starting once the suppressive compounds have cleared (timed off the longest ester’s half-life), or lower-dose continuously for fertility/hypogonadism protocols under physician guidance.',
@@ -458,6 +490,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '20–40 mg/day for PCT; 10–20 mg/day for gyno management while on aromatizing compounds',
       frequency: 'Once daily (long half-life makes split dosing unnecessary)',
+      typicalDaily: { amount: 20, unit: 'mg' },
       timing: 'Oral, any time of day, with or without food.'
     },
     cycling: 'PCT: 4–6 weeks starting once suppressive compounds have cleared. For gyno symptoms (itchy/puffy nipples), often run at 10–20 mg until symptoms resolve. Less useful against prolactin-driven gyno from 19-nors (trenbolone, nandrolone), which is a different mechanism.',
@@ -473,6 +506,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '25–75 mg/day',
       frequency: 'Once daily or split into two doses',
+      typicalDaily: { amount: 50, unit: 'mg' },
       timing: 'Oral, with or without food.'
     },
     cycling: 'Typically run alongside other compounds for the duration of a cycle rather than standalone; some TRT protocols add low doses continuously for libido/free-T effects.',
@@ -488,6 +522,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '10–20 mg/day (low/conservative end of typical ranges — many protocols run considerably higher)',
       frequency: 'Once or twice daily, split doses given its short half-life',
+      typicalDaily: { amount: 15, unit: 'mg' },
       timing: 'Oral, with or without food per product guidance.'
     },
     cycling: 'Typically run in defined 6–8 week blocks rather than continuously; suppresses natural testosterone production (reversible), so often timed alongside a TRT baseline or with a post-cycle recovery plan.',
@@ -503,6 +538,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '50–100 mg/day (oral acetate; requires higher doses than the injectable enanthate version due to lower bioavailability and short half-life)',
       frequency: 'Split into 2 daily doses given its short half-life',
+      typicalDaily: { amount: 75, unit: 'mg' },
       timing: 'Oral, with or without food per product guidance.'
     },
     cycling: 'Typically run 12–16 weeks given its mild nature and slow-building effects; suppresses natural testosterone production (reversible), so commonly run alongside a TRT-dose testosterone base rather than alone.',
@@ -518,6 +554,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '300–600 mg weekly (higher end of typical educational ranges since it is comparatively weak per mg)',
       frequency: '1–2x weekly given the long ester',
+      typicalDaily: { amount: 450 / 7, unit: 'mg' },
       timing: 'Intramuscular injection; time of day is not important, consistency between doses is.'
     },
     cycling: 'Typically run 12–16 weeks; suppresses natural testosterone production (reversible), so commonly run alongside a TRT-dose testosterone base rather than alone.',
@@ -533,6 +570,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–400 mg weekly (educational ranges; often started low to assess tolerance)',
       frequency: 'Every day or every other day given the short ester',
+      typicalDaily: { amount: 300 / 7, unit: 'mg' },
       timing: 'Intramuscular injection; consistency between doses matters.'
     },
     cycling: 'Run in defined 6–10 week blocks alongside a testosterone base, never standalone and never as a first cycle — universally considered an advanced compound. Strongly suppressive; requires a full recovery plan.',
@@ -548,6 +586,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–400 mg weekly (educational ranges)',
       frequency: '2x weekly',
+      typicalDaily: { amount: 300 / 7, unit: 'mg' },
       timing: 'Intramuscular injection; consistency between doses matters.'
     },
     cycling: 'Run in defined 8–12 week blocks alongside a testosterone base; advanced-only compound. Strongly suppressive; requires a full recovery plan.',
@@ -563,6 +602,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '150–300 mg weekly (the historic human product was dosed at 76.5 mg every 1–2 weeks clinically)',
       frequency: '1–2x weekly given the long ester',
+      typicalDaily: { amount: 225 / 7, unit: 'mg' },
       timing: 'Intramuscular injection.'
     },
     cycling: 'Defined 8–12 week blocks alongside a testosterone base; advanced-only, strongly suppressive.',
@@ -578,6 +618,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '300–600 mg weekly (educational ranges)',
       frequency: '1–2x weekly given the long ester',
+      typicalDaily: { amount: 450 / 7, unit: 'mg' },
       timing: 'Intramuscular injection.'
     },
     cycling: 'Because onset is slow, typically run in long 14–20 week blocks alongside a testosterone base; suppressive, requires a recovery plan.',
@@ -593,6 +634,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '300–400 mg weekly (educational ranges)',
       frequency: 'Every other day given the short ester',
+      typicalDaily: { amount: 350 / 7, unit: 'mg' },
       timing: 'Intramuscular injection.'
     },
     cycling: 'Run 8–12 weeks alongside a testosterone base — nandrolone without a test base is strongly associated with libido/erectile problems ("deca dick"). Deeply suppressive; recovery takes longer than with testosterone-only protocols.',
@@ -608,6 +650,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–400 mg weekly (educational ranges); 100–150 mg weekly in "therapeutic" joint-support protocols',
       frequency: '1x weekly',
+      typicalDaily: { amount: 300 / 7, unit: 'mg' },
       timing: 'Intramuscular injection.'
     },
     cycling: 'Slow onset — typically 12–16 week blocks alongside a testosterone base (never solo; see "deca dick"). Deeply suppressive with a long recovery tail.',
@@ -623,6 +666,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '300–400 mg weekly (educational ranges)',
       frequency: 'Every other day given the short propionate ester',
+      typicalDaily: { amount: 350 / 7, unit: 'mg' },
       timing: 'Intramuscular injection.'
     },
     cycling: 'Run 6–10 weeks alongside a testosterone base, typically during cutting phases; suppressive like all AAS.',
@@ -638,6 +682,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '400–600 mg weekly (educational ranges; slightly higher than prop is common since more of the weight is ester)',
       frequency: '2x weekly',
+      typicalDaily: { amount: 500 / 7, unit: 'mg' },
       timing: 'Intramuscular injection.'
     },
     cycling: 'Run 8–12 weeks alongside a testosterone base, typically while cutting; suppressive.',
@@ -653,6 +698,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–400 mg weekly (educational ranges)',
       frequency: '2x weekly',
+      typicalDaily: { amount: 300 / 7, unit: 'mg' },
       timing: 'Intramuscular injection; many users rotate larger muscle groups and dilute with other oils to manage PIP.'
     },
     cycling: 'Run 8–12 weeks alongside a testosterone base; suppressive.',
@@ -668,6 +714,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '20–30 mg/day (educational conservative range)',
       frequency: 'Split into 2–3 doses across the day given the short half-life',
+      typicalDaily: { amount: 25, unit: 'mg' },
       timing: 'Oral; some protocols concentrate dosing pre-workout.'
     },
     cycling: 'Short 4–6 week blocks only, almost always alongside an injectable base — the hepatotoxicity of 17-alkylated orals makes longer runs a bad trade. Suppressive.',
@@ -683,6 +730,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '20–40 mg/day (educational ranges)',
       frequency: 'Once daily or split into 2 doses',
+      typicalDaily: { amount: 30, unit: 'mg' },
       timing: 'Oral, with or without food.'
     },
     cycling: 'Short 6–8 week blocks, typically alongside an injectable base; suppressive. Liver limits duration like all 17-alkylated orals.',
@@ -698,6 +746,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '25–50 mg/day oral, or 50 mg every other day injectable (educational ranges)',
       frequency: 'Oral split into 2 doses; injectable daily or every other day',
+      typicalDaily: { amount: 37.5, unit: 'mg' },
       timing: 'Typically run the final 4–6 weeks before a physique peak.'
     },
     cycling: 'Short 4–6 week blocks alongside a testosterone base; suppressive. The dry-joint effect makes it a poor pairing with heavy low-rep training for some.',
@@ -713,6 +762,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '50–100 mg/day (educational ranges; 50 mg is plenty for most)',
       frequency: 'Once daily or split',
+      typicalDaily: { amount: 50, unit: 'mg' },
       timing: 'Oral; often used as a 4-week kickstart or a pre-contest fullness tool.'
     },
     cycling: 'Short 4–6 week blocks only, alongside an injectable base; suppressive. Diminishing returns above 100 mg are well-documented while toxicity keeps climbing.',
@@ -728,6 +778,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '10–20 mg/day (educational ranges — this is a compound where more is emphatically not better)',
       frequency: 'Once daily or split',
+      typicalDaily: { amount: 15, unit: 'mg' },
       timing: 'Oral.'
     },
     cycling: 'Very short 3–4 week blocks maximum, alongside an injectable base; suppressive. Longer runs are where the published liver-injury cases cluster.',
@@ -743,6 +794,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '10–20 mg/day (educational ranges)',
       frequency: 'Once daily or split; some strength athletes dose only on training/competition days',
+      typicalDaily: { amount: 15, unit: 'mg' },
       timing: 'Oral, ~1–2 hours before training when used acutely.'
     },
     cycling: 'Very short 2–4 week blocks (or acute use), alongside a base; suppressive. Duration is limited by liver and lipid toxicity, not by diminishing gains.',
@@ -758,6 +810,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '20 mcg/day starting, titrated up by 20 mcg every few days as tolerated; common educational ceiling 80–120 mcg/day',
       frequency: 'Once daily (long half-life) — morning dosing limits sleep disruption',
+      typicalDaily: { amount: 60, unit: 'mcg' },
       timing: 'Classic protocols run 2 weeks on / 2 weeks off to offset receptor downregulation; others taper up continuously and stop.'
     },
     cycling: 'Effectiveness fades as beta-2 receptors downregulate over 2–4 weeks; breaks restore sensitivity. Always titrate — never start at the target dose.',
@@ -773,6 +826,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '1 mg/day (hair loss dose; 5mg tablets are commonly split/quartered to reach this)',
       frequency: 'Once daily',
+      typicalDaily: { amount: 1, unit: 'mg' },
       timing: 'Oral, any time of day; consistency matters more than timing. Effects take 3-6+ months to become noticeable.'
     },
     cycling: 'Taken continuously — benefits reverse within ~6-12 months of stopping since it only suppresses ongoing conversion, it does not create a lasting change.',
@@ -788,6 +842,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '0.5 mg/day (standard dose; some protocols use 0.5 mg every other day or a few times weekly given the very long half-life)',
       frequency: 'Once daily',
+      typicalDaily: { amount: 0.5, unit: 'mg' },
       timing: 'Oral, any time of day, with or without food; consistency matters more than timing. Effects take 3-6+ months to become noticeable. When switching from finasteride, no washout is needed — dutasteride covers everything finasteride does and more.'
     },
     cycling: 'Taken continuously — benefits reverse after stopping, though the very long half-life means DHT suppression persists for weeks to months after discontinuation.',
@@ -803,6 +858,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '25-50 mg elemental daily for ordinary repletion. The hepcidin-loading protocol runs 70-75 mg three times a day, about 210-225 mg/day elemental, for 5-10 days.',
       frequency: 'Once daily, or a single dose on alternate days for the best fractional absorption. Three times daily only when the goal is loading hepcidin, not absorbing iron.',
+      typicalDaily: { amount: 37.5, unit: 'mg' },
       timing: 'Morning, empty stomach, away from calcium, coffee, tea and dairy. Vitamin C raises absorption, so take it alongside when repleting and avoid it when the goal is raising hepcidin.'
     },
     cycling: 'Continuous while repleting a deficit. The hepcidin-loading use is an intentionally bounded 5-10 day block, never an ongoing regimen.',
@@ -818,6 +874,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '2.5–5 mg/day (daily protocol; 10–20 mg as-needed is the episodic alternative)',
       frequency: 'Once daily',
+      typicalDaily: { amount: 5, unit: 'mg' },
       timing: 'Oral, any time of day, with or without food; consistency matters more than timing since steady state is the point of daily dosing.'
     },
     cycling: 'Taken continuously on the daily protocol — effects on blood flow persist only while it is in the system.',
@@ -832,6 +889,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '0.25 mg starting dose, titrated up to 1–2.4 mg over months',
       frequency: 'Weekly',
+      typicalDaily: { amount: 1 / 7, unit: 'mg' },
       timing: 'Same day each week; titration schedule (typically every 4 weeks) reduces GI side effects.'
     },
     reconstitution: {
@@ -849,6 +907,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '2.5 mg starting dose, titrated up to 5–15 mg over months',
       frequency: 'Weekly',
+      typicalDaily: { amount: 5 / 7, unit: 'mg' },
       timing: 'Same day each week; slow titration (every 4 weeks) minimizes GI side effects.'
     },
     reconstitution: {
@@ -866,6 +925,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '1 mg starting dose, titrated up to 4–12 mg over months per trial protocols',
       frequency: 'Weekly',
+      typicalDaily: { amount: 4 / 7, unit: 'mg' },
       timing: 'Same day each week; slow titration (every 4 weeks) minimizes GI side effects.'
     },
     reconstitution: {
@@ -883,6 +943,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '50–150 mg/day',
       frequency: 'Once daily (oral)',
+      typicalDaily: { amount: 100, unit: 'mg' },
       timing: 'Oral capsule, commonly taken with food per supplier guidance.'
     },
     cycling: 'Often used in multi-month blocks tied to a body-composition goal, then reassessed; human long-term data is limited.',
@@ -922,6 +983,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–600 mcg',
       frequency: '1–2x daily',
+      typicalDaily: { amount: 600, unit: 'mcg' },
       timing: 'Intranasal spray is the most common route; subQ injection is also used.'
     },
     reconstitution: {
@@ -937,6 +999,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '200–600 mcg',
       frequency: '1–2x daily',
+      typicalDaily: { amount: 600, unit: 'mcg' },
       timing: 'Intranasal spray is the most common route; subQ injection is also used.'
     },
     reconstitution: {
@@ -953,6 +1016,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '100–300 mcg',
       frequency: 'Once daily',
+      typicalDaily: { amount: 200, unit: 'mcg' },
       timing: 'Evening, before bed; often titrated gradually up from the low end of the range.'
     },
     reconstitution: {
@@ -984,6 +1048,7 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     dosing: {
       range: '25–100 mg/day (Russian clinical dosing for asthenia was 50–100 mg/day)',
       frequency: 'Once daily, typically in the morning',
+      typicalDaily: { amount: 50, unit: 'mg' },
       timing: 'Oral; poorly water-soluble, so absorption improves with a fatty meal (some users dose sublingually in suspension). Effects build over several days of consistent use rather than hitting acutely.'
     },
     cycling: 'Often run for a few weeks at a time with breaks; the dopamine-synthesis mechanism is claimed to avoid tolerance/withdrawal, but long-term Western data doesn’t exist to confirm it.',

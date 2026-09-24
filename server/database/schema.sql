@@ -150,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(categ
 
 -- Standing vitamin/supplement/skin-routine stack. Unlike journal peptides these are not
 -- dose-logged day by day — rows describe the ongoing regimen and feed the AI digest and
--- lab-summary prompts as protocol context (see server/utils/protocol.ts).
+-- lab-summary prompts as protocol context (see server/utils/supplementContext.ts).
 -- status 'on_hand' = owned but not being taken (support supplements staged for a future
 -- cycle, a possible finasteride->dutasteride switch, etc.) — listed to the AI separately.
 -- status 'stopped' rows are kept: recent stops are relevant context for lab trends.
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS supplements (
 -- one-field edit. actual_end is only set when a cycle ends off-plan (cut early on bad labs, or
 -- extended); status (upcoming/active/done) is always derived from the dates, never stored.
 -- Read by the adherence panel, calendar rings, home dashboard strip, and the AI prompt
--- context (cycleContext in server/utils/protocol.ts).
+-- context (server/utils/cycleContext.ts).
 --
 -- start_precision records how much of start_date is a commitment: 'day' is a picked start,
 -- while 'month'/'quarter' mean "sometime in Oct 2026" / "sometime in Q4 2026" and store only
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS invites (
 -- Vaccination log: one row per dose. Exists because "when was your last tetanus shot?" had no
 -- answer (2026-09-09). /journal/vaccines groups rows into per-family coverage with next-due
 -- dates (shared/utils/vaccines.ts); recent shots feed the AI digest and lab-summary prompts as
--- an acute-response caveat (vaccineContext in server/utils/protocol.ts). vaccine is freeform,
+-- an acute-response caveat (server/utils/vaccineContext.ts). vaccine is freeform,
 -- usually a KNOWN_VACCINES name via autocomplete; product is the brand/formulation.
 CREATE TABLE IF NOT EXISTS vaccinations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

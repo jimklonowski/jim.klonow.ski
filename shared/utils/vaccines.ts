@@ -1,5 +1,5 @@
 // Vaccine catalogue + booster math. Shared (app + server) because /journal/vaccines renders the
-// coverage table from it and the AI prompt context (vaccineContext in server/utils/protocol.ts)
+// coverage table from it and the AI prompt context (server/utils/vaccineContext.ts)
 // reports the same "last dose / next due" facts.
 //
 // The log exists because a routine "when was your last tetanus shot?" had no answer — so the

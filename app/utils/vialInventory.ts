@@ -71,36 +71,12 @@ export function computeRemaining(vial: Vial, entries: JournalEntry[]) {
   return { used, remaining, pct }
 }
 
-// Best-effort per-day dose from compoundInfo when there isn't enough logged history.
-// Parses the typical dose range (midpoint) and frequency into an amount in `targetUnit`.
+// compoundInfo's typical per-day amount, in `targetUnit`, for when there isn't enough logged
+// history. It used to be parsed out of the prose range and frequency, which misread anything
+// phrased as a weekly total ("200–400 mg weekly" at "every other day" came out as 150 mg/day).
 function typicalDailyAmount(compound: string, targetUnit: DoseUnit): number | null {
-  const info = getCompoundInfo(compound)
-  if (!info) return null
-
-  const m = info.dosing.range.match(/([\d.]+)(?:\s*[–—-]\s*([\d.]+))?\s*(mg|mcg|iu)/i)
-  if (!m) return null
-  const lo = parseFloat(m[1]!)
-  const hi = m[2] ? parseFloat(m[2]) : lo
-  const mid = (lo + hi) / 2
-  const unit = m[3]!.toLowerCase() as DoseUnit
-
-  const perDose = convertUnitFor(compound, mid, unit, targetUnit)
-  if (perDose == null) return null
-  return perDose * parseFrequencyPerDay(info.dosing.frequency)
-}
-
-// Rough doses-per-day from a free-text frequency string ("1–2x daily", "2x weekly", etc.).
-function parseFrequencyPerDay(frequency: string): number {
-  const f = frequency.toLowerCase()
-  if (f.includes('every other day') || f.includes('eod')) return 0.5
-
-  let mult = 1
-  const mx = f.match(/(\d+)\s*x/)
-  if (mx) mult = parseInt(mx[1]!)
-  else if (f.includes('twice')) mult = 2
-
-  if (f.includes('week')) return mult / 7
-  return mult // treat daily / unspecified as per-day
+  const typical = getCompoundInfo(compound)?.dosing.typicalDaily
+  return typical ? convertUnitFor(compound, typical.amount, typical.unit, targetUnit) : null
 }
 
 export function estimateDailyRate(
