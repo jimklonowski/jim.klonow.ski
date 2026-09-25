@@ -29,6 +29,18 @@
     <p class="mt-3 text-[11px] text-faint">
       demo mode — a fictional persona with synthetic data · no sign-up
     </p>
+    <a
+      :href="REPO_URL"
+      target="_blank"
+      rel="noopener"
+      class="mt-5 inline-flex items-center gap-1.5 text-[11px] text-muted hover:text-accent"
+    >
+      <UIcon
+        name="simple-icons:github"
+        class="size-3.5"
+      />
+      source on github
+    </a>
   </div>
 
   <TuiDataState
@@ -253,6 +265,7 @@
 <script setup lang="ts">
 import { diffDays } from '#shared/utils/dates'
 import { isFullAccessRole } from '#shared/utils/access'
+import { REPO_URL } from '#shared/utils/site'
 import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
