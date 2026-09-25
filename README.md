@@ -28,24 +28,27 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | ![Entries ledger](.github/screenshots/journal-entries.png) | ![Calendar](.github/screenshots/journal-calendar.png) |
 | **`/journal/supplements` — standing stack** | **`/tools/calculator` — reconstitution & syringe units** |
 | ![Supplements](.github/screenshots/journal-supplements.png) | ![Calculator](.github/screenshots/tools-calculator.png) |
-| **`/tools/sharing` — role-based share links** | **`/tools/import` — Apple Health import + auto-sync** |
+| **`/journal/vaccines` — immunization record** | **`/tools/data` — export + change history** |
+| ![Vaccines](.github/screenshots/journal-vaccines.png) | ![Data](.github/screenshots/tools-data.png) |
+| **`/tools/sharing` — share links + sessions** | **`/tools/import` — Apple Health import + auto-sync** |
 | ![Sharing](.github/screenshots/tools-sharing.png) | ![Import](.github/screenshots/tools-import.png) |
 
 </details>
 
 ## Stack
 
-- **Nuxt 4** + Vue 3 + TypeScript
+- **Nuxt 4** + Vue 3 + TypeScript, on **Node ≥ 22.18** and **pnpm 11**
 - **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" dark-only TUI theme (JetBrains Mono / Departure Mono)
 - **Installable PWA** — standalone display, afib-heartbeat icon set (`public/`), iOS homescreen metas in `app/app.vue`
-- **Cloudflare Workers** — deployed via Wrangler (nodejs_compat)
-- **Cloudflare D1** — primary data store (journal, labs, DEXA, health metrics, workouts, cycles, digests, share invites)
-- **Cloudflare R2** — lab PDF and progress photo storage
-- **Cloudflare KV** — rate limiting
+- **Cloudflare Workers** (Paid plan) — deployed via Wrangler (nodejs_compat), with cron triggers for the scheduled tasks
+- **Cloudflare D1** — two databases: the real one (`DB`) and the demo sandbox (`DEMO_DB`), built and changed by numbered migrations
+- **Cloudflare R2** — lab PDFs, progress photos, the demo seed, and the weekly database backups
+- **Cloudflare KV** — rate limiting, and the "sign out other devices" cutoff
+- **zod** — every request body and query string is validated against a schema in `shared/utils/schemas.ts`
 - **nuxt-echarts** — trend charts
-- **Anthropic SDK** — server-side lab PDF parsing, protocol-aware lab summaries, daily/weekly health digests, freeform stock-dump parsing into inventory rows (structured output), and the `/ask` chat
+- **Anthropic SDK** — lab PDF parsing, protocol-aware lab summaries, daily/weekly health digests, freeform stock-dump parsing into inventory rows (structured output), and the `/ask` chat (models under **AI** below)
 - **Whoop API** — OAuth sync for recovery, sleep, and workout data
-- **@nuxtjs/seo** — per-page titles via a `%s | jim.klonow.ski` template (each page sets just its leaf name with `useSeoMeta`) and inferred OG/Twitter cards over a shared `public/og.png`
+- **@nuxtjs/seo** — per-page titles via a `%s | jim.klonow.ski` template (each page sets just its leaf name with `useSeoMeta`), inferred OG/Twitter cards over a shared `public/og.png`, and the robots rules under **Search engines and AI crawlers**
 
 ## Sections
 
@@ -57,6 +60,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/labs/upload` | Upload a new lab PDF (parsed server-side into structured markers) — owner only |
 | `/labs/login` | Owner password sign-in |
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
+| `/demo` | Starts a 24-hour demo session on the synthetic sandbox and lands on the home dashboard with a short guided tour — see **Demo mode** |
 | `/journal` | Hub — vital tiles with sparklines, today's doses + workout, soda/Whoop strip, and cards into each spoke below |
 | `/journal/trends` | Every vitals + Whoop/Apple Watch chart under one shared range picker (30/60/90d/all, optional 7d smoothing) |
 | `/journal/compounds` | Active protocol and every tracked compound — modeled exposure curves for the slow-release injectables (Bateman superposition of the dose log, lab draws overlaid) and a planned-vs-logged adherence panel scoring the standing cadence plus any planned cycles — linking out to the calculator and vial inventory |
@@ -65,14 +69,16 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/journal/workouts` | Session log merged from Apple Health + Whoop, with stat cells and type mix |
 | `/journal/entries` | Day-log ledger of every journal row — hidden from the doctor role |
 | `/journal/[date]` | Create or edit a day's entry (read-only for guests) — "copy from previous" mirrors each injection site (left glute → right glute) so sides rotate day to day |
-| `/journal/calendar` | Month view with compound-colored dots, scheduled-dose rings (planned vs logged, from the hand-maintained `PROTOCOL_RULES` cadence merged with any planned cycles — an upcoming cycle previews its rings on future days) + protocol timeline (logged compounds, plus standing meds backfilled from the `STANDING_COMPOUNDS` constant) |
+| `/journal/calendar` | Month view with compound-colored dots, scheduled-dose rings (planned vs logged, from the standing `PROTOCOL_RULES` cadence merged with any planned cycles — an upcoming cycle previews its rings on future days) + protocol timeline (logged compounds, plus the standing meds in `STANDING_COMPOUNDS` that never enter the dose log; both live in `shared/utils/protocolRules.ts`) |
 | `/journal/photos` | Progress photos — bulk upload, before/after compare slider, reframing |
 | `/journal/compound/[name]` | Dosing history for a single compound, with a modeled exposure curve for the slow-release ones |
 | `/journal/supplements` | Standing vitamin/supplement/skin stack (active, on-hand, discontinued) — feeds AI prompts; editing owner only |
+| `/journal/vaccines` | Immunization record — one row per dose, grouped into per-vaccine coverage with next-due boosters (`shared/utils/vaccines.ts`), plus a profile card for standing facts like blood type. Recent shots reach the AI prompts as an acute-response caveat; readable by every role, editing owner only |
 | `/tools/calculator` | Peptide reconstitution & syringe unit calculator — bridges IU↔mg for HGH/hCG when opened from a compound page (IU doses display their mg equivalent app-wide via `IU_PER_MG` in `shared/utils/peptideCalc.ts`) |
 | `/tools/inventory` | Peptide vial inventory and depletion tracking — **✦ STOCK DUMP** has Claude parse a freeform "what's in the fridge" sentence into sealed-vial rows (structured output, corrected in a confirm table before saving), and a **runway panel** (`shared/utils/stockRunway.ts`) shows days-of-stock per compound at the logged pace plus whether the stockpile covers the remaining doses of the next planned cycle — owner only, plus the demo sandbox |
 | `/tools/import` | One-time Apple Health XML import + Health Auto Export auto-sync webhook — owner only |
-| `/tools/sharing` | Mint, list, and revoke share links — owner only |
+| `/tools/data` | Full JSON export (the weekly backup's format) and the change history, where any delete or overwrite can be put back — owner only |
+| `/tools/sharing` | Mint, list, and revoke share links, and sign out your other devices — owner only |
 | `/ask` | AI analysis console — streaming chat over the full tracked history (labs, DEXA, journal, Whoop, protocol) — owner only |
 | `/privacy` | Privacy notice |
 
@@ -82,12 +88,14 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 Cookie sessions are HMAC-signed tokens (key: `LABS_SECRET`) carrying one of four roles:
 
-- **owner** — logs in with `LABS_PASSWORD`; full read/write. Writes to lab data additionally require a 9-digit `LABS_UPLOAD_PIN` (second-factor cookie, 12h).
-- **friend** — read-only mirror of the whole site.
-- **doctor** — clinical slice only: labs, DEXA, vitals/protocol trends, compounds, workouts. Daily entries, the `/journal/entries` ledger, notes, sodas, photos, and digests are blocked (notes/sodas are stripped server-side).
-- **demo** — self-serve, credential-free 24h session minted by visiting [`/demo`](https://jim.klonow.ski/demo) (replaces whatever session cookie is present). Sees and edits only the synthetic sandbox — see **Demo mode** below. Blocked from the AI/upload/sharing surfaces.
+- **owner** — logs in with `LABS_PASSWORD`; full read/write. Lab uploads, lab JSON saves, and summary regeneration also need a 9-digit `LABS_UPLOAD_PIN` (a second-factor cookie, 12h).
+- **friend** — read-only mirror of the whole site, except the owner's management pages (upload, import, data, sharing, inventory) and `/ask`.
+- **doctor** — the clinical record: labs and DEXA, the journal hub, vitals and protocol trends, compounds and their dossiers, workouts, the calendar, the calculator, supplements, vaccines, and planned cycles. Daily entries, the `/journal/entries` ledger, photos, and digests are off-limits, and the journal list the doctor receives has food, sodas, and notes blanked server-side. The allowlist is `DOCTOR_PAGES` in `shared/utils/access.ts`; anything not on it is denied.
+- **demo** — self-serve, credential-free 24h session minted by visiting [`/demo`](https://jim.klonow.ski/demo) (replaces whatever session cookie is present). Sees and edits only the synthetic sandbox — see **Demo mode** below. Blocked from the AI, upload, import, data, and sharing pages.
 
-Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/tools/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
+Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/tools/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table, which stores only a SHA-256 of each link's token. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
+
+Owner sessions are self-contained signed tokens, so **Sign out other devices** on `/tools/sharing` is how one ends early: it stores a cutoff time in KV, and every owner session and upload-PIN unlock issued before it stops working (this device gets a fresh token). It can take up to a minute to reach every Cloudflare location.
 
 Enforcement is layered: `server/middleware/auth.ts` verifies the cookie once per request and gates page navigation, `shared/utils/access.ts` holds the role→page policy shared with the client route middleware, and every API handler asserts its own requirement (`requireLabsAuth` / `requireOwner` / `requireRole` in `server/utils/auth.ts`).
 
@@ -99,7 +107,7 @@ Visiting **[/demo](https://jim.klonow.ski/demo)** mints a demo-role session and 
 
 - A fully **synthetic persona**: ~20 months of journal vitals and doses, 9 lab draws with story arcs (ApoB 108→71, a TRT start with the expected LH/FSH suppression and hematocrit creep), 4 DEXA scans, daily sleep/recovery metrics, workouts, a supplement stack, and a vial inventory that lines up with the logged doses.
 - **Sandboxed writes** — journal days, sodas, supplements, and vials are editable (`requireWriteAccess` guard); demo visitors share the sandbox until it resets.
-- **Canned AI** — TICKER digests and lab summaries are pre-written into the seed; no live Anthropic calls, and `/ask`, uploads, imports, and sharing stay owner-only.
+- **Canned AI** — TICKER digests and lab summaries are pre-written into the seed; no live Anthropic calls, and `/ask`, uploads, imports, the data page, and sharing stay owner-only.
 - **Nightly reset** — the `demo:reset` task (09:00 UTC cron) wipes the sandbox and reseeds it from `demo/seed.json` in R2, re-anchoring every relative date so the data always ends "yesterday".
 
 The persona is generated deterministically by `scripts/demo/generate-demo-data.mjs` (committed seed: `scripts/demo/demo-seed.json`) and loaded with `pnpm demo:seed:local` / `pnpm demo:seed:remote`. Progress photos are neutral placeholder silhouettes under `demo/` keys in the photos bucket; the photo proxy refuses any non-`demo/` key to a demo session.
@@ -115,6 +123,16 @@ Hardening beyond auth is handled by [nuxt-security](https://nuxt-security.vercel
 
 Deliberately not enabled — with reasoning in the config comments: `xssValidator` (false-positives on freeform journal text; Vue escaping + CSP cover XSS), `corsHandler` (same-origin API), `allowedMethodsRestricter` (nitro's file-based method routing already 405s), CSRF tokens (cookies are `httpOnly`/`secure`/`sameSite: lax`).
 
+The lab-PDF proxy only serves flat lab-PDF names (`isLabPdfKey`). The labs bucket also holds the demo seed and the database backups, and the proxy would otherwise have served those to any signed-in guest who guessed a key.
+
+### Search engines and AI crawlers
+
+Only the public pages are meant to be indexed: the home page and `/privacy`. Both halves of that live in `nuxt.config.ts`:
+
+- **`robots.txt`** disallows `/labs`, `/journal`, `/tools`, `/ask`, `/share`, and `/demo`. A crawled `/demo` would mint a session, and everything else only ever shows a crawler a login redirect. `/api` is deliberately left out, since blocking it can break Google's render of pages that fetch client-side.
+- **Route rules** (`robots: false`) send `X-Robots-Tag: noindex` on the private sections and keep them out of the sitemap.
+- **AI-usage directives** in the `*` group (`Content-Usage: train-ai=n, search=y` and `Content-Signal: search=yes, ai-train=no, ai-input=no`) say search indexing yes, training and live AI-answer fetching no. They're advisory. Cloudflare's "Block AI bots" rule enforces the same thing at the edge.
+
 ## Data & integrations
 
 - All entries (journal, labs, DEXA, health metrics, workouts, vials, cycles, digests, invites) live in **D1**. `server/database/schema.sql` is the commented schema. The databases themselves are built and changed by the numbered wrangler migrations in `server/database/migrations`.
@@ -126,47 +144,104 @@ Deliberately not enabled — with reasoning in the config comments: `xssValidato
 - The **`/ask` console** (`server/api/ai/ask.post.ts`) streams answers to freeform questions over a per-request fact sheet built by `server/utils/askContext.ts` — every lab draw, every DEXA scan, all-time compound history, precomputed trends, and recent daily detail. Owner-only and KV rate-limited, since every question is an Anthropic call.
 - All three AI surfaces share standing protocol context: the intended dosing schedule (generated by `shared/utils/protocolProse.ts` from the same `PROTOCOL_RULES` the adherence panel scores against, plus standing meds that never hit the dose log and as-needed compounds), dated one-off notes (`shared/utils/protocolEvents.ts`), the supplement stack rendered live from the `supplements` table (so edits on `/journal/supplements` reach the prompts without a deploy), and planned-cycle context from the `cycles` table — an upcoming cycle flags the need for a baseline draw, an active one tells the model which day/week the period falls on and to compare gating markers (HDL, ALT/AST, hematocrit, ferritin, estradiol) against the named baseline draw and hands it the passive vitals watch precomputed (flagged/watch/steady per metric, so it narrates deterministic numbers rather than re-deriving them), a not-yet-scheduled one (month/quarter precision) is described as intent rather than a schedule — no start date to count toward, plus whether the latest draw is fresh enough to serve as its baseline — and a recently ended one frames the recovery window. All of it as-of-date aware, since lab summaries can regenerate for historical draws.
 
+### AI
+
+Every model choice is one line in `AI_MODELS` (`server/utils/ai.ts`):
+
+| Task | Model |
+|---|---|
+| `/ask` chat, daily and weekly digests | Claude Sonnet 5 (`claude-sonnet-5`) |
+| Lab / DEXA / echo PDF extraction, lab summaries, stock-dump parsing | Claude Opus 5.5 (`claude-opus-5-5`) |
+
+All of it is server-side and owner-only (the demo reads canned digests and summaries from its seed). Each database-backed block of prompt context (supplements, cycles, vaccines) has its own file in `server/utils/`.
+
+## Architecture
+
+- **`shared/`** is code both the app and the server use: domain math (cycles, trends, PK curves, stock runway, vaccines), the protocol rules and prose, request schemas, the access policy, and the `/api/health` rules. It imports nothing from Nuxt or h3, and its relative imports carry an explicit `.ts`, so `node --test` loads it directly under Node's type stripping. That's what the unit tests exercise.
+- **Validation.** Request shapes are zod schemas in `shared/utils/schemas.ts`. Handlers read them through `readValidatedJson` / `validatedQuery` (`server/utils/validate.ts`), so a bad field is a 400 that names it rather than a 500 from a D1 bind.
+- **Reads.** List endpoints go through `listRows` (`server/utils/db.ts`), which routes demo sessions to `DEMO_DB`. Responses carry an ETag (`server/utils/etag.ts`) and `Cache-Control: private, no-cache`, so the browser revalidates and gets an empty 304 when nothing changed. Date-keyed lists accept `?from=YYYY-MM-DD&to=YYYY-MM-DD`. On the client, every list comes from `useListResource` (`app/composables/useListResource.ts`), which shares one cached copy per key across pages and revalidates in the background on client-side navigation.
+- **Writes and forms.** `useSaveAction` wraps each save or delete (pending flag, double-submit guard, success toast, and a failure toast that shows the server's message). `useDirtyGuard` warns before leaving a form with unsaved edits.
+- **Change history.** Owner writes to the tracked tables record the row as it was before (`server/utils/audit.ts`, the `audit_log` table), and `/tools/data` can put any of them back. That stands in for a `deleted_at` column on every table. Demo-sandbox writes and automated ones (webhook, Whoop sync, digests) aren't recorded.
+- **Theme layers.** Colors are `@theme` tokens in `app/assets/css/main.css`. Component-wide looks (floating-panel chrome, field wells, form labels, tables) are set once in `app/app.config.ts`. Charts and inline styles, which need literal colors, read the hex twins in `app/utils/chartTheme.ts`, and `tests/theme.test.mjs` fails if those drift from the CSS tokens.
+- **Database.** Numbered migrations in `server/database/migrations` build and change both databases, and each database records what it has applied in `d1_migrations`. `server/database/schema.sql` is the commented snapshot for reading; `tests/migrations.test.mjs` replays every migration in SQLite and fails if the result differs from it.
+- **One Vue version.** `pnpm-workspace.yaml` pins `vue` and every `@vue/*` package to a single catalog line. Mixed Vue patch releases once broke every page with a link during production SSR.
+
+## Scheduled tasks
+
+Cloudflare fires the crons in `wrangler.jsonc` `triggers.crons`, and `server/schedule.ts` maps each to its Nitro tasks (`server/tasks/`). `tests/schedule.test.mjs` holds the two lists equal. Times are UTC; Chicago is 5 hours behind in summer, 6 in winter.
+
+| Cron | Task | What it does |
+|---|---|---|
+| `0 9 * * *` | `demo:reset` | Wipes the demo sandbox and reseeds it from R2, dates re-anchored to yesterday |
+| `0 11 * * *` | `whoop:sync` | Pulls recovery, sleep, strain, and workouts from Whoop |
+| `0 14 * * *` | `digest:daily` | Writes yesterday's recap |
+| `0 15 * * SUN` | `digest:weekly` | Writes the recap of the Sunday–Saturday week just ended |
+| `0 8 * * SUN` | `db:backup` | Snapshots the main database to R2 as gzipped JSON, keeping 12 weeks |
+| `0 8 * * SUN` | `audit:purge` | Removes the files of photos deleted 30+ days ago, and change-history entries older than a year |
+
+Days of the week are always written as names. Cloudflare numbers them 1 = Sunday … 7 = Saturday, so a digit means something different than it does in most crons, and a `0` fails the deploy. A cron's tasks run concurrently.
+
+### Monitoring and backups
+
+- Every task runs through `runLoggedTask` (`server/utils/taskRuns.ts`). It records each run in the `task_runs` table and then lets a failure through, so the cron invocation fails in Cloudflare's log too.
+- `GET /api/health` returns `{ ok }` with 200 or 503, for an uptime monitor to watch. It fails when a task is overdue against its window (`TASK_STALE_AFTER_HOURS` in `server/schedule.ts`), when a task's latest run failed, or when the Apple Health or Whoop feeds stop arriving. Only the owner sees the per-check detail.
+- The weekly backup lands in the labs bucket under `backups/d1/`, which the PDF proxy refuses to serve. To restore one, or an export from `/tools/data`, turn it back into SQL with `scripts/restore-backup.mjs`; its header has the steps. Rehearse on `--local` first. D1 Time Travel separately covers any point in the last 30 days.
+
+## Configuration
+
+Every secret the Worker reads is listed, with notes, in `.env.example`. Copy it to `.env` for local development; in production set each with `npx wrangler secret put <NAME>`.
+
+| Variable | Used for |
+|---|---|
+| `LABS_SECRET` | HMAC key for the session and upload-PIN cookies. Rotating it signs everyone out |
+| `LABS_PASSWORD` | Owner sign-in at `/labs/login` |
+| `LABS_UPLOAD_PIN` | Second factor for lab uploads, JSON saves, and summary regeneration |
+| `WEBHOOK_TOKEN` | Bearer token Health Auto Export sends to the Apple Health webhook (its own secret; the webhook refuses everything while it's unset) |
+| `ANTHROPIC_API_KEY` | Every AI call |
+| `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | Whoop OAuth app credentials, for connecting and the nightly sync |
+
+Bindings (the D1 databases, R2 buckets, and KV namespace) are declared in `wrangler.jsonc`; `pnpm types` regenerates their TypeScript types in `worker-configuration.d.ts`.
+
 ## Dev
+
+Requires Node 22.18 or newer (the tests and scripts rely on its built-in TypeScript type stripping) and pnpm 11.
 
 ```bash
 pnpm install
-pnpm dev            # https://local.emkay.com:3000 (requires local TLS cert in certs/)
-pnpm typecheck
-pnpm lint
-pnpm test           # unit tests (node --test, no framework) over the framework-free shared/utils math:
-                    #   cycle dates/windows, passive cycle signals, stock runway, labs time-travel
-pnpm sync:local     # mirror prod -> local: D1 dump/import + R2 objects (stop dev server first)
-pnpm sync:local:r2  # top up local R2 objects only (PDFs/photos referenced by local D1)
-pnpm demo:generate    # regenerate the synthetic demo persona (scripts/demo/demo-seed.json)
-pnpm demo:seed:local  # wipe + reseed the local demo sandbox DB and R2 objects
-pnpm demo:seed:remote # same against the production DEMO_DB + buckets
+pnpm dev              # HTTPS dev server on port 3000
+pnpm check            # types, lint, typecheck, tests (what pnpm deploy runs first)
+pnpm test             # unit tests (node --test over tests/*.test.mjs, no framework)
+pnpm test:watch       # the same, rerunning on change
+pnpm types            # regenerate worker-configuration.d.ts after editing wrangler.jsonc
 pnpm db:new <name>    # new numbered migration in server/database/migrations
 pnpm db:migrate       # apply pending migrations to both local DBs (main + demo)
 pnpm db:status        # applied/pending per local DB (db:status:remote for the real ones)
+pnpm sync:local       # mirror prod -> local: D1 dump/import + R2 objects (stop the dev server first)
+pnpm sync:local:r2    # top up local R2 objects only (PDFs/photos referenced by local D1)
+pnpm demo:generate    # regenerate the synthetic demo persona (scripts/demo/demo-seed.json)
+pnpm demo:seed:local  # wipe + reseed the local demo sandbox DB and R2 objects
+pnpm demo:seed:remote # same against the production DEMO_DB + buckets
 ```
+
+The dev server runs over HTTPS so secure cookies work locally. Its host and certificate paths are `devServer` in `nuxt.config.ts`; point them at your own locally trusted certificate (e.g. from mkcert) in `certs/`, which is gitignored. D1, R2, and KV are emulated locally under `.wrangler/state`.
 
 `pnpm sync:local` clears all local D1 state, the demo DB included. Afterwards run `pnpm db:migrate`, which rebuilds the empty demo DB and applies anything newer than prod, then `pnpm demo:seed:local`.
 
 ## Deploy
 
 ```bash
-pnpm deploy     # nuxt build + wrangler deploy
-pnpm preview    # local Wrangler Workers emulator
+pnpm deploy     # pnpm check, then nuxt build, then wrangler deploy
+pnpm preview    # build, then run the built Worker in Wrangler's local emulator
 ```
 
-Schema changes are numbered migrations (`pnpm db:new <name>`), mirrored into `server/database/schema.sql` in the same change. `pnpm test` fails if replaying the migrations doesn't reproduce that file. Apply them to both remote databases before deploying code that needs them:
+The build generates the real deploy config. Nitro writes `.output/server/wrangler.json`, which is `wrangler.jsonc` with the Worker entry point and static assets pointed at the build output, plus a `.wrangler/deploy/config.json` that redirects `wrangler deploy` to it. That's why the deploy log warns that `main` and `assets` are overridden. Edit `wrangler.jsonc`, never the generated file.
+
+Schema changes are numbered migrations (`pnpm db:new <name>`), mirrored into `server/database/schema.sql` in the same change. Apply them to both remote databases **before** deploying code that needs them:
 
 ```bash
-pnpm db:migrate:remote   # main + demo; each database records what it has applied in d1_migrations
+pnpm db:migrate:remote   # main + demo; each asks for confirmation
 ```
 
-The one-off files applied by hand before the ledger existed are in `server/database/archive`.
+The one-off files applied by hand before the migrations ledger existed are in `server/database/archive`.
 
-### Monitoring and backups
-
-- Every cron task records each run in the `task_runs` table, and a failed run also fails the cron invocation in Cloudflare's log.
-- `GET /api/health` returns `{ ok }` with 200 or 503, for an uptime monitor. It fails when a task is overdue against its cadence (`TASK_STALE_AFTER_HOURS` in `server/schedule.ts`), when a task's latest run failed, or when the Apple Health or Whoop feeds stop arriving. The owner sees the per-check detail.
-- Owner writes to the tracked tables (journal days and sodas, supplements, vials, vaccines, cycles, photos, profile, lab and DEXA saves) are logged in `audit_log` with the row as it was before. `/tools/data` lists them and can put any delete or overwrite back. That replaces a `deleted_at` column on every table. A deleted photo keeps its R2 files for 30 days, then the weekly `audit:purge` removes them. The same page downloads a full export in the backup format.
-- `/tools/sharing` has **Sign out other devices**. It sets a cutoff in KV, and owner and upload-PIN tokens issued before it stop working.
-- The JSON list endpoints send an ETag and `Cache-Control: private, no-cache`, so the browser revalidates and gets a 304 when nothing changed. Date-keyed lists also accept `?from=YYYY-MM-DD&to=YYYY-MM-DD`.
-- `db:backup` runs Sundays at 08:00 UTC. It writes the main database as gzipped JSON to `backups/d1/` in the labs bucket and keeps 12 copies. OAuth tokens are left out. To restore, run `scripts/restore-backup.mjs`; its header has the steps. Rehearse on `--local` first.
+CI (`.github/workflows/ci.yml`) runs lint, typecheck, the tests, and a production build on every push, on Node 22 and 24. It doesn't deploy.
