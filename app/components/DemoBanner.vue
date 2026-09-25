@@ -6,6 +6,19 @@
     <span class="text-accent font-medium">▚ demo</span>
     <span class="text-muted">fictional persona · synthetic data · sandbox resets daily</span>
     <span class="ml-auto flex items-center gap-3.5 shrink-0">
+      <!-- A demo visitor is exactly who might want to see how it's built. -->
+      <a
+        :href="REPO_URL"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 text-faint hover:text-accent"
+      >
+        <UIcon
+          name="simple-icons:github"
+          class="size-3"
+        />
+        source
+      </a>
       <button
         type="button"
         class="text-faint hover:text-accent uppercase tracking-[0.06em]"
@@ -21,6 +34,8 @@
 </template>
 
 <script setup lang="ts">
+import { REPO_URL } from '#shared/utils/site'
+
 const { role } = await useAuth()
 const isDemo = computed(() => role.value === 'demo')
 

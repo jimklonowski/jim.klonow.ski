@@ -72,14 +72,30 @@
         </p>
       </div>
 
-      <p class="mt-2.5 text-[10.5px] text-ghost tracking-widest uppercase">
-        session cookie · read-only share links issued on request
-      </p>
+      <div class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <p class="text-[10.5px] text-ghost tracking-widest uppercase">
+          session cookie · read-only share links issued on request
+        </p>
+        <a
+          :href="REPO_URL"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-1.5 text-[10.5px] tracking-widest uppercase text-faint hover:text-accent"
+        >
+          <UIcon
+            name="simple-icons:github"
+            class="size-3"
+          />
+          source
+        </a>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { REPO_URL } from '#shared/utils/site'
+
 definePageMeta({ layout: false })
 // One of only two pages a signed-out visitor can reach, so it's the one place a crawler could
 // actually index — and a sign-in form is nothing anyone should find in search results.
