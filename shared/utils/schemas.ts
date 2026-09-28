@@ -340,6 +340,17 @@ export const zWhoopCallbackQuery = z.object({
   state: z.string().min(1).max(256)
 })
 
+// A Whoop webhook body, parsed only after its signature checks out. v2 ids are UUIDs (a
+// recovery event carries its sleep's UUID); a numeric id would be a v1 delivery and is kept as a
+// string so the handler can refuse it by shape. `type` stays an open string: an event type Whoop
+// adds later should be acknowledged and ignored, not 400'd into five retries.
+export const zWhoopWebhook = z.object({
+  user_id: z.number().int().optional(),
+  id: z.union([z.string().min(1).max(64), z.number().int()]).transform(String),
+  type: z.string().min(1).max(64),
+  trace_id: z.string().max(128).optional()
+})
+
 // --- list reads ---
 
 // ?from / ?to on the date-keyed list endpoints. Both optional and inclusive; a reversed range is

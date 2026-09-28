@@ -75,6 +75,18 @@ const syncLabel = computed(() => {
   return days === 1 ? 'synced yesterday' : `synced ${days}d ago`
 })
 
+// Whoop's webhook pushes each scored sleep, recovery and workout within minutes; the nightly sync
+// above is the reconciliation pass. Shown as its own line so a silent webhook is noticeable.
+const pushLabel = computed(() => {
+  const at = status.value?.lastPushAt
+  if (!at) return 'no pushes from Whoop yet'
+  const mins = Math.floor((Date.now() - Date.parse(at)) / 60000)
+  if (Number.isNaN(mins)) return 'no pushes from Whoop yet'
+  if (mins < 60) return `last push ${Math.max(mins, 1)}m ago`
+  const hours = Math.floor(mins / 60)
+  return hours < 48 ? `last push ${hours}h ago` : `last push ${Math.floor(hours / 24)}d ago`
+})
+
 const healthLabel = computed(() => {
   if (!status.value) return ''
   if (status.value.needsReconnect) return 'Whoop rejected the saved credentials — reconnect'
@@ -110,6 +122,10 @@ const menuItems = computed(() => {
   const items = [{
     label: status.value?.needsReconnect ? 'Connection expired' : healthLabel.value || syncLabel.value,
     icon: healthy.value ? 'i-lucide-check' : 'i-lucide-triangle-alert',
+    disabled: true
+  }, {
+    label: pushLabel.value,
+    icon: 'i-lucide-radio-tower',
     disabled: true
   }]
   if (!status.value?.needsReconnect) {

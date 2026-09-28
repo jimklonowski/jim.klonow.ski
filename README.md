@@ -137,7 +137,11 @@ Only the public pages are meant to be indexed: the home page and `/privacy`. Bot
 
 - All entries (journal, labs, DEXA, health metrics, workouts, vials, cycles, digests, invites) live in **D1**. `server/database/schema.sql` is the commented schema. The databases themselves are built and changed by the numbered wrangler migrations in `server/database/migrations`.
 - Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary.
-- **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/workout data on a schedule into `health_metrics` and `workouts`.
+- **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/strain/workout data into `health_metrics` and `workouts`.
+  - Whoop also pushes each scored sleep, recovery and workout to `POST /api/whoop/webhook` within minutes (v2 webhooks, set in the Whoop developer dashboard).
+  - The endpoint checks Whoop's HMAC signature, re-reads the named record and upserts it. Each delivery is logged as a `whoop:webhook` run.
+  - The nightly sync stays as the reconciliation pass: a delivery can be missed, and strain has no webhook.
+  - Record-to-row mapping is shared by both paths, in `shared/utils/whoopRecords.ts`.
 - **Apple Health** data + workouts sync automatically via the [Health Auto Export](https://www.healthyapps.dev/) iOS app, which POSTs to the webhook at `server/api/journal/health-webhook.post.ts` (a one-time Apple Health XML import lives at `/tools/import`).
 - Scheduled **digests** (`server/tasks/digest/daily.ts`, `weekly.ts`) have Claude summarize the period's vitals, doses, sleep, and workouts — anchored to protocol change-points detected from the dose log (`shared/utils/trends.ts`) — into a short recap stored in the `digests` table and surfaced on the home dashboard (`app/components/home/Digest.vue`, daily above weekly) and in the all-digests slide-over (`DigestPanel.vue`).
 - The **AI lab summary** (`server/api/labs/generate-summary.post.ts`) compares each draw against prior draws with protocol context (current compounds + recent start/stop events + where the draw landed on each injectable's modeled exposure curve — `shared/utils/pk.ts`, so a near-peak vs near-trough draw isn't misread as a real change) and can be regenerated from the labs dashboard.
@@ -198,7 +202,7 @@ Every secret the Worker reads is listed, with notes, in `.env.example`. Copy it 
 | `LABS_UPLOAD_PIN` | Second factor for lab uploads, JSON saves, and summary regeneration |
 | `WEBHOOK_TOKEN` | Bearer token Health Auto Export sends to the Apple Health webhook (its own secret; the webhook refuses everything while it's unset) |
 | `ANTHROPIC_API_KEY` | Every AI call |
-| `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | Whoop OAuth app credentials, for connecting and the nightly sync |
+| `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | Whoop OAuth app credentials, for connecting and the nightly sync. The secret also verifies webhook signatures |
 
 Bindings (the D1 databases, R2 buckets, and KV namespace) are declared in `wrangler.jsonc`; `pnpm types` regenerates their TypeScript types in `worker-configuration.d.ts`.
 

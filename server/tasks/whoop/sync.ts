@@ -1,63 +1,11 @@
 /// <reference path="../../../worker-configuration.d.ts" />
-import { HOME_TZ } from '#shared/utils/time'
-import type { HealthMetricField, WorkoutUpsert } from '../../utils/db'
+import { cycleMetric, metricsByDate, recoveryMetric, sleepMetric, whoopWorkoutRow } from '#shared/utils/whoopRecords'
+import type { WhoopCycleRecord, WhoopRecoveryRecord, WhoopSleepRecord, WhoopWorkoutRecord } from '#shared/utils/whoopRecords'
 
-interface WhoopWorkoutRecord {
-  id?: string
-  start?: string
-  end?: string
-  sport_name?: string
-  score_state?: string
-  score?: {
-    average_heart_rate?: number
-    max_heart_rate?: number
-    kilojoule?: number
-    distance_meter?: number
-  }
-}
-
-interface WhoopRecoveryRecord {
-  created_at?: string
-  score_state?: string
-  score?: { recovery_score?: number }
-}
-
-interface WhoopSleepRecord {
-  end?: string
-  /** True for a nap. Naps carry their own (low) performance score and must not overwrite the night. */
-  nap?: boolean
-  score_state?: string
-  score?: { sleep_performance_percentage?: number }
-}
-
-interface WhoopCycleRecord {
-  start?: string
-  /** Absent while the cycle is still running. */
-  end?: string | null
-  score_state?: string
-  score?: { strain?: number }
-}
-
-// Only SCORED records carry real measurements; PENDING_SCORE and UNSCORABLE come back with an
-// empty or partial `score` that would otherwise be stored as though it were a reading.
-const SCORED = 'SCORED'
-
-// Whoop timestamps are UTC; bucketing by their date string put any evening workout (7pm+ local)
-// on the next day, where it could no longer line up with the Apple Health copy of the same
-// session. Convert to home timezone before taking the date. HOME_TZ comes from
-// shared/utils/time.ts, which is also where "today" is derived for the same reason.
-const localDateFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: HOME_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
-})
-
-function dateFromTimestamp(ts?: string | null): string | null {
-  if (!ts) return null
-  const parsed = new Date(ts)
-  return Number.isNaN(parsed.getTime()) ? null : localDateFmt.format(parsed)
-}
-
-const KJ_PER_KCAL = 4.184
-const METERS_PER_MILE = 1609.34
+// The nightly reconciliation. Since 2026-09-28 Whoop also pushes each scored sleep, recovery and
+// workout to /api/whoop/webhook within minutes; this run still re-reads the window, because a
+// webhook can be missed, and it's the only source of strain (Whoop has no cycle webhooks).
+// Record → row mapping lives in shared/utils/whoopRecords.ts so both paths bucket identically.
 
 // How far back to ask for records. Normally this is "since the last good sync, minus a little
 // overlap" — Whoop scores a cycle some time after it ends, so the most recent day is often still
@@ -75,41 +23,6 @@ function syncStart(lastSyncedAt: string | null): string {
     ? now - DEFAULT_LOOKBACK_DAYS * DAY_MS
     : parsed - OVERLAP_DAYS * DAY_MS
   return new Date(Math.max(from, floor)).toISOString()
-}
-
-/**
- * Newest-last, so a plain loop that assigns into a per-date map leaves the newest record for each
- * date in place. The API returns collections newest-first, and nothing in it guarantees that —
- * relying on the arrival order made "which sleep won a given date" an accident of the response.
- */
-function oldestFirst<T>(records: T[], timestamp: (r: T) => string | null | undefined): T[] {
-  return [...records].sort((a, b) => String(timestamp(a) ?? '').localeCompare(String(timestamp(b) ?? '')))
-}
-
-function mapWhoopWorkout(w: WhoopWorkoutRecord): WorkoutUpsert | null {
-  const date = dateFromTimestamp(w.start)
-  if (!w.id || !date) return null
-
-  let durationMin: number | null = null
-  if (w.start && w.end) {
-    const ms = new Date(w.end).getTime() - new Date(w.start).getTime()
-    if (ms > 0) durationMin = Math.round(ms / 60000 * 10) / 10
-  }
-
-  // score is only populated once Whoop has scored the activity; guard every field.
-  const s = w.score_state === SCORED ? w.score : undefined
-
-  return {
-    external_id: `whoop:${w.id}`,
-    date,
-    workout_type: w.sport_name || 'Workout',
-    start_time: w.start ?? null,
-    duration_min: durationMin,
-    calories: s?.kilojoule != null ? Math.round(s.kilojoule / KJ_PER_KCAL) : null,
-    avg_hr: s?.average_heart_rate ?? null,
-    max_hr: s?.max_heart_rate ?? null,
-    distance_mi: s?.distance_meter != null ? Math.round(s.distance_meter / METERS_PER_MILE * 100) / 100 : null
-  }
 }
 
 export default defineTask({
@@ -151,36 +64,9 @@ async function syncWhoop(db: D1Database) {
   const sleep = settled(sleepRes, 'sleep')
   const cycles = settled(cyclesRes, 'cycle')
 
-  const byDate: Record<string, Partial<Record<HealthMetricField, number>>> = {}
-
-  // Recovery records have no start/end of their own (tied to a sleep/cycle id) - created_at is
-  // the closest approximation to "the day this recovery is for", needs confirming live.
-  for (const r of oldestFirst(recovery, r => r.created_at)) {
-    if (r.score_state !== SCORED) continue
-    const date = dateFromTimestamp(r.created_at)
-    const score = r.score?.recovery_score
-    if (date && typeof score === 'number') byDate[date] = { ...byDate[date], recovery_score: score }
-  }
-
-  for (const s of oldestFirst(sleep, s => s.end)) {
-    // A nap is a second sleep record for the same day, scored against a nap's own (much
-    // shorter) need — letting one land would overwrite the night's performance with ~10%.
-    if (s.nap || s.score_state !== SCORED) continue
-    const date = dateFromTimestamp(s.end)
-    const score = s.score?.sleep_performance_percentage
-    if (date && typeof score === 'number') byDate[date] = { ...byDate[date], sleep_performance_pct: score }
-  }
-
-  for (const c of oldestFirst(cycles, c => c.start)) {
-    // Bucket strain on the day the cycle STARTED. Whoop cycles run wake-to-wake, so a cycle
-    // beginning Monday morning ends Tuesday morning — keying off `end` filed Monday's strain
-    // under Tuesday, one day later than the sleep and recovery beside it, and every digest
-    // then narrated the previous day's number as today's.
-    if (c.score_state !== SCORED) continue
-    const date = dateFromTimestamp(c.start)
-    const score = c.score?.strain
-    if (date && typeof score === 'number') byDate[date] = { ...byDate[date], strain: score }
-  }
+  const byDate = metricsByDate(recovery, r => r.created_at, recoveryMetric)
+  metricsByDate(sleep, s => s.end, sleepMetric, byDate)
+  metricsByDate(cycles, c => c.start, cycleMetric, byDate)
 
   let touched = 0
   for (const [date, fields] of Object.entries(byDate)) {
@@ -193,7 +79,7 @@ async function syncWhoop(db: D1Database) {
   let workouts = 0
   try {
     for (const record of await whoopFetchAll<WhoopWorkoutRecord>(db, '/v2/activity/workout', { start })) {
-      const row = mapWhoopWorkout(record)
+      const row = whoopWorkoutRow(record)
       if (row) {
         await upsertWorkout(db, row)
         workouts++

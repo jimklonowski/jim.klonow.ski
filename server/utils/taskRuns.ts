@@ -59,16 +59,25 @@ async function record(db: D1Database, row: { task: string, started: number, ok: 
  */
 export async function runLoggedTask<T>(event: TaskEvent, task: string, fn: (env: Env) => Promise<T>): Promise<{ result: T }> {
   const env = taskEnv(event)
+  return { result: await runLogged(env.DB, task, () => fn(env)) }
+}
+
+/**
+ * The same run log for work that isn't a scheduled task — each Whoop webhook delivery is one
+ * `whoop:webhook` row. /api/health only checks the names in SCHEDULED_TASKS, so these add
+ * history without adding a staleness alarm.
+ */
+export async function runLogged<T>(db: D1Database, task: string, fn: () => Promise<T>): Promise<T> {
   const started = Date.now()
   try {
-    const result = await fn(env)
-    await record(env.DB, { task, started, ok: true, result })
-    return { result }
+    const result = await fn()
+    await record(db, { task, started, ok: true, result })
+    return result
   }
   catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`${task} failed:`, message)
-    await record(env.DB, { task, started, ok: false, error: message, result: err instanceof TaskFailure ? err.result : undefined })
+    await record(db, { task, started, ok: false, error: message, result: err instanceof TaskFailure ? err.result : undefined })
     throw err
   }
 }
