@@ -1,7 +1,7 @@
 <template>
   <div
     class="ticker select-none cursor-pointer"
-    :class="[activeEvent ? `ev-${activeEvent}` : mood ? `mood-${mood}` : '', `size-${size}`, { sluggish }]"
+    :class="[activeEvent ? `ev-${activeEvent}` : mood ? `mood-${mood}` : '', `size-${size}`, { sluggish, full: isFull }]"
     :style="{ '--beat': `${beatSeconds}s` }"
     role="button"
     tabindex="0"
@@ -11,9 +11,9 @@
     @mouseenter="trigger('bigbeat')"
   >
     <div class="heart-wrap">
-      <!-- lg: the full-size rubber-hose sprite, one pose per mood/event. -->
+      <!-- The full rubber-hose figure, one pose per mood/event. -->
       <div
-        v-if="size === 'lg'"
+        v-if="isFull"
         class="heart hose"
         :style="{ '--cols': TICKER_COLS, '--rows': TICKER_ROWS }"
         aria-hidden="true"
@@ -88,7 +88,7 @@
 // TICKER — the pixel-heart digest companion (design_handoff_ticker). A 7×6 pixel
 // sprite that beats at the live RHR, with an EKG sweep below and JS-triggered event
 // one-shots (double-beat, celebration, thump, flatline gag). Pure CSS/SVG, no assets.
-// size 'lg' swaps in the full-size rubber-hose sprite from shared/utils/tickerSprite.ts.
+// `full` (always on at size 'lg') swaps in the rubber-hose figure from shared/utils/tickerSprite.ts.
 import { TICKER_COLS, TICKER_POSES, TICKER_ROWS, tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerCell, TickerPose } from '#shared/utils/tickerSprite'
 
@@ -107,9 +107,16 @@ const props = withDefaults(defineProps<{
    * A one-shot event plays over it and it resumes after.
    */
   mood?: 'thinking' | 'talking' | null
-  /** 'lg' is the full-size rubber-hose TICKER (gloves, sneakers, a pose per mood) for pages it hosts (/ask). */
+  /** 'lg' doubles the pixels for pages TICKER hosts (/ask); it always draws the full figure. */
   size?: 'md' | 'lg'
-}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md' })
+  /**
+   * The rubber-hose figure (gloves, sneakers, a pose per mood) instead of the 7×6 heart. Off by
+   * default at 'md', where the heart has to fit tight spots like the phone header on /ask.
+   */
+  full?: boolean
+}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false })
+
+const isFull = computed(() => props.full || props.size === 'lg')
 
 const emit = defineEmits<{ open: [] }>()
 
@@ -439,7 +446,8 @@ const ekgPoints = computed(() => {
   60% { transform: scale(0.93, 1.08); }
 }
 
-/* ── Size: 'lg' is the host on /ask — the full-size rubber-hose sprite ──── */
+/* ── The full rubber-hose figure: 3px pixels at md, 6px at lg (the /ask host) ── */
+.full .heart { --px: 3px; --px-gap: 1px; }
 .size-lg .heart { --px: 6px; --px-gap: 1px; }
 .heart.hose {
   grid-template-columns: repeat(var(--cols), var(--px));
@@ -493,7 +501,7 @@ const ekgPoints = computed(() => {
   50% { opacity: 1; }
 }
 /* Flatline: the colour drains while it's down. */
-.size-lg.ev-flatline .heart { filter: saturate(0.45); }
+.full.ev-flatline .heart { filter: saturate(0.45); }
 .size-lg .ekg { width: 108px; height: 28px; }
 .size-lg .cap { font-size: 11px; margin-top: 10px; }
 .size-lg .bpm { font-size: 10px; }

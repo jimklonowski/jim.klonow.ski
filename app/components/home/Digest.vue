@@ -69,6 +69,7 @@
     <div class="ticker-footer relative mt-auto pt-3 border-t border-line-soft flex items-center gap-4">
       <TickerCompanion
         ref="companion"
+        full
         :rhr="rhr"
         :sluggish="sluggish"
         @open="digestOpen = true"
@@ -92,13 +93,16 @@
             {{ generating ? 'generating…' : 'regenerate ⟳' }}
           </button>
         </div>
+        <!-- One line each: beside the full figure a single "daily · weekly" line wraps mid-phrase. -->
         <span class="text-muted">
           daily: {{ daily ? relative(daily.period_end) : '—' }}
           <span
             v-if="daily"
             class="text-accent"
           >✓</span>
-          · weekly: {{ weekly ? relative(weekly.period_end) : '—' }}
+        </span>
+        <span class="text-muted -mt-1">
+          weekly: {{ weekly ? relative(weekly.period_end) : '—' }}
           <span
             v-if="weekly"
             class="text-accent"
@@ -253,12 +257,15 @@ function isRecent(date: string) {
    Matching --color-line-soft to the divider (not the brighter --color-line-input) is the
    other half: the wedge has to look like the same stroke, not a foreign object on top of it.
    Both values are tied to what this sits on — bg-bg in index.vue — so re-home the footer and
-   these have to follow. */
+   these have to follow.
+
+   left is the heart's centre minus half the diamond: the full figure's body sits at columns 4–20
+   of its 28-column canvas, so the heart is centred ~50px in, not at the middle of the sprite. */
 .ticker-footer::before {
   content: '';
   position: absolute;
   top: -5px;
-  left: 27px;
+  left: 45px;
   width: 10px;
   height: 10px;
   background: var(--color-bg);
