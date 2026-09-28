@@ -1,7 +1,7 @@
 <template>
   <div
     class="ticker select-none cursor-pointer"
-    :class="[activeEvent ? `ev-${activeEvent}` : '', { sluggish }]"
+    :class="[activeEvent ? `ev-${activeEvent}` : mood ? `mood-${mood}` : '', `size-${size}`, { sluggish }]"
     :style="{ '--beat': `${beatSeconds}s` }"
     role="button"
     tabindex="0"
@@ -11,7 +11,21 @@
     @mouseenter="trigger('bigbeat')"
   >
     <div class="heart-wrap">
+      <!-- lg: the full-size rubber-hose sprite, one pose per mood/event. -->
       <div
+        v-if="size === 'lg'"
+        class="heart hose"
+        :style="{ '--cols': TICKER_COLS, '--rows': TICKER_ROWS }"
+        aria-hidden="true"
+      >
+        <span
+          v-for="(cell, i) in poseCells"
+          :key="i"
+          :class="cell.ink ? [`ink-${cell.ink}`, cell.motion && `mo-${cell.motion}`] : undefined"
+        />
+      </div>
+      <div
+        v-else
         class="heart"
         aria-hidden="true"
       >
@@ -32,6 +46,10 @@
         class="zzz"
         aria-hidden="true"
       >z z z</span>
+      <span
+        class="dots"
+        aria-hidden="true"
+      >· · ·</span>
     </div>
 
     <div class="ekg-wrap">
@@ -70,6 +88,9 @@
 // TICKER — the pixel-heart digest companion (design_handoff_ticker). A 7×6 pixel
 // sprite that beats at the live RHR, with an EKG sweep below and JS-triggered event
 // one-shots (double-beat, celebration, thump, flatline gag). Pure CSS/SVG, no assets.
+// size 'lg' swaps in the full-size rubber-hose sprite from shared/utils/tickerSprite.ts.
+import { TICKER_COLS, TICKER_POSES, TICKER_ROWS, tickerSprite } from '#shared/utils/tickerSprite'
+import type { TickerCell, TickerPose } from '#shared/utils/tickerSprite'
 
 const props = withDefaults(defineProps<{
   /** Latest resting HR reading — drives the beat (clamped 40–100 bpm). */
@@ -80,7 +101,15 @@ const props = withDefaults(defineProps<{
   caption?: string | null
   /** Accessible name — says what clicking the heart does in this context. */
   ariaLabel?: string
-}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests' })
+  /**
+   * A held state, unlike the one-shot events: 'thinking' while an answer is being worked out
+   * (a slow rock and a trail of dots), 'talking' while it streams (quicker beat, busy EKG).
+   * A one-shot event plays over it and it resumes after.
+   */
+  mood?: 'thinking' | 'talking' | null
+  /** 'lg' is the full-size rubber-hose TICKER (gloves, sneakers, a pose per mood) for pages it hosts (/ask). */
+  size?: 'md' | 'lg'
+}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md' })
 
 const emit = defineEmits<{ open: [] }>()
 
@@ -99,7 +128,9 @@ const CELL_CLASS = { '.': '', 'R': 'px-r', 'H': 'px-h', 'E': 'px-e' } as const
 
 const beatSeconds = computed(() => {
   if (props.sluggish) return 60 / 45
-  return 60 / Math.min(100, Math.max(40, props.rhr ?? 63))
+  const resting = 60 / Math.min(100, Math.max(40, props.rhr ?? 63))
+  // Talking gets the heart going a little — a quarter faster than resting.
+  return props.mood === 'talking' ? resting * 0.75 : resting
 })
 
 const bpmLabel = computed(() => {
@@ -135,6 +166,22 @@ onUnmounted(() => clearTimeout(eventTimer))
 
 defineExpose({ trigger })
 
+// --- Full-size poses (size 'lg') ------------------------------------------
+// Events that have a pose win over the held mood, and the mood over the short-sleep slump;
+// digest and bigbeat are pure animation and keep whatever pose is showing.
+
+const POSE_CELLS = Object.fromEntries(TICKER_POSES.map(p => [p, tickerSprite(p)])) as Record<TickerPose, TickerCell[]>
+
+const pose = computed<TickerPose>(() => {
+  if (activeEvent.value === 'celebrate') return 'happy'
+  if (activeEvent.value === 'thump') return 'worried'
+  if (activeEvent.value === 'flatline') return 'flatline'
+  if (props.mood) return props.mood
+  return props.sluggish ? 'sleepy' : 'idle'
+})
+
+const poseCells = computed(() => POSE_CELLS[pose.value])
+
 // EKG polyline per state. The dash sweep uses a fixed dasharray (~92, matching the
 // reference demo) so all variants share one animation.
 const EKG_IDLE = '0,6 12,6 16,2 20,10 24,4 28,6 46,6'
@@ -143,7 +190,7 @@ const EKG_FLAT = '0,6 46,6'
 
 const ekgPoints = computed(() => {
   if (activeEvent.value === 'flatline') return EKG_FLAT
-  if (activeEvent.value === 'digest') return EKG_BURST
+  if (activeEvent.value === 'digest' || (!activeEvent.value && props.mood === 'talking')) return EKG_BURST
   return EKG_IDLE
 })
 </script>
@@ -164,10 +211,12 @@ const ekgPoints = computed(() => {
   margin: 0 auto;
 }
 .heart {
+  --px: 6px;
+  --px-gap: 1px;
   display: inline-grid;
-  grid-template-columns: repeat(7, 6px);
-  grid-template-rows: repeat(6, 6px);
-  gap: 1px;
+  grid-template-columns: repeat(7, var(--px));
+  grid-template-rows: repeat(6, var(--px));
+  gap: var(--px-gap);
   transform-origin: center bottom;
   animation:
     ticker-beat var(--beat) ease-in-out infinite,
@@ -390,6 +439,101 @@ const ekgPoints = computed(() => {
   60% { transform: scale(0.93, 1.08); }
 }
 
+/* ── Size: 'lg' is the host on /ask — the full-size rubber-hose sprite ──── */
+.size-lg .heart { --px: 6px; --px-gap: 1px; }
+.heart.hose {
+  grid-template-columns: repeat(var(--cols), var(--px));
+  grid-template-rows: repeat(var(--rows), var(--px));
+}
+/* Sprite-only shades beside the theme tokens (canvas direction C). */
+.ink-rim { background: #6e1f2c; }
+.ink-red { background: var(--heart); }
+.ink-shade { background: #c2493f; }
+.ink-hi { background: var(--heart-hi); }
+.ink-spec { background: #ffd5cc; }
+.ink-eye { background: var(--ticker-eye); }
+.ink-glint { background: var(--color-hi); }
+.ink-blush { background: #f5a0a6; }
+.ink-tongue { background: #ff9aa5; }
+.ink-drop { background: #8fd3ff; }
+.ink-limb { background: var(--color-dim); }
+.ink-glove { background: var(--color-hi); }
+.ink-shoe { background: var(--color-accent); }
+.ink-clip { background: var(--color-warn); }
+.ink-line { background: var(--color-faint); }
+.ink-flag { background: var(--heart); }
+.ink-mug { background: var(--color-ember); }
+.ink-coffee { background: #5a3424; }
+/* Blinks close the top rows of each eye onto the bottom one. */
+.mo-lid { animation: hose-blink 4.7s linear infinite; }
+.mo-lid-glint { animation: hose-blink-glint 4.7s linear infinite; }
+@keyframes hose-blink {
+  0%, 92%, 100% { background: var(--ticker-eye); }
+  94%, 98% { background: var(--heart); }
+}
+@keyframes hose-blink-glint {
+  0%, 92%, 100% { background: var(--color-hi); }
+  94%, 98% { background: var(--heart); }
+}
+/* Talking: the lower lip and tongue flap shut every other beat of a fast cycle. */
+.mo-jaw { animation: hose-jaw 0.42s steps(1) infinite; }
+.mo-jaw-tongue { animation: hose-jaw-tongue 0.42s steps(1) infinite; }
+@keyframes hose-jaw {
+  0% { background: var(--ticker-eye); }
+  50% { background: var(--heart); }
+}
+@keyframes hose-jaw-tongue {
+  0% { background: #ff9aa5; }
+  50% { background: var(--heart); }
+}
+/* Wave lines and coffee steam. */
+.mo-flicker { animation: hose-flicker 1.6s ease-in-out infinite; }
+@keyframes hose-flicker {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+/* Flatline: the colour drains while it's down. */
+.size-lg.ev-flatline .heart { filter: saturate(0.45); }
+.size-lg .ekg { width: 108px; height: 28px; }
+.size-lg .cap { font-size: 11px; margin-top: 10px; }
+.size-lg .bpm { font-size: 10px; }
+.size-lg .zzz,
+.size-lg .dots { font-size: 12px; }
+
+/* ── Held moods ─────────────────────────────────────────────────────────── */
+/* THINKING — a slow side-to-side rock over the beat, with a trail of dots. */
+.mood-thinking .heart {
+  animation:
+    ticker-ponder 2.4s ease-in-out infinite,
+    ticker-glow var(--beat) ease-in-out infinite;
+}
+@keyframes ticker-ponder {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+.dots {
+  position: absolute;
+  left: 100%;
+  top: -6px;
+  margin-left: 3px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.mood-thinking .dots {
+  animation: ticker-dots 1.4s steps(4) infinite;
+}
+@keyframes ticker-dots {
+  0% { opacity: 0.25; clip-path: inset(0 100% 0 0); }
+  33% { opacity: 0.9; clip-path: inset(0 66% 0 0); }
+  66% { opacity: 0.9; clip-path: inset(0 33% 0 0); }
+  100% { opacity: 0.9; clip-path: inset(0 0 0 0); }
+}
+/* TALKING — the beat quickens (see beatSeconds) and the EKG runs the busy burst trace. */
+
 /* ── Reduced motion: static sprite, glow pulse only ─────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .heart,
@@ -397,15 +541,24 @@ const ekgPoints = computed(() => {
   .ev-celebrate .heart,
   .ev-thump .heart,
   .ev-flatline .heart,
-  .ev-bigbeat .heart {
+  .ev-bigbeat .heart,
+  .mood-thinking .heart {
     animation: ticker-glow var(--beat) ease-in-out infinite;
   }
   .ekg-line,
   .px-e,
+  .mo-lid,
+  .mo-lid-glint,
+  .mo-jaw,
+  .mo-jaw-tongue,
+  .mo-flicker,
   .sparkle,
   .zzz,
+  .dots,
   .beeep {
     animation: none !important;
   }
+  /* The dots still say "thinking" without moving. */
+  .mood-thinking .dots { opacity: 0.8; }
 }
 </style>

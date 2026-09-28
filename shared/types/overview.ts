@@ -12,6 +12,8 @@ export interface OverviewSummary {
   streak: number
   /** Newest journal row of any kind, or null before the first entry. */
   latestEntryDate: string | null
+  /** The most recent resting HR logged — TICKER beats at it outside the home dashboard. */
+  latestRhr: number | null
   /** Sodas logged today; null for roles that don't see the soda log (doctor). */
   sodasToday: number | null
   /** The newest draw with its raw markers (derived markers are computed client-side). */

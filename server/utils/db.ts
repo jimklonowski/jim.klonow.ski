@@ -149,7 +149,11 @@ export function parseLabsRow(row: Record<string, unknown>) {
     sources: (JSON.parse((row.sources as string) || '[]') as string[]).map(toPdfUrl),
     markers: JSON.parse((row.markers as string) || '{}'),
     qualitative: JSON.parse((row.qualitative as string) || '[]'),
-    ai_summary: (row.ai_summary as string | null) ?? null
+    ai_summary: (row.ai_summary as string | null) ?? null,
+    // Provenance (migration 0004); null for summaries written before it.
+    ai_summary_model: (row.ai_summary_model as string | null | undefined) ?? null,
+    ai_summary_prompt_hash: (row.ai_summary_prompt_hash as string | null | undefined) ?? null,
+    ai_summary_at: (row.ai_summary_at as string | null | undefined) ?? null
   }
 }
 
@@ -246,7 +250,9 @@ export function parseDigestRow(row: Record<string, unknown>) {
     period_end: row.period_end as string,
     summary: row.summary as string,
     stats: JSON.parse((row.stats as string) || '{}'),
-    created_at: (row.created_at as string | null) ?? null
+    created_at: (row.created_at as string | null) ?? null,
+    model: (row.model as string | null | undefined) ?? null,
+    prompt_hash: (row.prompt_hash as string | null | undefined) ?? null
   }
 }
 

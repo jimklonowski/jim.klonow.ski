@@ -177,6 +177,17 @@ export const zDigestGenerate = z.object({
 
 export const zSummaryGenerate = z.object({ date: zIsoDate })
 
+// Backfill a few missing digests per request: each is a model call, run one after another, so
+// a small batch keeps the request short and lets the page show progress between batches.
+export const zDigestBackfill = z.object({
+  kind: z.enum(['daily', 'weekly'], 'kind must be \'daily\' or \'weekly\''),
+  dates: z.array(zIsoDate).min(1).max(5)
+})
+
+export const zDigestGaps = z.object({
+  days: z.coerce.number().int().min(7).max(365).default(60)
+})
+
 // Stockpile text for the vials parser: the same 4,000-character cap the model prompt is sized for.
 export const zVialParse = z.object({ text: zText(4000).min(1, 'Nothing to parse') })
 
@@ -185,8 +196,12 @@ export const zVialParse = z.object({ text: zText(4000).min(1, 'Nothing to parse'
 // server's local day when absent or malformed, as before.
 export const zAsk = z.object({
   messages: z.unknown().optional(),
-  today: zIsoDate.optional().catch(undefined)
+  today: zIsoDate.optional().catch(undefined),
+  // The saved conversation this turn belongs to; absent starts a new one.
+  threadId: zId.optional()
 })
+
+export const zAskThread = z.object({ id: z.coerce.number().int().positive() })
 
 // --- photos, vaccinations, profile ---
 

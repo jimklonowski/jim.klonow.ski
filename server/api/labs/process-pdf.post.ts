@@ -15,26 +15,21 @@ function buildPdfFilename(originalName: string, date: string): string {
   return `${date}-${base}.pdf`
 }
 
-const EXTRACTION_PROMPT = `Extract all biomarker values from this lab report PDF and return ONLY a valid JSON object — no markdown, no explanation, just JSON.
-
-Structure:
-{
-  "date": "YYYY-MM-DD",
-  "fasting": true,
-  "markers": {},
-  "qualitative": [{ "name": "Factor V Leiden Mutation Analysis", "result": "Negative" }]
-}
+// The response shape is enforced by structured outputs (the *_SCHEMA constants below), so the
+// prompts only say what goes in each field. They used to ask for "ONLY valid JSON" and parse the
+// reply as text, which turned a stray code fence or a cut-off object into an opaque 502.
+const EXTRACTION_PROMPT = `Extract every biomarker value from this lab report PDF.
 
 Rules:
-- date: specimen collection date in YYYY-MM-DD format
+- date: specimen collection date
 - fasting: true if the report indicates a fasting specimen in ANY wording — Quest prints "FASTING: YES", other labs (e.g. CHW) print "Fasting", "Fasting: Y", "Patient fasting", or a fasting note beside glucose/lipids. false if it says FASTING: NO / non-fasting, or carries no fasting information at all
 - For values like "<10", use the number 10
 - For values like ">X", use X
 - Units: convert to the unit the site stores. ABSOLUTE NEUTROPHILS/LYMPHOCYTES/MONOCYTES/EOSINOPHILS/BASOPHILS are stored in cells/uL — if the report gives them in K/uL, x10E3/uL, x10^3/uL or thousand/uL, multiply by 1000 (1.6 K/uL → 1600). WHITE BLOOD CELL COUNT and PLATELET COUNT are stored in K/uL; RED BLOOD CELL COUNT in M/uL
 - Lab names vary between labs ("Neutrophils Absolute", "Neut Abs" and "ANC" are all ABSOLUTE NEUTROPHILS) — match by meaning, not exact wording, but never invent a marker the report doesn't contain
 - Only include markers actually present in the report
-- markers is ONLY for numeric results matching one of the exact key names below
-- qualitative is for any test result that is NOT a plain number — genetic/mutation analyses, antibody positive/negative, presence/absence findings, or any other categorical result. Use the report's own test name for "name" and its exact reported result (e.g. "Negative", "Heterozygous", "Detected") for "result". Omit qualitative entirely if there are no such results.
+- markers: one { key, value } entry per numeric result, key being one of the exact key names below
+- qualitative is for any test result that is NOT a plain number — genetic/mutation analyses, antibody positive/negative, presence/absence findings, or any other categorical result. Use the report's own test name for "name" and its exact reported result (e.g. "Negative", "Heterozygous", "Detected") for "result". Leave the list empty if there are no such results.
 
 Use EXACTLY these key names (lab name → key):
 GLUCOSE → glucose
@@ -111,68 +106,90 @@ PSA → psa
 VITAMIN B12 → vitamin_b12
 FOLATE (FOLIC ACID) → folate`
 
-const DEXA_EXTRACTION_PROMPT = `Extract all data from this DEXA/DXA body composition scan report and return ONLY valid JSON — no markdown, no explanation.
-
-Structure (use exactly these field names):
-{
-  "date": "YYYY-MM-DD",
-  "weight_lbs": 155.0,
-  "total": {
-    "body_fat_pct": 20.2,
-    "total_mass_lbs": 157.9,
-    "fat_mass_lbs": 31.9,
-    "lean_mass_lbs": 120.1,
-    "bmc_lbs": 5.9,
-    "fat_free_lbs": 126.0
-  },
-  "regions": {
-    "arms": { "fat_pct": 16.3, "fat_lbs": 3.3, "lean_lbs": 16.3 },
-    "legs": { "fat_pct": 21.8, "fat_lbs": 11.2, "lean_lbs": 37.9 },
-    "trunk": { "fat_pct": 20.4, "fat_lbs": 15.3, "lean_lbs": 58.1 },
-    "android": { "fat_pct": 19.1, "fat_lbs": 2.1 },
-    "gynoid": { "fat_pct": 22.4, "fat_lbs": 5.2 }
-  },
-  "vat": { "volume_in3": 1.21, "fat_mass_lbs": 0.04 },
-  "ag_ratio": 0.84,
-  "bone_density": {
-    "total_bmd": 1.154,
-    "t_score": -0.5,
-    "z_score": -0.1
-  },
-  "symmetry": {
-    "right_arm_lean": 8.4,
-    "left_arm_lean": 8.0,
-    "right_leg_lean": 18.7,
-    "left_leg_lean": 19.1
-  }
-}
+const DEXA_EXTRACTION_PROMPT = `Extract the data from this DEXA/DXA body composition scan report. All masses in pounds, all percentages as plain numbers (20.2 for 20.2%).
 
 Rules:
-- date: scan measurement date in YYYY-MM-DD format
-- weight_lbs: the patient's measured/scale weight (not DEXA total mass)
-- Omit any section not present in the report (vat, bone_density, symmetry are optional)
-- Return ONLY valid JSON`
+- date: scan measurement date
+- measurements: one { field, value } entry per figure the report gives, field being one of:
+  weight_lbs — the patient's measured/scale weight (not DEXA total mass)
+  total.body_fat_pct, total.total_mass_lbs, total.fat_mass_lbs, total.lean_mass_lbs, total.bmc_lbs, total.fat_free_lbs — whole-body figures
+  regions.arms / regions.legs / regions.trunk .fat_pct, .fat_lbs, .lean_lbs — e.g. regions.arms.fat_pct
+  regions.android / regions.gynoid .fat_pct, .fat_lbs
+  vat.volume_in3, vat.fat_mass_lbs — visceral adipose tissue
+  ag_ratio — the android/gynoid ratio
+  bone_density.total_bmd, bone_density.t_score, bone_density.z_score
+  symmetry.right_arm_lean, symmetry.left_arm_lean, symmetry.right_leg_lean, symmetry.left_leg_lean
+- Leave out any figure the report doesn't have — never estimate one`
 
-const ECHO_EXTRACTION_PROMPT = `Extract data from this transthoracic echocardiogram report and return ONLY valid JSON — no markdown, no explanation.
-
-Structure:
-{
-  "date": "YYYY-MM-DD",
-  "markers": {},
-  "qualitative": [{ "name": "...", "result": "..." }]
-}
+const ECHO_EXTRACTION_PROMPT = `Extract data from this transthoracic echocardiogram report.
 
 Rules:
-- date: the study date in YYYY-MM-DD format
-- markers keys and where to find each value in the "Measurements" table — use EXACTLY these names:
+- date: the study date
+- markers: one { key, value } entry per value found. The keys and where to find each value in the "Measurements" table:
   - la_volume_index: the "Vol/bsa, S" row under the "Left atrium" section (ml/m²)
   - lv_mass_index: the "Mass/bsa" row under the "Left ventricle" section (g/m²)
   - e_e_prime_ratio: the "E/e', avg, TDI" row under the "Left ventricle" section (unitless)
   - ivs_thickness: the "IVS, ED" row under the "Ventricular septum" section specifically (cm) — do NOT use the "PW, ED" row under "Left ventricle", which is a different measurement (posterior wall, not septum)
   - ejection_fraction: the estimated ejection fraction stated in the Conclusions/Observations narrative text (not the measurements table). It is usually given as a range like "55-60%" — use the midpoint (e.g. 57.5 for "55-60%")
 - Only include a marker if its value is actually present in the report
-- qualitative: any notable narrative findings from the Conclusions/Observations/Summary sections that are not plain numbers — valve regurgitation/stenosis grades, wall motion abnormalities, chamber size/function descriptions, pericardial findings, overall impression, etc. Use a short descriptive "name" (e.g. "Mitral Valve", "Overall Impression") and the finding as "result" (e.g. "Mild regurgitation", "Normal LV systolic and diastolic function"). Omit qualitative entirely if there's nothing notable.
-- Return ONLY valid JSON`
+- qualitative: any notable narrative findings from the Conclusions/Observations/Summary sections that are not plain numbers — valve regurgitation/stenosis grades, wall motion abnormalities, chamber size/function descriptions, pericardial findings, overall impression, etc. Use a short descriptive "name" (e.g. "Mitral Valve", "Overall Impression") and the finding as "result" (e.g. "Mild regurgitation", "Normal LV systolic and diastolic function"). Leave the list empty if there's nothing notable.`
+
+// --- Response schemas (structured outputs) ---------------------------------------------------
+// Every property is required, and every figure is a { key, value } list entry rather than an
+// optional or nullable field: the API caps a schema at 16 union-typed (nullable) parameters, and
+// a DEXA report written as nested nullable fields had 33. A figure the report lacks is simply not
+// in the list. Keys are enums, so the model can't invent one; sanitizeMarkers still whitelists.
+
+type JsonSchema = Record<string, unknown>
+const num: JsonSchema = { type: 'number' }
+const str: JsonSchema = { type: 'string' }
+const obj = (properties: Record<string, JsonSchema>): JsonSchema =>
+  ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false })
+
+/** The bloodwork keys, read off the prompt's own "LAB NAME → key" list so the two can't drift. */
+const BLOODWORK_KEYS = [...EXTRACTION_PROMPT.matchAll(/→ (\w+)$/gm)].map(m => m[1]!)
+const ECHO_KEYS = ['la_volume_index', 'lv_mass_index', 'e_e_prime_ratio', 'ivs_thickness', 'ejection_fraction']
+
+const markerList = (keys: string[]): JsonSchema => ({ type: 'array', items: obj({ key: { type: 'string', enum: keys }, value: num }) })
+const qualitativeList: JsonSchema = { type: 'array', items: obj({ name: str, result: str }) }
+const date: JsonSchema = { type: 'string', format: 'date' }
+
+const BLOODWORK_SCHEMA = obj({ date, fasting: { type: 'boolean' }, markers: markerList(BLOODWORK_KEYS), qualitative: qualitativeList })
+const ECHO_SCHEMA = obj({ date, markers: markerList(ECHO_KEYS), qualitative: qualitativeList })
+/** Every DEXA figure as a dotted path into the stored shape (dexa_entries' JSON columns). */
+const DEXA_FIELDS = [
+  'weight_lbs',
+  ...['body_fat_pct', 'total_mass_lbs', 'fat_mass_lbs', 'lean_mass_lbs', 'bmc_lbs', 'fat_free_lbs'].map(f => `total.${f}`),
+  ...['arms', 'legs', 'trunk'].flatMap(r => ['fat_pct', 'fat_lbs', 'lean_lbs'].map(f => `regions.${r}.${f}`)),
+  ...['android', 'gynoid'].flatMap(r => ['fat_pct', 'fat_lbs'].map(f => `regions.${r}.${f}`)),
+  'vat.volume_in3', 'vat.fat_mass_lbs',
+  'ag_ratio',
+  'bone_density.total_bmd', 'bone_density.t_score', 'bone_density.z_score',
+  'symmetry.right_arm_lean', 'symmetry.left_arm_lean', 'symmetry.right_leg_lean', 'symmetry.left_leg_lean'
+]
+const DEXA_SCHEMA = obj({
+  date,
+  measurements: { type: 'array', items: obj({ field: { type: 'string', enum: DEXA_FIELDS }, value: num }) }
+})
+
+/** [{ field: 'total.body_fat_pct', value }] → { total: { body_fat_pct } }, the stored shape. */
+function dexaObject(extracted: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { date: extracted.date }
+  for (const m of Array.isArray(extracted.measurements) ? extracted.measurements : []) {
+    const { field, value } = m as { field: string, value: number }
+    const path = field.split('.')
+    let node = out
+    for (const part of path.slice(0, -1)) node = (node[part] ??= {}) as Record<string, unknown>
+    node[path.at(-1)!] = value
+  }
+  return out
+}
+
+/** [{ key, value }] → { key: value }, the stored form. */
+function markerObject(list: unknown): Record<string, unknown> {
+  if (!Array.isArray(list)) return {}
+  return Object.fromEntries(list.filter(m => m && typeof m === 'object').map(m => [(m as { key: string }).key, (m as { value: unknown }).value]))
+}
 
 export default defineEventHandler(async (event) => {
   requireOwner(event)
@@ -191,11 +208,11 @@ export default defineEventHandler(async (event) => {
   const reportTypePart = formData.find(p => p.name === 'type')
   const reportType = reportTypePart?.data?.toString() ?? 'bloodwork'
 
-  const prompt = reportType === 'dexa'
-    ? DEXA_EXTRACTION_PROMPT
+  const [prompt, schema] = reportType === 'dexa'
+    ? [DEXA_EXTRACTION_PROMPT, DEXA_SCHEMA]
     : reportType === 'echo'
-      ? ECHO_EXTRACTION_PROMPT
-      : EXTRACTION_PROMPT
+      ? [ECHO_EXTRACTION_PROMPT, ECHO_SCHEMA]
+      : [EXTRACTION_PROMPT, BLOODWORK_SCHEMA]
 
   const base64Data = Buffer.from(pdf.data).toString('base64')
 
@@ -209,7 +226,7 @@ export default defineEventHandler(async (event) => {
       // adaptively and max_tokens caps thinking + output together, hence the headroom. Medium
       // effort: a misread value lands in the lab history, so this is worth some reasoning.
       max_tokens: 16_000,
-      output_config: { effort: 'medium' },
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
       messages: [{
         role: 'user',
         content: [
@@ -228,19 +245,16 @@ export default defineEventHandler(async (event) => {
   logAiUsage('extract', AI_MODELS.extract, response.usage, response.stop_reason, startedAt)
   assertCompleted(response.stop_reason, 'extract')
 
-  const text = textOf(response.content)
-  const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()
-
+  // Structured outputs guarantee the shape; the parse only fails on an empty or refused reply.
   let extracted: Record<string, unknown>
   try {
-    extracted = JSON.parse(cleaned)
+    extracted = JSON.parse(textOf(response.content)) as Record<string, unknown>
   }
   catch {
-    throw createError({ statusCode: 502, message: 'Could not parse the extraction result — try re-running it.' })
+    throw createError({ statusCode: 502, message: 'The extraction came back empty — try re-running it.' })
   }
-  if (!extracted || typeof extracted !== 'object' || Array.isArray(extracted)) {
-    throw createError({ statusCode: 502, message: 'The extraction returned an unexpected shape.' })
-  }
+  if (reportType === 'dexa') extracted = dexaObject(extracted)
+  else extracted.markers = markerObject(extracted.markers)
 
   // The report is third-party content sharing a turn with the extraction instructions, so what
   // comes back is untrusted: keep only marker keys this site can store, as finite numbers, and

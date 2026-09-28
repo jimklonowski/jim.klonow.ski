@@ -102,8 +102,16 @@
       >
         {{ latestSummary.text }}
       </p>
+      <!-- Provenance: only summaries written since it was recorded carry it. -->
       <p
-        v-else
+        v-if="!regenerating && summaryOpen && latestSummary?.model"
+        class="mt-2 text-[10.5px] text-ghost tracking-[0.06em]"
+        :title="latestSummary.promptHash ? `prompt ${latestSummary.promptHash}` : undefined"
+      >
+        written by {{ latestSummary.model }}{{ latestSummary.at ? ` · ${formatDate(latestSummary.at.slice(0, 10), 'monthDay').toLowerCase()}` : '' }}
+      </p>
+      <p
+        v-else-if="!regenerating && !latestSummary"
         class="mt-2 text-[12.5px] text-muted"
       >
         No AI summary for this draw yet{{ isOwner ? ' — hit regen to generate one.' : '.' }}
@@ -366,7 +374,15 @@ const activeMarkers = computed(() => byCategory(activeCategory.value))
 // Most recent visible draw that has a generated summary — older draws predate the feature.
 const latestSummary = computed(() => {
   const entry = [...visibleEntries.value].reverse().find(e => e.ai_summary)
-  return entry ? { date: entry.date, text: entry.ai_summary as string } : null
+  return entry
+    ? {
+        date: entry.date,
+        text: entry.ai_summary as string,
+        model: entry.ai_summary_model ?? null,
+        promptHash: entry.ai_summary_prompt_hash ?? null,
+        at: entry.ai_summary_at ?? null
+      }
+    : null
 })
 
 const isRecentDraw = computed(() => {

@@ -223,9 +223,12 @@ Be factual, specific, and concise. If everything is stable and in range, say so 
     throw createError({ statusCode: 502, message: 'Summary generation returned no text' })
   }
 
-  await db.prepare('UPDATE labs_entries SET ai_summary = ?2 WHERE date = ?1')
-    .bind(date, summary)
-    .run()
+  const provenance = { model: AI_MODELS.summary, promptHash: promptHash(prompt), at: new Date().toISOString() }
+  await db.prepare(`
+    UPDATE labs_entries
+    SET ai_summary = ?2, ai_summary_model = ?3, ai_summary_prompt_hash = ?4, ai_summary_at = ?5
+    WHERE date = ?1
+  `).bind(date, summary, provenance.model, provenance.promptHash, provenance.at).run()
 
-  return { ok: true, date, summary }
+  return { ok: true, date, summary, ...provenance }
 })

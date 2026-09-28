@@ -13,4 +13,8 @@ export interface LabsEntry {
   markers: Record<string, number | null>
   qualitative: QualitativeResult[]
   ai_summary?: string | null
+  /** Provenance of ai_summary: the model, a hash of its exact prompt, and when (null before 0004). */
+  ai_summary_model?: string | null
+  ai_summary_prompt_hash?: string | null
+  ai_summary_at?: string | null
 }

@@ -47,17 +47,23 @@ async function storeDigest(
   periodStart: string,
   periodEnd: string,
   summary: string,
-  stats: unknown
+  stats: unknown,
+  prompt: string
 ) {
   await db.prepare(`
-    INSERT INTO digests (type, period_start, period_end, summary, stats, created_at)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+    INSERT INTO digests (type, period_start, period_end, summary, stats, created_at, model, prompt_hash)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
     ON CONFLICT(type, period_end) DO UPDATE SET
       period_start = excluded.period_start,
       summary = excluded.summary,
       stats = excluded.stats,
-      created_at = excluded.created_at
-  `).bind(type, periodStart, periodEnd, summary, JSON.stringify(stats ?? {}), new Date().toISOString()).run()
+      created_at = excluded.created_at,
+      model = excluded.model,
+      prompt_hash = excluded.prompt_hash
+  `).bind(
+    type, periodStart, periodEnd, summary, JSON.stringify(stats ?? {}), new Date().toISOString(),
+    AI_MODELS.digest, promptHash(prompt)
+  ).run()
 }
 
 export interface DigestResult {
@@ -121,7 +127,7 @@ export async function generateDigest(
   const facts = built.lines.join('\n')
   const prompt = kind === 'weekly' ? weeklyDigestPrompt(start, end, facts, regimen) : dailyDigestPrompt(end, facts, regimen)
   const summary = await callClaude(prompt)
-  await storeDigest(db, kind, start, end, summary, built.stats)
+  await storeDigest(db, kind, start, end, summary, built.stats, prompt)
 
   return { ok: true, type: kind, period_start: start, period_end: end, summary }
 }
