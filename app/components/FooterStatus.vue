@@ -7,8 +7,14 @@
     <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-[10.5px] text-ghost whitespace-nowrap overflow-x-auto">
       <span class="shrink-0">jim.klonow.ski v2</span>
 
+      <!-- The owner gets the live /api/health check (task runs and data feeds); everyone else
+           keeps the static line, since the per-check detail is owner-only by design. -->
+      <HealthStatus v-if="role === 'owner'" />
       <template v-if="hasSession && summary">
-        <span class="shrink-0 hidden sm:inline">D1 <span class="text-accent">✓</span> R2 <span class="text-accent">✓</span> KV <span class="text-accent">✓</span></span>
+        <span
+          v-if="role !== 'owner'"
+          class="shrink-0 hidden sm:inline"
+        >D1 <span class="text-accent">✓</span> R2 <span class="text-accent">✓</span> KV <span class="text-accent">✓</span></span>
         <span
           v-if="summary.pdfCount"
           class="shrink-0"

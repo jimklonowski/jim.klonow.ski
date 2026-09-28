@@ -1,5 +1,5 @@
 import type { JournalEntry } from '~/data/journal'
 
 export function useJournalEntries() {
-  return useListResource<JournalEntry[]>('/journal', '/api/journal/list')
+  return useListResource<JournalEntry[]>('/journal', '/api/journal/list', { label: 'journal entries' })
 }

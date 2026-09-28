@@ -1,6 +1,7 @@
 import { SCHEDULED_TASKS, TASK_STALE_AFTER_HOURS } from '../schedule'
 import { FEED_STALE_AFTER_DAYS, feedCheck, isHealthy, taskCheck, type HealthCheck, type TaskHistory } from '#shared/utils/health'
 import { localToday } from '#shared/utils/time'
+import type { HealthReport } from '#shared/types/health'
 
 // Is the site still doing its unattended work? Every scheduled task against its cadence (from
 // task_runs) and every data feed against its expected daily arrival.
@@ -74,7 +75,7 @@ async function feedChecks(db: D1Database, today: string): Promise<HealthCheck[]>
   ]
 }
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event): Promise<HealthReport> => {
   const db = getRealDb(event)
   const now = Date.now()
   const checks = [...await taskChecks(db, now), ...await feedChecks(db, localToday())]

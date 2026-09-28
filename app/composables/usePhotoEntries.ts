@@ -14,5 +14,5 @@ export interface ProgressPhoto {
 }
 
 export function usePhotoEntries() {
-  return useListResource<ProgressPhoto[]>('/journal/photos', '/api/journal/photos/list')
+  return useListResource<ProgressPhoto[]>('/journal/photos', '/api/journal/photos/list', { label: 'photos' })
 }

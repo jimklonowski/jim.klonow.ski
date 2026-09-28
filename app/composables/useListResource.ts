@@ -17,12 +17,42 @@
 //
 // `error` and `status` come straight from useAsyncData. Pages render the error, and the status
 // is there for pages that want a loading state.
+//
+// 3. A failed refresh keeps what's on screen. useAsyncData resets `data` to its default when a
+//    fetch fails, so one dropped background revalidate blanked a list that was fine a second
+//    earlier (or flipped the page to its TuiDataState error panel). When the browser already
+//    holds content for the key, the fetcher returns that instead and raises a toast saying the
+//    list couldn't refresh. A failed FIRST load still throws, and the page's error panel shows it.
 
 interface ListResourceOptions<Raw, T> {
   /** Reshape the response once, before it's cached (e.g. the labs list's derived markers). */
   transform?: (raw: Raw) => T
   /** Fetch only on execute(): for data behind a click, like the digest panel. */
   lazy?: boolean
+  /** What the list is, for the "couldn't refresh" toast ("journal entries"). Defaults to the key. */
+  label?: string
+}
+
+// Every list that failed to refresh in the last few seconds shares one toast, so going offline
+// (every mounted list failing together) reads as one message, not a stack of five.
+const REFRESH_TOAST_ID = 'list-refresh-failed'
+const REFRESH_TOAST_WINDOW_MS = 15_000
+const failedRecently = new Map<string, number>()
+
+function refreshFailedToast(toast: ReturnType<typeof useToast>, label: string, err: unknown) {
+  const now = Date.now()
+  for (const [l, at] of failedRecently) if (now - at > REFRESH_TOAST_WINDOW_MS) failedRecently.delete(l)
+  failedRecently.set(label, now)
+  const labels = [...failedRecently.keys()]
+  const status = (err as { statusCode?: number, status?: number } | null)?.statusCode
+    ?? (err as { status?: number } | null)?.status
+  toast.add({
+    id: REFRESH_TOAST_ID,
+    title: `Couldn't refresh ${labels.join(', ')}`,
+    description: `Showing what was already loaded${status ? ` (the server answered ${status})` : ' (no response — offline?)'}. It retries on the next page change.`,
+    color: 'warning',
+    icon: 'i-lucide-cloud-off'
+  })
 }
 
 // When each key last started a fetch in this browser tab. A mount revalidates unless the key
@@ -43,7 +73,9 @@ function hasContent(value: unknown): boolean {
 export function useListResource<T, Raw = T>(key: string, url: string, options: ListResourceOptions<Raw, T> = {}) {
   const requestFetch = useRequestFetch()
   const nuxtApp = useNuxtApp()
-  const { transform, lazy = false } = options
+  const { transform, lazy = false, label = key } = options
+  // Taken in setup: the fetcher below runs later, outside the component's injection context.
+  const toast = useToast()
   // Created while hydrating a hard load: the SSR payload was fetched for this very render.
   const fromSsr = import.meta.client && nuxtApp.isHydrating
 
@@ -54,6 +86,16 @@ export function useListResource<T, Raw = T>(key: string, url: string, options: L
       try {
         const raw = await requestFetch<Raw>(url)
         return transform ? transform(raw) : (raw as unknown as T)
+      }
+      catch (err) {
+        // Rule 3: keep the last good value rather than let useAsyncData wipe it. The payload
+        // holds the last successful (already transformed) result for this key.
+        const current = nuxtApp.payload.data[key]
+        if (import.meta.client && hasContent(current)) {
+          refreshFailedToast(toast, label, err)
+          return current as T
+        }
+        throw err
       }
       finally {
         // Stamped again on completion, so a slow blocking fetch isn't repeated by the mount

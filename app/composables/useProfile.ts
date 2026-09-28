@@ -1,5 +1,5 @@
 import type { Profile } from '#shared/utils/profile'
 
 export function useProfile() {
-  return useListResource<Profile>('/journal/profile', '/api/journal/profile')
+  return useListResource<Profile>('/journal/profile', '/api/journal/profile', { label: 'profile' })
 }

@@ -93,26 +93,53 @@
           <p class="tui-label text-accent">
             Copy this now — it can't be shown again
           </p>
-          <div class="flex flex-wrap items-center gap-2 mt-1.5">
-            <code class="flex-1 min-w-0 truncate text-[12px] text-hi">{{ createdLink }}</code>
-            <button
-              type="button"
-              class="tui-btn shrink-0"
-              @click="copyCreated"
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 mt-1.5">
+            <!-- Scan-to-open, for handing the link over in person (a doctor's phone across the
+                 desk). Drawn here from the same one-time URL, never stored or sent anywhere.
+                 Dark modules on a light field with a wide quiet zone: inverted codes and tight
+                 margins are what cheaper scanners fail on. -->
+            <svg
+              v-if="createdQr"
+              class="shrink-0 w-40 h-40 self-center sm:self-auto"
+              :viewBox="`0 0 ${createdQr.size} ${createdQr.size}`"
+              shape-rendering="crispEdges"
+              role="img"
+              aria-label="QR code for the share link"
             >
-              {{ copied ? '✓ COPIED' : 'COPY' }}
-            </button>
-            <button
-              type="button"
-              class="tui-btn shrink-0"
-              @click="createdLink = null"
-            >
-              DONE
-            </button>
+              <rect
+                :width="createdQr.size"
+                :height="createdQr.size"
+                fill="#e6f2ec"
+              />
+              <path
+                :d="createdQr.path"
+                fill="#070a09"
+              />
+            </svg>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <code class="flex-1 min-w-0 truncate text-[12px] text-hi">{{ createdLink }}</code>
+                <button
+                  type="button"
+                  class="tui-btn shrink-0"
+                  @click="copyCreated"
+                >
+                  {{ copied ? '✓ COPIED' : 'COPY' }}
+                </button>
+                <button
+                  type="button"
+                  class="tui-btn shrink-0"
+                  @click="createdLink = null"
+                >
+                  DONE
+                </button>
+              </div>
+              <p class="mt-1.5 text-[11px] text-muted leading-[1.6]">
+                Scan the code to open it on another phone. Lost it? Revoke the link below and
+                create a new one.
+              </p>
+            </div>
           </div>
-          <p class="mt-1.5 text-[11px] text-muted leading-[1.6]">
-            Lost it? Revoke the link below and create a new one.
-          </p>
         </div>
       </div>
     </section>
@@ -211,6 +238,7 @@
 </template>
 
 <script setup lang="ts">
+import { encode } from 'uqr'
 import type { Invite } from '#shared/types/invites'
 
 useSeoMeta({ title: 'Tools · Sharing' })
@@ -236,6 +264,19 @@ const form = reactive({ role: 'friend', label: '', expiresDays: 30, maxUses: 0 }
 const createdLink = ref<string | null>(null)
 const copied = ref(false)
 const toast = useToast()
+
+// The link as a QR code: one SVG path with a 1×1 square per dark module, plus a 4-module quiet
+// zone (the spec's minimum). Medium error correction survives a scuffed phone screen.
+const QR_QUIET_ZONE = 4
+const createdQr = computed(() => {
+  if (!createdLink.value) return null
+  const { data, size } = encode(createdLink.value, { ecc: 'M', border: QR_QUIET_ZONE })
+  let path = ''
+  data.forEach((row, y) => row.forEach((dark, x) => {
+    if (dark) path += `M${x} ${y}h1v1h-1z`
+  }))
+  return { size, path }
+})
 
 const { data, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
 // Active links first, revoked sunk to the bottom — each group keeps the API's newest-first order.
