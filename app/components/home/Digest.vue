@@ -75,39 +75,47 @@
         @open="digestOpen = true"
       />
       <div class="flex-1 min-w-0 flex flex-col gap-1.5 text-[11.5px]">
-        <div class="flex flex-wrap items-baseline gap-3.5">
-          <button
-            type="button"
-            class="text-accent hover:text-accent-hover cursor-pointer"
-            @click="digestOpen = true"
+        <button
+          type="button"
+          class="self-start text-accent hover:text-accent-hover cursor-pointer"
+          @click="digestOpen = true"
+        >
+          all digests →
+        </button>
+        <!-- One line per digest, each with its own regenerate (owner only: it spends tokens).
+             Beside the full figure a single "daily · weekly" line wrapped mid-phrase. A two-column
+             grid (rows dissolve with `contents`) keeps both regen buttons in one column. -->
+        <div
+          class="grid items-baseline gap-x-2.5 gap-y-1.5"
+          :class="isOwner ? 'grid-cols-[max-content_max-content]' : 'grid-cols-1'"
+        >
+          <div
+            v-for="row in freshness"
+            :key="row.kind"
+            class="contents"
           >
-            all digests →
-          </button>
-          <button
-            v-if="isOwner"
-            type="button"
-            class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
-            :disabled="generating"
-            @click="regenerate"
-          >
-            {{ generating ? 'generating…' : 'regenerate ⟳' }}
-          </button>
+            <span class="text-muted">
+              {{ row.kind }}: {{ row.digest ? relative(row.digest.period_end) : '—' }}
+              <span
+                v-if="row.digest"
+                class="text-accent"
+              >✓</span>
+            </span>
+            <button
+              v-if="isOwner"
+              type="button"
+              class="justify-self-start text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
+              :disabled="row.regen.pending.value"
+              :aria-label="`Regenerate the ${row.kind} digest`"
+              :title="row.kind === 'daily' ? 'Regenerate today\'s recap' : 'Regenerate the past 7 days'"
+              @click="row.regen.run()"
+            >
+              <!-- "writing…", not "generating…": the longest row ("weekly: yesterday ✓") plus
+                   the longer word overflowed the ~215px column beside the figure. -->
+              {{ row.regen.pending.value ? 'writing…' : 'regen ⟳' }}
+            </button>
+          </div>
         </div>
-        <!-- One line each: beside the full figure a single "daily · weekly" line wraps mid-phrase. -->
-        <span class="text-muted">
-          daily: {{ daily ? relative(daily.period_end) : '—' }}
-          <span
-            v-if="daily"
-            class="text-accent"
-          >✓</span>
-        </span>
-        <span class="text-muted -mt-1">
-          weekly: {{ weekly ? relative(weekly.period_end) : '—' }}
-          <span
-            v-if="weekly"
-            class="text-accent"
-          >✓</span>
-        </span>
       </div>
     </div>
   </div>
@@ -176,21 +184,40 @@ function relative(date: string) {
   return formatDate(date, 'monthDay').toLowerCase()
 }
 
-const { run: regenerate, pending: generating } = useSaveAction(async () => {
-  const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', {
-    method: 'POST',
-    body: { kind: 'daily', endDate: localToday() }
+// One regenerate per digest, each with its own pending state so both can run at once. Daily
+// redoes today's recap; weekly redoes "this past week" (the 7 days ending yesterday, the server's
+// default and the digest panel's "This past week"), which is the one this column shows.
+function regenerator(kind: 'daily' | 'weekly') {
+  return useSaveAction(async () => {
+    const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', {
+      method: 'POST',
+      body: kind === 'daily' ? { kind, endDate: localToday() } : { kind }
+    })
+    if (res.skipped) {
+      toast.add({
+        title: 'Nothing to summarize',
+        description: kind === 'daily' ? 'No data logged for today yet.' : 'No data logged in the past week.',
+        color: 'warning'
+      })
+      return false
+    }
+    emit('refresh')
+    return true
+  }, {
+    error: 'Generation failed',
+    success: generated => generated
+      ? { title: 'Digest ready', description: kind === 'daily' ? 'Today\'s recap regenerated.' : 'The weekly recap regenerated.' }
+      : null
   })
-  if (res.skipped) {
-    toast.add({ title: 'Nothing to summarize', description: 'No data logged for today yet.', color: 'warning' })
-    return false
-  }
-  emit('refresh')
-  return true
-}, {
-  error: 'Generation failed',
-  success: generated => generated ? { title: 'Digest ready', description: 'Today\'s recap regenerated.' } : null
-})
+}
+
+const regenDaily = regenerator('daily')
+const regenWeekly = regenerator('weekly')
+
+const freshness = computed(() => [
+  { kind: 'daily' as const, digest: daily.value, regen: regenDaily },
+  { kind: 'weekly' as const, digest: weekly.value, regen: regenWeekly }
+])
 
 // --- TICKER event wiring (design_handoff_ticker screen 04) ------------------
 // One-shots are triggered here where the data lives; the companion itself
