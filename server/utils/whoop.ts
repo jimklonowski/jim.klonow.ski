@@ -157,6 +157,20 @@ async function accessToken(db: D1Database): Promise<string> {
   return tokens.access_token
 }
 
+/**
+ * One record by path (`/v2/activity/sleep/<id>`, `/v2/cycle/<id>/recovery`…), or null when Whoop
+ * says it doesn't exist — a webhook can name a record that was deleted before we read it.
+ */
+export async function whoopFetchOne<T>(db: D1Database, path: string): Promise<T | null> {
+  const token = await accessToken(db)
+  const res = await fetch(`${WHOOP_API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw createError({ statusCode: 502, message: `Whoop API request failed: ${res.status} ${(await res.text()).slice(0, 200)}` })
+  }
+  return res.json<T>()
+}
+
 interface WhoopPage<T> {
   records?: T[]
   next_token?: string | null

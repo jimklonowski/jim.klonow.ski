@@ -8,4 +8,9 @@ export interface WhoopStatus {
   lastErrorAt: string | null
   /** True when the refresh token was rejected — only a reconnect fixes it. */
   needsReconnect: boolean
+  /**
+   * When Whoop last pushed a record through the webhook that was processed cleanly, or null if
+   * it never has. Set by /api/whoop/status from the run log; getWhoopStatus leaves it out.
+   */
+  lastPushAt?: string | null
 }

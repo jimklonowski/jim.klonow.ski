@@ -1,6 +1,7 @@
-// TICKER's full-size "rubber-hose" sprite (design canvas direction C, 2026-09-28): the heart on a
-// 17×15 grid with brows, a mouth and cheeks, plus gloves, sneakers and a prop per pose, laid out
-// on a 28×16 canvas. Pure data: the component turns each cell's ink into a colour.
+// TICKER's sprites (design canvas, 2026-09-28): the heart on a 17×15 grid with brows, a mouth and
+// cheeks. The 'full' figure (direction C, "rubber-hose") adds gloves, sneakers and a prop per pose
+// on a 28×16 canvas; the 'face' figure (direction A, "hi-bit") is the heart alone, for tight spots.
+// Pure data: the component turns each cell's ink into a colour.
 
 export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline'] as const
 export type TickerPose = typeof TICKER_POSES[number]
@@ -17,10 +18,20 @@ export interface TickerCell {
   motion: TickerCellMotion
 }
 
-/** The canvas spans body columns −4…23 and rows 0…15 (limbs reach past the heart's 17×15 box). */
-export const TICKER_COL_MIN = -4
-export const TICKER_COLS = 28
-export const TICKER_ROWS = 16
+export type TickerFigure = 'full' | 'face'
+
+export interface TickerSprite {
+  cols: number
+  rows: number
+  /** Row-major, cols × rows; `ink: null` is transparent. */
+  cells: TickerCell[]
+}
+
+// The full canvas spans body columns −4…23 and rows 0…15 (limbs reach past the heart's box).
+const CANVAS: Record<TickerFigure, { colMin: number, cols: number, rows: number }> = {
+  full: { colMin: -4, cols: 28, rows: 16 },
+  face: { colMin: 0, cols: 17, rows: 15 }
+}
 
 // The silhouette as filled column ranges per row: [start, end, start, end…].
 const SILHOUETTE = [
@@ -84,7 +95,7 @@ function eyes(grid: Grid, leftCol: number, rightCol: number, top: number, height
 
 const BLUSH: Point[] = [[7, 3], [7, 4], [7, 12], [7, 13]]
 
-function face(grid: Grid, pose: TickerPose) {
+function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
   switch (pose) {
     case 'thinking':
       eyes(grid, 5, 12, 4, 2, 1) // glancing up and to the side
@@ -108,6 +119,8 @@ function face(grid: Grid, pose: TickerPose) {
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, [[3, 4], [2, 5], [2, 11], [3, 12]], 'rim') // brows up in the middle
       paint(grid, [[9, 6], [8, 7], [9, 8], [8, 9], [9, 10]], 'eye')
+      // The full figure flicks its sweat drop off the scratching glove instead.
+      if (figure === 'face') paint(grid, [[1, 16], [2, 16]], 'drop')
       break
     case 'sleepy':
       paint(grid, [[5, 4], [5, 5], [5, 11], [5, 12]], 'rim') // heavy lids
@@ -205,16 +218,16 @@ function limbs(grid: Grid, pose: TickerPose) {
   }
 }
 
-/** Row-major cells for one pose, TICKER_COLS × TICKER_ROWS; `ink: null` is transparent. */
-export function tickerSprite(pose: TickerPose): TickerCell[] {
+export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full'): TickerSprite {
   const grid = body()
-  face(grid, pose)
-  limbs(grid, pose)
+  face(grid, pose, figure)
+  if (figure === 'full') limbs(grid, pose)
+  const { colMin, cols, rows } = CANVAS[figure]
   const cells: TickerCell[] = []
-  for (let r = 0; r < TICKER_ROWS; r++) {
-    for (let c = TICKER_COL_MIN; c < TICKER_COL_MIN + TICKER_COLS; c++) {
+  for (let r = 0; r < rows; r++) {
+    for (let c = colMin; c < colMin + cols; c++) {
       cells.push(grid.get(at(r, c)) ?? { ink: null, motion: '' })
     }
   }
-  return cells
+  return { cols, rows, cells }
 }
