@@ -67,7 +67,7 @@ export const FEED_STALE_AFTER_DAYS = {
   // Apple Health via Health Auto Export → /api/journal/health-webhook.
   'apple:sleep': 2,
   'apple:weight': 3,
-  // Whoop, via the nightly whoop:sync.
+  // Whoop: pushed by /api/whoop/webhook within minutes, reconciled by the nightly whoop:sync.
   'whoop:recovery': 2
 } as const
 

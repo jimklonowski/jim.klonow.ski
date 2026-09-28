@@ -30,5 +30,5 @@ export interface DexaEntry {
 }
 
 export function useDexaEntries() {
-  return useListResource<DexaEntry[]>('dexa', '/api/dexa/list')
+  return useListResource<DexaEntry[]>('dexa', '/api/dexa/list', { label: 'DEXA scans' })
 }

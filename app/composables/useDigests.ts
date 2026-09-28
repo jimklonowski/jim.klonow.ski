@@ -13,5 +13,5 @@ export interface Digest {
 
 // Lazy: only fetched when the digest panel is first opened (call execute()).
 export function useDigests() {
-  return useListResource<Digest[]>('digests', '/api/journal/digest/list', { lazy: true })
+  return useListResource<Digest[]>('digests', '/api/journal/digest/list', { lazy: true, label: 'digests' })
 }
