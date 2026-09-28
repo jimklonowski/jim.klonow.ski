@@ -73,6 +73,9 @@ export default defineEventHandler(async (event) => {
   const stream = createAnthropic({ timeout: 120_000 }).messages.stream({
     model: AI_MODELS.chat,
     max_tokens: 8192,
+    // Stated, not defaulted: Sonnet 5.5's API default is `high`, and its guide puts chat and
+    // other latency-sensitive work at medium or low. Adaptive thinking shares max_tokens.
+    output_config: { effort: 'medium' },
     // The rules + fact sheet are byte-identical on every turn of a same-day conversation: the
     // sheet is rebuilt from D1 per request, but every query is ORDER BY'd and `today` is pinned
     // by the client, so only `messages` varies. The cache marker makes turns 2..N read the
@@ -121,6 +124,14 @@ export default defineEventHandler(async (event) => {
         }
         const final = await stream.finalMessage()
         logAiUsage('chat', AI_MODELS.chat, final.usage, final.stop_reason, startedAt)
+        if (final.stop_reason === 'refusal') {
+          // Sonnet 5.5 declines in more categories than Sonnet 5, and a decline can land after
+          // part of an answer streamed. Say so in-band and keep the exchange out of the thread,
+          // like a failure: a half-answer shouldn't be replayed as history on the next turn.
+          console.warn('[ai] chat declined:', JSON.stringify((final as { stop_details?: unknown }).stop_details ?? null))
+          controller.enqueue(encoder.encode('\n\n*[I can\'t help with that one as asked — try rephrasing it]*'))
+          return
+        }
         if (final.stop_reason === 'max_tokens') {
           const note = '\n\n*[answer truncated — ask a narrower question]*'
           answer += note

@@ -154,7 +154,7 @@ Every model choice is one line in `AI_MODELS` (`server/utils/ai.ts`):
 
 | Task | Model |
 |---|---|
-| `/ask` chat, daily and weekly digests | Claude Sonnet 5 (`claude-sonnet-5`) |
+| `/ask` chat, daily and weekly digests | Claude Sonnet 5.5 (`claude-sonnet-5-5`) |
 | Lab / DEXA / echo PDF extraction, lab summaries, stock-dump parsing | Claude Opus 5.5 (`claude-opus-5-5`) |
 
 All of it is server-side and owner-only (the demo reads canned digests and summaries from its seed). Each database-backed block of prompt context (supplements, cycles, vaccines) has its own file in `server/utils/`.

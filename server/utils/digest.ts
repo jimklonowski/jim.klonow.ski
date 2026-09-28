@@ -22,7 +22,8 @@ async function callClaude(prompt: string): Promise<string> {
   try {
     // The model runs adaptive thinking by default and max_tokens caps thinking + text
     // together, so leave generous headroom; low effort keeps the thinking spend small
-    // for what is a short writing task over precomputed facts.
+    // for what is a short writing task over precomputed facts. (Sonnet 5.5 recalibrated its
+    // levels and defaults to high, so this must stay explicit.)
     response = await createAnthropic({ maxRetries: 4, timeout: 60_000 }).messages.create({
       model: AI_MODELS.digest,
       max_tokens: 8192,
