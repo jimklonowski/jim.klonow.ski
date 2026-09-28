@@ -17,14 +17,19 @@ export function promptHash(prompt: string): string {
 
 /**
  * Model per surface. Deliberately one constant: a model bump is a line here, not a five-file
- * search. These are the models each surface has been running — the open question of moving the
- * whole set onto one current model is an explicit decision, not something to drift into.
+ * search. Moving a surface is an explicit decision, not something to drift into.
+ *
+ * 2026-09-28: chat and digest moved Sonnet 5 → Sonnet 5.5 (same price, faster, fewer tokens,
+ * clearer writing). Sonnet 5.5 recalibrated effort and defaults to `high` on the API, so every
+ * Sonnet call states its level; it also declines in more categories, which the /ask stream now
+ * handles. The Opus 5.5 surfaces stay: extraction errors become permanent lab history and the
+ * summary is the judgment-heavy piece, at a few calls a month.
  */
 export const AI_MODELS = {
   /** /ask — conversational, streams, prompt-cached fact sheet. */
-  chat: 'claude-sonnet-5',
+  chat: 'claude-sonnet-5-5',
   /** Daily + weekly recaps, written from precomputed facts. */
-  digest: 'claude-sonnet-5',
+  digest: 'claude-sonnet-5-5',
   /** Lab/DEXA/echo PDF → structured JSON. */
   extract: 'claude-opus-5-5',
   /** Prose trend summary for a draw. */
