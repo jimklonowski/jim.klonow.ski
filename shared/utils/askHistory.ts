@@ -19,13 +19,19 @@ export interface AskMessage { role: AskRole, content: string }
 /**
  * The most recent `max` non-empty messages, then any leading assistant turns dropped so the
  * history opens on a user turn. Blank messages (the streaming placeholder) are removed first.
- * Returns the same element objects, so reactive proxies pass through untouched.
+ *
+ * Earlier answers longer than `maxChars` are cut to fit, since the handler refuses any message
+ * over it: an answer can run well past that, and every follow-up after one used to fail. The
+ * model only needs the gist of what it already said; the saved thread keeps the whole answer.
+ * Messages that fit are returned as the same objects, so reactive proxies pass through.
  */
-export function trimAskHistory<T extends AskMessage>(messages: T[], max = ASK_MAX_TURNS): T[] {
+export function trimAskHistory<T extends AskMessage>(messages: T[], max = ASK_MAX_TURNS, maxChars = ASK_MAX_CONTENT_CHARS): T[] {
   const kept = messages.filter(m => m.content.trim())
   let start = Math.max(0, kept.length - max)
   while (start < kept.length && kept[start]!.role !== 'user') start++
-  return kept.slice(start)
+  return kept.slice(start).map(m => m.role === 'assistant' && m.content.length > maxChars
+    ? { ...m, content: `${m.content.slice(0, maxChars - 1)}…` }
+    : m)
 }
 
 export type AskHistoryCheck

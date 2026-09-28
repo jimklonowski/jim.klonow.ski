@@ -1,4 +1,14 @@
+import { createHash } from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
+
+/**
+ * A short fingerprint of the exact prompt text, stored beside a lab summary or digest. Two with
+ * the same hash were written from identical instructions and data, so a changed hash on a
+ * regenerate says the prompt (or what fed it) moved, not just the model's sampling.
+ */
+export function promptHash(prompt: string): string {
+  return createHash('sha256').update(prompt).digest('hex').slice(0, 16)
+}
 
 // One place for every Anthropic call the site makes. Before this, five handlers each constructed
 // their own client, hardcoded their own model id, and handled (or didn't handle) truncation and

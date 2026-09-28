@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cadenceOf, fmtDay, protocolSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
 import { eventContext } from '../shared/utils/protocolEvents.ts'
-import { PROTOCOL_RULES } from '../shared/utils/protocolRules.ts'
+import { PROTOCOL_RULES, doseLabelOn } from '../shared/utils/protocolRules.ts'
 import { COMPOUND_INFO } from '../app/data/compoundInfo.ts'
 
 const lineFor = (text, needle) => text.split('\n').find(l => l.includes(needle))
@@ -18,7 +18,7 @@ test('the schedule today: every running rule, with injectables and per-injection
   assert.match(lineFor(s, 'Testosterone Cypionate'), /^- Monday \+ Thursday: Testosterone Cypionate 75 mg per injection \(150 mg\/week — reduced from 100 mg/)
   assert.match(lineFor(s, 'hCG 300'), /^- Tuesday \+ Friday \+ Sunday: hCG 300 IU per injection \(900 IU\/week — raised from 250 IU on 2026-09-08\)\.$/)
   // Daily injectables get neither "per injection" nor a weekly total.
-  assert.equal(lineFor(s, 'HGH 2.5'), '- Every day: HGH 2.5 IU (raised from 2 IU on 2026-09-03, via 2.25 IU on 2026-09-02).')
+  assert.equal(lineFor(s, 'HGH 2.5'), '- Every day: HGH 2.5 IU (raised from 2 IU on 2026-09-03).')
   assert.equal(lineFor(s, 'Finasteride'), '- Every day: Finasteride 1 mg.')
   assert.match(lineFor(s, 'Tadalafil'), /Tadalafil 5 mg tablet .*deliberately NOT in the dose log/)
   assert.equal(lineFor(s, 'only injectables'), '- Testosterone Cypionate, hCG, and HGH are the only injectables currently running.')
@@ -85,4 +85,30 @@ test('typicalDaily is a positive per-day amount wherever it is set', () => {
   assert.ok(Math.abs(COMPOUND_INFO['Trenbolone Acetate'].dosing.typicalDaily.amount - 300 / 7) < 1e-9)
   // As-needed compounds have no typical rate to fall back on.
   assert.equal(COMPOUND_INFO['PT-141'].dosing.typicalDaily, undefined)
+})
+
+test('each dose is the step in force on the as-of date, never a later one', () => {
+  const aug = protocolSchedule('2026-08-15')
+  // Before the Aug 24 cut: 100 mg per injection, and nothing about the cut to come.
+  assert.equal(lineFor(aug, 'Testosterone Cypionate'), '- Monday + Thursday: Testosterone Cypionate 100 mg per injection (200 mg/week — raised from 50 mg on 2026-06-22).')
+  // The 500 IU week in July came and went; mid-August is back at 250.
+  assert.equal(lineFor(aug, 'hCG'), '- Tuesday + Friday + Sunday: hCG 250 IU per injection (750 IU/week — reduced from 500 IU on 2026-07-21).')
+  assert.equal(lineFor(aug, 'HGH'), '- Every day: HGH 2 IU (raised from 1.5 IU on 2026-08-11).')
+  // The first step has nothing before it, so no change is named.
+  assert.equal(lineFor(protocolSchedule('2026-06-19'), 'Testosterone Cypionate'), '- Monday + Thursday: Testosterone Cypionate 50 mg per injection (100 mg/week).')
+})
+
+test('the schedule check prints the dose of the day it checks', () => {
+  const logged = new Map([['HGH', new Set(['2026-08-15'])]])
+  assert.match(scheduleContext(PROTOCOL_RULES, '2026-08-15', '2026-08-15', logged, '2026-08-16'), /due today: HGH 2 IU \(daily\)/)
+})
+
+test('every rule with dose steps keeps doseLabel equal to its last step', () => {
+  for (const r of PROTOCOL_RULES) {
+    if (!r.doses?.length) continue
+    assert.equal(r.doseLabel, r.doses.at(-1).label, r.compound)
+    assert.equal(r.doses[0].from, r.from, `${r.compound}: the first step starts with the rule`)
+    assert.deepEqual(r.doses.map(d => d.from), [...r.doses.map(d => d.from)].sort(), `${r.compound}: steps in date order`)
+    assert.equal(doseLabelOn(r, '2099-01-01'), r.doseLabel)
+  }
 })

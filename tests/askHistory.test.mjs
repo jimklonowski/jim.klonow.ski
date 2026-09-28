@@ -2,7 +2,7 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ASK_MAX_TURNS, checkAskHistory, trimAskHistory } from '../shared/utils/askHistory.ts'
+import { ASK_MAX_CONTENT_CHARS, ASK_MAX_TURNS, checkAskHistory, trimAskHistory } from '../shared/utils/askHistory.ts'
 
 /** A transcript of `pairs` answered exchanges followed by one fresh question: 2·pairs + 1 messages. */
 function transcript(pairs) {
@@ -65,4 +65,13 @@ test('checkAskHistory returns plain role/content copies', () => {
   const r = checkAskHistory([{ role: 'user', content: 'hi', extra: 1 }])
   assert.equal(r.ok, true)
   assert.deepEqual(r.messages, [{ role: 'user', content: 'hi' }])
+})
+
+test('a long earlier answer is cut to fit, so the follow-up is still accepted', () => {
+  const long = { role: 'assistant', content: 'x'.repeat(ASK_MAX_CONTENT_CHARS + 500) }
+  const sent = trimAskHistory([{ role: 'user', content: 'q1' }, long, { role: 'user', content: 'q2' }])
+  assert.equal(sent[1].content.length, ASK_MAX_CONTENT_CHARS)
+  assert.ok(sent[1].content.endsWith('…'))
+  assert.equal(long.content.length, ASK_MAX_CONTENT_CHARS + 500, 'the transcript itself is untouched')
+  assert.equal(checkAskHistory(sent).ok, true)
 })

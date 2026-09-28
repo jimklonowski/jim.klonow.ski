@@ -32,7 +32,12 @@ CREATE TABLE IF NOT EXISTS labs_entries (
   sources TEXT NOT NULL DEFAULT '[]',
   markers TEXT NOT NULL DEFAULT '{}',
   qualitative TEXT NOT NULL DEFAULT '[]',
-  ai_summary TEXT
+  ai_summary TEXT,
+  -- Provenance of ai_summary (migration 0004): the model, a hash of the exact prompt, and when.
+  -- NULL on summaries written before provenance was recorded.
+  ai_summary_model TEXT,
+  ai_summary_prompt_hash TEXT,
+  ai_summary_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dexa_entries (
@@ -132,7 +137,9 @@ CREATE TABLE IF NOT EXISTS digests (
   period_end TEXT NOT NULL,
   summary TEXT NOT NULL,
   stats TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  model TEXT,        -- which model wrote it (migration 0004); NULL before then
+  prompt_hash TEXT   -- hash of the exact prompt, so a rewrite of the prompt is visible per digest
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, period_end);
 
@@ -291,3 +298,25 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_row ON audit_log(table_name, row_key);
+
+-- Saved /ask conversations (2026-09-28, migration 0004). A thread per conversation, titled from
+-- its first question; its turns in order. The fact sheet is rebuilt per request, so only the
+-- questions and Ticker's answers are stored. Owner-only and never in the demo sandbox. Deleting a
+-- thread deletes its messages.
+CREATE TABLE IF NOT EXISTS ask_threads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL      -- last turn; the thread list sorts by it
+);
+CREATE INDEX IF NOT EXISTS idx_ask_threads_updated ON ask_threads(updated_at);
+
+CREATE TABLE IF NOT EXISTS ask_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  thread_id INTEGER NOT NULL REFERENCES ask_threads(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,           -- 'user' | 'assistant'
+  content TEXT NOT NULL,
+  model TEXT,                   -- the model that wrote an assistant turn
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ask_messages_thread ON ask_messages(thread_id, id);

@@ -29,12 +29,28 @@
               <button
                 type="button"
                 class="tui-btn"
-                :disabled="generating"
+                :disabled="generating || filling"
               >
-                {{ generating ? 'GENERATING…' : '✦ GENERATE ▾' }}
+                {{ filling ? `FILLING ${fillDone}/${fillTotal}…` : generating ? 'GENERATING…' : '✦ GENERATE ▾' }}
               </button>
             </UDropdownMenu>
           </div>
+
+          <!-- Missing digests: past days (and weeks) that have data but no recap, e.g. while the
+               cron was failing. Filling them spends one model call each. -->
+          <p
+            v-if="isOwner && gapCount && !filling"
+            class="text-[11px] text-muted"
+          >
+            {{ gapSummary }} in the last {{ gaps?.days }} days {{ gapCount === 1 ? 'has' : 'have' }} data but no digest ·
+            <button
+              type="button"
+              class="text-accent hover:text-accent-hover cursor-pointer"
+              @click="fillGaps"
+            >
+              fill gaps ⟳
+            </button>
+          </p>
 
           <p
             v-if="status === 'pending'"
@@ -117,7 +133,75 @@ watch(open, (v) => {
     loadedOnce = true
     execute()
   }
+  if (v && isOwner.value) loadGaps()
 }, { immediate: true })
+
+// --- missing digests (owner) ---
+
+interface Gaps { days: number, daily: string[], weekly: string[] }
+const gaps = ref<Gaps | null>(null)
+const gapCount = computed(() => (gaps.value?.daily.length ?? 0) + (gaps.value?.weekly.length ?? 0))
+const gapSummary = computed(() => {
+  const g = gaps.value
+  if (!g) return ''
+  const parts = []
+  if (g.daily.length) parts.push(`${g.daily.length} day${g.daily.length === 1 ? '' : 's'}`)
+  if (g.weekly.length) parts.push(`${g.weekly.length} week${g.weekly.length === 1 ? '' : 's'}`)
+  return parts.join(' and ')
+})
+
+async function loadGaps() {
+  try {
+    gaps.value = await $fetch<Gaps>('/api/journal/digest/gaps')
+  }
+  catch {
+    gaps.value = null
+  }
+}
+
+const filling = ref(false)
+const fillDone = ref(0)
+const fillTotal = ref(0)
+const BATCH = 5
+
+// Batches of five, oldest first, so progress shows between requests and a long backlog never
+// becomes one multi-minute request. A failed day is counted and reported; the rest still run.
+async function fillGaps() {
+  const g = gaps.value
+  if (!g || filling.value) return
+  const jobs = [
+    ...g.daily.map(date => ({ kind: 'daily' as const, date })),
+    ...g.weekly.map(date => ({ kind: 'weekly' as const, date }))
+  ]
+  filling.value = true
+  fillDone.value = 0
+  fillTotal.value = jobs.length
+  let failed = 0
+  try {
+    for (const kind of ['daily', 'weekly'] as const) {
+      const dates = jobs.filter(j => j.kind === kind).map(j => j.date)
+      for (let i = 0; i < dates.length; i += BATCH) {
+        const res = await $fetch<{ results: Array<{ ok: boolean }> }>('/api/journal/digest/backfill', {
+          method: 'POST',
+          body: { kind, dates: dates.slice(i, i + BATCH) }
+        })
+        failed += res.results.filter(r => !r.ok).length
+        fillDone.value += res.results.length
+        await refresh()
+      }
+    }
+    toast.add(failed
+      ? { title: 'Gaps partly filled', description: `${fillDone.value - failed} written, ${failed} failed — try again later.`, color: 'warning', icon: 'i-lucide-info' }
+      : { title: 'Gaps filled', description: `${fillDone.value} digest${fillDone.value === 1 ? '' : 's'} written.`, color: 'success', icon: 'i-lucide-check' })
+  }
+  catch (err) {
+    toast.add({ title: 'Backfill stopped', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })
+  }
+  finally {
+    filling.value = false
+    loadGaps()
+  }
+}
 
 const FILTERS = [
   { label: 'All', value: 'all' as const },
@@ -133,12 +217,15 @@ const filtered = computed(() =>
 
 // --- generation ---
 
-const generateItems = [
+const generateItems = computed(() => [
   [
     { label: 'Today\'s recap', icon: 'i-lucide-calendar-days', onSelect: () => generate('daily', localToday()) },
     { label: 'This past week', icon: 'i-lucide-calendar-range', onSelect: () => generate('weekly') }
-  ]
-]
+  ],
+  ...(gapCount.value
+    ? [[{ label: `Fill gaps (${gapCount.value} missing)`, icon: 'i-lucide-history', onSelect: fillGaps }]]
+    : [])
+])
 
 const { run: generate, pending: generating } = useSaveAction(async (kind: 'daily' | 'weekly', endDate?: string) => {
   const res = await $fetch<{ skipped?: boolean }>('/api/journal/digest/generate', { method: 'POST', body: { kind, endDate } })

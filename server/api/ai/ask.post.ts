@@ -2,29 +2,36 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { checkAskHistory } from '#shared/utils/askHistory'
 import { localToday } from '#shared/utils/time'
 import { zAsk } from '#shared/utils/schemas'
-import { readerContext } from '../../utils/digestPrompts'
+import { TICKER_CHAT_VOICE, readerContext } from '../../utils/digestPrompts'
 
-// Ask-the-data chat: answers freeform questions over the full tracked history (labs, DEXA,
-// journal, Whoop, protocol). Owner-only — same policy as digest generation: nobody else gets
-// to spend Anthropic tokens. Streams plain-text deltas; the client renders them as they land.
+// Ask-the-data chat, answered by TICKER: freeform questions over the full tracked history (labs,
+// DEXA, journal, Whoop, protocol). Owner-only — same policy as digest generation: nobody else
+// gets to spend Anthropic tokens. Streams plain-text deltas; the client renders them as they
+// land. Each finished exchange is saved to its thread (ask_threads / ask_messages).
 
 // The schedule inside readerContext is as of `today`, which the client pins for the whole
 // conversation, so the rules stay byte-identical across turns and the prompt cache still hits.
-const systemRules = (today: string) => `You are the analysis console on a personal health dashboard, answering the owner's questions about his own data. ${readerContext(today)}
+const systemRules = (today: string) => `You are answering the owner's questions about his own data on his personal health dashboard. ${readerContext(today)}
+
+${TICKER_CHAT_VOICE}
 
 Ground rules:
-- Answer from the fact sheet below. Cite the dates and numbers you're reasoning from so answers are checkable against the dashboard.
+- Answer from the fact sheet below.
 - Trends measured against protocol dates are observed associations — say so; don't assert causation.
-- If the data can't answer the question (marker never tested, window not tracked), say exactly that rather than estimating an answer.
-- Honest signal over encouragement: if something looks off, say it plainly.
 - Formatting: light Markdown — **bold** the numbers that matter, short bullet lists where they read better than prose. No headings, no tables. Keep answers tight; this is a terminal, not an essay.
-- No greeting, no closing, no medical-advice disclaimers.`
+- No greeting and no medical-advice disclaimers.`
 
 /** The text of a streamed delta, or null for the structural events around it. */
 function textDelta(event: Anthropic.MessageStreamEvent): string | null {
   return event.type === 'content_block_delta' && event.delta.type === 'text_delta'
     ? event.delta.text
     : null
+}
+
+/** A thread title from its first question: one line, bounded. */
+function titleFrom(question: string): string {
+  const line = question.replace(/\s+/g, ' ').trim()
+  return line.length > 80 ? `${line.slice(0, 79)}…` : line
 }
 
 export default defineEventHandler(async (event) => {
@@ -36,10 +43,31 @@ export default defineEventHandler(async (event) => {
   const history = checkAskHistory(body.messages)
   if (!history.ok) throw createError({ statusCode: 400, message: history.problem })
   const messages: Anthropic.MessageParam[] = history.messages
+  const question = history.messages.at(-1)!.content
   // The client sends its local date so "this week" means Jim's week, not UTC's.
   const today = body.today ?? localToday()
+  const db = getDb(event)
 
-  const context = await buildAskContext(getDb(event), today)
+  // The thread this exchange lands in. A new conversation gets its row now, so its id can go
+  // back in a header before the first byte of the answer; it's removed again if nothing is saved.
+  let threadId = body.threadId ?? null
+  let createdThread = false
+  if (threadId != null) {
+    const exists = await db.prepare('SELECT 1 FROM ask_threads WHERE id = ?1').bind(threadId).first()
+    if (!exists) throw createError({ statusCode: 404, message: 'That conversation no longer exists — start a new one' })
+  }
+  else {
+    const now = new Date().toISOString()
+    const res = await db.prepare('INSERT INTO ask_threads (title, created_at, updated_at) VALUES (?1, ?2, ?2)')
+      .bind(titleFrom(question), now).run()
+    threadId = res.meta.last_row_id
+    createdThread = true
+  }
+  const dropEmptyThread = async () => {
+    if (createdThread) await db.prepare('DELETE FROM ask_threads WHERE id = ?1').bind(threadId).run().catch(() => {})
+  }
+
+  const context = await buildAskContext(db, today)
 
   const startedAt = Date.now()
   const stream = createAnthropic({ timeout: 120_000 }).messages.stream({
@@ -67,6 +95,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     stream.abort()
+    await dropEmptyThread()
     throw aiError(err, 'chat')
   }
 
@@ -74,27 +103,49 @@ export default defineEventHandler(async (event) => {
   // out the status is already sent, so a mid-stream failure can only be reported in-band.
   setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
   setHeader(event, 'Cache-Control', 'no-store')
+  setHeader(event, 'X-Thread-Id', String(threadId))
 
   const encoder = new TextEncoder()
   return new ReadableStream<Uint8Array>({
     async start(controller) {
+      let answer = ''
+      let completed = false
       try {
         while (!step.done) {
           const text = textDelta(step.value)
-          if (text) controller.enqueue(encoder.encode(text))
+          if (text) {
+            answer += text
+            controller.enqueue(encoder.encode(text))
+          }
           step = await iterator.next()
         }
         const final = await stream.finalMessage()
         logAiUsage('chat', AI_MODELS.chat, final.usage, final.stop_reason, startedAt)
         if (final.stop_reason === 'max_tokens') {
-          controller.enqueue(encoder.encode('\n\n*[answer truncated — ask a narrower question]*'))
+          const note = '\n\n*[answer truncated — ask a narrower question]*'
+          answer += note
+          controller.enqueue(encoder.encode(note))
         }
+        completed = answer.trim().length > 0
       }
       catch (err) {
         console.error('[ai] chat stream failed:', err instanceof Error ? err.message : err)
         controller.enqueue(encoder.encode('\n\n*[generation failed — try again]*'))
       }
       finally {
+        // Only a finished answer is saved, question and answer together — the page drops a
+        // failed exchange from the transcript, so the thread must not keep half of one.
+        if (completed) {
+          const now = new Date().toISOString()
+          await db.batch([
+            db.prepare('INSERT INTO ask_messages (thread_id, role, content, created_at) VALUES (?1, \'user\', ?2, ?3)').bind(threadId, question, now),
+            db.prepare('INSERT INTO ask_messages (thread_id, role, content, model, created_at) VALUES (?1, \'assistant\', ?2, ?3, ?4)').bind(threadId, answer, AI_MODELS.chat, now),
+            db.prepare('UPDATE ask_threads SET updated_at = ?2 WHERE id = ?1').bind(threadId, now)
+          ]).catch(err => console.error('[ai] could not save the exchange:', err instanceof Error ? err.message : err))
+        }
+        else {
+          await dropEmptyThread()
+        }
         controller.close()
       }
     },

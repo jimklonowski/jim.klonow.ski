@@ -30,28 +30,72 @@ export interface ProtocolRule {
   to?: string | null
   /** Given by injection: "per injection" wording, and the prompts' "only injectables" line. */
   injected?: boolean
-  /** Prompt clause after the dose while it runs — dose history, reasons. */
+  /**
+   * The dose over time, oldest first, when it has changed: each step holds from its date until
+   * the next. The AI prompts read the step in force on their as-of date and say what it changed
+   * from, so a summary regenerated for an old draw sees that day's dose, not today's. The last
+   * step's label must equal doseLabel (tests/protocolProse.test.mjs holds them equal).
+   */
+  doses?: DoseStep[]
+  /** Prompt clause after the dose while it runs — reasons, context. */
   note?: string
   /** Prompt clause once `to` has passed: why it stopped. */
   stopNote?: string
 }
 
+export interface DoseStep {
+  /** First day at this dose, YYYY-MM-DD. */
+  from: string
+  label: string
+}
+
+/** The step in force on `date`, and the one before it; both null for a rule without steps. */
+export function doseStepOn(rule: ProtocolRule, date: string): { step: DoseStep | null, previous: DoseStep | null } {
+  const steps = rule.doses ?? []
+  let i = -1
+  while (i + 1 < steps.length && steps[i + 1]!.from <= date) i++
+  return { step: steps[i] ?? null, previous: steps[i - 1] ?? null }
+}
+
+/** The dose on `date`: its step's label, or doseLabel for a rule with no steps (or before them). */
+export function doseLabelOn(rule: ProtocolRule, date: string): string {
+  return doseStepOn(rule, date).step?.label ?? rule.doseLabel
+}
+
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 
-// doseLabel is the current dose and display-only, so a dose change edits it in place (with the
-// history in `note`) and the row keeps its `from`.
+// doseLabel is the current dose, which is what the app displays. A dose change appends a step to
+// `doses` and updates doseLabel to match; the row keeps its `from`. Steps come from the dose log
+// (a dose held four days or more; one-off doses and two-day dips are left out).
 export const PROTOCOL_RULES: ProtocolRule[] = [
   {
     compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18', injected: true,
-    note: 'reduced from 100 mg per injection, 200 mg/week, in late August 2026'
+    doses: [
+      { from: '2026-06-18', label: '50 mg' },
+      { from: '2026-06-22', label: '100 mg' },
+      { from: '2026-08-24', label: '75 mg' }
+    ]
   },
   {
     compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18', injected: true,
-    note: 'raised from 250 IU on 2026-09-08'
+    doses: [
+      { from: '2026-06-18', label: '250 IU' },
+      { from: '2026-07-14', label: '500 IU' },
+      { from: '2026-07-21', label: '250 IU' },
+      { from: '2026-09-08', label: '300 IU' }
+    ]
   },
   {
     compound: 'HGH', doseLabel: '2.5 IU', weekdays: EVERY_DAY, from: '2026-06-13', injected: true,
-    note: 'raised from 2 IU on 2026-09-03, via 2.25 IU on 2026-09-02'
+    doses: [
+      { from: '2026-06-13', label: '1 IU' },
+      { from: '2026-06-20', label: '1.5 IU' },
+      { from: '2026-07-02', label: '2 IU' },
+      { from: '2026-07-17', label: '2.25 IU' },
+      { from: '2026-07-22', label: '1.5 IU' },
+      { from: '2026-08-11', label: '2 IU' },
+      { from: '2026-09-03', label: '2.5 IU' }
+    ]
   },
   // `to` is inclusive, so the rings stop expecting a dose from 2026-09-02 on.
   {

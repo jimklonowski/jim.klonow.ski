@@ -8,7 +8,8 @@
 import { diffDays, weekdayOf } from './dates.ts'
 import type { ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
 import {
-  AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, nextDueDay, ruleActiveOn, tallySchedule
+  AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, doseLabelOn, doseStepOn, nextDueDay, ruleActiveOn,
+  tallySchedule
 } from './protocolRules.ts'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -42,19 +43,32 @@ function joinAnd(items: string[]): string {
 // supplement stack uses for "recently discontinued".
 const DISCONTINUED_RELEVANCE_DAYS = 120
 
+const AMOUNT = /^([\d.]+)\s*(.+)$/
+
 // "150 mg/week" for a non-daily rule whose label is a plain amount; null otherwise.
-function weeklyTotal(rule: ProtocolRule): string | null {
-  const m = /^([\d.]+)\s*(.+)$/.exec(rule.doseLabel)
+function weeklyTotal(rule: ProtocolRule, label: string): string | null {
+  const m = AMOUNT.exec(label)
   if (!m || rule.weekdays.length === 7) return null
   return `${Number(m[1]) * rule.weekdays.length} ${m[2]}/week`
 }
 
-function ruleLine(rule: ProtocolRule): string {
+// "raised from 250 IU on 2026-09-08" — the last change on or before asOf, from the dose steps.
+function lastChange(rule: ProtocolRule, asOf: string): string | null {
+  const { step, previous } = doseStepOn(rule, asOf)
+  if (!step || !previous) return null
+  const [a, b] = [AMOUNT.exec(previous.label), AMOUNT.exec(step.label)]
+  const verb = a && b && a[2] === b[2] ? (Number(b[1]) > Number(a[1]) ? 'raised' : 'reduced') : 'changed'
+  return `${verb} from ${previous.label} on ${step.from}`
+}
+
+function ruleLine(rule: ProtocolRule, asOf: string): string {
   const days = rule.weekdays.length === 7 ? 'Every day' : mondayFirst(rule.weekdays).map(d => DAY_NAMES_LONG[d]).join(' + ')
+  const label = doseLabelOn(rule, asOf)
   const perInjection = rule.injected && rule.weekdays.length < 7
-  const weekly = perInjection ? weeklyTotal(rule) : null
-  const detail = [weekly, rule.note].filter(Boolean).join(' — ')
-  return `- ${days}: ${rule.compound} ${rule.doseLabel}${perInjection ? ' per injection' : ''}${detail ? ` (${detail})` : ''}.`
+  const weekly = perInjection ? weeklyTotal(rule, label) : null
+  const history = [lastChange(rule, asOf), rule.note].filter(Boolean).join('; ')
+  const detail = [weekly, history].filter(Boolean).join(' — ')
+  return `- ${days}: ${rule.compound} ${label}${perInjection ? ' per injection' : ''}${detail ? ` (${detail})` : ''}.`
 }
 
 function standingLine(s: StandingCompound): string {
@@ -64,8 +78,8 @@ function standingLine(s: StandingCompound): string {
 /**
  * The intended dosing schedule as it stood on `asOf`: rules and standing meds in force that
  * day, the as-needed list, and rules stopped within the last few months (so a gap in the log
- * reads as the plan). asOf matters because lab summaries regenerate for historical draws.
- * Doses are the current ones — a rule's `note` carries its history.
+ * reads as the plan). asOf matters because lab summaries regenerate for historical draws: each
+ * dose is the step in force that day, with the change that led to it, and never a later one.
  */
 export function protocolSchedule(
   asOf: string,
@@ -77,7 +91,7 @@ export function protocolSchedule(
   const injectables = active.filter(r => r.injected).map(r => r.compound)
 
   const lines = [
-    ...active.map(ruleLine),
+    ...active.map(r => ruleLine(r, asOf)),
     ...standing.filter(s => s.from <= asOf && (s.to == null || s.to >= asOf)).map(standingLine)
   ]
   if (injectables.length) {
@@ -87,7 +101,7 @@ export function protocolSchedule(
     lines.push(`- ${a.compound} is as-needed only (${a.note}), so sporadic logging is expected, not a lapse.`)
   }
   for (const r of stopped) {
-    lines.push(`- ${r.compound} ${r.doseLabel} ${cadenceOf(r.weekdays)} ran until ${r.to} and is now discontinued${r.stopNote ? ` — ${r.stopNote}` : ''}. Its absence from the dose log since then is deliberate, never a missed dose.`)
+    lines.push(`- ${r.compound} ${doseLabelOn(r, r.to!)} ${cadenceOf(r.weekdays)} ran until ${r.to} and is now discontinued${r.stopNote ? ` — ${r.stopNote}` : ''}. Its absence from the dose log since then is deliberate, never a missed dose.`)
   }
   return `Intended dosing schedule (the reference for adherence — journal dose logs should line up with this; call out deviations, don't re-announce matches):\n${lines.join('\n')}`
 }
@@ -116,7 +130,7 @@ function dailyScheduleLine(date: string, tallies: ScheduleTally[], today: string
   const names = (list: ScheduleTally[]) => list.map(t => t.rule.compound).join(', ')
 
   const parts = [
-    `Schedule check for ${fmtDay(date)}, against the intended schedule above with any planned cycle layered in — due today: ${due.length ? due.map(t => `${t.rule.compound} ${t.rule.doseLabel} (${cadenceOf(t.rule.weekdays)})`).join(', ') : 'nothing'}.`
+    `Schedule check for ${fmtDay(date)}, against the intended schedule above with any planned cycle layered in — due today: ${due.length ? due.map(t => `${t.rule.compound} ${doseLabelOn(t.rule, date)} (${cadenceOf(t.rule.weekdays)})`).join(', ') : 'nothing'}.`
   ]
   if (logged.length) parts.push(`Logged: ${names(logged)}.`)
   if (unlogged.length) {
@@ -144,7 +158,7 @@ function weeklyScheduleLines(start: string, end: string, tallies: ScheduleTally[
     const window = t.rule.to != null && t.rule.to < end
       ? `, schedule ended ${fmtDay(t.rule.to)}`
       : t.rule.from > start ? `, schedule began ${fmtDay(t.rule.from)}` : ''
-    let line = `- ${t.rule.compound} ${t.rule.doseLabel} (${cadenceOf(t.rule.weekdays)}${window}): `
+    let line = `- ${t.rule.compound} ${doseLabelOn(t.rule, end)} (${cadenceOf(t.rule.weekdays)}${window}): `
     line += dueDates.length
       ? `${daily ? `${dueDates.length} days due` : `due ${listDays(dueDates)}`} — ${t.hit.length} logged`
       : 'nothing due'
