@@ -1,29 +1,52 @@
-// TICKER's full-size sprite (shared/utils/tickerSprite.ts): every pose fills the canvas, keeps the
-// same heart, and has limbs and props that actually attach to it.
+// TICKER's sprites (shared/utils/tickerSprite.ts): every pose fills its canvas and keeps the same
+// heart; the full figure's limbs and props attach to it; the face figure is the heart alone.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { TICKER_COLS, TICKER_POSES, TICKER_ROWS, tickerSprite } from '../shared/utils/tickerSprite.ts'
+import { TICKER_POSES, tickerSprite } from '../shared/utils/tickerSprite.ts'
 
 const BODY = new Set(['rim', 'red', 'shade', 'hi', 'spec', 'eye', 'glint', 'blush', 'tongue'])
 const ATTACHED = new Set(['limb', 'glove', 'shoe', 'clip', 'flag', 'mug', 'coffee', 'line'])
+const FIGURES = ['full', 'face']
 
-const cellAt = (cells, r, c) => (r < 0 || r >= TICKER_ROWS || c < 0 || c >= TICKER_COLS) ? null : cells[r * TICKER_COLS + c]
-
-test('every pose fills the whole canvas', () => {
-  for (const pose of TICKER_POSES) {
-    assert.equal(tickerSprite(pose).length, TICKER_COLS * TICKER_ROWS, pose)
+test('every pose fills its whole canvas', () => {
+  assert.deepEqual([tickerSprite('idle').cols, tickerSprite('idle').rows], [28, 16])
+  assert.deepEqual([tickerSprite('idle', 'face').cols, tickerSprite('idle', 'face').rows], [17, 15])
+  for (const figure of FIGURES) {
+    for (const pose of TICKER_POSES) {
+      const s = tickerSprite(pose, figure)
+      assert.equal(s.cells.length, s.cols * s.rows, `${figure} ${pose}`)
+    }
   }
 })
 
 test('the heart silhouette is the same in every pose', () => {
-  const silhouette = cells => cells.map(c => BODY.has(c.ink)).join('')
-  const idle = silhouette(tickerSprite('idle'))
-  for (const pose of TICKER_POSES) assert.equal(silhouette(tickerSprite(pose)), idle, pose)
+  for (const figure of FIGURES) {
+    const silhouette = pose => tickerSprite(pose, figure).cells.map(c => BODY.has(c.ink)).join('')
+    const idle = silhouette('idle')
+    for (const pose of TICKER_POSES) assert.equal(silhouette(pose), idle, `${figure} ${pose}`)
+  }
+})
+
+test('the face figure is the full figure\'s heart, cropped: same face, no limbs or props', () => {
+  for (const pose of TICKER_POSES) {
+    const full = tickerSprite(pose)
+    const face = tickerSprite(pose, 'face')
+    for (let r = 0; r < face.rows; r++) {
+      for (let c = 0; c < face.cols; c++) {
+        const f = face.cells[r * face.cols + c]
+        const g = full.cells[r * full.cols + c + 4]
+        if (BODY.has(f.ink) || BODY.has(g.ink)) assert.deepEqual(f, g, `${pose} ${r},${c}`)
+      }
+    }
+    const extras = face.cells.filter(c => c.ink && !BODY.has(c.ink)).map(c => c.ink)
+    assert.deepEqual(extras, pose === 'worried' ? ['drop', 'drop'] : [], pose)
+  }
 })
 
 test('limbs and props connect to the heart (wave lines, steam and the sweat drop may float)', () => {
   for (const pose of TICKER_POSES) {
-    const cells = tickerSprite(pose)
+    const { cols, rows, cells } = tickerSprite(pose)
+    const cellAt = (r, c) => (r < 0 || r >= rows || c < 0 || c >= cols) ? null : cells[r * cols + c]
     const reached = new Set()
     const queue = []
     cells.forEach((c, i) => {
@@ -33,12 +56,12 @@ test('limbs and props connect to the heart (wave lines, steam and the sweat drop
     })
     while (queue.length) {
       const i = queue.shift()
-      const r = Math.floor(i / TICKER_COLS)
-      const c = i % TICKER_COLS
+      const r = Math.floor(i / cols)
+      const c = i % cols
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
-          const n = cellAt(cells, r + dr, c + dc)
-          const j = (r + dr) * TICKER_COLS + (c + dc)
+          const n = cellAt(r + dr, c + dc)
+          const j = (r + dr) * cols + (c + dc)
           if (n && !reached.has(j) && ATTACHED.has(n.ink) && n.motion !== 'flicker') {
             reached.add(j)
             queue.push(j)
@@ -49,17 +72,19 @@ test('limbs and props connect to the heart (wave lines, steam and the sweat drop
     const loose = cells
       .map((c, i) => ({ c, i }))
       .filter(({ c, i }) => ATTACHED.has(c.ink) && c.motion !== 'flicker' && !reached.has(i))
-      .map(({ i }) => `${Math.floor(i / TICKER_COLS)},${i % TICKER_COLS}`)
+      .map(({ i }) => `${Math.floor(i / cols)},${i % cols}`)
     assert.deepEqual(loose, [], `${pose}: detached cells`)
   }
 })
 
 test('each pose looks different, and only the expected ones animate', () => {
-  const sig = pose => tickerSprite(pose).map(c => `${c.ink}:${c.motion}`).join('|')
-  assert.equal(new Set(TICKER_POSES.map(sig)).size, TICKER_POSES.length)
-  const motions = pose => new Set(tickerSprite(pose).map(c => c.motion).filter(Boolean))
-  assert.ok(motions('idle').has('lid'), 'idle blinks')
-  assert.ok(motions('talking').has('jaw'), 'talking moves its mouth')
-  assert.ok(!motions('idle').has('jaw'), 'idle keeps its mouth still')
-  assert.ok(!motions('flatline').has('lid'), 'X eyes do not blink')
+  for (const figure of FIGURES) {
+    const sig = pose => tickerSprite(pose, figure).cells.map(c => `${c.ink}:${c.motion}`).join('|')
+    assert.equal(new Set(TICKER_POSES.map(sig)).size, TICKER_POSES.length, figure)
+    const motions = pose => new Set(tickerSprite(pose, figure).cells.map(c => c.motion).filter(Boolean))
+    assert.ok(motions('idle').has('lid'), `${figure}: idle blinks`)
+    assert.ok(motions('talking').has('jaw'), `${figure}: talking moves its mouth`)
+    assert.ok(!motions('idle').has('jaw'), `${figure}: idle keeps its mouth still`)
+    assert.ok(!motions('flatline').has('lid'), `${figure}: X eyes do not blink`)
+  }
 })

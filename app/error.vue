@@ -59,6 +59,8 @@
           <div class="ticker-footer relative mt-3 pt-3 border-t border-line-soft flex items-center gap-4">
             <TickerCompanion
               ref="companion"
+              full
+              :mood="kind.mood"
               :rhr="kind.bpm"
               :caption="kind.caption"
               :aria-label="`TICKER — ${primary.label}`"
@@ -108,10 +110,14 @@ const err = props.error
 const status = Number(err.status ?? err.statusCode ?? 500)
 const statusText = err.statusText ?? err.statusMessage ?? (status === 404 ? 'Page Not Found' : 'Server Error')
 
-// The URL that failed, on both server and client. Compound routes carry encoded names; show
-// them decoded, but never let a malformed sequence take the error page down with it.
+// The URL that failed, on both server and client. Server-side the page renders inside Nitro's
+// internal /__nuxt_error request, so useRequestURL() says "/__nuxt_error" there and the real
+// path only on the client (a hydration mismatch); the error carries the original url, so prefer
+// it. Compound routes carry encoded names; show them decoded, but never let a malformed
+// sequence take the error page down with it.
 const path = (() => {
-  const raw = useRequestURL().pathname
+  const url = (err as { url?: unknown }).url
+  const raw = (typeof url === 'string' && url ? url.split('?')[0]! : '') || useRequestURL().pathname
   try {
     return decodeURIComponent(raw)
   }
@@ -138,7 +144,8 @@ const retry: Action = { label: 'try again ⟳', run: () => clearError() }
 const signIn: Action = { label: 'sign in ❯', run: () => clearError({ redirect: '/labs/login' }) }
 
 // One persona per class of failure: header label, page title, the heart's caption and beat
-// rate, the wordmark dot, the one-shot TICKER plays on arrival, and which exits to offer.
+// rate, the wordmark dot, the one-shot TICKER plays on arrival, the pose it holds after (a 404
+// keeps scratching its chin, "searching…"), and which exits to offer.
 const kind = (() => {
   if (status === 404) {
     return {
@@ -149,6 +156,7 @@ const kind = (() => {
       bpm: 84,
       dot: 'bg-warn',
       event: 'thump' as const,
+      mood: 'thinking' as const,
       actions: [
         home,
         { label: 'labs →', run: () => clearError({ redirect: '/labs' }) },
@@ -165,6 +173,7 @@ const kind = (() => {
       bpm: 63,
       dot: 'bg-warn',
       event: null,
+      mood: null,
       actions: [signIn, home]
     }
   }
@@ -177,6 +186,7 @@ const kind = (() => {
       bpm: 63,
       dot: 'bg-warn',
       event: null,
+      mood: null,
       actions: [retry, home]
     }
   }
@@ -188,6 +198,7 @@ const kind = (() => {
     bpm: 72,
     dot: 'bg-danger',
     event: 'flatline' as const,
+    mood: null,
     actions: [retry, home]
   }
 })()
@@ -216,12 +227,13 @@ onMounted(() => {
 <style scoped>
 /* Speech chevron on the divider, pointing down at the heart — a copy of home/Digest.vue's
    notch, with the same page-coloured fill masking the divider across its mouth so the line
-   reads as dipping into the wedge. Both values assume this sits on bg-bg. */
+   reads as dipping into the wedge. Both values assume this sits on bg-bg, and left is the
+   full figure's heart centre (~50px in) minus half the diamond, as there. */
 .ticker-footer::before {
   content: '';
   position: absolute;
   top: -5px;
-  left: 27px;
+  left: 45px;
   width: 10px;
   height: 10px;
   background: var(--color-bg);

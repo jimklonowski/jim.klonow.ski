@@ -11,28 +11,16 @@
     @mouseenter="trigger('bigbeat')"
   >
     <div class="heart-wrap">
-      <!-- The full rubber-hose figure, one pose per mood/event. -->
+      <!-- One pose per mood/event: the rubber-hose figure when full, else the face alone. -->
       <div
-        v-if="isFull"
-        class="heart hose"
-        :style="{ '--cols': TICKER_COLS, '--rows': TICKER_ROWS }"
+        class="heart"
+        :style="{ '--cols': sprite.cols, '--rows': sprite.rows }"
         aria-hidden="true"
       >
         <span
-          v-for="(cell, i) in poseCells"
+          v-for="(cell, i) in sprite.cells"
           :key="i"
           :class="cell.ink ? [`ink-${cell.ink}`, cell.motion && `mo-${cell.motion}`] : undefined"
-        />
-      </div>
-      <div
-        v-else
-        class="heart"
-        aria-hidden="true"
-      >
-        <span
-          v-for="(cell, i) in CELLS"
-          :key="i"
-          :class="CELL_CLASS[cell]"
         />
       </div>
       <span
@@ -85,17 +73,17 @@
 </template>
 
 <script setup lang="ts">
-// TICKER — the pixel-heart digest companion (design_handoff_ticker). A 7×6 pixel
-// sprite that beats at the live RHR, with an EKG sweep below and JS-triggered event
-// one-shots (double-beat, celebration, thump, flatline gag). Pure CSS/SVG, no assets.
-// `full` (always on at size 'lg') swaps in the rubber-hose figure from shared/utils/tickerSprite.ts.
-import { TICKER_COLS, TICKER_POSES, TICKER_ROWS, tickerSprite } from '#shared/utils/tickerSprite'
-import type { TickerCell, TickerPose } from '#shared/utils/tickerSprite'
+// TICKER — the pixel-heart digest companion (design_handoff_ticker, redrawn 2026-09-28). A
+// pixel sprite from shared/utils/tickerSprite.ts that beats at the live RHR, with an EKG sweep
+// below and JS-triggered event one-shots (double-beat, celebration, thump, flatline gag) that
+// each strike a pose. Pure CSS/SVG, no assets.
+import { TICKER_POSES, tickerSprite } from '#shared/utils/tickerSprite'
+import type { TickerFigure, TickerPose, TickerSprite } from '#shared/utils/tickerSprite'
 
 const props = withDefaults(defineProps<{
   /** Latest resting HR reading — drives the beat (clamped 40–100 bpm). */
   rhr?: number | null
-  /** Short-sleep state: visual beat slows to 45 bpm, eyes half-lidded, zzz. */
+  /** Short-sleep state: visual beat slows to 45 bpm, heavy lids (and the coffee when full), zzz. */
   sluggish?: boolean
   /** Replaces the "♥ N bpm live" caption where there is no live reading to show (error page). */
   caption?: string | null
@@ -110,8 +98,8 @@ const props = withDefaults(defineProps<{
   /** 'lg' doubles the pixels for pages TICKER hosts (/ask); it always draws the full figure. */
   size?: 'md' | 'lg'
   /**
-   * The rubber-hose figure (gloves, sneakers, a pose per mood) instead of the 7×6 heart. Off by
-   * default at 'md', where the heart has to fit tight spots like the phone header on /ask.
+   * The rubber-hose figure (gloves, sneakers, a prop per pose) instead of the heart's face alone.
+   * Off by default at 'md', where the heart has to fit tight spots like the phone header on /ask.
    */
   full?: boolean
 }>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false })
@@ -119,19 +107,6 @@ const props = withDefaults(defineProps<{
 const isFull = computed(() => props.full || props.size === 'lg')
 
 const emit = defineEmits<{ open: [] }>()
-
-// 7×6 grid map from the handoff: . empty · R red · H highlight · E eye (bg-colored,
-// fills red for a frame to blink).
-const GRID = [
-  '.RR.RR.',
-  'RHRRRRR',
-  'RERRERR',
-  'RRRRRRR',
-  '.RRRRR.',
-  '..RRR..'
-]
-const CELLS = GRID.join('').split('') as Array<'.' | 'R' | 'H' | 'E'>
-const CELL_CLASS = { '.': '', 'R': 'px-r', 'H': 'px-h', 'E': 'px-e' } as const
 
 const beatSeconds = computed(() => {
   if (props.sluggish) return 60 / 45
@@ -173,11 +148,14 @@ onUnmounted(() => clearTimeout(eventTimer))
 
 defineExpose({ trigger })
 
-// --- Full-size poses (size 'lg') ------------------------------------------
+// --- Poses -----------------------------------------------------------------
 // Events that have a pose win over the held mood, and the mood over the short-sleep slump;
 // digest and bigbeat are pure animation and keep whatever pose is showing.
 
-const POSE_CELLS = Object.fromEntries(TICKER_POSES.map(p => [p, tickerSprite(p)])) as Record<TickerPose, TickerCell[]>
+const SPRITES = Object.fromEntries((['full', 'face'] as const).map(figure => [
+  figure,
+  Object.fromEntries(TICKER_POSES.map(p => [p, tickerSprite(p, figure)]))
+])) as Record<TickerFigure, Record<TickerPose, TickerSprite>>
 
 const pose = computed<TickerPose>(() => {
   if (activeEvent.value === 'celebrate') return 'happy'
@@ -187,7 +165,7 @@ const pose = computed<TickerPose>(() => {
   return props.sluggish ? 'sleepy' : 'idle'
 })
 
-const poseCells = computed(() => POSE_CELLS[pose.value])
+const sprite = computed(() => SPRITES[isFull.value ? 'full' : 'face'][pose.value])
 
 // EKG polyline per state. The dash sweep uses a fixed dasharray (~92, matching the
 // reference demo) so all variants share one animation.
@@ -217,24 +195,71 @@ const ekgPoints = computed(() => {
   width: max-content;
   margin: 0 auto;
 }
+/* Pixel size per figure: the face alone at md is 3px pixels with no gap (51×45, about the old 7×6
+   heart's footprint; 2px with a 1px gap read as a dot matrix at that size), the full figure 3px
+   on md and 6px at lg (the /ask host), both with a 1px gap. --cols/--rows come from the sprite. */
 .heart {
-  --px: 6px;
-  --px-gap: 1px;
+  --px: 3px;
+  --px-gap: 0px;
   display: inline-grid;
-  grid-template-columns: repeat(7, var(--px));
-  grid-template-rows: repeat(6, var(--px));
+  grid-template-columns: repeat(var(--cols), var(--px));
+  grid-template-rows: repeat(var(--rows), var(--px));
   gap: var(--px-gap);
   transform-origin: center bottom;
   animation:
     ticker-beat var(--beat) ease-in-out infinite,
     ticker-glow var(--beat) ease-in-out infinite;
 }
-.px-r { background: var(--heart); }
-.px-h { background: var(--heart-hi); }
-.px-e {
-  background: var(--ticker-eye);
-  position: relative;
-  animation: ticker-blink 4.7s linear infinite;
+.full .heart { --px: 3px; --px-gap: 1px; }
+.size-lg .heart { --px: 6px; --px-gap: 1px; }
+
+/* Inks: theme tokens where one fits, sprite-only shades otherwise. */
+.ink-rim { background: #6e1f2c; }
+.ink-red { background: var(--heart); }
+.ink-shade { background: #c2493f; }
+.ink-hi { background: var(--heart-hi); }
+.ink-spec { background: #ffd5cc; }
+.ink-eye { background: var(--ticker-eye); }
+.ink-glint { background: var(--color-hi); }
+.ink-blush { background: #f5a0a6; }
+.ink-tongue { background: #ff9aa5; }
+.ink-drop { background: #8fd3ff; }
+.ink-limb { background: var(--color-dim); }
+.ink-glove { background: var(--color-hi); }
+.ink-shoe { background: var(--color-accent); }
+.ink-clip { background: var(--color-warn); }
+.ink-line { background: var(--color-faint); }
+.ink-flag { background: var(--heart); }
+.ink-mug { background: var(--color-ember); }
+.ink-coffee { background: #5a3424; }
+
+/* Blinks close the top rows of each eye onto the bottom one. */
+.mo-lid { animation: ticker-lid 4.7s linear infinite; }
+.mo-lid-glint { animation: ticker-lid-glint 4.7s linear infinite; }
+@keyframes ticker-lid {
+  0%, 92%, 100% { background: var(--ticker-eye); }
+  94%, 98% { background: var(--heart); }
+}
+@keyframes ticker-lid-glint {
+  0%, 92%, 100% { background: var(--color-hi); }
+  94%, 98% { background: var(--heart); }
+}
+/* Talking: the lower lip and tongue flap shut on a fast cycle. */
+.mo-jaw { animation: ticker-jaw 0.42s steps(1) infinite; }
+.mo-jaw-tongue { animation: ticker-jaw-tongue 0.42s steps(1) infinite; }
+@keyframes ticker-jaw {
+  0% { background: var(--ticker-eye); }
+  50% { background: var(--heart); }
+}
+@keyframes ticker-jaw-tongue {
+  0% { background: #ff9aa5; }
+  50% { background: var(--heart); }
+}
+/* Wave lines and coffee steam. */
+.mo-flicker { animation: ticker-flicker 1.6s ease-in-out infinite; }
+@keyframes ticker-flicker {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
 }
 
 /* ── EKG ────────────────────────────────────────────────────────────────── */
@@ -293,17 +318,9 @@ const ekgPoints = computed(() => {
   0% { stroke-dashoffset: 92; }
   100% { stroke-dashoffset: 0; }
 }
-@keyframes ticker-blink {
-  0%, 92%, 100% { background: var(--ticker-eye); }
-  94%, 98% { background: var(--heart); }
-}
 
 /* ── Short-sleep state (persists until a ≥7h night) ─────────────────────── */
-/* Half-lidded: the top of each eye fills with the lid (heart red). */
-.sluggish .px-e {
-  background: linear-gradient(to bottom, var(--heart) 0 55%, var(--ticker-eye) 55% 100%);
-  animation: none;
-}
+/* The sleepy pose draws the heavy lids; this is the floating zzz. */
 .zzz {
   position: absolute;
   left: 100%;
@@ -374,7 +391,7 @@ const ekgPoints = computed(() => {
   100% { opacity: 0; transform: scale(0.7); }
 }
 
-/* NEW LAB FLAG — beat pauses 400ms, then one hard thump; eyes widen; EKG spike ×2. */
+/* NEW LAB FLAG — beat pauses 400ms, then one hard thump; worried pose; EKG spike ×2. */
 .ev-thump .heart {
   animation:
     ticker-thump 1.6s ease-in-out,
@@ -387,18 +404,15 @@ const ekgPoints = computed(() => {
   55% { transform: scale(0.97, 1.02); }
   70%, 100% { transform: scale(1); }
 }
-.ev-thump .px-e {
-  animation: none;
-  transform: scaleY(1.5);
-}
 .ev-thump .ekg-line {
   transform: scaleY(2);
 }
 
 /* SODA #3 — the gag: EKG flatlines with a faint beeeep, heart tips over with
-   X eyes, then shakes it off and resumes. */
+   X eyes (the flatline pose) and its colour drains, then shakes it off and resumes. */
 .ev-flatline .heart {
   animation: ticker-keel 2s ease-in-out;
+  filter: saturate(0.45);
 }
 @keyframes ticker-keel {
   0% { transform: rotate(0deg); }
@@ -407,19 +421,6 @@ const ekgPoints = computed(() => {
   86% { transform: rotate(3deg); }
   93% { transform: rotate(-2deg); }
   100% { transform: rotate(0deg); }
-}
-.ev-flatline .px-e {
-  background: var(--ticker-eye);
-  animation: none;
-}
-.ev-flatline .px-e::after {
-  content: '×';
-  position: absolute;
-  inset: 0;
-  font-size: 7px;
-  line-height: 6px;
-  text-align: center;
-  color: var(--heart);
 }
 .ev-flatline .ekg-line {
   animation: none;
@@ -446,62 +447,7 @@ const ekgPoints = computed(() => {
   60% { transform: scale(0.93, 1.08); }
 }
 
-/* ── The full rubber-hose figure: 3px pixels at md, 6px at lg (the /ask host) ── */
-.full .heart { --px: 3px; --px-gap: 1px; }
-.size-lg .heart { --px: 6px; --px-gap: 1px; }
-.heart.hose {
-  grid-template-columns: repeat(var(--cols), var(--px));
-  grid-template-rows: repeat(var(--rows), var(--px));
-}
-/* Sprite-only shades beside the theme tokens (canvas direction C). */
-.ink-rim { background: #6e1f2c; }
-.ink-red { background: var(--heart); }
-.ink-shade { background: #c2493f; }
-.ink-hi { background: var(--heart-hi); }
-.ink-spec { background: #ffd5cc; }
-.ink-eye { background: var(--ticker-eye); }
-.ink-glint { background: var(--color-hi); }
-.ink-blush { background: #f5a0a6; }
-.ink-tongue { background: #ff9aa5; }
-.ink-drop { background: #8fd3ff; }
-.ink-limb { background: var(--color-dim); }
-.ink-glove { background: var(--color-hi); }
-.ink-shoe { background: var(--color-accent); }
-.ink-clip { background: var(--color-warn); }
-.ink-line { background: var(--color-faint); }
-.ink-flag { background: var(--heart); }
-.ink-mug { background: var(--color-ember); }
-.ink-coffee { background: #5a3424; }
-/* Blinks close the top rows of each eye onto the bottom one. */
-.mo-lid { animation: hose-blink 4.7s linear infinite; }
-.mo-lid-glint { animation: hose-blink-glint 4.7s linear infinite; }
-@keyframes hose-blink {
-  0%, 92%, 100% { background: var(--ticker-eye); }
-  94%, 98% { background: var(--heart); }
-}
-@keyframes hose-blink-glint {
-  0%, 92%, 100% { background: var(--color-hi); }
-  94%, 98% { background: var(--heart); }
-}
-/* Talking: the lower lip and tongue flap shut every other beat of a fast cycle. */
-.mo-jaw { animation: hose-jaw 0.42s steps(1) infinite; }
-.mo-jaw-tongue { animation: hose-jaw-tongue 0.42s steps(1) infinite; }
-@keyframes hose-jaw {
-  0% { background: var(--ticker-eye); }
-  50% { background: var(--heart); }
-}
-@keyframes hose-jaw-tongue {
-  0% { background: #ff9aa5; }
-  50% { background: var(--heart); }
-}
-/* Wave lines and coffee steam. */
-.mo-flicker { animation: hose-flicker 1.6s ease-in-out infinite; }
-@keyframes hose-flicker {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 1; }
-}
-/* Flatline: the colour drains while it's down. */
-.full.ev-flatline .heart { filter: saturate(0.45); }
+/* ── Size: 'lg' is the host on /ask ─────────────────────────────────────── */
 .size-lg .ekg { width: 108px; height: 28px; }
 .size-lg .cap { font-size: 11px; margin-top: 10px; }
 .size-lg .bpm { font-size: 10px; }
@@ -554,7 +500,6 @@ const ekgPoints = computed(() => {
     animation: ticker-glow var(--beat) ease-in-out infinite;
   }
   .ekg-line,
-  .px-e,
   .mo-lid,
   .mo-lid-glint,
   .mo-jaw,
