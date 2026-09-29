@@ -7,7 +7,7 @@
        the news in the digest-bubble composition from home/Digest.vue. -->
   <UApp>
     <div class="min-h-screen bg-bg flex items-center justify-center px-4 py-10">
-      <div class="w-full max-w-[560px]">
+      <div class="w-full max-w-140">
         <!-- Wordmark — a real link home; client-side navigation clears the error on its own. -->
         <div class="flex items-center gap-2.5">
           <NuxtLink
@@ -89,7 +89,7 @@
              to say here. -->
         <pre
           v-if="stack"
-          class="mt-4 p-3 border border-dashed border-line-input text-[10.5px] leading-[1.6] text-faint overflow-x-auto whitespace-pre-wrap break-words"
+          class="mt-4 p-3 border border-dashed border-line-input text-[10.5px] leading-[1.6] text-faint overflow-x-auto whitespace-pre-wrap wrap-break-word"
         >{{ stack }}</pre>
       </div>
     </div>
