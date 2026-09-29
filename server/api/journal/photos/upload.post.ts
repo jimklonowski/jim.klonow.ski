@@ -1,5 +1,6 @@
 import { localToday } from '#shared/utils/time'
 import { zPhotoUploadQuery } from '#shared/utils/schemas'
+import { wipeGps } from '#shared/utils/exifGps'
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -29,6 +30,12 @@ export default defineEventHandler(async (event) => {
   // when it didn't, e.g. a non-JS client or a request that raced ahead of the client-side parse.
   const taken_at = suppliedDate ?? await extractPhotoDate(data)
   const date = taken_at ?? localToday()
+
+  // Phone cameras GPS-tag by default, and originals are served to the friend role — wipe the
+  // coordinates before anything is stored. In-place byte edit, no decode/re-encode: pixels,
+  // orientation and the date tags above are untouched. `scripts/strip-photo-gps.mjs` applies
+  // the same wipe to photos uploaded before this existed.
+  wipeGps(data)
 
   const ext = EXT_BY_MIME[contentType] ?? 'jpg'
   const r2Key = `${date}-${category}-${Date.now()}.${ext}`

@@ -136,7 +136,7 @@ Only the public pages are meant to be indexed: the home page and `/privacy`. Bot
 ## Data & integrations
 
 - All entries (journal, labs, DEXA, health metrics, workouts, vials, cycles, digests, invites) live in **D1**. `server/database/schema.sql` is the commented schema. The databases themselves are built and changed by the numbered wrangler migrations in `server/database/migrations`.
-- Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary.
+- Lab PDFs and progress photos are stored in **R2**, served through authenticated proxy routes; parsed marker data is written to D1 alongside a Claude-generated summary. Photo uploads get their GPS EXIF wiped in place before storage (`shared/utils/exifGps.ts` — pixels, orientation, and date tags untouched; `scripts/strip-photo-gps.mjs` retrofits the wipe onto already-stored photos), and non-owner sessions can only fetch files a live photo row references.
 - **Whoop** OAuth sync (`server/api/whoop/*`, `server/tasks/whoop/sync.ts`) pulls recovery/sleep/strain/workout data into `health_metrics` and `workouts`.
   - Whoop also pushes each scored sleep, recovery and workout to `POST /api/whoop/webhook` within minutes (v2 webhooks, set in the Whoop developer dashboard).
   - The endpoint checks Whoop's HMAC signature, re-reads the named record and upserts it. Each delivery is logged as a `whoop:webhook` run.
@@ -188,7 +188,7 @@ Days of the week are always written as names. Cloudflare numbers them 1 = Sunday
 ### Monitoring and backups
 
 - Every task runs through `runLoggedTask` (`server/utils/taskRuns.ts`). It records each run in the `task_runs` table and then lets a failure through, so the cron invocation fails in Cloudflare's log too.
-- `GET /api/health` returns `{ ok }` with 200 or 503, for an uptime monitor to watch. It fails when a task is overdue against its window (`TASK_STALE_AFTER_HOURS` in `server/schedule.ts`), when a task's latest run failed, or when the Apple Health or Whoop feeds stop arriving. Only the owner sees the per-check detail.
+- `GET /api/health` returns `{ ok }` with 200 or 503, for an uptime monitor to watch. It fails when a task is overdue against its window (`TASK_STALE_AFTER_HOURS` in `server/schedule.ts`) or when a task's latest run failed. The Apple Health / Whoop **feed checks are personal** (their staleness says when the owner last weighed in or wore the strap), so they only count — and the per-check detail only appears — for the signed-in owner or a monitor calling with `?token=<HEALTH_TOKEN>`. Point the uptime monitor at the token URL, or it will watch the tasks but not the feeds.
 - The weekly backup lands in the labs bucket under `backups/d1/`, which the PDF proxy refuses to serve. To restore one, or an export from `/tools/data`, turn it back into SQL with `scripts/restore-backup.mjs`; its header has the steps. Rehearse on `--local` first. D1 Time Travel separately covers any point in the last 30 days.
 
 ## Configuration
@@ -203,6 +203,7 @@ Every secret the Worker reads is listed, with notes, in `.env.example`. Copy it 
 | `WEBHOOK_TOKEN` | Bearer token Health Auto Export sends to the Apple Health webhook (its own secret; the webhook refuses everything while it's unset) |
 | `ANTHROPIC_API_KEY` | Every AI call |
 | `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | Whoop OAuth app credentials, for connecting and the nightly sync. The secret also verifies webhook signatures |
+| `HEALTH_TOKEN` | Optional. `/api/health?token=…` gives the uptime monitor the full report, personal feed checks included — anonymous callers get task checks only |
 
 Bindings (the D1 databases, R2 buckets, and KV namespace) are declared in `wrangler.jsonc`; `pnpm types` regenerates their TypeScript types in `worker-configuration.d.ts`.
 

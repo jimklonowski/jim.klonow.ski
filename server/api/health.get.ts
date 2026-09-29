@@ -6,9 +6,11 @@ import type { HealthReport } from '#shared/types/health'
 // Is the site still doing its unattended work? Every scheduled task against its cadence (from
 // task_runs) and every data feed against its expected daily arrival.
 //
-// Built for an uptime monitor: anyone gets `{ ok }` with 200 or 503, and nothing else. The data
-// dates alone would say when the owner last weighed in or slept, so the per-check detail is
-// owner-only. Always the real DB — a demo session's health is not the site's.
+// Built for an uptime monitor: anyone gets `{ ok }` with 200 or 503, and nothing else. The feed
+// checks are personal — their ok/503 alone says when the owner last weighed in or wore the
+// strap — so an anonymous caller's answer covers only the task checks. The owner, and a monitor
+// presenting `?token=<HEALTH_TOKEN>`, get the feeds counted in plus the per-check detail.
+// Always the real DB — a demo session's health is not the site's.
 
 interface RunRow {
   task: string
@@ -79,11 +81,14 @@ export default defineEventHandler(async (event): Promise<HealthReport> => {
   const db = getRealDb(event)
   const now = Date.now()
   const checks = [...await taskChecks(db, now), ...await feedChecks(db, localToday())]
-  const ok = isHealthy(checks)
+
+  const isMonitor = safeEqual(getQuery(event).token, process.env.HEALTH_TOKEN)
+  const full = event.context.auth?.role === 'owner' || isMonitor
+  const ok = isHealthy(full ? checks : checks.filter(c => !c.name.startsWith('feed:')))
 
   setResponseStatus(event, ok ? 200 : 503)
   setHeader(event, 'Cache-Control', 'no-store')
-  return event.context.auth?.role === 'owner'
+  return full
     ? { ok, checkedAt: new Date(now).toISOString(), checks }
     : { ok }
 })
