@@ -602,6 +602,7 @@
                     alt=""
                     loading="lazy"
                     class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
+                    :class="{ '-scale-x-100': photo.frameFlip }"
                   >
                 </button>
                 <button

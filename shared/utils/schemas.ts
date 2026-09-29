@@ -213,7 +213,8 @@ export const zPhotoUpdate = z.object({
   // anything the UI can produce and only stop a hand-made request storing an absurd transform.
   frameOffsetX: z.number().min(-1000).max(1000).optional(),
   frameOffsetY: z.number().min(-1000).max(1000).optional(),
-  frameScale: z.number().positive().max(100).optional()
+  frameScale: z.number().positive().max(100).optional(),
+  frameFlip: z.boolean().optional()
 })
 
 const PHOTO_CATEGORY_VALUES = PHOTO_CATEGORIES.map(c => c.value) as [PhotoCategory, ...PhotoCategory[]]

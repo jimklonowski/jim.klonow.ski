@@ -12,7 +12,18 @@
 </template>
 
 <script setup lang="ts">
-import { CHART_AXIS, CHART_TOOLTIP, CHART_WARN, chartFrame, seriesSymbol } from '~/utils/chartTheme'
+import { annotationsAt } from '#shared/utils/chartAnnotations'
+import type { PlacedAnnotation } from '#shared/utils/chartAnnotations'
+import { ANNOTATION_STYLE, CHART_AXIS, CHART_TOOLTIP, CHART_WARN, chartFrame, seriesSymbol } from '~/utils/chartTheme'
+
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
+
+interface AxisTooltipParam {
+  axisValueLabel?: string
+  marker?: string
+  seriesName?: string
+  value?: unknown
+}
 
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
@@ -41,6 +52,16 @@ const props = withDefaults(defineProps<{
   fixedGutter?: boolean
   /** Text alternative for screen readers. Falls back to a generated series/range summary. */
   ariaLabel?: string
+  /** Protocol context already placed on this chart's categories (shared/utils/chartAnnotations):
+   * dose changes as solid ember lines, events and cycles as faint bands. Their text is in the
+   * hover tooltip for the date under the cursor, so even a 46px bare tile carries it. */
+  annotations?: PlacedAnnotation[]
+  /** Give the second series its own y-axis on the right: two markers in different units on one
+   * chart (HDL mg/dL against total T ng/dL) without one flattening the other. */
+  dualAxis?: boolean
+  /** Draw straight across gaps. For sparse, unaligned series (two markers from different
+   * panels) where a null is "not measured that day", not a break in the line. */
+  connectNulls?: boolean
 }>(), {
   xAxisKey: 'date',
   height: 160,
@@ -52,7 +73,10 @@ const props = withDefaults(defineProps<{
   pointKey: undefined,
   markerKey: undefined,
   fixedGutter: false,
-  ariaLabel: undefined
+  ariaLabel: undefined,
+  annotations: () => [],
+  dualAxis: false,
+  connectNulls: false
 })
 
 /** "Line chart: Weight, Resting HR — 90 points, 2026-06-24 to 2026-09-22" */
@@ -74,21 +98,42 @@ const option = computed<ECOption>(() => {
   const markerKey = props.markerKey
   const hasMarkers = markerKey != null && props.data.some(d => d[markerKey])
 
+  // Guides on the first series only, otherwise they stack up per line: the dashed lab-draw
+  // verticals, the ember dose-change lines, and the event/cycle bands behind everything.
+  const onChart = props.annotations.filter(a => labels.includes(a.at) && (a.end == null || labels.includes(a.end)))
+  const drawLines = props.markLines.filter(v => labels.includes(v)).map(xAxis => ({ xAxis }))
+  const doseLines = onChart.filter(a => a.end == null).map(a => ({
+    xAxis: a.at,
+    lineStyle: { color: ANNOTATION_STYLE.doseLine, type: 'solid' as const, width: 1 }
+  }))
+  // echarts types a band as a [start, end] pair, so build it as a tuple.
+  const bands = onChart.filter(a => a.end != null).map((a): [{ xAxis: string, itemStyle: { color: string } }, { xAxis: string }] => [
+    { xAxis: a.at, itemStyle: { color: a.kind === 'cycle' ? ANNOTATION_STYLE.cycle : ANNOTATION_STYLE.event } },
+    { xAxis: a.end! }
+  ])
+
+  const frame = chartFrame({
+    labels,
+    showLegend: props.showLegend,
+    grid: props.bare ? 'bare' : props.fixedGutter ? 'fixed' : 'normal',
+    xAxis: { boundaryGap: false, show: !props.bare },
+    // A bare tile is read for its shape, so let the line fill the box instead of anchoring to
+    // a zero baseline it never approaches. Two axes compare shapes too, so neither pins to 0.
+    yAxis: { show: !props.bare, scale: props.bare || props.dualAxis, splitLine: { show: !props.bare } }
+  })
+
   return {
-    ...chartFrame({
-      labels,
-      showLegend: props.showLegend,
-      grid: props.bare ? 'bare' : props.fixedGutter ? 'fixed' : 'normal',
-      xAxis: { boundaryGap: false, show: !props.bare },
-      // A bare tile is read for its shape, so let the line fill the box instead of
-      // anchoring to a zero baseline it never approaches.
-      yAxis: { show: !props.bare, scale: props.bare, splitLine: { show: !props.bare } }
-    }),
+    ...frame,
+    ...(props.dualAxis
+      ? { yAxis: [frame.yAxis, { ...frame.yAxis, position: 'right' as const, splitLine: { show: false } }] }
+      : {}),
     color: categories.map(([, c]) => c.color),
-    tooltip: CHART_TOOLTIP,
+    tooltip: onChart.length ? { ...CHART_TOOLTIP, formatter: tooltipWith(onChart, labels) } : CHART_TOOLTIP,
     series: categories.map(([key, meta], i) => ({
       type: 'line',
       name: meta.name,
+      ...(props.dualAxis && i === 1 ? { yAxisIndex: 1 } : {}),
+      ...(props.connectNulls ? { connectNulls: true } : {}),
       data: flagRows || hasMarkers
         ? props.data.map((d) => {
             const marker = markerKey ? d[markerKey] as string : ''
@@ -112,21 +157,41 @@ const option = computed<ECOption>(() => {
       ...(props.area
         ? { areaStyle: { color: meta.color, opacity: 0.08 } }
         : {}),
-      // Only the first series carries the guides, otherwise they stack up per line.
-      ...(i === 0 && props.markLines.length
+      ...(i === 0 && (drawLines.length || doseLines.length)
         ? {
             markLine: {
               silent: true,
               symbol: 'none',
               lineStyle: { color: CHART_AXIS.guide, type: 'dashed', width: 1 },
               label: { show: false },
-              data: props.markLines
-                .filter(v => labels.includes(v))
-                .map(xAxis => ({ xAxis }))
+              data: [...drawLines, ...doseLines]
             }
           }
+        : {}),
+      ...(i === 0 && bands.length
+        ? { markArea: { silent: true, label: { show: false }, data: bands } }
         : {})
     }))
   }
 })
+
+/**
+ * The axis tooltip, plus whatever protocol context covers the hovered date. Rebuilds echarts'
+ * default body (date, then one marker/name/value row per series) because a formatter replaces
+ * it wholesale.
+ */
+function tooltipWith(placed: PlacedAnnotation[], order: string[]) {
+  return (raw: unknown) => {
+    const params = (Array.isArray(raw) ? raw : [raw]) as AxisTooltipParam[]
+    const category = params[0]?.axisValueLabel ?? ''
+    const rows = params
+      .filter(p => p.value != null && p.value !== '')
+      .map(p => `${p.marker ?? ''}${escapeHtml(p.seriesName ?? '')} <b>${escapeHtml(String(p.value))}</b>`)
+    const notes = annotationsAt(placed, category, order).map((a) => {
+      const color = a.kind === 'dose' ? ANNOTATION_STYLE.dose : a.kind === 'cycle' ? ANNOTATION_STYLE.cycleText : ANNOTATION_STYLE.eventText
+      return `<span style="color:${color}">${a.kind === 'dose' ? '│' : '▒'} ${escapeHtml(a.text)}</span>`
+    })
+    return [escapeHtml(category), ...rows, ...notes].join('<br/>')
+  }
+}
 </script>

@@ -28,6 +28,7 @@
           :categories="categories"
           :height="height"
           :mark-lines="markLines"
+          :annotations="placed"
           bare
         />
         <template #fallback>
@@ -39,6 +40,8 @@
 </template>
 
 <script setup lang="ts">
+import { placeAnnotations } from '#shared/utils/chartAnnotations'
+import type { ChartAnnotation } from '#shared/utils/chartAnnotations'
 import { CHART_ACCENT } from '~/utils/chartTheme'
 
 // One bordered metric tile: label + unit on the left, latest value on the right, and a bare
@@ -52,15 +55,19 @@ const props = withDefaults(defineProps<{
   accent?: boolean
   /** One entry per line. Multi-series tiles (BP) pass two. */
   series: Array<{ key: string, name: string, color?: string }>
-  /** Rows keyed by `date` plus one field per series key. */
+  /** Rows keyed by `date` (the axis label) plus one field per series key. Rows that also carry
+   * `day` (YYYY-MM-DD) can take `annotations`. */
   rows: Array<Record<string, string | number | null>>
   height?: number
   /** x-axis labels to dash a vertical guide at (lab draw dates). */
   markLines?: string[]
+  /** Protocol context to place on this tile's own points (see placed below). */
+  annotations?: ChartAnnotation[]
   to?: string
 }>(), {
   height: 46,
-  markLines: () => []
+  markLines: () => [],
+  annotations: () => []
 })
 
 const categories = computed(() =>
@@ -73,4 +80,18 @@ const chartData = computed(() =>
 )
 
 const hasData = computed(() => chartData.value.length >= 2)
+
+// Placed per tile, not once per page: each tile drops the days its own series has no reading
+// for, so a change has to land on the first point THIS line actually has on or after it.
+const placed = computed(() => {
+  if (!props.annotations.length) return []
+  const days: string[] = []
+  const labelOf = new Map<string, string>()
+  for (const row of chartData.value) {
+    if (typeof row.day !== 'string') continue
+    days.push(row.day)
+    labelOf.set(row.day, String(row.date))
+  }
+  return placeAnnotations(props.annotations, days, day => labelOf.get(day) ?? day)
+})
 </script>

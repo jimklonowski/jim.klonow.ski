@@ -58,6 +58,22 @@ export const CHART_AXIS = {
   guide: THEME['line-accent']
 } as const
 
+/**
+ * Protocol context on the time-series charts (shared/utils/chartAnnotations.ts): a dose change
+ * is a half-strength ember line, an event (travel) a faint warn band, a cycle a faint accent
+ * band. All of it sits under the data's contrast on purpose: 90 days can hold a dozen dose
+ * steps, and at full strength they out-shouted the 46px trend lines they annotate. The *Text
+ * variants are the same hues at full strength, for the tooltip and the key.
+ */
+export const ANNOTATION_STYLE = {
+  doseLine: 'rgba(232, 131, 75, 0.42)',
+  dose: THEME.ember,
+  event: 'rgba(232, 179, 75, 0.13)',
+  eventText: THEME.warn,
+  cycle: 'rgba(44, 232, 164, 0.1)',
+  cycleText: THEME.accent
+} as const
+
 export const CHART_TEXT = {
   fontFamily: '\'JetBrains Mono\', ui-monospace, monospace',
   fontSize: 10

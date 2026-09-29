@@ -5,7 +5,7 @@
       :meta="`${metricCount} metrics`"
     >
       <template #actions>
-        <JournalRangePicker />
+        <JournalRangePicker :show-notes="annotationsAvailable" />
       </template>
     </JournalHeader>
     <JournalNav />
@@ -16,6 +16,22 @@
     />
 
     <div class="px-4 sm:px-6 py-3.5 space-y-3.5">
+      <!-- The key to the lines and bands on every tile below; hovering a tile names the ones
+           under the cursor. Only what falls inside the selected range. -->
+      <p
+        v-if="annotationKey.length"
+        class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10.5px] leading-[1.6]"
+        aria-label="Protocol notes on these charts"
+      >
+        <span class="text-faint uppercase tracking-widest">notes</span>
+        <span
+          v-for="a in annotationKey"
+          :key="`${a.kind}-${a.from}-${a.text}`"
+          class="whitespace-nowrap"
+          :style="{ color: a.color }"
+        >{{ a.glyph }} {{ a.text }} <span class="text-muted">{{ a.when }}</span></span>
+      </p>
+
       <!-- Vitals: manual entry + Withings scale -->
       <section>
         <TuiHeader
@@ -38,6 +54,7 @@
             :series="tile.series"
             :rows="vitalRows"
             :mark-lines="tile.markLines"
+            :annotations="annotations"
           />
         </div>
       </section>
@@ -71,6 +88,7 @@
             :accent="tile.accent"
             :series="tile.series"
             :rows="healthRows"
+            :annotations="annotations"
           />
         </div>
         <p
@@ -146,8 +164,12 @@
 </template>
 
 <script setup lang="ts">
+import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
+import { cycleEnd, isTentative } from '#shared/utils/cycles'
+import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
+import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
-import { CHART_ACCENT, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
+import { ANNOTATION_STYLE, CHART_ACCENT, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
 useSeoMeta({ title: 'Journal · Trends' })
 
@@ -160,11 +182,41 @@ function retryAll() {
   refreshHealth()
 }
 const { data: labsData } = await useLabsEntries()
+const { data: cyclesData } = await useCycles()
+const { role } = await useAuth()
 
-const { inRange, smoothRows } = useTrendRange()
+const { inRange, smoothRows, notes } = useTrendRange()
 
 const entries = computed(() => journalData.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
+
+// --- protocol notes (dose changes, dated events, cycles) ---
+// PROTOCOL_RULES and PROTOCOL_EVENTS are the owner's real protocol, so the demo persona's
+// charts never get them (its doses drift by design and would contradict the lines).
+const annotationsAvailable = computed(() => role.value != null && role.value !== 'demo')
+const annotations = computed(() => {
+  if (!notes.value || !annotationsAvailable.value) return []
+  const today = localToday()
+  const cycles = (cyclesData.value ?? [])
+    .filter(c => !isTentative(c) && c.start_date <= today)
+    .map(c => ({ name: c.name, from: c.start_date, to: cycleEnd(c) < today ? cycleEnd(c) : today }))
+  return [...ruleAnnotations(PROTOCOL_RULES), ...eventAnnotations(PROTOCOL_EVENTS), ...cycleAnnotations(cycles)]
+})
+
+/** The key strip: every annotation that lands on the visible range, placed on all its days. */
+const annotationKey = computed(() => {
+  if (!annotations.value.length) return []
+  const days = [...new Set([...inRange(entries.value), ...inRange(healthEntries.value)].map(e => e.date))].sort()
+  const md = (d: string) => formatDate(d, 'monthDay').toLowerCase()
+  return placeAnnotations(annotations.value, days, d => d).map(a => ({
+    ...a,
+    glyph: a.kind === 'dose' ? '│' : '▒',
+    color: a.kind === 'dose' ? ANNOTATION_STYLE.dose : a.kind === 'cycle' ? ANNOTATION_STYLE.cycleText : ANNOTATION_STYLE.eventText,
+    when: a.to && a.to !== a.from
+      ? `${md(a.from)}–${a.from.slice(0, 7) === a.to.slice(0, 7) ? a.to.slice(8).replace(/^0/, '') : md(a.to)}`
+      : md(a.from)
+  }))
+})
 
 // --- lab draw markers ---
 const drawsInRange = computed(() => {
@@ -189,6 +241,7 @@ const vitalRows = computed(() =>
   smoothRows(
     inRange(entries.value).map(e => ({
       date: formatDate(e.date, 'monthDay'),
+      day: e.date,
       weight_lbs: e.weight_lbs ?? null,
       bp_systolic: e.bp_systolic ?? null,
       bp_diastolic: e.bp_diastolic ?? null,
@@ -294,6 +347,7 @@ const healthRows = computed(() =>
   smoothRows(
     inRange(healthEntries.value).map(e => ({
       date: formatDate(e.date, 'monthDay'),
+      day: e.date,
       ...Object.fromEntries(
         Object.keys(HEALTH_METRICS_META).map(k => [k, (e as unknown as Record<string, number | null>)[k] ?? null])
       )

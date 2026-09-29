@@ -152,7 +152,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_type_period ON digests(type, perio
 -- frame_offset_x/y (percent of image size, e.g. -30) and frame_scale (1 = no zoom) let a photo be
 -- manually repositioned/zoomed for consistent framing across a comparison set without touching
 -- the original pixels - applied as a CSS transform wherever the photo renders. Defaults are a
--- no-op so existing rows render unchanged.
+-- no-op so existing rows render unchanged. frame_flip (0/1) mirrors the photo left-to-right to
+-- undo a mirror selfie; unlike the pan/zoom it also applies in the lightbox and on the day page,
+-- since it corrects the photo rather than framing it for a comparison.
 CREATE TABLE IF NOT EXISTS progress_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL,
@@ -163,7 +165,8 @@ CREATE TABLE IF NOT EXISTS progress_photos (
   created_at TEXT NOT NULL,
   frame_offset_x REAL NOT NULL DEFAULT 0,
   frame_offset_y REAL NOT NULL DEFAULT 0,
-  frame_scale REAL NOT NULL DEFAULT 1
+  frame_scale REAL NOT NULL DEFAULT 1,
+  frame_flip INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_progress_photos_date ON progress_photos(date);
 CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(category);

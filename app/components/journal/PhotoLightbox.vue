@@ -25,6 +25,7 @@ const open = computed({
         :src="photo.url"
         :alt="`${photoCategoryLabel(photo.category)} progress photo, ${formatDate(photo.date)}`"
         class="w-full h-auto"
+        :class="{ '-scale-x-100': photo.frameFlip }"
       >
     </template>
   </UModal>

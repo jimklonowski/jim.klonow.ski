@@ -1,5 +1,17 @@
 <template>
-  <span class="flex items-center gap-2.5 text-[11px]">
+  <span class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+    <button
+      v-if="showNotes"
+      type="button"
+      class="cursor-pointer"
+      :class="notes ? 'text-body' : 'text-faint hover:text-accent'"
+      :aria-pressed="notes"
+      @click="notes = !notes"
+    >notes <span :class="notes ? 'text-accent' : 'text-faint'">[{{ notes ? 'on' : 'off' }}]</span></button>
+    <span
+      v-if="showNotes"
+      class="text-ghost"
+    >·</span>
     <button
       type="button"
       class="cursor-pointer"
@@ -17,5 +29,10 @@
 </template>
 
 <script setup lang="ts">
-const { days, smooth } = useTrendRange()
+withDefaults(defineProps<{
+  /** Offer the protocol-notes toggle (the page draws annotations). */
+  showNotes?: boolean
+}>(), { showNotes: false })
+
+const { days, smooth, notes } = useTrendRange()
 </script>

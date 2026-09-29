@@ -122,7 +122,8 @@ export function parseProgressPhotoRow(row: Record<string, unknown>) {
     created_at: row.created_at as string,
     frameOffsetX: (row.frame_offset_x as number | null) ?? 0,
     frameOffsetY: (row.frame_offset_y as number | null) ?? 0,
-    frameScale: (row.frame_scale as number | null) ?? 1
+    frameScale: (row.frame_scale as number | null) ?? 1,
+    frameFlip: row.frame_flip === 1
   }
 }
 

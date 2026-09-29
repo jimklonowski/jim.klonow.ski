@@ -315,6 +315,26 @@
         </div>
       </section>
 
+      <!-- The whole category in date order, frame by frame -->
+      <section
+        v-if="photosForCategory.length >= 2"
+        class="px-4 sm:px-6 py-4 border-t border-line"
+      >
+        <TuiHeader
+          label="TIMELAPSE"
+          :dashes="11"
+        >
+          <span class="text-[10.5px] text-muted normal-case">{{ timelapseMeta }}</span>
+        </TuiHeader>
+        <JournalPhotoTimelapse
+          class="mt-2.5"
+          :photos="photosForCategory"
+          :category-label="photoCategoryLabel(category)"
+          :weights="weightByDate"
+          :frame-style="frameStyle"
+        />
+      </section>
+
       <!-- Every individual photo in this category, for quick stepping (a day can have more than one) -->
       <section class="px-4 sm:px-6 py-4 border-t border-line">
         <TuiHeader
@@ -381,7 +401,7 @@
         </div>
 
         <p class="mt-2.5 text-[11px] text-muted">
-          Tap <span class="text-warn">before</span> or <span class="text-accent">after</span> above to pick the slot you're filling, then tap a thumbnail. Filling Before arms After for you.{{ isOwner ? ' Long-press a thumbnail for reframe / edit / delete.' : '' }}
+          Tap <span class="text-warn">before</span> or <span class="text-accent">after</span> above to pick the slot you're filling, then tap a thumbnail. Filling Before arms After for you.{{ isOwner ? ' Long-press a thumbnail for reframe / flip / edit / delete.' : '' }}
         </p>
       </section>
     </template>
@@ -455,7 +475,7 @@
               :src="reframingPhoto.url"
               alt=""
               class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-              :style="{ transform: `translate(${reframeForm.offsetX}%, ${reframeForm.offsetY}%) scale(${reframeForm.scale})` }"
+              :style="{ transform: frameTransform(reframeForm.offsetX, reframeForm.offsetY, reframeForm.scale, reframingPhoto.frameFlip) }"
               draggable="false"
             >
             <div class="absolute inset-0 pointer-events-none">
@@ -518,6 +538,13 @@ useSeoMeta({ title: 'Journal · Photos' })
 
 const { data: photosData, refresh, error } = await usePhotoEntries()
 const { isOwner } = await useAuth()
+// Weigh-ins for the timelapse caption. The journal list is usually cached already.
+const { data: journalData } = await useJournalEntries()
+const weightByDate = computed(() => {
+  const map = new Map<string, number>()
+  for (const e of journalData.value ?? []) if (e.weight_lbs != null) map.set(e.date, e.weight_lbs)
+  return map
+})
 
 // --- One-time thumbnail backfill for photos uploaded before thumbnails existed ---
 // Re-fetches each already-uploaded original through the authenticated proxy, regenerates a
@@ -585,6 +612,15 @@ const headerMeta = computed(() => {
   const latest = [...all].sort((a, b) => a.date.localeCompare(b.date)).at(-1)
   if (latest) parts.push(`latest ${formatDateTerse(latest.date)}`)
   return parts.join(' · ')
+})
+
+/** "12 photos over 84 days" — the TIMELAPSE header's meta line. */
+const timelapseMeta = computed(() => {
+  const list = photosForCategory.value
+  const first = list[0]
+  const last = list.at(-1)
+  if (!first || !last) return ''
+  return `${list.length} photos over ${diffDays(first.date, last.date)} days`
 })
 
 const emptyDescription = computed(() =>
@@ -797,6 +833,10 @@ function menuItemsFor(photo: ProgressPhoto) {
     label: 'Reframe',
     icon: 'i-lucide-move',
     onSelect: () => openReframe(photo)
+  }, {
+    label: photo.frameFlip ? 'Unflip' : 'Flip Horizontally',
+    icon: 'i-lucide-flip-horizontal-2',
+    onSelect: () => toggleFlip(photo)
   }]
   if (isReframed(photo)) {
     reframeGroup.push({
@@ -822,9 +862,15 @@ function menuItemsFor(photo: ProgressPhoto) {
 // wherever it renders - non-destructive, the original pixels are untouched.
 // Always returns the same key set so the style binding stays assignable to
 // `Record<string, string>` (PhotoCompareSlider's before/after style props).
+// The flip goes last so it mirrors about the image's own centre, after the pan: dragging right
+// in the reframe tool still moves a flipped photo right.
+function frameTransform(offsetX: number, offsetY: number, scale: number, flip: boolean) {
+  return `translate(${offsetX}%, ${offsetY}%) scale(${scale})${flip ? ' scaleX(-1)' : ''}`
+}
+
 function frameStyle(photo: ProgressPhoto | null): Record<string, string> {
-  if (!photo || !isReframed(photo)) return { transform: 'none' }
-  return { transform: `translate(${photo.frameOffsetX}%, ${photo.frameOffsetY}%) scale(${photo.frameScale})` }
+  if (!photo || (!isReframed(photo) && !photo.frameFlip)) return { transform: 'none' }
+  return { transform: frameTransform(photo.frameOffsetX, photo.frameOffsetY, photo.frameScale, photo.frameFlip) }
 }
 
 const reframingPhoto = ref<ProgressPhoto | null>(null)
@@ -901,4 +947,14 @@ const { run: resetFraming } = useSaveAction(async (photo: ProgressPhoto) => {
   })
   await refresh()
 }, { error: 'Reset failed' })
+
+// Mirror selfies come out left-right reversed (a freckle under the wrong eye). Kept out of
+// isReframed/Reset Framing on purpose: it corrects the photo rather than framing it.
+const { run: toggleFlip } = useSaveAction(async (photo: ProgressPhoto) => {
+  await $fetch('/api/journal/photos/update', {
+    method: 'POST',
+    body: { id: photo.id, frameFlip: !photo.frameFlip }
+  })
+  await refresh()
+}, { error: 'Flip failed' })
 </script>
