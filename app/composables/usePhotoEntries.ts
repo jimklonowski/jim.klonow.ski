@@ -11,6 +11,8 @@ export interface ProgressPhoto {
   frameOffsetX: number
   frameOffsetY: number
   frameScale: number
+  /** Rendered mirrored left-to-right, undoing a mirror selfie. */
+  frameFlip: boolean
 }
 
 export function usePhotoEntries() {

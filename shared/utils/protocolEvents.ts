@@ -15,6 +15,12 @@ export interface ProtocolEvent {
   to?: string
   /** Days after `to` the note keeps appearing in prompts; defaults to EVENT_RELEVANCE_DAYS. */
   relevanceDays?: number
+  /**
+   * A few words for the band drawn on the trend charts (shared/utils/chartAnnotations.ts).
+   * Omit it and the event stays prompt-only: the draw-day note has the draw guides already, and
+   * the iron protocol is also the "Vorck Ferritin Protocol" cycle, which draws its own band.
+   */
+  label?: string
   /** Pronoun-free prose. */
   note: string
 }
@@ -27,6 +33,7 @@ export const PROTOCOL_EVENTS: ProtocolEvent[] = [
   {
     from: '2026-09-05',
     to: '2026-09-07',
+    label: 'Labor Day travel',
     note: 'Labor Day weekend travel, Sat 2026-09-05 through Mon 2026-09-07. The trip — not a protocol change — disrupted dosing: HGH was missed on 09-06 and 09-07, the Sunday hCG dose (09-06) was skipped, and the Monday testosterone injection went in around 12:45 on 09-07 instead of the usual ~04:15 slot (it is logged at its actual time). Read the gap as travel, never as a stop, a taper, or an adherence trend, and mention it once rather than as a recurring headline. Modeled HGH exposure sits a little under steady state for a few days afterwards, so IGF-1 on a draw within the following week may read somewhat below its usual level.'
   },
   {

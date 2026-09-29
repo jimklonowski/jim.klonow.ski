@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
   if (body.frameOffsetX !== undefined) addSet('frame_offset_x', body.frameOffsetX)
   if (body.frameOffsetY !== undefined) addSet('frame_offset_y', body.frameOffsetY)
   if (body.frameScale !== undefined) addSet('frame_scale', body.frameScale)
+  if (body.frameFlip !== undefined) addSet('frame_flip', body.frameFlip ? 1 : 0)
 
   if (!sets.length) {
     throw createError({ statusCode: 400, message: 'Nothing to update' })

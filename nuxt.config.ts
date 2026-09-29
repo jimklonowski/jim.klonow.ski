@@ -167,8 +167,9 @@ export default defineNuxtConfig({
     // the bundle carries only what the charts actually use.
     // Every component an option touches has to be listed: echarts drops the rest without a
     // word (a series' markLine is not a top-level key, so it never gets the "used but not
-    // imported" dev warning). The lab-draw guides were invisible until MarkLine joined.
-    components: ['GridComponent', 'TooltipComponent', 'LegendComponent', 'MarkLineComponent']
+    // imported" dev warning). The lab-draw guides were invisible until MarkLine joined;
+    // MarkArea draws the event and cycle bands (shared/utils/chartAnnotations.ts).
+    components: ['GridComponent', 'TooltipComponent', 'LegendComponent', 'MarkLineComponent', 'MarkAreaComponent']
   },
 
   eslint: {

@@ -228,6 +228,18 @@
           :mark-lines="timeTravelling && latest ? [formatDate(latest.date, 'monthDay')] : []"
         />
       </div>
+
+      <TuiHeader
+        label="COMPARE"
+        class="mt-5"
+      >
+        <span class="text-[10.5px] text-muted normal-case">two markers, own axes</span>
+      </TuiHeader>
+      <LabsCompareCard
+        class="mt-2.5"
+        :entries="entries"
+        :viewed-date="timeTravelling ? latest?.date ?? null : null"
+      />
     </section>
 
     <!-- Time travel: scrub the whole page back to an earlier draw. Sticky, so it stays in

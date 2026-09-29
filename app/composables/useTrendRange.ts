@@ -12,6 +12,8 @@ export const TREND_RANGES = [
 export function useTrendRange() {
   const days = useState('journal-trend-days', () => 90)
   const smooth = useState('journal-trend-smooth', () => false)
+  /** Protocol context (dose changes, events, cycles) drawn on the trend charts. */
+  const notes = useState('journal-trend-notes', () => true)
 
   /**
    * Inclusive lower bound as YYYY-MM-DD, or null when showing all history. Home-timezone
@@ -46,5 +48,5 @@ export function useTrendRange() {
     })
   }
 
-  return { days, smooth, cutoff, inRange, smoothRows }
+  return { days, smooth, notes, cutoff, inRange, smoothRows }
 }
