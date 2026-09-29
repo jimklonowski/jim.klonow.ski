@@ -3,6 +3,12 @@
   "name": "jim-klonow-ski",
   "account_id": "82c809bb82b0eeaa8d0a77282865a43d",
   "compatibility_date": "2026-05-13",
+  // The site lives only on jim.klonow.ski (a dashboard-attached custom domain). Without these,
+  // wrangler re-enables the *.workers.dev twin on every deploy — a second, guessable origin
+  // outside the zone's WAF and AI-crawler rules, serving the same static assets with no edge
+  // protections. preview_urls covers version-preview subdomains the same way.
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": {
     "enabled": true
   },
