@@ -4,6 +4,30 @@
 // check uses only WebCrypto, which Workers and node both have.
 import { HOME_TZ } from './time.ts'
 
+/**
+ * What a failed token refresh means for the stored connection (server/utils/whoop.ts acts on it).
+ * Whoop refresh tokens are single-use, and webhooks arrive in bursts across isolates, so a
+ * rejected refresh usually means "someone else already rotated this token", not "the grant is
+ * dead" — and revoking on sight (the pre-2026-09-29 behavior) killed the connection the winner
+ * had just refreshed, until a manual reconnect.
+ *
+ *   - 'adopt-rotated': the stored refresh token is no longer the one we tried — a concurrent
+ *     refresh won; use the stored pair.
+ *   - 'revoke-if-current': the grant itself was rejected (400 invalid_grant / 401 invalid_client)
+ *     and the row still holds the rejected token. Revoke conditionally on that token, so a
+ *     photo-finish winner's save is never clobbered.
+ *   - 'transient': a 429 or 5xx (or any status that isn't a grant rejection) — leave the
+ *     connection alone and let the next run retry. A truly dead grant that only ever answers an
+ *     odd status keeps surfacing through last_error and /api/health instead of a false revoke.
+ */
+export type WhoopRefreshFailurePlan = 'adopt-rotated' | 'revoke-if-current' | 'transient'
+
+export function planWhoopRefreshFailure(status: number, storedRefreshToken: string | null, usedRefreshToken: string): WhoopRefreshFailurePlan {
+  if (status !== 400 && status !== 401) return 'transient'
+  if (storedRefreshToken && storedRefreshToken !== usedRefreshToken) return 'adopt-rotated'
+  return 'revoke-if-current'
+}
+
 export interface WhoopWorkoutRecord {
   id?: string
   start?: string

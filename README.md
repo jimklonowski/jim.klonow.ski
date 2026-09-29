@@ -230,7 +230,7 @@ pnpm demo:seed:remote # same against the production DEMO_DB + buckets
 
 The dev server runs over HTTPS so secure cookies work locally. Its host and certificate paths are `devServer` in `nuxt.config.ts`; point them at your own locally trusted certificate (e.g. from mkcert) in `certs/`, which is gitignored. D1, R2, and KV are emulated locally under `.wrangler/state`.
 
-`pnpm sync:local` clears all local D1 state, the demo DB included. Afterwards run `pnpm db:migrate`, which rebuilds the empty demo DB and applies anything newer than prod, then `pnpm demo:seed:local`.
+`pnpm sync:local` clears all local D1 state, the demo DB included. Afterwards run `pnpm db:migrate`, which rebuilds the empty demo DB and applies anything newer than prod, then `pnpm demo:seed:local`. Whoop's sign-in tokens are deliberately dropped from the local copy: the refresh token is single-use, so a local dev refresh would consume prod's and kill the live connection.
 
 ## Deploy
 
