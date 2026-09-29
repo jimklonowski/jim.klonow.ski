@@ -37,6 +37,14 @@ try {
 
   console.log('\n[3/4] Importing into local D1...')
   run(`npx wrangler d1 execute ${DB} --local --file "${dump}"`)
+
+  // Whoop refresh tokens are single-use: if the local dev server refreshed with this copy, it
+  // would consume PROD's live token and kill the real connection until a manual reconnect
+  // (the weekly backup excludes this table for the same reason). Local Whoop UI simply reads
+  // "not connected"; use Whoop → Reconnect on the local /journal if a connected local copy is
+  // ever genuinely needed.
+  console.log('    dropping whoop_tokens from the local copy (single-use refresh token stays prod\'s)...')
+  run(`npx wrangler d1 execute ${DB} --local --command "DELETE FROM whoop_tokens"`)
 }
 finally {
   // The dump is the entire health history in plaintext — never leave it on disk.

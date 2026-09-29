@@ -1,4 +1,5 @@
 import type { WhoopStatus } from '#shared/types/whoop'
+import { planWhoopRefreshFailure } from '#shared/utils/whoopRecords'
 
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 const WHOOP_API_BASE = 'https://api.prod.whoop.com/developer'
@@ -77,13 +78,16 @@ export async function markWhoopError(db: D1Database, message: string) {
 }
 
 /**
- * Marks the connection dead. Whoop invalidates a refresh token the moment it's consumed, so a
- * rejected refresh means no future request can succeed — without this the row stayed, `connected`
- * kept reporting true, and the nightly cron failed silently until someone noticed missing data.
+ * Marks the connection dead — but only while the row still holds the refresh token that was
+ * rejected. Whoop invalidates a refresh token the moment it's consumed, so a rejected refresh
+ * means no future request with THAT token can succeed; an unconditional revoke here used to kill
+ * a token pair a concurrent refresh had just saved. Returns false when the row moved on.
  */
-async function revokeWhoopTokens(db: D1Database, reason: string) {
-  await db.prepare('UPDATE whoop_tokens SET revoked = 1, last_error = ?1, last_error_at = ?2 WHERE id = 1')
-    .bind(reason.slice(0, 500), new Date().toISOString()).run()
+async function revokeWhoopTokensIfCurrent(db: D1Database, usedRefreshToken: string, reason: string): Promise<boolean> {
+  const { meta } = await db
+    .prepare('UPDATE whoop_tokens SET revoked = 1, last_error = ?1, last_error_at = ?2 WHERE id = 1 AND refresh_token = ?3')
+    .bind(reason.slice(0, 500), new Date().toISOString(), usedRefreshToken).run()
+  return (meta?.changes ?? 0) > 0
 }
 
 // sync.ts fires several whoopFetch() calls concurrently (Promise.allSettled), and each
@@ -124,10 +128,23 @@ async function refreshWhoopToken(db: D1Database, refreshToken: string): Promise<
 
   if (!res.ok) {
     const detail = `${res.status} ${(await res.text()).slice(0, 200)}`
-    // 4xx means the grant itself was rejected (revoked in the Whoop app, expired, already used).
-    // A 5xx is Whoop having a moment — leave the connection alone and retry on the next run.
-    if (res.status >= 400 && res.status < 500) {
-      await revokeWhoopTokens(db, `Whoop rejected the saved credentials (${detail}). Reconnect to restore syncing.`)
+    // The in-flight guard above only covers this isolate; webhooks arrive in bursts across
+    // isolates, each holding the same single-use refresh token. planWhoopRefreshFailure decides
+    // whether this failure means "someone else rotated the token first" (adopt their pair),
+    // "the grant is genuinely dead" (revoke, conditionally), or "Whoop is having a moment"
+    // (429/5xx — leave the connection alone and retry next run).
+    const row = await tokenRow(db)
+    const plan = planWhoopRefreshFailure(res.status, row && !row.revoked ? row.refresh_token : null, refreshToken)
+    if (plan === 'adopt-rotated') {
+      return { access_token: row!.access_token, refresh_token: row!.refresh_token, expires_at: row!.expires_at }
+    }
+    if (plan === 'revoke-if-current') {
+      const revoked = await revokeWhoopTokensIfCurrent(db, refreshToken, `Whoop rejected the saved credentials (${detail}). Reconnect to restore syncing.`)
+      if (!revoked) {
+        // Photo finish: the winner saved between our failure and this write. Adopt their pair.
+        const winner = await getWhoopTokens(db)
+        if (winner && winner.refresh_token !== refreshToken) return winner
+      }
       throw createError({ statusCode: 401, message: 'Whoop connection expired — reconnect to restore syncing' })
     }
     throw createError({ statusCode: 502, message: `Whoop token refresh failed: ${detail}` })
