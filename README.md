@@ -189,7 +189,7 @@ Days of the week are always written as names. Cloudflare numbers them 1 = Sunday
 
 - Every task runs through `runLoggedTask` (`server/utils/taskRuns.ts`). It records each run in the `task_runs` table and then lets a failure through, so the cron invocation fails in Cloudflare's log too.
 - `GET /api/health` returns `{ ok }` with 200 or 503, for an uptime monitor to watch. It fails when a task is overdue against its window (`TASK_STALE_AFTER_HOURS` in `server/schedule.ts`) or when a task's latest run failed. The Apple Health / Whoop **feed checks are personal** (their staleness says when the owner last weighed in or wore the strap), so they only count — and the per-check detail only appears — for the signed-in owner or a monitor calling with `?token=<HEALTH_TOKEN>`. Point the uptime monitor at the token URL, or it will watch the tasks but not the feeds.
-- The weekly backup lands in the labs bucket under `backups/d1/`, which the PDF proxy refuses to serve. To restore one, or an export from `/tools/data`, turn it back into SQL with `scripts/restore-backup.mjs`; its header has the steps. Rehearse on `--local` first. D1 Time Travel separately covers any point in the last 30 days.
+- The weekly backup lands in the labs bucket under `backups/d1/`, which the PDF proxy refuses to serve. To restore one, or an export from `/tools/data`, turn it back into SQL with `scripts/restore-backup.mjs`; its header has the steps, and its `--drill` flag rehearses the SQL against a scratch copy of the schema (foreign keys enforced, row counts checked) before anything real is touched. The generated SQL deletes children before parents and inserts parents before children, keeps every statement under D1's 100 KB cap, and **merges `invites` instead of replacing them** — restoring an old backup never resurrects a revoked share link or hands a spent one its uses back. Rehearse on `--local` first. D1 Time Travel separately covers any point in the last 30 days.
 
 ## Configuration
 
@@ -230,7 +230,7 @@ pnpm demo:seed:remote # same against the production DEMO_DB + buckets
 
 The dev server runs over HTTPS so secure cookies work locally. Its host and certificate paths are `devServer` in `nuxt.config.ts`; point them at your own locally trusted certificate (e.g. from mkcert) in `certs/`, which is gitignored. D1, R2, and KV are emulated locally under `.wrangler/state`.
 
-`pnpm sync:local` clears all local D1 state, the demo DB included. Afterwards run `pnpm db:migrate`, which rebuilds the empty demo DB and applies anything newer than prod, then `pnpm demo:seed:local`.
+`pnpm sync:local` clears all local D1 state, the demo DB included. Afterwards run `pnpm db:migrate`, which rebuilds the empty demo DB and applies anything newer than prod, then `pnpm demo:seed:local`. Whoop's sign-in tokens are deliberately dropped from the local copy: the refresh token is single-use, so a local dev refresh would consume prod's and kill the live connection.
 
 ## Deploy
 

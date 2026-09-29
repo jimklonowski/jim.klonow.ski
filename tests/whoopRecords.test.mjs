@@ -4,8 +4,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import {
-  cycleMetric, metricsByDate, recoveryMetric, sleepMetric, verifyWhoopSignature,
-  WHOOP_WEBHOOK_MAX_AGE_MS, whoopLocalDate, whoopWorkoutRow
+  cycleMetric, metricsByDate, planWhoopRefreshFailure, recoveryMetric, sleepMetric,
+  verifyWhoopSignature, WHOOP_WEBHOOK_MAX_AGE_MS, whoopLocalDate, whoopWorkoutRow
 } from '../shared/utils/whoopRecords.ts'
 import { zWhoopWebhook } from '../shared/utils/schemas.ts'
 
@@ -93,4 +93,20 @@ test('webhook bodies: v2 UUIDs pass as strings, unknown event types are still ac
   assert.equal(zWhoopWebhook.parse({ id: 1234, type: 'sleep.updated' }).id, '1234')
   assert.equal(zWhoopWebhook.parse({ id: 'u', type: 'cycle.updated' }).type, 'cycle.updated')
   assert.equal(zWhoopWebhook.safeParse({ type: 'sleep.updated' }).success, false)
+})
+
+test('a failed token refresh: adopt a concurrent rotation, revoke only a current dead grant, never on 429/5xx', () => {
+  // The refresh token is single-use. A 400/401 with the row already holding a DIFFERENT token
+  // means another isolate won the race — adopt, don't revoke the pair it just saved.
+  assert.equal(planWhoopRefreshFailure(400, 'winner-token', 'my-stale-token'), 'adopt-rotated')
+  assert.equal(planWhoopRefreshFailure(401, 'winner-token', 'my-stale-token'), 'adopt-rotated')
+  // The row still holds the rejected token: the grant is genuinely dead (revoked in the Whoop
+  // app, expired) — revoke, conditionally on that same token.
+  assert.equal(planWhoopRefreshFailure(400, 'same-token', 'same-token'), 'revoke-if-current')
+  assert.equal(planWhoopRefreshFailure(401, null, 'same-token'), 'revoke-if-current')
+  // Rate limits and outages must never kill the connection (they used to: any 4xx revoked).
+  assert.equal(planWhoopRefreshFailure(429, 'same-token', 'same-token'), 'transient')
+  assert.equal(planWhoopRefreshFailure(403, 'same-token', 'same-token'), 'transient')
+  assert.equal(planWhoopRefreshFailure(500, 'same-token', 'same-token'), 'transient')
+  assert.equal(planWhoopRefreshFailure(503, null, 'same-token'), 'transient')
 })
