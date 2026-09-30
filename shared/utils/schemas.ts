@@ -364,7 +364,9 @@ export const zDateRange = z.object({
 // --- audit log ---
 
 export const zAuditList = z.object({
-  limit: z.coerce.number().int().min(1).max(500).default(100)
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  /** Cursor: only entries with id below this — the history pages backwards from the newest. */
+  before: z.coerce.number().int().positive().optional()
 })
 
 export const zAuditRestore = z.object({ id: zId })
