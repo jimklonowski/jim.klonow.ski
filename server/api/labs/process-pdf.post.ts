@@ -1,18 +1,25 @@
+import { createHash } from 'node:crypto'
 import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
 import { isIsoDate } from '#shared/utils/time'
 
-// Builds "[YYYY-MM-DD]-[Description].pdf" from an arbitrary uploaded filename, stripping any
-// date-like text already in it first so re-running extraction never doubles up the date.
-function buildPdfFilename(originalName: string, date: string): string {
+// Builds "[YYYY-MM-DD]-[Description]-[hash8].pdf" from an arbitrary uploaded filename, stripping
+// any date-like text or old hash suffix already in it first, so re-running an extraction (or
+// re-uploading a file saved from the PDF proxy) never doubles either one up. The content hash
+// keeps two different same-day reports with the same portal filename on two different keys —
+// without it, previewing the second silently replaced the first draw's stored PDF — while a
+// byte-identical re-upload still lands on the identical key.
+function buildPdfFilename(originalName: string, date: string | null, contentHash: string): string {
   const base = originalName
     .replace(/\.pdf$/i, '')
     .replace(/^\d{4}-\d{2}-\d{2}[-_ ]*/, '')
     .replace(/[-_ ]*\d{4}-\d{2}-\d{2}$/, '')
+    .replace(/[-_ ]*[0-9a-f]{8}$/i, '')
     .replace(/\d{4}$/, '')
     .replace(/^[-_ ]+/, '')
     .replace(/[-_ ]+$/, '')
-    .trim() || 'LabResult'
-  return `${date}-${base}.pdf`
+    .trim()
+    .slice(0, 80) || 'LabResult'
+  return `${date ? `${date}-` : ''}${base}-${contentHash}.pdf`
 }
 
 // The response shape is enforced by structured outputs (the *_SCHEMA constants below), so the
@@ -273,12 +280,13 @@ export default defineEventHandler(async (event) => {
   }
 
   // Store the PDF in R2 — sources hold bare object keys; list endpoints turn them into proxy URLs.
-  // Filename is derived from the extracted (authoritative) date, not whatever the file was named on
-  // upload, so every stored PDF follows "[Description]-[YYYY-MM-DD].pdf" regardless of source filename.
+  // The key is "[YYYY-MM-DD]-[Description]-[hash8].pdf": the date from the extraction (the
+  // authoritative one, not the upload's filename) and 8 hex chars of the file's SHA-256, so two
+  // reports can never collide on a key however they're named — this `put` runs at preview time,
+  // before anything is saved, and used to be able to replace another draw's stored PDF.
   const extractedDate = isIsoDate(extracted.date) ? extracted.date : null
-  const pdfFilename = extractedDate
-    ? buildPdfFilename(pdf.filename ?? 'LabResult.pdf', extractedDate)
-    : (pdf.filename ?? 'lab.pdf')
+  const contentHash = createHash('sha256').update(pdf.data).digest('hex').slice(0, 8)
+  const pdfFilename = buildPdfFilename(pdf.filename ?? 'LabResult.pdf', extractedDate, contentHash)
   const bucket = getLabsBucket(event)
   await bucket.put(pdfFilename, pdf.data, {
     httpMetadata: { contentType: 'application/pdf' }

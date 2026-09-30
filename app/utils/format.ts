@@ -38,7 +38,8 @@ export function shortSite(site: string): string {
 
 export function pdfLabel(src: string): string {
   const filename = src.split('/').pop() ?? src
-  return decodeURIComponent(filename).replace(/\.pdf$/i, '')
+  // Newer keys end in an 8-hex content hash (collision guard, process-pdf.post.ts) — noise here.
+  return decodeURIComponent(filename).replace(/\.pdf$/i, '').replace(/-[0-9a-f]{8}$/i, '')
 }
 
 // Free-text narrative findings can't be reliably graded word-for-word, so this only flags
