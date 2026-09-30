@@ -17,10 +17,10 @@
 // Shared (app + server) because the pages and the AI prompt context (cycleContext in
 // server/utils/cycleContext.ts) must agree on the same status/day/window math.
 
-import type { PkDose } from './pk'
 import type { ProtocolRule } from './protocolRules'
 import type { DoseUnit } from '../types/journal'
-// Explicit .ts: a runtime import, and the plain-node test runner can't resolve it extensionless.
+// Explicit .ts: runtime imports, and the plain-node test runner can't resolve them extensionless.
+import { pkDoseAmount, type PkDose, type PkModel } from './pk.ts'
 import { diffDays, shiftDays } from './dates.ts'
 
 export interface CyclePlanItem {
@@ -269,8 +269,14 @@ export function mergeRules(standing: CycleRule[], cycles: Cycle[]): CycleRule[] 
 }
 
 /** Every date a plan item calls for a dose of `compound`, as synthetic PkDose rows — the
- * planned exposure curve is just the real Bateman engine fed this instead of the dose log. */
-export function plannedDoses(cycle: Cycle, compound: string): PkDose[] {
+ * planned exposure curve is just the real Bateman engine fed this instead of the dose log.
+ *
+ * With a `model`, amounts are expressed in the model's unit exactly like the logged side's
+ * pkDosesFor (mcg→mg; a wrong-kind unit is dropped, never guessed) — superposition adds
+ * amounts, so a plan row entered in mcg used to feed the curve a thousandfold spike and the
+ * shared-peak normalization flattened the logged overlay beside it. Without a model, amounts
+ * stay in the item's own unit: stock coverage compares them against vials measured the same way. */
+export function plannedDoses(cycle: Cycle, compound: string, model?: PkModel): PkDose[] {
   // Deliberately NOT gated on isTentative, unlike cycleRules: the dose *count* here is
   // week-relative and so is real for a tentative plan — it's what stock coverage sums to
   // answer "is the fridge deep enough for this run?", the question you ask precisely while
@@ -282,9 +288,11 @@ export function plannedDoses(cycle: Cycle, compound: string): PkDose[] {
     if (item.compound !== compound) continue
     const window = itemWindow(cycle, item)
     if (!window) continue
+    const amount = model ? pkDoseAmount(item.dose, item.unit, model) : item.dose
+    if (amount == null || amount <= 0) continue
     for (let d = window.from; d <= window.to; d = shiftDays(d, 1)) {
       if (item.weekdays.includes(new Date(d + 'T12:00:00').getDay())) {
-        dates.push({ date: d, amount: item.dose })
+        dates.push({ date: d, amount })
       }
     }
   }

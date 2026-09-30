@@ -452,7 +452,8 @@ const overlayRows = computed(() => {
     const model = PK_MODELS[compound]
     if (!model) continue
 
-    const plan = plannedDoses(cycle.value, compound)
+    // The model converts plan amounts into its own unit (a mcg row fed raw was 1000×).
+    const plan = plannedDoses(cycle.value, compound, model)
     const plannedPoints = exposureSeries(plan, model, from, to)
 
     const logged = pkDosesFor(entries.value, compound, model)
