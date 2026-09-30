@@ -19,11 +19,15 @@ import { ANNOTATION_STYLE, CHART_AXIS, CHART_TOOLTIP, CHART_WARN, chartFrame, se
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 
 interface AxisTooltipParam {
+  /** The raw category value — with an ISO-day axis, the YYYY-MM-DD, however the label displays. */
+  axisValue?: string | number
   axisValueLabel?: string
   marker?: string
   seriesName?: string
   value?: unknown
 }
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
@@ -90,6 +94,15 @@ const describedChart = computed(() => {
 const option = computed<ECOption>(() => {
   const categories = Object.entries(props.categories)
   const labels = props.data.map(d => d[props.xAxisKey] as string)
+
+  // An axis of ISO days charts on the exact dates (so annotations, guides and tooltips can never
+  // land on the same month-day of another year) and formats only the DISPLAY here. Once the data
+  // spans years, the short label carries ’yy the way CompareCard's does.
+  const isoAxis = labels.length > 0 && labels.every(l => typeof l === 'string' && ISO_DAY.test(l))
+  const multiYear = isoAxis && labels[0]!.slice(0, 4) !== labels.at(-1)!.slice(0, 4)
+  const displayDay = (d: string) => ISO_DAY.test(d)
+    ? `${formatDate(d, 'monthDay')}${multiYear ? ` ’${d.slice(2, 4)}` : ''}`
+    : d
   const pointKey = props.pointKey
   const symbol = seriesSymbol(pointKey ? props.data.filter(d => d[pointKey]).length : props.data.length)
   // Per-row symbols only when the density rule allows points at all: an item-level 'circle'
@@ -124,11 +137,16 @@ const option = computed<ECOption>(() => {
 
   return {
     ...frame,
+    ...(isoAxis
+      ? { xAxis: { ...frame.xAxis, axisLabel: { ...frame.xAxis.axisLabel, formatter: displayDay } } }
+      : {}),
     ...(props.dualAxis
       ? { yAxis: [frame.yAxis, { ...frame.yAxis, position: 'right' as const, splitLine: { show: false } }] }
       : {}),
     color: categories.map(([, c]) => c.color),
-    tooltip: onChart.length ? { ...CHART_TOOLTIP, formatter: tooltipWith(onChart, labels) } : CHART_TOOLTIP,
+    tooltip: onChart.length || isoAxis
+      ? { ...CHART_TOOLTIP, formatter: tooltipWith(onChart, labels, isoAxis ? displayDay : undefined) }
+      : CHART_TOOLTIP,
     series: categories.map(([key, meta], i) => ({
       type: 'line',
       name: meta.name,
@@ -178,12 +196,14 @@ const option = computed<ECOption>(() => {
 /**
  * The axis tooltip, plus whatever protocol context covers the hovered date. Rebuilds echarts'
  * default body (date, then one marker/name/value row per series) because a formatter replaces
- * it wholesale.
+ * it wholesale. Annotations are matched on the RAW category value (`axisValue` — the ISO day),
+ * never on display text: `axisValueLabel` follows the axis formatter, and a formatted "Aug 24"
+ * names a day in every year of an all-time range.
  */
-function tooltipWith(placed: PlacedAnnotation[], order: string[]) {
+function tooltipWith(placed: PlacedAnnotation[], order: string[], display?: (d: string) => string) {
   return (raw: unknown) => {
     const params = (Array.isArray(raw) ? raw : [raw]) as AxisTooltipParam[]
-    const category = params[0]?.axisValueLabel ?? ''
+    const category = String(params[0]?.axisValue ?? params[0]?.axisValueLabel ?? '')
     const rows = params
       .filter(p => p.value != null && p.value !== '')
       .map(p => `${p.marker ?? ''}${escapeHtml(p.seriesName ?? '')} <b>${escapeHtml(String(p.value))}</b>`)
@@ -191,7 +211,7 @@ function tooltipWith(placed: PlacedAnnotation[], order: string[]) {
       const color = a.kind === 'dose' ? ANNOTATION_STYLE.dose : a.kind === 'cycle' ? ANNOTATION_STYLE.cycleText : ANNOTATION_STYLE.eventText
       return `<span style="color:${color}">${a.kind === 'dose' ? '│' : '▒'} ${escapeHtml(a.text)}</span>`
     })
-    return [escapeHtml(category), ...rows, ...notes].join('<br/>')
+    return [escapeHtml(display ? display(category) : category), ...rows, ...notes].join('<br/>')
   }
 }
 </script>

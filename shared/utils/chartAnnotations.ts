@@ -80,9 +80,9 @@ export function cycleAnnotations(cycles: CycleSpan[]): ChartAnnotation[] {
 export interface PlacedAnnotation {
   kind: AnnotationKind
   text: string
-  /** The category (x-axis label) the line sits on, or the band's first. */
+  /** The day (YYYY-MM-DD category value) the line sits on, or the band's first. */
   at: string
-  /** The band's last category. Absent for a line. */
+  /** The band's last day. Absent for a line. */
   end?: string
   /** The dates as they happened, for the key: "Aug 24", "Sep 18–27". */
   from: string
@@ -90,16 +90,17 @@ export interface PlacedAnnotation {
 }
 
 /**
- * Places annotations on a chart whose points are `dates` (YYYY-MM-DD, ascending), labelled by
- * `label(date)`. A line lands on the first point on or after its date, and only if that date is
- * within the data; a band covers its first through last point inside its span, clipped to the
- * data, and is dropped when no point falls inside it.
+ * Places annotations on a chart whose points are `dates` (YYYY-MM-DD, ascending). A line lands on
+ * the first point on or after its date, and only if that date is within the data; a band covers
+ * its first through last point inside its span, clipped to the data, and is dropped when no point
+ * falls inside it.
+ *
+ * `at`/`end` stay ISO days — the chart's category VALUES must be days too, with any prettier text
+ * applied by a display formatter (AreaChart does this). Placing onto formatted labels was the
+ * wrong-year bug: "Aug 24" names a day in every year of an all-time range, so echarts drew the
+ * line on the last year's match while the tooltip lookup found the first's.
  */
-export function placeAnnotations(
-  annotations: ChartAnnotation[],
-  dates: string[],
-  label: (date: string) => string
-): PlacedAnnotation[] {
+export function placeAnnotations(annotations: ChartAnnotation[], dates: string[]): PlacedAnnotation[] {
   if (!dates.length) return []
   const first = dates[0]!
   const last = dates.at(-1)!
@@ -108,12 +109,12 @@ export function placeAnnotations(
     if (a.to == null) {
       if (a.from < first || a.from > last) continue
       const at = dates.find(d => d >= a.from)
-      if (at) placed.push({ kind: a.kind, text: a.text, at: label(at), from: a.from })
+      if (at) placed.push({ kind: a.kind, text: a.text, at, from: a.from })
       continue
     }
     const inside = dates.filter(d => d >= a.from && d <= a.to!)
     if (!inside.length) continue
-    placed.push({ kind: a.kind, text: a.text, at: label(inside[0]!), end: label(inside.at(-1)!), from: a.from, to: a.to })
+    placed.push({ kind: a.kind, text: a.text, at: inside[0]!, end: inside.at(-1)!, from: a.from, to: a.to })
   }
   return placed.sort((x, y) => x.from.localeCompare(y.from))
 }
