@@ -120,6 +120,22 @@ test('plannedDoses expands the cadence into dated doses', () => {
   assert.equal(plannedDoses(run(), 'Oxandrolone').length, 35) // 5 weeks daily
 })
 
+test('plannedDoses with a model converts to the model unit, like the logged side', () => {
+  const model = { absorptionHalfLifeDays: 10, eliminationHalfLifeDays: 1, unit: 'mg' }
+  const mcgPlan = run({ compounds: [{ ...primo, dose: 200_000, unit: 'mcg' }] })
+
+  // Without a model the amount stays in the item's unit — stock coverage counts it that way.
+  assert.equal(plannedDoses(mcgPlan, 'Methenolone Enanthate')[0].amount, 200_000)
+  // With the model, mcg→mg — fed raw, the plan curve spiked 1000× and the shared-peak
+  // normalization flattened the logged overlay next to it.
+  assert.equal(plannedDoses(mcgPlan, 'Methenolone Enanthate', model)[0].amount, 200)
+  assert.equal(plannedDoses(run(), 'Methenolone Enanthate', model)[0].amount, 200)
+
+  // A unit the model can't express (hCG's IU has no fixed mass) is dropped, never guessed.
+  const iuPlan = run({ compounds: [{ ...primo, dose: 500, unit: 'iu' }] })
+  assert.deepEqual(plannedDoses(iuPlan, 'Methenolone Enanthate', model), [])
+})
+
 test('checkpoints: windows, baseline picks the freshest pre-start draw', () => {
   const c = run()
   const states = checkpointStates(c, ['2026-07-20', '2026-08-30', '2026-11-02'], '2026-11-10')
