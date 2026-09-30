@@ -185,24 +185,20 @@ export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
 
 // Shared by the Apple Health webhook and the Whoop sync task - health_metrics has no manual-entry
 // UI, so whichever source has a value for a field just overwrites it (no null-only-patch needed).
+// One statement, not SELECT-then-INSERT: Whoop pushes sleep.updated and recovery.updated within
+// moments of each other after a night, and on a date with no row yet both deliveries used to see
+// "missing", race to INSERT, and the loser die on the PRIMARY KEY — a 502 that Whoop retried and
+// the menu wore as ⚠ until the next clean sync. ON CONFLICT touches only this call's fields, so
+// concurrent writers with different fields still merge instead of clobbering each other.
 export async function upsertHealthMetrics(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): Promise<boolean> {
   const cols = HEALTH_METRIC_FIELDS.filter(f => fields[f] != null)
   if (cols.length === 0) return false
 
-  const existing = await db.prepare('SELECT date FROM health_metrics WHERE date = ?1').bind(date).first()
-  if (!existing) {
-    const allCols = ['date', ...cols]
-    const placeholders = allCols.map((_, i) => `?${i + 1}`).join(', ')
-    await db.prepare(`INSERT INTO health_metrics (${allCols.join(', ')}) VALUES (${placeholders})`)
-      .bind(date, ...cols.map(f => fields[f]))
-      .run()
-  }
-  else {
-    const setClause = cols.map((f, i) => `${f} = ?${i + 2}`).join(', ')
-    await db.prepare(`UPDATE health_metrics SET ${setClause} WHERE date = ?1`)
-      .bind(date, ...cols.map(f => fields[f]))
-      .run()
-  }
+  await db.prepare(`
+    INSERT INTO health_metrics (date, ${cols.join(', ')})
+    VALUES (?1, ${cols.map((_, i) => `?${i + 2}`).join(', ')})
+    ON CONFLICT(date) DO UPDATE SET ${cols.map(f => `${f} = excluded.${f}`).join(', ')}
+  `).bind(date, ...cols.map(f => fields[f]!)).run()
   return true
 }
 
