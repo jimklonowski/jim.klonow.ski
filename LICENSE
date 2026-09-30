@@ -4,9 +4,12 @@ License, while site content is not licensed for reuse.
 - "Code" means the application source code: TypeScript/JavaScript, Vue
   components, configuration, build scripts, and styles.
 - "Content" means everything else: written copy and posts, photographs and
-  images, logos and branding, fonts and design assets in `public/`, and any
+  images, logos and branding, original design assets in `public/`, and any
   personal data (including health, lab, and journal data) displayed by or
   associated with this site.
+- Third-party fonts are neither Code nor Content and keep their own licenses:
+  Departure Mono (Helena Zhang) and JetBrains Mono ship under the SIL Open
+  Font License 1.1.
 
 --------------------------------------------------------------------------------
 CODE — MIT License

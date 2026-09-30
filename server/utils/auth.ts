@@ -181,13 +181,16 @@ function sessionKv(event: H3Event): KVNamespace {
 /** Owner and upload tokens issued before this (unix seconds) are refused. 0 = no cutoff set. */
 export async function ownerSessionCutoff(event: H3Event): Promise<number> {
   if (cutoffMemo && Date.now() - cutoffMemo.at < CUTOFF_MEMO_MS) return cutoffMemo.value
-  let value = 0
+  let value: number
   try {
     value = Number(await sessionKv(event).get(CUTOFF_KEY)) || 0
   }
   catch (err) {
-    // An unreadable KV must not lock the owner out of their own site; log and allow.
+    // An unreadable KV must not lock the owner out of their own site; log and allow — but keep
+    // the LAST KNOWN cutoff rather than memoizing 0, which re-admitted signed-out-everywhere
+    // tokens for the next 15 seconds on any KV blip.
     console.error('session cutoff: KV read failed:', err instanceof Error ? err.message : err)
+    value = cutoffMemo?.value ?? 0
   }
   cutoffMemo = { value, at: Date.now() }
   return value

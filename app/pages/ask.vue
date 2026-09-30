@@ -18,7 +18,22 @@
           {{ bubble }}
         </p>
       </div>
+      <!-- A failed list must not read as "no conversations saved yet". -->
+      <p
+        v-if="threadsError"
+        class="mt-6 text-[11.5px] text-danger"
+      >
+        Couldn't load saved conversations.
+        <button
+          type="button"
+          class="text-accent hover:text-accent-hover cursor-pointer"
+          @click="() => refreshThreads()"
+        >
+          retry ⟳
+        </button>
+      </p>
       <AskThreadList
+        v-else
         class="mt-6"
         :threads="threads"
         :active-id="threadId"
@@ -215,7 +230,7 @@ const { role } = await useAuth()
 const { data: overview } = useOverviewSummary(role)
 const rhr = computed(() => overview.value?.latestRhr ?? null)
 
-const { data: threadData, refresh: refreshThreads } = await useAsyncData('ask-threads',
+const { data: threadData, error: threadsError, refresh: refreshThreads } = await useAsyncData('ask-threads',
   () => useRequestFetch()<AskThreadSummary[]>('/api/ai/threads'))
 const threads = computed(() => threadData.value ?? [])
 

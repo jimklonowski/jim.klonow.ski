@@ -22,17 +22,20 @@ export default defineEventHandler(async (event) => {
   }
   const form = normalizeForm(row.form)
   const bacWaterMl = isPillForm(form) ? null : body.bac_water_ml
-  const remainingQty = ((row.quantity as number | null) ?? 1) - 1
 
-  const batchStatement = remainingQty > 0
-    ? db.prepare('UPDATE vials SET quantity = ?2 WHERE id = ?1').bind(body.id, remainingQty)
-    : db.prepare('DELETE FROM vials WHERE id = ?1').bind(body.id)
-
+  // Every statement re-checks the batch's live state instead of trusting the read above: two
+  // opens racing on the same batch (two tabs, two devices) each computed `quantity - 1` from the
+  // same read and spawned two actives while the batch dropped by one. The insert only fires
+  // while a sealed unit still exists AT THAT MOMENT, the decrement is arithmetic in SQL, and the
+  // delete collects a batch that just hit zero — one transaction, so the trio can't interleave.
+  const stillSealed = 'SELECT 1 FROM vials WHERE id = ?1 AND status = \'sealed\' AND quantity >= 1'
   const insertActive = db.prepare(`
     INSERT INTO vials
       (compound, supplier, vial_amount, vial_unit, quantity, status, opened_date, bac_water_ml, lot, expiry, cost, notes, form, unit_count, created_at)
-    VALUES (?1, ?2, ?3, ?4, 1, 'active', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+    SELECT ?2, ?3, ?4, ?5, 1, 'active', ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14
+    WHERE EXISTS (${stillSealed})
   `).bind(
+    body.id,
     row.compound,
     row.supplier ?? null,
     row.vial_amount,
@@ -47,13 +50,18 @@ export default defineEventHandler(async (event) => {
     (row.unit_count as number | null) ?? null,
     new Date().toISOString()
   )
+  const decrement = db.prepare('UPDATE vials SET quantity = quantity - 1 WHERE id = ?1 AND status = \'sealed\' AND quantity >= 1').bind(body.id)
+  const cleanup = db.prepare('DELETE FROM vials WHERE id = ?1 AND status = \'sealed\' AND quantity <= 0').bind(body.id)
 
-  const [, inserted] = await db.batch([batchStatement, insertActive])
+  const [inserted, decremented, deleted] = await db.batch([insertActive, decrement, cleanup])
+  if (!decremented?.meta.changes) {
+    throw createError({ statusCode: 409, message: 'That batch was already emptied — refresh the list' })
+  }
 
   // Two rows change: the sealed batch (decremented, or deleted when it was the last one) and the
   // new active vial. `row` was read above, so it doubles as the batch's before-image.
   const summary = `opened ${row.compound} ${row.vial_amount} ${row.vial_unit}`
-  await recordAudit(event, { table: 'vials', key: body.id, before: row, deleted: remainingQty <= 0, summary })
+  await recordAudit(event, { table: 'vials', key: body.id, before: row, deleted: !!deleted?.meta.changes, summary })
   if (inserted?.meta.last_row_id) {
     await recordAudit(event, { table: 'vials', key: inserted.meta.last_row_id, before: null, summary })
   }

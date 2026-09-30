@@ -214,7 +214,7 @@ Requires Node 22.18 or newer (the tests and scripts rely on its built-in TypeScr
 ```bash
 pnpm install
 pnpm dev              # HTTPS dev server on port 3000
-pnpm check            # types, lint, typecheck, tests (what pnpm deploy runs first)
+pnpm check            # types, lint, typecheck, tests (what pnpm run deploy runs first)
 pnpm test             # unit tests (node --test over tests/*.test.mjs, no framework)
 pnpm test:watch       # the same, rerunning on change
 pnpm types            # regenerate worker-configuration.d.ts after editing wrangler.jsonc
@@ -235,9 +235,11 @@ The dev server runs over HTTPS so secure cookies work locally. Its host and cert
 ## Deploy
 
 ```bash
-pnpm deploy     # pnpm check, then nuxt build, then wrangler deploy
-pnpm preview    # build, then run the built Worker in Wrangler's local emulator
+pnpm run deploy   # pnpm check, then nuxt build, then wrangler deploy
+pnpm preview      # build, then run the built Worker in Wrangler's local emulator
 ```
+
+(`run` matters: bare `pnpm deploy` invokes pnpm's own workspace-deploy command, not this script.)
 
 The build generates the real deploy config. Nitro writes `.output/server/wrangler.json`, which is `wrangler.jsonc` with the Worker entry point and static assets pointed at the build output, plus a `.wrangler/deploy/config.json` that redirects `wrangler deploy` to it. That's why the deploy log warns that `main` and `assets` are overridden. Edit `wrangler.jsonc`, never the generated file.
 

@@ -259,16 +259,18 @@ function periodLabel(d: Digest) {
 }
 function relativeTime(iso: string | null) {
   if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(diff / 86400000)
+  // Calendar days in HOME_TZ, not elapsed hours: 11:50pm yesterday is "yesterday" at 8am.
+  const days = diffDays(localDayOf(iso), localToday())
   if (days <= 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days}d ago`
   return `${Math.floor(days / 7)}w ago`
 }
 function fmtSleep(min: number) {
-  const h = Math.floor(min / 60)
-  const m = Math.round(min % 60)
+  // Round the total before splitting, or 419.7 reads "6h 60m".
+  const total = Math.round(min)
+  const h = Math.floor(total / 60)
+  const m = total % 60
   return h ? `${h}h ${m}m` : `${m}m`
 }
 function chips(d: Digest): string[] {

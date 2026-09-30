@@ -44,8 +44,24 @@
         <span class="text-[10.5px] text-muted normal-case">your edits and deletes, newest first — any of them can be put back</span>
       </TuiHeader>
 
+      <!-- A failed load is an error, not an empty history — "no changes yet" on a 500 reads as
+           data loss on exactly the page that exists to undo one. -->
+      <p
+        v-if="auditError"
+        class="mt-2.5 text-[12px] text-danger"
+      >
+        Couldn't load the change history.
+        <button
+          type="button"
+          class="text-accent hover:text-accent-hover cursor-pointer"
+          @click="refresh"
+        >
+          retry ⟳
+        </button>
+      </p>
+
       <UTable
-        v-if="entries.length"
+        v-else-if="entries.length"
         :data="entries"
         :columns="COLUMNS"
         :meta="rowMeta"
@@ -167,7 +183,7 @@ const rowMeta = {
 
 const PAGE = 100
 
-const { data, refresh: refreshAudit } = await useAsyncData('audit', () => useRequestFetch()<AuditEntry[]>('/api/audit'))
+const { data, error: auditError, refresh: refreshAudit } = await useAsyncData('audit', () => useRequestFetch()<AuditEntry[]>('/api/audit'))
 const entries = computed(() => data.value ?? [])
 
 // A full first page means there may be older entries below the cutoff.
@@ -209,7 +225,13 @@ function when(iso: string) {
 function confirmText(e: AuditEntry): string {
   const what = `${TABLE_LABELS[e.table] ?? e.table} — ${e.summary ?? e.key}`
   if (e.action === 'delete') return `Put back ${what}?`
-  if (e.action === 'create') return `Remove ${what}, undoing its creation?`
+  if (e.action === 'create') {
+    // A journal "create" can be one soda tap that made the day's row — undoing it removes the
+    // WHOLE row, doses and notes included, not just the tap. Say so.
+    return e.table === 'journal_entries'
+      ? `Remove ${what}? This deletes that day's whole entry — anything added to it since goes too (logged, so it can be undone).`
+      : `Remove ${what}, undoing its creation?`
+  }
   return `Put ${what} back the way it was before this change? Anything edited on it since is replaced (that's logged too, so it can be undone).`
 }
 

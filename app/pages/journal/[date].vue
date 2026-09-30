@@ -803,11 +803,15 @@ async function confirmUploadPhoto() {
 }
 
 // No catch used to mean a failed delete was an unhandled rejection with nothing on screen.
-const { run: deletePhoto } = useSaveAction(async (id: number) => {
+const { run: runDeletePhoto } = useSaveAction(async (id: number) => {
   await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })
   if (lightboxPhoto.value?.id === id) lightboxPhoto.value = null
   await refreshPhotos()
 }, { error: 'Delete failed' })
+
+function deletePhoto(id: number) {
+  if (window.confirm('Delete this photo? It can be restored from Tools → Data for 30 days.')) runDeletePhoto(id)
+}
 
 const lightboxPhoto = ref<ProgressPhoto | null>(null)
 

@@ -153,8 +153,23 @@
         <span class="text-[10.5px] text-muted normal-case">URLs aren't stored — revoke and reissue if one is lost</span>
       </TuiHeader>
 
+      <!-- A failed load must not read as "no links yet" — that's an invitation to mint a duplicate. -->
+      <p
+        v-if="invitesError"
+        class="mt-2.5 text-[12px] text-danger"
+      >
+        Couldn't load the share links.
+        <button
+          type="button"
+          class="text-accent hover:text-accent-hover cursor-pointer"
+          @click="() => refresh()"
+        >
+          retry ⟳
+        </button>
+      </p>
+
       <div
-        v-if="invites.length"
+        v-else-if="invites.length"
         class="border border-line-soft mt-2.5"
       >
         <div
@@ -188,7 +203,7 @@
               type="button"
               class="text-faint hover:text-danger cursor-pointer"
               :aria-label="`Revoke link for ${invite.label || 'unlabeled link'}`"
-              @click="revoke(invite.id)"
+              @click="confirmRevoke(invite)"
             >revoke</button>
           </span>
         </div>
@@ -278,7 +293,7 @@ const createdQr = computed(() => {
   return { size, path }
 })
 
-const { data, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
+const { data, error: invitesError, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
 // Active links first, revoked sunk to the bottom — each group keeps the API's newest-first order.
 const invites = computed(() => {
   const list = data.value ?? []
@@ -363,7 +378,16 @@ function confirmSignOutElsewhere() {
   if (window.confirm('Sign out every other device? You stay signed in here.')) signOutElsewhere()
 }
 
+// Revoking has no undo (invites aren't in the change history) and signs out everyone on the
+// link, so it earns the same confirm "sign out other devices" already had.
+function confirmRevoke(invite: Invite) {
+  if (window.confirm(`Revoke "${invite.label || invite.role}"? Everyone signed in through it is signed out, and this can't be undone.`)) {
+    revoke(invite.id)
+  }
+}
+
 function shortDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  // HOME_TZ, not the runtime's zone: the UTC SSR pass dated evening-created links tomorrow.
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: HOME_TZ })
 }
 </script>

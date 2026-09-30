@@ -10,8 +10,11 @@ import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#s
 // stats stored beside the recap. Every number the model cites is computed here, not by it.
 
 function fmtDuration(min: number): string {
-  const h = Math.floor(min / 60)
-  const m = Math.round(min % 60)
+  // Round the total BEFORE splitting: floor/round separately turned a weekly average of 419.7
+  // into "6h 60m" — in the AI prompt, no less.
+  const total = Math.round(min)
+  const h = Math.floor(total / 60)
+  const m = total % 60
   return h ? `${h}h ${m}m` : `${m}m`
 }
 
