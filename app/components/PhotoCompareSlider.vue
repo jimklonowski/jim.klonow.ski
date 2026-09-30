@@ -16,13 +16,22 @@
       :style="afterStyle"
       draggable="false"
     >
-    <img
-      :src="beforeUrl"
-      :alt="beforeLabel ? `Before: ${beforeLabel}` : 'Before photo'"
-      class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-      :style="{ clipPath: `inset(0 ${100 - pct}% 0 0)`, ...beforeStyle }"
-      draggable="false"
+    <!-- The reveal clip lives on this untransformed wrapper, never on the photo itself: a
+         clip-path is applied in the element's own transformed coordinates, so carrying both on
+         the <img> mirrored the clip along with a flipped Before (it rendered on the After side
+         and grew backwards when dragged) and shifted the seam by any reframe pan/zoom. -->
+    <div
+      class="absolute inset-0 pointer-events-none"
+      :style="{ clipPath: `inset(0 ${100 - pct}% 0 0)` }"
     >
+      <img
+        :src="beforeUrl"
+        :alt="beforeLabel ? `Before: ${beforeLabel}` : 'Before photo'"
+        class="absolute inset-0 w-full h-full object-cover"
+        :style="beforeStyle"
+        draggable="false"
+      >
+    </div>
 
     <!-- Divider + drag handle -->
     <div

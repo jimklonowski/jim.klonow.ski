@@ -44,10 +44,18 @@
         />
 
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3">
+          <p
+            v-if="!entriesReady"
+            class="text-[11.5px] text-danger"
+          >
+            Couldn't load the current journal, so importing is disabled — merging needs it to
+            tell new days from existing ones. Reload the page to retry.
+          </p>
           <button
             v-if="selectedFile && !parsing"
             type="button"
-            class="tui-btn tui-btn-accent"
+            class="tui-btn tui-btn-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!entriesReady"
             @click="parseFile"
           >
             ⌖ PARSE FILE
@@ -146,7 +154,7 @@
             <button
               type="button"
               class="tui-btn tui-btn-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="importing || selectedCount === 0"
+              :disabled="importing || selectedCount === 0 || !entriesReady"
               @click="importRows"
             >
               {{ importing ? 'IMPORTING ⟳' : importButtonLabel }}
@@ -281,6 +289,8 @@ import { blankEntry } from '~/data/journal'
 
 useSeoMeta({ title: 'Tools · Data Import' })
 
+const toast = useToast()
+
 const METRICS = ['Body Mass', 'Resting Heart Rate', 'Heart Rate Variability', 'Blood Pressure']
 
 const RIGHT = { class: { th: 'text-right', td: 'text-right' } }
@@ -312,7 +322,12 @@ const RECORD_TYPES: Record<string, string> = {
   HKQuantityTypeIdentifierBloodPressureDiastolic: 'bp_diastolic'
 }
 
-const { data: allEntries } = await useJournalEntries()
+const { data: allEntries, error: entriesError } = await useJournalEntries()
+
+// The create-vs-update call hangs on this list, and /api/journal/save overwrites whole rows —
+// with a failed load every day would read as "create" and importing would blank existing days'
+// doses, food and notes. Fail closed instead ([date].vue guards its save the same way).
+const entriesReady = computed(() => !entriesError.value && allEntries.value != null)
 
 const entryMap = computed(() => {
   const map: Record<string, typeof allEntries.value extends Array<infer T> ? T : never> = {}
@@ -421,7 +436,7 @@ function buildRows(byDate: Record<string, HealthData>): ParsedRow[] {
 }
 
 async function parseFile() {
-  if (!selectedFile.value) return
+  if (!selectedFile.value || !entriesReady.value) return
   parsing.value = true
   parseProgress.value = 0
   rows.value = []
@@ -506,6 +521,7 @@ const failedText = computed(() =>
 )
 
 async function importRows() {
+  if (!entriesReady.value) return
   importing.value = true
   importDone.value = false
   done.value = 0
@@ -513,13 +529,34 @@ async function importRows() {
 
   const selected = rows.value.filter(r => r.selected)
 
+  // The preview's copy of the journal may be minutes old, and a day edited elsewhere since
+  // (another device, the webhook) would be reverted by the whole-row save. Re-read the
+  // authoritative list now and re-derive every action from it; a failed read means zero writes.
+  let fresh: Record<string, Record<string, unknown>>
+  try {
+    const list = await $fetch<Array<Record<string, unknown> & { date: string }>>('/api/journal/list')
+    fresh = Object.fromEntries(list.map(e => [e.date, e]))
+  }
+  catch (err) {
+    importing.value = false
+    toast.add({ title: 'Import not started', description: extractErrorMessage(err, 'Couldn\'t load the current journal to merge into — nothing was written.'), color: 'error' })
+    return
+  }
+
   try {
     for (const row of selected) {
-      const existing = (entryMap.value as Record<string, Record<string, unknown>>)[row.date]
+      const existing = fresh[row.date]
       let payload: Record<string, unknown>
 
       if (existing) {
-        payload = { ...existing, ...row.updates }
+        // Only fill fields still empty right now — the preview computed `updates` against an
+        // older copy, and an import must never overwrite a value logged since.
+        const updates = Object.fromEntries(Object.entries(row.updates).filter(([field]) => existing[field] == null))
+        if (Object.keys(updates).length === 0) {
+          done.value++ // everything this row offered is already in place
+          continue
+        }
+        payload = { ...existing, ...updates }
       }
       else {
         const blank = blankEntry(row.date)
