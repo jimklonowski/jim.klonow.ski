@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk'
+import { ASK_TRAILER_MARK, type AskStreamTrailer } from '#shared/types/ask'
 import { checkAskHistory } from '#shared/utils/askHistory'
 import { localToday } from '#shared/utils/time'
 import { zAsk } from '#shared/utils/schemas'
@@ -141,23 +142,42 @@ export default defineEventHandler(async (event) => {
       }
       catch (err) {
         console.error('[ai] chat stream failed:', err instanceof Error ? err.message : err)
-        controller.enqueue(encoder.encode('\n\n*[generation failed — try again]*'))
+        try {
+          controller.enqueue(encoder.encode('\n\n*[generation failed — try again]*'))
+        }
+        catch { /* the client cancelled — nobody left to tell */ }
       }
       finally {
-        // Only a finished answer is saved, question and answer together — the page drops a
-        // failed exchange from the transcript, so the thread must not keep half of one.
-        if (completed) {
-          const now = new Date().toISOString()
-          await db.batch([
-            db.prepare('INSERT INTO ask_messages (thread_id, role, content, created_at) VALUES (?1, \'user\', ?2, ?3)').bind(threadId, question, now),
-            db.prepare('INSERT INTO ask_messages (thread_id, role, content, model, created_at) VALUES (?1, \'assistant\', ?2, ?3, ?4)').bind(threadId, answer, AI_MODELS.chat, now),
-            db.prepare('UPDATE ask_threads SET updated_at = ?2 WHERE id = ?1').bind(threadId, now)
-          ]).catch(err => console.error('[ai] could not save the exchange:', err instanceof Error ? err.message : err))
+        // Only a finished answer is saved, question and answer together — the page keeps a
+        // failed exchange out of future history, so the thread must not keep half of one.
+        // The work rides event.waitUntil: a client disconnect cancels this handler, and without
+        // it a finished exchange could go unsaved or a just-created thread linger empty.
+        const persist = async () => {
+          if (completed) {
+            const now = new Date().toISOString()
+            await db.batch([
+              db.prepare('INSERT INTO ask_messages (thread_id, role, content, created_at) VALUES (?1, \'user\', ?2, ?3)').bind(threadId, question, now),
+              db.prepare('INSERT INTO ask_messages (thread_id, role, content, model, created_at) VALUES (?1, \'assistant\', ?2, ?3, ?4)').bind(threadId, answer, AI_MODELS.chat, now),
+              db.prepare('UPDATE ask_threads SET updated_at = ?2 WHERE id = ?1').bind(threadId, now)
+            ]).catch(err => console.error('[ai] could not save the exchange:', err instanceof Error ? err.message : err))
+          }
+          else {
+            await dropEmptyThread()
+          }
         }
-        else {
-          await dropEmptyThread()
+        const persisted = persist()
+        event.waitUntil(persisted)
+        await persisted
+        // The machine-readable ending, after any human-readable note: was the exchange saved,
+        // and which thread survives. The page strips it from the transcript and, on a failure,
+        // un-adopts a thread that no longer exists — adopting the X-Thread-Id header early used
+        // to strand the page on a deleted thread after a refused first question.
+        const trailer: AskStreamTrailer = { ok: completed, threadId: completed || !createdThread ? threadId : null }
+        try {
+          controller.enqueue(encoder.encode(`\n${ASK_TRAILER_MARK}${JSON.stringify(trailer)}`))
+          controller.close()
         }
-        controller.close()
+        catch { /* the client cancelled mid-stream */ }
       }
     },
     cancel() {

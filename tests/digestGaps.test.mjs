@@ -31,3 +31,13 @@ test('on a Saturday, the week ending that day is still under way', () => {
 test('the window bounds how far back it looks', () => {
   assert.deepEqual(digestGaps(['2026-07-01', '2026-09-20'], [], TODAY, 30).daily, ['2026-09-20'])
 })
+
+test('a period whose digest cron has not fired yet is pending, not a gap', () => {
+  // Before 14:00 UTC, yesterday belongs to the daily job — offering it would double-generate.
+  const g = digestGaps(['2026-09-26', '2026-09-27'], [], TODAY, 30, { daily: '2026-09-27' })
+  assert.deepEqual(g.daily, ['2026-09-26'])
+  // Sunday morning before the weekly cron: the week that ended Saturday is pending…
+  assert.deepEqual(digestGaps(['2026-09-22'], [], '2026-09-27', 30, { weekly: '2026-09-26' }).weekly, [])
+  // …and once the hour has passed (no pending), it is a gap like any other.
+  assert.deepEqual(digestGaps(['2026-09-22'], [], '2026-09-27', 30).weekly, ['2026-09-26'])
+})
