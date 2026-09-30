@@ -4,5 +4,5 @@ import { zAuditRestore } from '#shared/utils/schemas'
 export default defineEventHandler(async (event) => {
   requireOwner(event)
   const { id } = await readValidatedJson(event, zAuditRestore)
-  return { ok: true, ...await restoreAudit(getRealDb(event), id) }
+  return { ok: true, ...await restoreAudit(getRealDb(event), id, getPhotosBucket(event)) }
 })

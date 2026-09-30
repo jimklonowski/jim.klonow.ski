@@ -84,8 +84,24 @@
         </template>
       </UTable>
 
+      <!-- The API pages backwards by id; a photo delete stays restorable for 30 days, so its
+           entry has to stay reachable however many soda taps and saves came after it. -->
+      <div
+        v-if="canLoadOlder"
+        class="mt-2.5 flex justify-center"
+      >
+        <button
+          type="button"
+          class="tui-btn disabled:opacity-50"
+          :disabled="loadingOlder"
+          @click="loadOlder"
+        >
+          {{ loadingOlder ? 'LOADING…' : '↓ LOAD OLDER' }}
+        </button>
+      </div>
+
       <UEmpty
-        v-else
+        v-else-if="!entries.length"
         icon="i-lucide-history"
         variant="naked"
         title="No changes recorded yet"
@@ -149,8 +165,38 @@ const rowMeta = {
   }
 }
 
-const { data, refresh } = await useAsyncData('audit', () => useRequestFetch()<AuditEntry[]>('/api/audit'))
+const PAGE = 100
+
+const { data, refresh: refreshAudit } = await useAsyncData('audit', () => useRequestFetch()<AuditEntry[]>('/api/audit'))
 const entries = computed(() => data.value ?? [])
+
+// A full first page means there may be older entries below the cutoff.
+const reachedEnd = ref((data.value?.length ?? 0) < PAGE)
+const loadingOlder = ref(false)
+const canLoadOlder = computed(() => !reachedEnd.value && entries.value.length >= PAGE)
+
+// Restores change the history, so reload the first page and start paging over.
+async function refresh() {
+  await refreshAudit()
+  reachedEnd.value = (data.value?.length ?? 0) < PAGE
+}
+
+async function loadOlder() {
+  const oldest = entries.value.at(-1)?.id
+  if (oldest == null || loadingOlder.value) return
+  loadingOlder.value = true
+  try {
+    const older = await $fetch<AuditEntry[]>('/api/audit', { query: { before: oldest, limit: PAGE } })
+    data.value = [...(data.value ?? []), ...older]
+    if (older.length < PAGE) reachedEnd.value = true
+  }
+  catch (err) {
+    useToast().add({ title: 'Couldn\'t load older history', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })
+  }
+  finally {
+    loadingOlder.value = false
+  }
+}
 
 function downloadExport() {
   window.location.assign('/api/export')
@@ -167,10 +213,13 @@ function confirmText(e: AuditEntry): string {
   return `Put ${what} back the way it was before this change? Anything edited on it since is replaced (that's logged too, so it can be undone).`
 }
 
-// Other pages need no nudge: every list revalidates when its page mounts (useListResource).
+// Other pages revalidate when their page mounts (useListResource) — but the shell's status line,
+// footer and ⌘K palette read the 'overview' summary by name, and a restored draw or journal day
+// changes what they show, so nudge it like every other mutation site does.
 const { run: runRestore, pending: restoring } = useSaveAction(async (e: AuditEntry) => {
   await $fetch('/api/audit/restore', { method: 'POST', body: { id: e.id } })
   await refresh()
+  await refreshNuxtData('overview')
 }, {
   error: 'Could not restore',
   success: () => ({ title: 'Restored', description: 'Logged in the history, so it can be undone.' })

@@ -14,8 +14,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Not found' })
   }
 
-  await db.prepare('DELETE FROM progress_photos WHERE id = ?1').bind(id).run()
-  await recordAudit(event, { table: 'progress_photos', key: id, before, deleted: true, summary: `photo ${before.date} ${before.category}` })
+  // One batch: a delete whose audit insert failed would leave files the purge task never
+  // collects AND no entry to undo the delete from — for photos the log entry IS the delete's
+  // other half, not best-effort telemetry.
+  const del = db.prepare('DELETE FROM progress_photos WHERE id = ?1').bind(id)
+  const audit = auditStatement(event, { table: 'progress_photos', key: id, before, deleted: true, summary: `photo ${before.date} ${before.category}` })
+  await db.batch(audit ? [del, audit] : [del])
 
   return { ok: true }
 })
