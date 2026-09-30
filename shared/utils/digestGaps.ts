@@ -13,22 +13,26 @@ export interface DigestGaps {
 }
 
 /**
- * `dataDates` are the days anything was recorded (journal, health metrics, workouts); `have` are
- * the digests on file. Only complete periods count: today is still under way, and so is the week
- * that contains it.
+ * `dataDates` are the days anything digest-worthy was recorded (the endpoint mirrors the daily
+ * digest's own signals in SQL); `have` are the digests on file. Only complete periods count:
+ * today is still under way, and so is the week that contains it. `pending` names periods whose
+ * scheduled cron hasn't fired yet — yesterday isn't a "gap" at 7am when the daily job writes it
+ * at 14:00 UTC anyway; filling it early would spend a model call on partial data just for the
+ * cron to overwrite it.
  */
 export function digestGaps(
   dataDates: Iterable<string>,
   have: Array<{ type: string, period_end: string }>,
   today: string,
-  windowDays: number
+  windowDays: number,
+  pending: { daily?: string | null, weekly?: string | null } = {}
 ): DigestGaps {
   const since = shiftDays(today, -windowDays)
   const data = new Set([...dataDates].filter(d => d >= since && d < today))
   const daily = new Set(have.filter(d => d.type === 'daily').map(d => d.period_end))
   const weekly = new Set(have.filter(d => d.type === 'weekly').map(d => d.period_end))
 
-  const missingDaily = [...data].filter(d => !daily.has(d)).sort()
+  const missingDaily = [...data].filter(d => !daily.has(d) && d !== pending.daily).sort()
 
   const missingWeekly: string[] = []
   // The last Saturday strictly before today, then back a week at a time through the window.
@@ -36,7 +40,7 @@ export function digestGaps(
   while (sat >= since) {
     let hasData = false
     for (let i = 0; i < 7 && !hasData; i++) hasData = data.has(shiftDays(sat, -i))
-    if (hasData && !weekly.has(sat)) missingWeekly.unshift(sat)
+    if (hasData && !weekly.has(sat) && sat !== pending.weekly) missingWeekly.unshift(sat)
     sat = shiftDays(sat, -7)
   }
   return { daily: missingDaily, weekly: missingWeekly }

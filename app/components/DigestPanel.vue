@@ -177,22 +177,30 @@ async function fillGaps() {
   fillDone.value = 0
   fillTotal.value = jobs.length
   let failed = 0
+  let skipped = 0
   try {
     for (const kind of ['daily', 'weekly'] as const) {
       const dates = jobs.filter(j => j.kind === kind).map(j => j.date)
       for (let i = 0; i < dates.length; i += BATCH) {
-        const res = await $fetch<{ results: Array<{ ok: boolean }> }>('/api/journal/digest/backfill', {
+        const res = await $fetch<{ results: Array<{ ok: boolean, skipped?: boolean }> }>('/api/journal/digest/backfill', {
           method: 'POST',
           body: { kind, dates: dates.slice(i, i + BATCH) }
         })
         failed += res.results.filter(r => !r.ok).length
+        // A skipped day had nothing worth summarizing — counting it as "written" made the same
+        // gap reappear on every reload while the toast claimed success.
+        skipped += res.results.filter(r => r.ok && r.skipped).length
         fillDone.value += res.results.length
         await refresh()
       }
     }
+    const written = fillDone.value - failed - skipped
+    const parts = [`${written} written`]
+    if (skipped) parts.push(`${skipped} had nothing to summarize`)
+    if (failed) parts.push(`${failed} failed — try again later`)
     toast.add(failed
-      ? { title: 'Gaps partly filled', description: `${fillDone.value - failed} written, ${failed} failed — try again later.`, color: 'warning', icon: 'i-lucide-info' }
-      : { title: 'Gaps filled', description: `${fillDone.value} digest${fillDone.value === 1 ? '' : 's'} written.`, color: 'success', icon: 'i-lucide-check' })
+      ? { title: 'Gaps partly filled', description: `${parts.join(', ')}.`, color: 'warning', icon: 'i-lucide-info' }
+      : { title: 'Gaps filled', description: `${parts.join(', ')}.`, color: 'success', icon: 'i-lucide-check' })
   }
   catch (err) {
     toast.add({ title: 'Backfill stopped', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })

@@ -159,6 +159,11 @@ export default defineEventHandler(async (event) => {
   const updated: string[] = []
 
   for (const [date, vitals] of Object.entries(byDate)) {
+    // A date bucket is created for every well-formed point, recognized metric or not — an
+    // unrecognized-only day used to INSERT a completely blank journal row, which then read as
+    // "data" everywhere (it was the main source of unfillable digest gaps).
+    if (Object.keys(vitals).length === 0) continue
+
     const existing = await db.prepare('SELECT weight_lbs, rhr, hrv, bp_systolic, bp_diastolic FROM journal_entries WHERE date = ?1')
       .bind(date).first<Record<string, number | null>>()
 
@@ -194,6 +199,7 @@ export default defineEventHandler(async (event) => {
 
   let healthMetricsTouched = 0
   for (const [date, metricsForDate] of Object.entries(healthByDate)) {
+    if (Object.keys(metricsForDate).length === 0) continue // same blank-bucket rule as vitals
     if (await upsertHealthMetrics(db, date, metricsForDate)) healthMetricsTouched++
   }
 

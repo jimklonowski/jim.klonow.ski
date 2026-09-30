@@ -237,6 +237,8 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   }
 
   // Baseline is context, not data — decide whether the day is worth summarizing first.
+  // The gaps endpoint (server/api/journal/digest/gaps.get.ts) mirrors these signals in SQL so
+  // "fill gaps" never offers a day this line would skip — change one, change both.
   const hasData = lines.length > 1 || doses.length > 0 || workouts.length > 0
 
   // Planned vs logged, with the weekday already resolved — pushed after the hasData decision

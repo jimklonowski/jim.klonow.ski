@@ -183,8 +183,12 @@
 </template>
 
 <script setup lang="ts">
-import type { AskMessage as ChatMessage } from '#shared/utils/askHistory'
-import type { AskThread, AskThreadSummary } from '#shared/types/ask'
+import type { AskMessage } from '#shared/utils/askHistory'
+import { ASK_TRAILER_MARK, type AskStreamTrailer, type AskThread, type AskThreadSummary } from '#shared/types/ask'
+
+/** A transcript turn. `failed` marks an exchange the server kept out of the thread (a refusal or
+ * dropped answer): it stays readable, but never goes back out as history. */
+interface ChatMessage extends AskMessage { failed?: boolean }
 
 const GREETING = 'I\'ve got every draw, scan, dose, and Whoop night we\'ve logged in here. Ask me anything — I\'ll show my numbers.'
 
@@ -352,8 +356,9 @@ async function send(preset?: string) {
       body: JSON.stringify({
         // Drops the empty assistant placeholder just pushed and caps the history at a user
         // turn — a bare slice(-N) opened on an assistant turn after ten exchanges and the API
-        // rejected every request until "clear" (shared/utils/askHistory.ts).
-        messages: trimAskHistory(messages.value),
+        // rejected every request until "clear" (shared/utils/askHistory.ts). Failed exchanges
+        // stay visible in the transcript but are never sent back as conversation.
+        messages: trimAskHistory(messages.value.filter(m => !m.failed)),
         today: localToday(),
         ...(threadId.value != null ? { threadId: threadId.value } : {})
       })
@@ -362,24 +367,48 @@ async function send(preset?: string) {
       const err = await res.json().catch(() => null) as { message?: string } | null
       throw new Error(err?.message ?? `HTTP ${res.status}`)
     }
-    const savedAs = Number(res.headers.get('X-Thread-Id'))
-    if (Number.isInteger(savedAs) && savedAs > 0) threadId.value = savedAs
-
+    // The thread id comes from the end-of-stream trailer, not the X-Thread-Id header: a failed
+    // first question drops its just-created thread server-side, and adopting the header early
+    // left the page (and ?thread=) pointing at a conversation that no longer existed — every
+    // follow-up then 404'd until "new ⊕".
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
+    let full = ''
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      assistant.content += decoder.decode(value, { stream: true })
+      full += decoder.decode(value, { stream: true })
+      // Hold back the trailer so it never flashes in the transcript, even split across chunks.
+      const mark = full.indexOf(ASK_TRAILER_MARK)
+      assistant.content = mark === -1 ? full : full.slice(0, mark)
       if (assistant.content) {
         stopThinking()
         phase.value = 'talking'
       }
       scrollToBottom()
     }
+    let trailer: AskStreamTrailer | null = null
+    const mark = full.indexOf(ASK_TRAILER_MARK)
+    if (mark !== -1) {
+      try {
+        trailer = JSON.parse(full.slice(mark + 1)) as AskStreamTrailer
+      }
+      catch { trailer = null }
+      assistant.content = full.slice(0, mark).trimEnd()
+    }
     if (!assistant.content.trim()) assistant.content = '*[no answer returned — try again]*'
+    if (trailer) threadId.value = trailer.threadId
     phase.value = 'idle'
-    tickerEvent('digest')
+    if (trailer && !trailer.ok) {
+      // The server kept this exchange out of the thread — its in-band note is the last line
+      // above. Mark both turns so a retry doesn't replay a half-answer as conversation.
+      assistant.failed = true
+      const q = messages.value[messages.value.indexOf(assistant) - 1]
+      if (q?.role === 'user') q.failed = true
+    }
+    else {
+      tickerEvent('digest')
+    }
     refreshThreads()
   }
   catch (err) {
