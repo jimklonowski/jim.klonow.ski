@@ -80,10 +80,20 @@ const index = ref(Math.max(0, props.photos.length - 1))
 const last = computed(() => Math.max(0, props.photos.length - 1))
 const current = computed(() => props.photos[index.value] ?? null)
 
-// A new category (or a delete) changes the list under the playhead: land on the newest photo.
-watch(() => props.photos, (list) => {
+// Keyed on the photo IDS, not the array: every list refresh rebuilds the array identity without
+// changing a photo (a flip, a reframe, a thumbnail backfill), and resetting on that yanked the
+// playhead to the last frame mid-scrub. When the set genuinely changes, the playhead follows its
+// photo to the photo's new position; only a vanished photo (delete, category switch) stops
+// playback and lands on the newest.
+watch(() => props.photos.map(p => p.id).join(','), (ids, prev) => {
+  const currentId = (prev ?? '').split(',')[index.value]
+  const kept = currentId ? ids.split(',').indexOf(currentId) : -1
+  if (kept >= 0) {
+    index.value = kept
+    return
+  }
   stop()
-  index.value = Math.max(0, list.length - 1)
+  index.value = Math.max(0, props.photos.length - 1)
 })
 
 // Weight within a few days of the photo: shots and weigh-ins rarely fall on the same morning.
