@@ -58,9 +58,14 @@ const DOCTOR_PAGES = [
 /** The sign-in page: inside the gated prefix, but it is the way in, so never gated itself. */
 export const LOGIN_PATH = '/labs/login'
 
-/** Trailing slashes off, empty means root — so '/journal/' and '/journal' are one path. */
+/**
+ * Trailing slashes off, empty means root, and LOWERCASED — so '/journal/', '/journal' and
+ * '/Journal' are one path. The router matches routes case-insensitively, so '/ASK' reached the
+ * page while these exact-compare gates waved it past. Only gate comparisons use this; the
+ * original path (compound names carry case) still routes untouched.
+ */
 export function normalizePath(path: string): string {
-  return path.replace(/\/+$/, '') || '/'
+  return (path.replace(/\/+$/, '') || '/').toLowerCase()
 }
 
 /**
@@ -78,10 +83,11 @@ export function isProtectedPage(path: string): boolean {
 }
 
 export function canAccessPage(role: Role, path: string): boolean {
+  const p = normalizePath(path) // the prefixes below are lowercase; the router isn't case-picky
   if (role === 'owner') return true
-  if (role === 'demo') return !DEMO_BLOCKED_PAGES.some(re => re.test(path))
-  if (OWNER_PAGES.some(re => re.test(path))) return false
-  if (role === 'doctor') return DOCTOR_PAGES.some(re => re.test(path))
+  if (role === 'demo') return !DEMO_BLOCKED_PAGES.some(re => re.test(p))
+  if (OWNER_PAGES.some(re => re.test(p))) return false
+  if (role === 'doctor') return DOCTOR_PAGES.some(re => re.test(p))
   return true
 }
 

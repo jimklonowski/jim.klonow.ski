@@ -58,6 +58,8 @@
 const { role } = await useAuth()
 const { hasSession, data: summary, latestDraw, flagCounts } = useOverviewSummary(role)
 
-const todayStr = localToday()
-const todayLabel = `${new Date(todayStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })} ${todayStr}`
+const todayStr = useToday()
+const todayLabel = computed(() =>
+  `${new Date(todayStr.value + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })} ${todayStr.value}`
+)
 </script>

@@ -8,6 +8,16 @@ import {
   canAccessPage, isFullAccessRole, isProtectedPage, LOGIN_PATH, normalizePath
 } from '../shared/utils/access.ts'
 
+test('the gate is case-insensitive, because the router is', () => {
+  // '/ASK' routed to the page while the exact-compare gate waved it past.
+  for (const p of ['/ASK', '/Journal/Entries', '/Tools/Sharing', '/LABS/']) {
+    assert.equal(isProtectedPage(p), true, p)
+  }
+  assert.equal(canAccessPage('friend', '/Tools/Sharing'), false, 'owner pages stay owner pages in any case')
+  assert.equal(canAccessPage('doctor', '/Journal/Entries'), false)
+  assert.equal(canAccessPage('doctor', '/LABS'), true)
+})
+
 const ROLES = ['owner', 'friend', 'doctor', 'demo']
 
 /** path → the roles allowed to open it. Anything not listed is denied for that role. */

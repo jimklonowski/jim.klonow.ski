@@ -134,7 +134,8 @@ export default defineNuxtConfig({
     nitroAutoImports: true
   },
 
-  compatibilityDate: '2026-05-01',
+  // Kept equal to wrangler.jsonc's compatibility_date — two runtimes, one behavior vintage.
+  compatibilityDate: '2026-05-13',
 
   nitro: {
     preset: 'cloudflare_module',
@@ -142,8 +143,9 @@ export default defineNuxtConfig({
       deployConfig: true,
       nodeCompat: true
     },
-    compressPublicAssets: true,
-    experimental: { websocket: true, tasks: true },
+    // NOT compressPublicAssets: it writes .gz/.br twins of every public file (278 of them) that
+    // Workers static assets never serve — Cloudflare compresses at the edge on its own.
+    experimental: { tasks: true },
     // Must match wrangler.jsonc triggers.crons — see server/schedule.ts.
     scheduledTasks: SCHEDULED_TASKS
   },
@@ -255,9 +257,14 @@ export default defineNuxtConfig({
     headers: {
       contentSecurityPolicy: {
         // The module REPLACES arrays rather than merging, so 'self'/data: must be restated.
-        // blob: is for photo-upload previews (URL.createObjectURL in photos.vue / [date].vue);
-        // every other directive keeps module defaults — all assets on this site are self-hosted.
-        'img-src': ['\'self\'', 'data:', 'blob:']
+        // blob: is for photo-upload previews (URL.createObjectURL in photos.vue / [date].vue).
+        'img-src': ['\'self\'', 'data:', 'blob:'],
+        // Everything on this site is self-hosted, so say so: the module's defaults leave `https:`
+        // in several source lists, which would let injected markup pull from anywhere. default-src
+        // also catches directives not spelled out here (media, frames, workers).
+        'default-src': ['\'self\''],
+        'connect-src': ['\'self\''],
+        'font-src': ['\'self\'']
       }
     },
     rateLimiter: {

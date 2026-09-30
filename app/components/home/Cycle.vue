@@ -179,13 +179,13 @@ const props = defineProps<{
   healthMetrics: HealthMetricsEntry[]
 }>()
 
-const today = localToday()
+const today = useToday()
 
-const cycle = computed(() => relevantCycle(props.cycles, today))
-const state = computed(() => cycle.value ? cycleStatusOn(cycle.value, today) : 'done')
-const end = computed(() => cycle.value ? cycleEnd(cycle.value) : today)
-const progress = computed(() => cycle.value ? cycleProgress(cycle.value, today) : { day: 0, week: 0, totalDays: 1, totalWeeks: 0, pct: 0 })
-const startsIn = computed(() => cycle.value ? diffDays(today, cycle.value.start_date) : 0)
+const cycle = computed(() => relevantCycle(props.cycles, today.value))
+const state = computed(() => cycle.value ? cycleStatusOn(cycle.value, today.value) : 'done')
+const end = computed(() => cycle.value ? cycleEnd(cycle.value) : today.value)
+const progress = computed(() => cycle.value ? cycleProgress(cycle.value, today.value) : { day: 0, week: 0, totalDays: 1, totalWeeks: 0, pct: 0 })
+const startsIn = computed(() => cycle.value ? diffDays(today.value, cycle.value.start_date) : 0)
 const dossier = computed(() => `/journal/cycle/${cycle.value?.id}`)
 
 /** "Oct 2026"/"Q4 2026" when the start isn't a picked day yet, else null. */
@@ -205,7 +205,7 @@ const STATUS_CLASSES: Record<string, string> = {
 
 const adherence = computed(() =>
   cycle.value && state.value !== 'upcoming'
-    ? cycleAdherence(props.entries, cycle.value, today)
+    ? cycleAdherence(props.entries, cycle.value, today.value)
     : { rows: [], pct: null }
 )
 const pct = computed(() => adherence.value.pct)
@@ -233,14 +233,14 @@ const nextPhase = computed(() => {
 })
 
 const checkpoints = computed(() =>
-  cycle.value ? checkpointStates(cycle.value, props.draws.map(d => d.date), today) : []
+  cycle.value ? checkpointStates(cycle.value, props.draws.map(d => d.date), today.value) : []
 )
 
 /** The passive vitals watch, one line: flagged/watch shorthands, or a quiet "steady" so the
  * monitoring itself is visible. Omitted entirely when no metric has enough data yet. */
 const vitalsLine = computed(() => {
   if (!cycle.value || state.value !== 'active') return null
-  const signals = computeCycleSignals(cycle.value, today, props.entries, props.healthMetrics)
+  const signals = computeCycleSignals(cycle.value, today.value, props.entries, props.healthMetrics)
   if (!signals.some(s => s.state === 'steady' || s.state === 'watch' || s.state === 'flagged')) return null
   const act = activeSignals(signals)
   if (!act.length) return { text: 'vitals steady vs pre-cycle baseline', class: 'text-muted' }
@@ -266,7 +266,7 @@ const drawLine = computed(() => {
     if (tentativeStart.value) {
       const last = latestDraw.value
       if (!last) return { text: '⚠ no draw on file — get a baseline before you start', class: 'text-warn' }
-      const age = diffDays(last.date, today)
+      const age = diffDays(last.date, today.value)
       return age <= BASELINE_LOOKBACK_DAYS
         ? { text: `baseline ready · ${formatDate(last.date, 'monthDay')} draw, ${age}d old`, class: 'text-muted' }
         : { text: `⚠ last draw ${age}d ago — get a fresh baseline before you start`, class: 'text-warn' }
@@ -285,7 +285,7 @@ const drawLine = computed(() => {
     }
   }
   const next = checkpoints.value.find(cp => cp.state === 'due' || cp.state === 'upcoming')
-  const ago = latestDraw.value ? ` · last draw ${diffDays(latestDraw.value.date, today)}d ago` : ''
+  const ago = latestDraw.value ? ` · last draw ${diffDays(latestDraw.value.date, today.value)}d ago` : ''
   if (!next) return { text: `all checkpoints drawn${ago}`, class: 'text-muted' }
   return {
     text: `${next.label} ${next.state === 'due' ? 'due now' : `~${formatDate(next.windowFrom, 'monthDay')}`}${ago}`,

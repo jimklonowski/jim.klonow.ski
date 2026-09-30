@@ -51,3 +51,10 @@ worker-configuration.d.ts
 # its auth middleware) runs — nine real reports sat here unauthenticated until 2026-09-21.
 public/labs/
 public/**/*.pdf
+
+# Artifacts the documented workflows produce (README: Monitoring and backups, /tools/data) — each
+# is the full health history in plaintext, in a public repo. Keep them out even when a command is
+# run from the repo root instead of a temp dir.
+jim-klonow-ski-export-*.json
+restore*.sql
+*.json.gz

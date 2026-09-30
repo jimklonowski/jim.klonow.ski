@@ -790,13 +790,17 @@ const lightboxPhoto = ref<ProgressPhoto | null>(null)
 
 // These four had no catch at all: a failed request was an unhandled rejection and the photo
 // just silently stayed as it was.
-const { run: deletePhoto } = useSaveAction(async (id: number) => {
+const { run: runDeletePhoto } = useSaveAction(async (id: number) => {
   await $fetch('/api/journal/photos/delete', { method: 'POST', body: { id } })
   if (beforeId.value === id) beforeId.value = null
   if (afterId.value === id) afterId.value = null
   if (lightboxPhoto.value?.id === id) lightboxPhoto.value = null
   await refresh()
 }, { error: 'Delete failed' })
+
+function deletePhoto(id: number) {
+  if (window.confirm('Delete this photo? It can be restored from Tools → Data for 30 days.')) runDeletePhoto(id)
+}
 
 const editingPhoto = ref<ProgressPhoto | null>(null)
 const editForm = reactive<{ date: string, category: PhotoCategory }>({ date: '', category: 'chest' })

@@ -2,7 +2,16 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isIsoDate, localDaysAgo, localTimeNow, localToday } from '../shared/utils/time.ts'
+import { isIsoDate, localDayOf, localDaysAgo, localTimeNow, localToday } from '../shared/utils/time.ts'
+
+test('localDayOf: the HOME_TZ calendar day of a timestamp, not the UTC one', () => {
+  // 03:30 UTC is 22:30 the previous evening in Chicago (CDT).
+  assert.equal(localDayOf('2026-09-30T03:30:00.000Z'), '2026-09-29')
+  assert.equal(localDayOf('2026-09-30T14:00:00.000Z'), '2026-09-30')
+  // Winter (CST, UTC-6): 05:30 UTC is still the previous day.
+  assert.equal(localDayOf('2026-01-15T05:30:00.000Z'), '2026-01-14')
+  assert.equal(localDayOf('2026-01-15T06:30:00.000Z'), '2026-01-15')
+})
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/
 

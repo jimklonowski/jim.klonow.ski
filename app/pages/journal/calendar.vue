@@ -166,9 +166,13 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
-const { data: photosData } = await usePhotoEntries()
-const { data: cyclesData } = await useCycles()
 const { role, canEdit } = await useAuth()
+// Same conditional-composable rule as the home page's useCycles: the role is stable for the
+// component's lifetime. The photos API denies the doctor role, so this page 403'd on every
+// doctor visit just to draw dots it then couldn't have.
+const photosResource = role.value !== 'doctor' ? await usePhotoEntries() : null
+const photosData = computed(() => photosResource?.data.value ?? [])
+const { data: cyclesData } = await useCycles()
 
 // Daily entries are a full-access surface (owner / friend / demo); the doctor is bounced from
 // /journal/<date> by the route policy, so the grid must not offer the jump in the first place.

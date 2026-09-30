@@ -156,7 +156,7 @@ const { data: labsData } = await useLabsEntries()
 const { role, canEdit } = await useAuth()
 
 const paletteOpen = useState('command-palette-open', () => false)
-const today = localToday()
+const today = useToday()
 
 /** Newest first — a ledger reads backwards from today. */
 const entries = computed(() =>
@@ -181,19 +181,20 @@ function countByDate(list: { date: string }[] | null | undefined) {
 }
 const workoutCounts = computed(() => countByDate(workoutsData.value))
 const photoCounts = computed(() => countByDate(photosData.value))
-const drawDates = computed(() => new Set((labsData.value ?? []).map(l => l.date)))
+// date → that draw's real fasting flag: every draw day used to be labelled "fasting".
+const drawDates = computed(() => new Map((labsData.value ?? []).map(l => [l.date, l.fasting])))
 
 // Logged days only, here and in the strip below: the ledger lists every row (vitals-only ones
 // included), but "logged" has to mean hand-entered or the strip is solid green for any day the
 // watch synced. See shared/utils/journalLog.ts.
 const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
-const streak = computed(() => loggedStreak(entries.value, today))
+const streak = computed(() => loggedStreak(entries.value, today.value))
 
 // --- 60-day streak strip ---
 const streakStrip = computed(() => {
   const byDate = new Map(loggedEntries.value.map(e => [e.date, e]))
   const cells: Array<{ date: string, logged: boolean, class: string, title: string }> = []
-  for (const date of eachDay(shiftDays(today, -59), today)) {
+  for (const date of eachDay(shiftDays(today.value, -59), today.value)) {
     const entry = byDate.get(date)
     const extra = !!entry && ((photoCounts.value[date] ?? 0) > 0 || (entry.reconstitutions ?? []).length > 0)
     cells.push({
@@ -220,11 +221,11 @@ function vitalsLine(e: typeof entries.value[number]) {
 }
 
 /** Row-level callouts: an out-of-band reading, a fasting draw day, or a written note. */
-function flagsFor(e: typeof entries.value[number], isDraw: boolean) {
+function flagsFor(e: typeof entries.value[number], fasting: boolean) {
   const flags: Array<{ text: string, class: string }> = []
   if (e.hrv != null && e.hrv < 35) flags.push({ text: 'HRV low', class: 'text-warn' })
   if (e.bp_systolic != null && e.bp_systolic >= 130) flags.push({ text: 'BP high', class: 'text-warn' })
-  if (isDraw) flags.push({ text: 'fasting', class: 'text-muted' })
+  if (fasting) flags.push({ text: 'fasting', class: 'text-muted' })
   if (e.notes?.trim()) flags.push({ text: 'notes', class: 'text-muted' })
   return flags
 }
@@ -232,9 +233,10 @@ function flagsFor(e: typeof entries.value[number], isDraw: boolean) {
 const pageRows = computed(() =>
   pagedEntries.value.map((e) => {
     const isDraw = drawDates.value.has(e.date)
+    const fasting = drawDates.value.get(e.date) === true
     return {
       date: e.date,
-      isToday: e.date === today,
+      isToday: e.date === today.value,
       isDraw,
       vitals: vitalsLine(e),
       compounds: [...new Set((e.peptides ?? []).map(p => p.compound))].filter(Boolean).slice(0, 6),
@@ -242,7 +244,7 @@ const pageRows = computed(() =>
       photos: photoCounts.value[e.date] ?? 0,
       sodas: (e.sodas ?? []).length,
       workouts: workoutCounts.value[e.date] ?? 0,
-      flags: flagsFor(e, isDraw)
+      flags: flagsFor(e, fasting)
     }
   })
 )

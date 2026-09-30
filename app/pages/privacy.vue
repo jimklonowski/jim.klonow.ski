@@ -241,9 +241,10 @@
         <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
           The site sets a single signed, HTTP-only session cookie when someone signs in, plus a short-lived
           cookie that authorizes lab uploads. There are no analytics, advertising, or third-party tracking
-          cookies. To block abuse, visitor IP addresses are briefly counted on the sign-in, share-link, demo,
-          and AI endpoints, and these counts expire automatically. Cloudflare also keeps short-lived request
-          logs, which include IP addresses and requested URLs, so the site can be run and debugged.
+          cookies. To block abuse, visitor IP addresses are counted on the sign-in, share-link, demo,
+          and AI endpoints; the counts are used for rate limiting and nothing else. Cloudflare also keeps
+          short-lived request logs, which include IP addresses and requested URLs, so the site can be run
+          and debugged.
         </p>
       </section>
 

@@ -280,7 +280,8 @@ const {
 const cyclesData = hasSession ? useCycles() : null
 const cycles = computed(() => cyclesData?.data.value ?? [])
 
-const today = localToday()
+// Reactive: the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
 
 // The doctor role gets a curated clinical view: no daily entries, photos, or AI digests
 // (the digest endpoint would 403), so those panels and links are hidden rather than
@@ -308,7 +309,7 @@ function doseLabel(dose: PeptideEntry) {
 }
 
 // Sessions from an earlier day get a "last workout" label so they can't read as today's.
-const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today)
+const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today.value)
 
 // Every session leads with its age — "1h ago" answers what a clock time makes the reader work
 // out. Ticks once a minute so the label stays right while the page sits open (the PWA comes
@@ -332,7 +333,7 @@ function workoutAge(w: typeof allWorkouts.value[number]): string | null {
   }
   // No usable start time: whole days from the entry date, and nothing for today's — under
   // the "LOGGED TODAY" header "today" would only restate the heading.
-  const days = diffDays(w.date, today)
+  const days = diffDays(w.date, today.value)
   return days < 1 ? null : `${days}d ago`
 }
 
@@ -341,7 +342,7 @@ function workoutAge(w: typeof allWorkouts.value[number]): string | null {
 function workoutParts(w: typeof allWorkouts.value[number]) {
   // Today's sessions are placed by their age alone; an older day's keep the clock time after
   // it, since "2d ago" doesn't say whether that was a morning or an evening session.
-  const time = w.date === today ? null : workoutTime(w.start_time)
+  const time = w.date === today.value ? null : workoutTime(w.start_time)
   // "♥ 119/141" = avg/max; whichever is missing drops out rather than showing a dash.
   const hr = w.avg_hr != null
     ? `♥ ${w.avg_hr}${w.max_hr != null ? `/${w.max_hr}` : ''}`

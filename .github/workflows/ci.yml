@@ -1,6 +1,9 @@
 name: ci
 
-on: push
+# Branch pushes only: a release tag points at a commit whose push already ran this.
+on:
+  push:
+    branches: ['**']
 
 permissions:
   contents: read

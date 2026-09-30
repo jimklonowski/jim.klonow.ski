@@ -15,8 +15,9 @@
         >
           IMPORT
         </NuxtLink>
+        <!-- canEdit, not isFullAccess: the read-only friend was offered a "+ NEW" button. -->
         <NuxtLink
-          v-if="isFullAccess"
+          v-if="canEdit"
           :to="`/journal/${today}`"
           class="tui-btn tui-btn-accent"
         >
@@ -166,7 +167,7 @@ function retryAll() {
 }
 const { role, isOwner, canEdit } = await useAuth()
 
-const today = localToday()
+const today = useToday()
 const isFullAccess = computed(() => role.value !== 'doctor')
 
 const entries = computed(() => data.value ?? [])
@@ -175,7 +176,7 @@ const healthEntries = computed(() => healthData.value ?? [])
 // Logged days only — journal_entries also holds passively-imported vitals rows, which used to
 // make this count Apple Watch coverage. See shared/utils/journalLog.ts.
 const loggedEntries = computed(() => entries.value.filter(isLoggedDay))
-const streak = computed(() => loggedStreak(entries.value, today))
+const streak = computed(() => loggedStreak(entries.value, today.value))
 
 // --- vital tiles ---
 /** Trailing 30 days of a journal field, oldest first, nulls dropped. */
@@ -250,7 +251,7 @@ const vitalTiles = computed(() => {
 })
 
 // --- today panel ---
-const todayEntry = computed(() => entries.value.find(e => e.date === today) ?? null)
+const todayEntry = computed(() => entries.value.find(e => e.date === today.value) ?? null)
 const shownEntry = computed(() => todayEntry.value ?? entries.value.at(-1) ?? null)
 
 /**

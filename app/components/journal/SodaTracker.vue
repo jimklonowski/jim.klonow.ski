@@ -183,22 +183,25 @@ const entries = computed(() => data.value ?? [])
 
 // Home-timezone date/time (shared/utils/time.ts), not the runtime's clock zone: a late-night
 // tap logs against the Chicago calendar day whether the phone is travelling or the SSR pass is
-// running in a UTC Worker, and the 30-day strip's boundaries match between the two.
+// running in a UTC Worker, and the 30-day strip's boundaries match between the two. `today` is
+// the REACTIVE ref: after midnight the list, the strip and ✕ all move to the new day together —
+// a computed reading localToday() never re-ran, so at 7am the list still showed yesterday's
+// sodas while remove() posted today's date, deleting against the wrong day.
+const today = useToday()
 function localDateStr() {
-  return localToday()
+  return today.value
 }
 function localTimeStr() {
   return localTimeNow()
 }
 /** The local date `delta` days from today (negative = past). */
 function daysFromToday(delta: number) {
-  return localDaysAgo(-delta)
+  return shiftDays(today.value, delta)
 }
 
-const todaySodas = computed<SodaEntry[]>(() => {
-  const today = localDateStr()
-  return entries.value.find(e => e.date === today)?.sodas ?? []
-})
+const todaySodas = computed<SodaEntry[]>(() =>
+  entries.value.find(e => e.date === today.value)?.sodas ?? []
+)
 
 const lastSoda = computed<SodaEntry | null>(() => {
   const all = entries.value.flatMap(e => (e.sodas ?? []).map(s => ({ ...s, date: e.date })))

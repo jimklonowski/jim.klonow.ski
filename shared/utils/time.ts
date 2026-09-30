@@ -36,6 +36,15 @@ export function localTimeNow(): string {
 }
 
 /**
+ * The home-timezone calendar date (YYYY-MM-DD) a timestamp falls on. For "yesterday / N days
+ * ago" labels: elapsed-milliseconds ÷ 86 400 000 counts hours, not calendar days, so 11:50 pm
+ * last night read as "today" at 8 am.
+ */
+export function localDayOf(iso: string): string {
+  return isoDateFmt.format(new Date(iso))
+}
+
+/**
  * A date `days` before today (home timezone), as YYYY-MM-DD. Negative values look forward.
  *
  * Calendar arithmetic on the date string, anchored at UTC noon, rather than subtracting

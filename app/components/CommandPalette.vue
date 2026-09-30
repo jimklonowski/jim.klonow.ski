@@ -78,7 +78,7 @@ function openDigests() {
   digestOpen.value = true
 }
 
-const todayStr = localToday()
+const todayStr = useToday()
 
 // The doctor role gets a curated clinical view — no daily entries, photos, or AI digests.
 // See shared/utils/access.ts; offering those rows would just bounce them to /labs.
@@ -133,11 +133,12 @@ const manageItems = computed(() => {
 const actionItems = computed(() => {
   if (!role.value) return [{ label: 'sign in', suffix: '/labs/login', onSelect: () => go('/labs/login') }]
   const items = []
+  // Logging is an edit (owner/demo); digests are readable by the whole full-access tier.
+  if (canEdit.value) {
+    items.push({ label: '+ log today', suffix: todayStr.value, onSelect: () => go(`/journal/${todayStr.value}`) })
+  }
   if (isFullAccess.value) {
-    items.push(
-      { label: '+ log today', suffix: todayStr, onSelect: () => go(`/journal/${todayStr}`) },
-      { label: 'view digests', suffix: 'ai recaps', onSelect: openDigests }
-    )
+    items.push({ label: 'view digests', suffix: 'ai recaps', onSelect: openDigests })
   }
   if (isOwner.value) {
     items.push(

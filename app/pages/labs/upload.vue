@@ -382,6 +382,11 @@ const processing = ref(false)
 const error = ref('')
 const filename = ref('')
 const result = ref<LabResult | null>(null)
+
+// A parsed extraction is a paid Opus call: leaving the page before SAVE used to discard it
+// without a word. Dirty while a result exists and hasn't been saved; save and reset clear it
+// by construction, so no markClean bookkeeping.
+useDirtyGuard(() => (saveResult.value?.ok ? null : result.value))
 const saving = ref(false)
 const saveResult = ref<{ ok: boolean, date?: string, message?: string } | null>(null)
 const summarizing = ref(false)
