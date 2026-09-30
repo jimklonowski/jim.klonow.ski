@@ -208,7 +208,7 @@ const annotationKey = computed(() => {
   if (!annotations.value.length) return []
   const days = [...new Set([...inRange(entries.value), ...inRange(healthEntries.value)].map(e => e.date))].sort()
   const md = (d: string) => formatDate(d, 'monthDay').toLowerCase()
-  return placeAnnotations(annotations.value, days, d => d).map(a => ({
+  return placeAnnotations(annotations.value, days).map(a => ({
     ...a,
     glyph: a.kind === 'dose' ? '│' : '▒',
     color: a.kind === 'dose' ? ANNOTATION_STYLE.dose : a.kind === 'cycle' ? ANNOTATION_STYLE.cycleText : ANNOTATION_STYLE.eventText,
@@ -230,8 +230,10 @@ const drawsInRange = computed(() => {
 const drawLabel = computed(() =>
   drawsInRange.value.map(d => formatDate(d.date, 'monthDay').toLowerCase()).join(' · ')
 )
+// ISO days: the tiles chart on `day` values now, so a guide names one exact date — a formatted
+// label used to land on the same month-day of whichever year echarts matched last.
 const drawMarkLines = computed(() =>
-  drawsInRange.value.map(d => formatDate(d.date, 'monthDay'))
+  drawsInRange.value.map(d => d.date)
 )
 
 // --- vitals group ---

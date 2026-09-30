@@ -27,6 +27,7 @@
           :data="chartData"
           :categories="categories"
           :height="height"
+          :x-axis-key="xKey"
           :mark-lines="markLines"
           :annotations="placed"
           bare
@@ -81,17 +82,18 @@ const chartData = computed(() =>
 
 const hasData = computed(() => chartData.value.length >= 2)
 
+// Rows that carry `day` chart on the ISO day itself (AreaChart formats the display), so an
+// annotation or draw guide names one exact day — a "Aug 24"-style label axis matched the same
+// day in every year of the all-time range. Rows without `day` (the home hub's) keep their labels.
+const xKey = computed(() =>
+  chartData.value.length && chartData.value.every(r => typeof r.day === 'string') ? 'day' : 'date'
+)
+
 // Placed per tile, not once per page: each tile drops the days its own series has no reading
 // for, so a change has to land on the first point THIS line actually has on or after it.
 const placed = computed(() => {
-  if (!props.annotations.length) return []
-  const days: string[] = []
-  const labelOf = new Map<string, string>()
-  for (const row of chartData.value) {
-    if (typeof row.day !== 'string') continue
-    days.push(row.day)
-    labelOf.set(row.day, String(row.date))
-  }
-  return placeAnnotations(props.annotations, days, day => labelOf.get(day) ?? day)
+  if (!props.annotations.length || xKey.value !== 'day') return []
+  const days = chartData.value.map(r => r.day as string)
+  return placeAnnotations(props.annotations, days)
 })
 </script>
