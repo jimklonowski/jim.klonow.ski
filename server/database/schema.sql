@@ -49,7 +49,13 @@ CREATE TABLE IF NOT EXISTS dexa_entries (
   vat TEXT,
   ag_ratio REAL,
   bone_density TEXT,
-  symmetry TEXT
+  symmetry TEXT,
+  -- AI body-composition summary (migration 0006), mirroring labs_entries: the prose plus the
+  -- model, a hash of the exact prompt, and when it was written. NULL until generated.
+  ai_summary TEXT,
+  ai_summary_model TEXT,
+  ai_summary_prompt_hash TEXT,
+  ai_summary_at TEXT
 );
 
 -- recovery_score / strain / sleep_performance_pct arrived as ALTERs (footer) but belong in the

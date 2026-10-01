@@ -60,63 +60,18 @@
       @retry="refresh"
     />
 
-    <!-- AI summary readout -->
-    <div
+    <!-- AI summary readout — shared with the DEXA page; regen is PIN-gated inside the panel -->
+    <LabsAiSummaryPanel
       v-if="latest"
-      class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-line-input bg-inset"
-    >
-      <div class="flex items-baseline gap-3">
-        <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ LATEST DRAW AI SUMMARY</span>
-        <span
-          v-if="latestSummary"
-          class="text-[10.5px] text-muted tracking-[0.06em] uppercase"
-        >{{ formatDate(latestSummary.date, 'monthDay').toUpperCase() }}</span>
-        <span class="ml-auto flex items-center gap-2.5 text-[11px]">
-          <button
-            type="button"
-            class="text-accent hover:text-accent-hover cursor-pointer"
-            @click="summaryOpen = !summaryOpen"
-          >{{ summaryOpen ? 'collapse ▴' : 'expand ▾' }}</button>
-          <template v-if="isOwner">
-            <span class="text-faint">·</span>
-            <button
-              type="button"
-              class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
-              :disabled="regenerating"
-              @click="regenerateSummary"
-            >{{ regenerating ? 'working ⟳' : 'regen ⟳' }}</button>
-          </template>
-        </span>
-      </div>
-
-      <p
-        v-if="regenerating"
-        class="mt-2 text-[12.5px] text-muted"
-      >
-        Comparing the {{ formatDate(latest.date) }} draw against your history…
-      </p>
-      <p
-        v-else-if="latestSummary"
-        class="mt-2 text-[12.5px] leading-[1.7] text-dim whitespace-pre-line"
-        :class="summaryOpen ? '' : 'line-clamp-1'"
-      >
-        {{ latestSummary.text }}
-      </p>
-      <!-- Provenance: only summaries written since it was recorded carry it. -->
-      <p
-        v-if="!regenerating && summaryOpen && latestSummary?.model"
-        class="mt-2 text-[10.5px] text-ghost tracking-[0.06em]"
-        :title="latestSummary.promptHash ? `prompt ${latestSummary.promptHash}` : undefined"
-      >
-        written by {{ latestSummary.model }}{{ latestSummary.at ? ` · ${formatDate(latestSummary.at.slice(0, 10), 'monthDay').toLowerCase()}` : '' }}
-      </p>
-      <p
-        v-else-if="!regenerating && !latestSummary"
-        class="mt-2 text-[12.5px] text-muted"
-      >
-        No AI summary for this draw yet{{ isOwner ? ' — hit regen to generate one.' : '.' }}
-      </p>
-    </div>
+      class="mx-4 sm:mx-6 mt-4"
+      :summary="latestSummary"
+      :latest-date="latest.date"
+      endpoint="/api/labs/generate-summary"
+      noun="draw"
+      :can-regenerate="isOwner"
+      :default-open="isRecentDraw"
+      @regenerated="refresh"
+    />
 
     <div class="px-4 sm:px-6 py-4 space-y-2.5">
       <!-- Category tabs: equal-width segmented row with per-category counts -->
@@ -273,21 +228,6 @@
         </div>
       </template>
     </UModal>
-
-    <!-- PIN gate for summary regeneration — same second factor as the upload page -->
-    <UModal
-      v-model:open="pinModalOpen"
-      title="Upload PIN required"
-      description="Regenerating the AI summary is a write, so it needs your 9-digit upload PIN."
-    >
-      <template #body>
-        <LabsPinForm
-          variant="modal"
-          button-label="Unlock & regenerate"
-          @unlocked="onPinUnlocked"
-        />
-      </template>
-    </UModal>
   </div>
 </template>
 
@@ -401,41 +341,6 @@ const isRecentDraw = computed(() => {
   if (!latestSummary.value) return false
   return diffDays(latestSummary.value.date, localToday()) <= 7
 })
-
-// The regenerate endpoint is PIN-gated like uploads (403 when the labs-upload-auth session
-// cookie is missing), so a 403 opens the PIN modal and the retry happens after unlock.
-const summaryOpen = ref(isRecentDraw.value)
-const regenerating = ref(false)
-const pinModalOpen = ref(false)
-const toast = useToast()
-
-async function regenerateSummary() {
-  if (!latest.value || regenerating.value) return
-  regenerating.value = true
-  summaryOpen.value = true
-  try {
-    await $fetch('/api/labs/generate-summary', { method: 'POST', body: { date: latest.value.date } })
-    await refresh()
-    toast.add({ title: 'AI summary regenerated', description: `Draw from ${formatDate(latest.value.date)}`, color: 'success' })
-  }
-  catch (err) {
-    const e = err as { statusCode?: number, data?: { message?: string } }
-    if (e.statusCode === 403) {
-      pinModalOpen.value = true
-    }
-    else {
-      toast.add({ title: 'Summary generation failed', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })
-    }
-  }
-  finally {
-    regenerating.value = false
-  }
-}
-
-async function onPinUnlocked() {
-  pinModalOpen.value = false
-  await regenerateSummary()
-}
 
 // --- sources ---
 const allSources = computed(() =>

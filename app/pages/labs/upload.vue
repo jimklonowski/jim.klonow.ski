@@ -306,7 +306,7 @@
           v-if="summarizing"
           class="mt-2 text-[12.5px] text-muted"
         >
-          Comparing this draw against your history…
+          Comparing this {{ reportType === 'dexa' ? 'scan' : 'draw' }} against your history…
         </p>
         <p
           v-else-if="summary"
@@ -619,8 +619,9 @@ async function saveToSite() {
     saveResult.value = { ok: true, date: res.date }
     // The shell summary carries the last-draw date, flag counts, PDF total and latest DEXA.
     await refreshNuxtData('overview')
-    // DEXA saves go to their own table and have no marker history to narrate.
-    if (res.table === 'labs_entries') generateSummary(res.date)
+    // Each table has its own narrator: a draw gets the marker-history summary, a scan the
+    // body-composition one. Both store the prose on the row for their page to show.
+    generateSummary(res.table === 'dexa_entries' ? '/api/dexa/generate-summary' : '/api/labs/generate-summary', res.date)
   }
   catch (e: unknown) {
     saveResult.value = { ok: false, message: extractErrorMessage(e, 'Failed to save. Please try again.') }
@@ -630,12 +631,12 @@ async function saveToSite() {
   }
 }
 
-async function generateSummary(date: string) {
+async function generateSummary(endpoint: string, date: string) {
   summarizing.value = true
   summary.value = ''
   summaryError.value = ''
   try {
-    const res = await $fetch<{ summary: string }>('/api/labs/generate-summary', { method: 'POST', body: { date } })
+    const res = await $fetch<{ summary: string }>(endpoint, { method: 'POST', body: { date } })
     summary.value = res.summary
   }
   catch {

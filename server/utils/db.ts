@@ -318,6 +318,11 @@ export function parseDexaRow(row: Record<string, unknown>) {
     vat: row.vat ? JSON.parse(row.vat as string) : undefined,
     ag_ratio: (row.ag_ratio as number | null) ?? undefined,
     bone_density: row.bone_density ? JSON.parse(row.bone_density as string) : undefined,
-    symmetry: row.symmetry ? JSON.parse(row.symmetry as string) : undefined
+    symmetry: row.symmetry ? JSON.parse(row.symmetry as string) : undefined,
+    // AI summary + provenance (migration 0006); null until one is generated for the scan.
+    ai_summary: (row.ai_summary as string | null | undefined) ?? null,
+    ai_summary_model: (row.ai_summary_model as string | null | undefined) ?? null,
+    ai_summary_prompt_hash: (row.ai_summary_prompt_hash as string | null | undefined) ?? null,
+    ai_summary_at: (row.ai_summary_at as string | null | undefined) ?? null
   }
 }
