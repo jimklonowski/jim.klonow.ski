@@ -181,35 +181,35 @@
       <!-- Extracted markers -->
       <section class="px-4 sm:px-6 py-4">
         <TuiHeader
-          :label="`MARKERS · ${markerEntries.length}`"
+          :label="`${figureNoun.toUpperCase()} · ${previewEntries.length}`"
           :dashes="8"
         >
           <span class="text-[10.5px] text-muted normal-case truncate">{{ filename }}</span>
         </TuiHeader>
 
         <div
-          v-if="markerEntries.length"
+          v-if="previewEntries.length"
           class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-px bg-line border border-line mt-2.5"
         >
           <div
-            v-for="[key, value] in markerEntries"
-            :key="key"
+            v-for="entry in previewEntries"
+            :key="entry.key"
             class="bg-raised px-3 py-2.5"
           >
             <p
               class="text-[10.5px] text-muted uppercase tracking-[0.08em] leading-tight truncate"
-              :title="markerLabel(key)"
+              :title="entry.label"
             >
-              {{ markerLabel(key) }}
+              {{ entry.label }}
             </p>
             <p class="num-display text-[22px] leading-none mt-1.5">
-              {{ value }}
+              {{ entry.value }}
             </p>
             <p
               class="mt-1.5 text-[10.5px]"
-              :class="BIOMARKERS[key] ? 'text-muted' : 'text-warn'"
+              :class="entry.known ? 'text-muted' : 'text-warn'"
             >
-              {{ markerUnit(key) }}
+              {{ entry.unit }}
             </p>
           </div>
         </div>
@@ -218,7 +218,7 @@
           v-else
           class="mt-2.5 text-[12px] text-muted"
         >
-          No numeric markers in this report.
+          No numeric {{ figureNoun }} in this report.
         </p>
       </section>
 
@@ -328,14 +328,24 @@
 <script setup lang="ts">
 import type { QualitativeResult } from '#shared/types/labs'
 import { BIOMARKERS } from '~/data/biomarkers'
+import { dexaFieldMeta } from '~/data/dexa'
 
 useSeoMeta({ title: () => 'Labs · Upload' })
 
+// What /api/labs/process-pdf returns. Bloodwork and echo are a flat marker map; a DEXA comes back
+// already in the nested shape dexa_entries stores (total, regions, vat, …) and has no markers.
 interface LabResult {
   date: string
-  fasting: boolean
-  markers: Record<string, number>
+  fasting?: boolean
+  markers?: Record<string, number>
   qualitative?: QualitativeResult[]
+  weight_lbs?: number
+  total?: Record<string, number>
+  regions?: Record<string, Record<string, number>>
+  vat?: Record<string, number>
+  ag_ratio?: number
+  bone_density?: Record<string, number>
+  symmetry?: Record<string, number>
 }
 
 // PIN gate — validated server-side (httpOnly cookie, not readable by JS)
@@ -395,14 +405,52 @@ const summaryError = ref('')
 // kills setup (the page mounted blank with only the 403 from validate-upload to show for it).
 useDirtyGuard(() => (saveResult.value?.ok ? null : result.value))
 
-const markerEntries = computed(() =>
-  Object.entries(result.value?.markers ?? {}).sort(([a], [b]) => {
-    const aKnown = !!BIOMARKERS[a]
-    const bKnown = !!BIOMARKERS[b]
-    if (aKnown !== bKnown) return aKnown ? -1 : 1
-    return a.localeCompare(b)
-  })
-)
+interface PreviewEntry {
+  key: string
+  label: string
+  value: number
+  unit: string
+  /** False for a marker key the site can't store — shown in warning colour so it isn't silently dropped on save. */
+  known: boolean
+}
+
+// The top-level DEXA groups in report order, flattened to dotted paths ('total.body_fat_pct').
+const DEXA_GROUPS = ['weight_lbs', 'total', 'regions', 'vat', 'ag_ratio', 'bone_density', 'symmetry'] as const
+
+function flattenDexa(res: LabResult): PreviewEntry[] {
+  const out: PreviewEntry[] = []
+  const walk = (node: unknown, path: string) => {
+    if (typeof node === 'number') out.push({ key: path, value: node, known: true, ...dexaFieldMeta(path) })
+    else if (node && typeof node === 'object') {
+      for (const [k, v] of Object.entries(node)) walk(v, `${path}.${k}`)
+    }
+  }
+  for (const group of DEXA_GROUPS) walk(res[group], group)
+  return out
+}
+
+// One labelled list whatever the report type, so the preview grid is the same for all three.
+// It used to read `markers` alone, and a DEXA scan — which has none — previewed as "0 markers ·
+// No numeric markers in this report" with thirty good figures sitting behind it.
+const previewEntries = computed<PreviewEntry[]>(() => {
+  const res = result.value
+  if (!res) return []
+  if (reportType.value === 'dexa') return flattenDexa(res)
+  return Object.entries(res.markers ?? {})
+    .sort(([a], [b]) => {
+      const aKnown = !!BIOMARKERS[a]
+      const bKnown = !!BIOMARKERS[b]
+      if (aKnown !== bKnown) return aKnown ? -1 : 1
+      return a.localeCompare(b)
+    })
+    .map(([key, value]) => {
+      const meta = BIOMARKERS[key]
+      return { key, value, label: meta?.label ?? key, unit: meta?.unit ?? 'unrecognized key', known: !!meta }
+    })
+})
+
+// DEXA figures aren't lab markers; the headings and counts say so.
+const figureNoun = computed(() => (reportType.value === 'dexa' ? 'figures' : 'markers'))
 
 // Multi-part meta strings are assembled here — adjacent <template v-if> blocks in the markup
 // lose the spaces between them once Vue condenses whitespace.
@@ -411,7 +459,7 @@ const statusMeta = computed(() => {
   if (processing.value) return 'reading pdf'
   if (error.value) return 'extraction failed'
   if (result.value) {
-    const parts = [`${markerEntries.value.length} markers`, formatDateTerse(result.value.date)]
+    const parts = [`${previewEntries.value.length} ${figureNoun.value}`, formatDateTerse(result.value.date)]
     if (result.value.fasting) parts.push('fasting')
     return parts.join(' · ')
   }
@@ -429,6 +477,17 @@ interface ResultCell {
 const resultCells = computed<ResultCell[]>(() => {
   const res = result.value
   if (!res) return []
+  const report: ResultCell = { label: 'report', value: REPORT_LABELS[reportType.value].toUpperCase(), accent: false }
+  // A scan has no fasting state; body fat is the figure worth a glance before saving.
+  if (reportType.value === 'dexa') {
+    const bodyFat = res.total?.body_fat_pct
+    return [
+      { label: 'scan date', value: formatDateTerse(res.date), accent: false },
+      { label: 'figures found', value: `${previewEntries.value.length}`, accent: true },
+      { label: 'body fat', value: bodyFat == null ? '—' : `${bodyFat}%`, accent: false },
+      report
+    ]
+  }
   // Not every lab prints a fasting line (Quest does, CHW doesn't), so the extractor can miss it —
   // for bloodwork the cell doubles as a toggle so it's correctable before saving.
   const fastingCell: ResultCell = reportType.value === 'bloodwork'
@@ -436,9 +495,9 @@ const resultCells = computed<ResultCell[]>(() => {
     : { label: 'fasting', value: res.fasting ? 'YES' : 'NO', accent: false }
   return [
     { label: 'draw date', value: formatDateTerse(res.date), accent: false },
-    { label: 'markers found', value: `${markerEntries.value.length}`, accent: true },
+    { label: 'markers found', value: `${previewEntries.value.length}`, accent: true },
     fastingCell,
-    { label: 'report', value: REPORT_LABELS[reportType.value].toUpperCase(), accent: false }
+    report
   ]
 })
 
@@ -452,14 +511,6 @@ const saveMessage = computed(() => {
   if (!res.ok) return res.message ?? 'Failed to save. Please try again.'
   return `Saved ${res.date ? formatDate(res.date, 'long') : 'this draw'} — the dashboard will update automatically.`
 })
-
-function markerLabel(key: string) {
-  return BIOMARKERS[key]?.label ?? key
-}
-
-function markerUnit(key: string) {
-  return BIOMARKERS[key]?.unit ?? 'unrecognized key'
-}
 
 function colorClass(res: string) {
   return {

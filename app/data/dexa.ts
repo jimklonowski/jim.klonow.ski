@@ -81,3 +81,33 @@ export const REGION_LABELS: Record<string, string> = {
 export function formatLbs(v: number) {
   return v % 1 === 0 ? `${v}` : v.toFixed(1)
 }
+
+const pick = (m: DexaMetricMeta) => ({ label: m.label, unit: m.unit })
+
+// Every figure a DEXA extraction can carry, keyed by its dotted path into the stored entry
+// ('total.body_fat_pct', 'regions.arms.lean_lbs', 'symmetry.right_arm_lean'). The labels come
+// from the metric tables above where one exists, so the upload preview and the DEXA page agree.
+const DEXA_FIELD_META: Record<string, { label: string, unit: string }> = {
+  'weight_lbs': { label: 'Scale Weight', unit: 'lbs' },
+  ...Object.fromEntries(Object.entries(DEXA_TOTAL_METRICS).map(([key, m]) => [`total.${key}`, pick(m)] as const)),
+  ...Object.fromEntries(Object.entries(REGION_LABELS).flatMap(([region, name]) => [
+    [`regions.${region}.fat_pct`, { label: `${name} Fat %`, unit: '%' }] as const,
+    [`regions.${region}.fat_lbs`, { label: `${name} Fat`, unit: 'lbs' }] as const,
+    [`regions.${region}.lean_lbs`, { label: `${name} Lean`, unit: 'lbs' }] as const
+  ])),
+  'vat.volume_in3': pick(DEXA_OTHER_METRICS.vat_volume!),
+  'vat.fat_mass_lbs': { label: 'VAT Fat Mass', unit: 'lbs' },
+  'ag_ratio': { label: DEXA_OTHER_METRICS.ag_ratio!.label, unit: 'ratio' },
+  'bone_density.total_bmd': pick(DEXA_OTHER_METRICS.bmd_total!),
+  'bone_density.t_score': { label: DEXA_OTHER_METRICS.t_score!.label, unit: 'SD' },
+  'bone_density.z_score': { label: 'BMD Z-Score', unit: 'SD' },
+  'symmetry.right_arm_lean': { label: 'Right Arm Lean', unit: 'lbs' },
+  'symmetry.left_arm_lean': { label: 'Left Arm Lean', unit: 'lbs' },
+  'symmetry.right_leg_lean': { label: 'Right Leg Lean', unit: 'lbs' },
+  'symmetry.left_leg_lean': { label: 'Left Leg Lean', unit: 'lbs' }
+}
+
+/** Label and unit for a DEXA figure by dotted path; an unknown path falls back to the path itself. */
+export function dexaFieldMeta(path: string): { label: string, unit: string } {
+  return DEXA_FIELD_META[path] ?? { label: path, unit: '' }
+}
