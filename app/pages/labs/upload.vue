@@ -160,7 +160,7 @@
             :title="cell.hint"
             @click="cell.onClick"
           >
-            {{ cell.value }} <span class="text-[13px] text-muted align-middle">⇄</span>
+            {{ cell.value }} <span class="text-[13px] text-muted align-middle">{{ cell.glyph ?? '⇄' }}</span>
           </button>
           <p
             v-else
@@ -321,6 +321,15 @@
           {{ summaryError }}
         </p>
       </div>
+
+      <LabsDexaWeightModal
+        v-if="reportType === 'dexa'"
+        v-model:open="weightModalOpen"
+        :current="result.weight_lbs ?? null"
+        :reported="reportWeight"
+        :total-mass="result.total?.total_mass_lbs ?? null"
+        @apply="applyWeight"
+      />
     </template>
   </div>
 </template>
@@ -472,19 +481,34 @@ interface ResultCell {
   accent: boolean
   hint?: string
   onClick?: () => void
+  /** Shown after a clickable cell's value: ⇄ for a toggle (the default), ✎ for an editor. */
+  glyph?: string
 }
+
+// The scale weight as the report stated it (null when it had none), kept so the weight cell can
+// say when the value about to be saved differs from the paper.
+const reportWeight = ref<number | null>(null)
+const weightModalOpen = ref(false)
 
 const resultCells = computed<ResultCell[]>(() => {
   const res = result.value
   if (!res) return []
   const report: ResultCell = { label: 'report', value: REPORT_LABELS[reportType.value].toUpperCase(), accent: false }
-  // A scan has no fasting state; body fat is the figure worth a glance before saving.
+  // A scan has no fasting state. The cell that earns the spot is scale weight: on these reports
+  // it's a check-in figure typed in by the clinic, not a scan measurement, and it can lag badly
+  // (the Sep 2026 header said 155 lbs against a 169.8 lb total mass) — so, like fasting, it's
+  // editable here before it's saved. The save also refuses a scan without one.
   if (reportType.value === 'dexa') {
-    const bodyFat = res.total?.body_fat_pct
+    const weight = res.weight_lbs
+    const hint = reportWeight.value == null
+      ? 'not in report · click to enter'
+      : weight !== reportWeight.value
+        ? `report said ${reportWeight.value} · click to edit`
+        : 'from report header · click to edit'
     return [
       { label: 'scan date', value: formatDateTerse(res.date), accent: false },
       { label: 'figures found', value: `${previewEntries.value.length}`, accent: true },
-      { label: 'body fat', value: bodyFat == null ? '—' : `${bodyFat}%`, accent: false },
+      { label: 'scale weight', value: weight == null ? '—' : `${weight} lbs`, accent: false, hint, glyph: '✎', onClick: openWeightModal },
       report
     ]
   }
@@ -503,6 +527,17 @@ const resultCells = computed<ResultCell[]>(() => {
 
 function toggleFasting() {
   if (result.value) result.value.fasting = !result.value.fasting
+}
+
+function openWeightModal() {
+  weightModalOpen.value = true
+}
+
+// The edited weight goes straight onto the result, so the figures grid, DOWNLOAD JSON and SAVE TO
+// SITE all carry it — the same way the fasting toggle works.
+function applyWeight(weight: number) {
+  if (result.value) result.value.weight_lbs = weight
+  weightModalOpen.value = false
 }
 
 const saveMessage = computed(() => {
@@ -537,6 +572,7 @@ async function upload(file: File) {
     form.append('pdf', file)
     form.append('type', reportType.value)
     result.value = await $fetch<LabResult>('/api/labs/process-pdf', { method: 'POST', body: form })
+    reportWeight.value = typeof result.value.weight_lbs === 'number' ? result.value.weight_lbs : null
   }
   catch (e: unknown) {
     error.value = extractErrorMessage(e, 'Something went wrong. Please try again.')
@@ -555,6 +591,8 @@ function reset() {
   summarizing.value = false
   summary.value = ''
   summaryError.value = ''
+  reportWeight.value = null
+  weightModalOpen.value = false
   pdf.value = null
 }
 
