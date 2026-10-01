@@ -36,7 +36,8 @@ const stage = ref<HTMLDivElement>()
 const status = ref<'loading' | 'ready' | 'error'>('loading')
 const size = ref({ w: 300, h: 400 })
 const yaw = ref(0.55)
-const auto = ref(false)
+/** Turning on load; a drag or a view button takes over. Reduced motion shows the front view, still. */
+const auto = ref(true)
 /** 0 = the latest body, 1 = the previous one. */
 const morph = ref(0)
 const meshDates = ref<{ base: string, alt: string | null } | null>(null)
@@ -176,6 +177,11 @@ onMounted(async () => {
   const host = stage.value
   if (!host) return
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  // Reduced motion: no turning, and a straight-on front view rather than the three-quarter one.
+  if (reducedMotion) {
+    auto.value = false
+    yaw.value = 0
+  }
   try {
     const THREE = await import('three')
     const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
@@ -444,7 +450,8 @@ onMounted(async () => {
     const loop = () => {
       timer.update()
       const dt = timer.getDelta()
-      if (auto.value && !drag && !flat.value) yaw.value += dt * 0.35
+      // About twelve seconds per turn.
+      if (auto.value && !drag && !flat.value) yaw.value += dt * 0.5
       pivot.rotation.y = flat.value ? 0 : yaw.value
       const m = canMorph.value ? morph.value : 0
       if (mesh.morphTargetInfluences?.length) mesh.morphTargetInfluences[0] = m
