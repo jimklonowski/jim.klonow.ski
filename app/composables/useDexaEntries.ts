@@ -27,6 +27,11 @@ export interface DexaEntry {
   ag_ratio?: number
   bone_density?: { total_bmd: number, t_score: number, z_score: number }
   symmetry?: { right_arm_lean: number, left_arm_lean: number, right_leg_lean: number, left_leg_lean: number }
+  /** AI body-composition summary and its provenance (migration 0006); null until generated. */
+  ai_summary?: string | null
+  ai_summary_model?: string | null
+  ai_summary_prompt_hash?: string | null
+  ai_summary_at?: string | null
 }
 
 export function useDexaEntries() {
