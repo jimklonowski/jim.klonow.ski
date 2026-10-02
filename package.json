@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.01d",
+  "version": "2026.10.02",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -32,8 +32,8 @@
     "demo:seed:remote": "node scripts/demo/seed-demo.mjs --remote"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.129.0",
-    "@nuxt/ui": "^4.11.2",
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@nuxt/ui": "^4.11.3",
     "@nuxtjs/seo": "5.3.16",
     "@unhead/vue": "^3.4.2",
     "@vueuse/core": "^14.4.0",
