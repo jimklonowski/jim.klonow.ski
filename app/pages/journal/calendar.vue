@@ -130,6 +130,12 @@
           >
             ▲ lab draw
           </div>
+          <div
+            v-if="cell.isPlannedDraw"
+            class="mt-1 text-[10.5px] text-muted"
+          >
+            △ planned draw
+          </div>
 
           <div
             v-if="cell.weight"
@@ -158,6 +164,7 @@
 
 <script setup lang="ts">
 import { getCompoundColor } from '~/data/journal'
+import { isOpen, plannedDrawStates } from '#shared/utils/plannedDraws'
 
 useSeoMeta({ title: 'Journal · Calendar' })
 
@@ -166,6 +173,7 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const { data, refresh, error } = await useJournalEntries()
 const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
+const { data: plannedData } = await usePlannedDraws()
 const { role, canEdit } = await useAuth()
 // Same conditional-composable rule as the home page's useCycles: the role is stable for the
 // component's lifetime. The photos API denies the doctor role, so this page 403'd on every
@@ -198,6 +206,13 @@ const drawDates = computed(() => new Set((labsData.value ?? []).map(l => l.date)
 
 const todayDate = localToday()
 const today = new Date(todayDate + 'T12:00:00')
+
+// Booked draws still waiting on results — a hollow marker on the day, the way scheduled doses
+// get rings. A plan a draw has fulfilled shows as that draw instead.
+const plannedDates = computed(() => {
+  const open = plannedDrawStates(plannedData.value ?? [], [...drawDates.value], todayDate).filter(isOpen)
+  return new Set(open.map(s => s.plan.date))
+})
 
 const currentYear = ref(today.getFullYear())
 const currentMonth = ref(today.getMonth())
@@ -248,6 +263,8 @@ interface CalendarCell {
   isToday: boolean
   isFuture: boolean
   isDraw: boolean
+  /** A planned draw without results yet (shared/utils/plannedDraws.ts). */
+  isPlannedDraw: boolean
   hasEntry: boolean
   compounds: string[]
   /** Scheduled by PROTOCOL_RULES but not logged — a miss in the past, the plan ahead. */
@@ -267,7 +284,7 @@ const calendarCells = computed((): CalendarCell[] => {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
 
   const blank = (): CalendarCell => ({
-    date: null, day: null, isToday: false, isFuture: false, isDraw: false,
+    date: null, day: null, isToday: false, isFuture: false, isDraw: false, isPlannedDraw: false,
     hasEntry: false, compounds: [], scheduled: [], marks: '', weight: null, title: ''
   })
 
@@ -304,6 +321,7 @@ const calendarCells = computed((): CalendarCell[] => {
     if (entry?.reconCount) titleParts.push(`${entry.reconCount} reconstitution${entry.reconCount > 1 ? 's' : ''}`)
     if (photos) titleParts.push(`${photos} photo${photos > 1 ? 's' : ''}`)
     if (workouts) titleParts.push(`${workouts} workout${workouts > 1 ? 's' : ''}`)
+    if (plannedDates.value.has(dateStr)) titleParts.push('planned draw')
 
     cells.push({
       date: dateStr,
@@ -311,6 +329,7 @@ const calendarCells = computed((): CalendarCell[] => {
       isToday: dateStr === todayDate,
       isFuture: dateStr > todayDate,
       isDraw: drawDates.value.has(dateStr),
+      isPlannedDraw: plannedDates.value.has(dateStr),
       hasEntry: !!entry,
       compounds: entry?.compounds.slice(0, MAX_DOTS) ?? [],
       scheduled: scheduled.slice(0, MAX_DOTS),

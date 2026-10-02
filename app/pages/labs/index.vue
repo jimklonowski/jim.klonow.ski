@@ -28,6 +28,9 @@
           <template v-if="pdfCount">
             · {{ pdfCount }} source pdfs
           </template>
+          <template v-if="nextPlanned">
+            · next <span class="text-hi font-medium">{{ formatDateTerse(nextPlanned.plan.date) }}</span>
+          </template>
         </template>
       </p>
 
@@ -71,6 +74,15 @@
       :can-regenerate="isOwner"
       :default-open="isRecentDraw"
       @regenerated="refresh"
+    />
+
+    <!-- The next booked draw: countdown, what it answers, dated prep. Owner plans/edits here. -->
+    <LabsPlannedDraws
+      class="mx-4 sm:mx-6 mt-4"
+      :plans="plannedDraws"
+      :draw-dates="drawDates"
+      :is-owner="isOwner"
+      @refresh="refreshPlanned"
     />
 
     <div class="px-4 sm:px-6 py-4 space-y-2.5">
@@ -236,10 +248,12 @@ import { diffDays } from '#shared/utils/dates'
 import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
+import { nextPlannedDraw } from '#shared/utils/plannedDraws'
 
 useSeoMeta({ title: 'Labs' })
 
 const { data, refresh, error } = await useLabsEntries()
+const { data: plannedData, refresh: refreshPlanned } = await usePlannedDraws()
 const { isOwner } = await useAuth()
 const route = useRoute()
 const router = useRouter()
@@ -265,6 +279,11 @@ const visibleEntries = computed(() => entriesAsOf(entries.value, viewedDate.valu
 const latest = computed(() => visibleEntries.value.at(-1) ?? null)
 const newest = computed(() => entriesAsOf(entries.value, null).at(-1) ?? null)
 const drawsBack = computed(() => latest.value ? drawDates.value.length - 1 - drawDates.value.indexOf(latest.value.date) : 0)
+
+// --- planned draws ---
+// The soonest plan still waiting on results, for the title row; the section below has the rest.
+const plannedDraws = computed(() => plannedData.value ?? [])
+const nextPlanned = computed(() => nextPlannedDraw(plannedDraws.value, drawDates.value, localToday()))
 
 // --- category tabs ---
 const CATEGORY_SHORT: Record<Category, string> = {

@@ -167,6 +167,12 @@
         :draws="draws"
         :health-metrics="healthMetrics"
       />
+
+      <HomeNextDraw
+        :plans="plannedDraws"
+        :draw-dates="drawDates"
+        :is-owner="isOwner"
+      />
     </section>
 
     <section class="bg-bg px-6 pt-4 pb-5 min-w-0">
@@ -279,6 +285,9 @@ const {
 // lifetime (login is a hard navigation), so guests skip the fetch instead of 401ing.
 const cyclesData = hasSession ? useCycles() : null
 const cycles = computed(() => cyclesData?.data.value ?? [])
+const plannedData = hasSession ? usePlannedDraws() : null
+const plannedDraws = computed(() => plannedData?.data.value ?? [])
+const drawDates = computed(() => draws.value.map(d => d.date))
 
 // Reactive: the overnight PWA used to keep yesterday as today until a reload.
 const today = useToday()

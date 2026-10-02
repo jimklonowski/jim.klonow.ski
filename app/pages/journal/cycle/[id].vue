@@ -334,6 +334,7 @@ import {
   cycleSpanDays, cycleStatusOn, doseLabelOf, durationLabel, plannedDoses, tentativeStartLabel
 } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
+import { checkpointPlan, planInWindow } from '#shared/utils/plannedDraws'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
 import { adherencePctClass } from '~/utils/adherence'
@@ -345,6 +346,7 @@ const { data, refresh, error } = await useCycles()
 const { data: journalData } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: healthData } = await useHealthMetricsEntries()
+const { data: plannedData } = await usePlannedDraws()
 
 const cycleForm = useTemplateRef('cycleForm')
 
@@ -570,6 +572,12 @@ const nextCheckpointLabel = computed(() => {
   if (tentativeStart.value) return 'baseline draw · before you start'
   const next = checkpoints.value.find(cp => cp.state === 'due' || cp.state === 'upcoming')
   if (!next) return '—'
+  // A draw already booked for the window — by its checkpoint link, or just dated inside it —
+  // beats the window itself: "booked Nov 14 · Quest" answers the question the window only asks.
+  const plans = plannedData.value ?? []
+  const booked = (cycle.value?.id != null ? checkpointPlan(plans, cycle.value.id, next.key) : null)
+    ?? planInWindow(plans, next.windowFrom, next.windowTo)
+  if (booked) return `${next.label} · booked ${formatDate(booked.date, 'monthDay')}${booked.lab ? ` · ${booked.lab}` : ''}`
   return `${next.label} · ${formatDate(next.windowFrom, 'monthDay')}–${formatDate(next.windowTo, 'monthDay')}`
 })
 

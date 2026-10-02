@@ -1,5 +1,7 @@
 import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
 import { zLabsSave } from '#shared/utils/schemas'
+import { shiftDays } from '#shared/utils/dates'
+import { MATCH_WINDOW_DAYS } from '#shared/utils/plannedDraws'
 
 // Writes an extraction (or a hand-edited copy of one) into labs_entries / dexa_entries.
 //
@@ -102,5 +104,31 @@ export default defineEventHandler(async (event) => {
 
   if (dropped.length) console.warn(`[labs] ${date}: ignored unrecognized marker keys — ${dropped.join(', ')}`)
 
-  return { ok: true, table: 'labs_entries', date, ...(dropped.length ? { ignored: dropped } : {}) }
+  // Close the loop with a planned draw: the nearest plan still waiting on results within a few
+  // days of this date gets this row as its fulfilment, so the home strip and the /labs section
+  // flip from "next draw" to done and the AI summary for this date leads with the plan's
+  // questions. The plan is identified by the same window matchDraw() would use anyway, so the
+  // link is derived data and is not audited.
+  const planned = await linkPlannedDraw(db, date)
+
+  return { ok: true, table: 'labs_entries', date, planned, ...(dropped.length ? { ignored: dropped } : {}) }
 })
+
+async function linkPlannedDraw(db: D1Database, date: string): Promise<{ id: number, date: string } | null> {
+  try {
+    const row = await db.prepare(`
+      SELECT id, date FROM planned_draws
+      WHERE labs_date IS NULL AND date >= ?1 AND date <= ?2
+      ORDER BY abs(julianday(date) - julianday(?3)) ASC, date ASC
+      LIMIT 1
+    `).bind(shiftDays(date, -MATCH_WINDOW_DAYS), shiftDays(date, MATCH_WINDOW_DAYS), date).first<{ id: number, date: string }>()
+    if (!row) return null
+    await db.prepare('UPDATE planned_draws SET labs_date = ?2 WHERE id = ?1').bind(row.id, date).run()
+    return row
+  }
+  catch (err) {
+    // A sandbox without migration 0007 has nothing to link; anything else is a real failure.
+    if (isMissingTable(err)) return null
+    throw err
+  }
+}

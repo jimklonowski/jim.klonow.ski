@@ -3,6 +3,8 @@ import type { H3Event } from 'h3'
 import type { AuthContext } from './auth'
 import { normalizeForm } from '#shared/utils/vialForm'
 import { zDateRange } from '#shared/utils/schemas'
+import type { CheckpointKey } from '#shared/utils/cycles'
+import type { PlannedDraw } from '#shared/utils/plannedDraws'
 
 // nitro-cloudflare-dev types `context.cloudflare.env` as PlatformProxy["env"] (unknown) since it
 // isn't parameterized with our Env — cast through the generated global Env from worker-configuration.d.ts.
@@ -236,6 +238,21 @@ export function parseVialRow(row: Record<string, unknown>) {
     cost: (row.cost as number | null) ?? null,
     notes: (row.notes as string | null) ?? null,
     created_at: (row.created_at as string | null) ?? null
+  }
+}
+
+export function parsePlannedDrawRow(row: Record<string, unknown>): PlannedDraw {
+  return {
+    id: row.id as number,
+    date: row.date as string,
+    lab: (row.lab as string | null) ?? null,
+    panel: (row.panel as string | null) ?? null,
+    fasting: !!row.fasting,
+    purpose: (row.purpose as string | null) ?? null,
+    cycle_id: (row.cycle_id as number | null) ?? null,
+    checkpoint_key: (row.checkpoint_key as CheckpointKey | null) ?? null,
+    labs_date: (row.labs_date as string | null) ?? null,
+    created_at: (row.created_at as string | null) ?? undefined
   }
 }
 
