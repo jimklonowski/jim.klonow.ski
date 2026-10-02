@@ -147,6 +147,7 @@ const TABLE_LABELS: Record<string, string> = {
   vials: 'Vial',
   vaccinations: 'Vaccine',
   cycles: 'Cycle',
+  planned_draws: 'Planned draw',
   progress_photos: 'Photo',
   profile: 'Profile'
 }

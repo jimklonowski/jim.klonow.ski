@@ -20,6 +20,7 @@ export const AUDIT_KEYS = {
   vials: 'id',
   vaccinations: 'id',
   cycles: 'id',
+  planned_draws: 'id',
   progress_photos: 'id',
   profile: 'key'
 } as const

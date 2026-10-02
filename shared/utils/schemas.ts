@@ -266,6 +266,22 @@ export const zCycleSave = z.object({
   notes: zOptText(5000)
 })
 
+// --- planned draws ---
+
+// The checkpoint link is both halves or neither; that cross-field rule stays in the handler.
+// `fasting` defaults on: nearly every planned panel is, and the prep reminders hang off it.
+export const zPlannedDrawSave = z.object({
+  id: zId.optional(),
+  date: zIsoDate,
+  lab: zOptText(80),
+  panel: zOptText(300),
+  fasting: z.boolean().default(true),
+  purpose: zOptText(2000),
+  cycle_id: z.preprocess(blankAsAbsent, zId.nullish()).transform(v => v ?? null),
+  checkpoint_key: z.enum(['baseline', 'mid', 'end', 'recovery'], 'Bad checkpoint_key').nullish().transform(v => v ?? null),
+  labs_date: zOptDate
+})
+
 // --- lab / DEXA saves (hand-edited extraction JSON) ---
 
 // The marker, qualitative and source lists stay `unknown` here on purpose: sanitizeMarkers /

@@ -563,6 +563,18 @@ const vaccinationRows = [
   [D(1572), 'Tetanus (Td/Tdap)', 'Boostrix', 'Urgent care after a kitchen knife slip — due again in about six years.', `${D(1572)}T21:10:00.000Z`]
 ]
 
+// --- planned_draws --------------------------------------------------------------------------
+
+// One draw booked a couple of weeks out, so the home strip's NEXT DRAW block and the /labs
+// section have something to show, and the plan the most recent draw fulfilled (labs_date set),
+// so the folded history row demonstrates the upload link. A negative offset is a future date,
+// as with vial expiries. No cycle checkpoint: the demo persona plans no cycles.
+const LAST_DRAW = DRAWS.at(-1)
+const plannedDrawRows = [
+  [D(-12), 'Quest', 'CBC + CMP + lipids + total/free testosterone + estradiol', 1, 'Testosterone on the current dose\nLipids after six weeks of the fiber and omega-3 add', null, null, null, `${D(16)}T15:00:00.000Z`],
+  [D(LAST_DRAW), 'Quest', 'Full panel', 1, 'Baseline before the GLP-1 taper', null, null, D(LAST_DRAW), `${D(LAST_DRAW + 30)}T15:00:00.000Z`]
+]
+
 // --- profile --------------------------------------------------------------------------------
 
 // Wallet-card facts (PROFILE_FIELDS in shared/utils/profile.ts). Without a row the card on
@@ -632,6 +644,11 @@ const seed = {
       cols: ['key', 'value', 'updated_at'],
       jsonCols: [],
       rows: profileRows
+    },
+    planned_draws: {
+      cols: ['date', 'lab', 'panel', 'fasting', 'purpose', 'cycle_id', 'checkpoint_key', 'labs_date', 'created_at'],
+      jsonCols: [],
+      rows: plannedDrawRows
     }
   }
 }

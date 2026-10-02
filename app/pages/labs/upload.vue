@@ -402,7 +402,7 @@ const error = ref('')
 const filename = ref('')
 const result = ref<LabResult | null>(null)
 const saving = ref(false)
-const saveResult = ref<{ ok: boolean, date?: string, message?: string } | null>(null)
+const saveResult = ref<{ ok: boolean, date?: string, message?: string, planned?: { id: number, date: string } | null } | null>(null)
 const summarizing = ref(false)
 const summary = ref('')
 const summaryError = ref('')
@@ -544,7 +544,10 @@ const saveMessage = computed(() => {
   const res = saveResult.value
   if (!res) return ''
   if (!res.ok) return res.message ?? 'Failed to save. Please try again.'
-  return `Saved ${res.date ? formatDate(res.date, 'long') : 'this draw'} — the dashboard will update automatically.`
+  // The save links the row to a planned draw within a few days of it; the summary then leads
+  // with that plan's questions.
+  const linked = res.planned ? ` Linked to the draw planned for ${formatDate(res.planned.date, 'monthDay')}.` : ''
+  return `Saved ${res.date ? formatDate(res.date, 'long') : 'this draw'} — the dashboard will update automatically.${linked}`
 })
 
 function colorClass(res: string) {
@@ -612,11 +615,11 @@ async function saveToSite() {
   saving.value = true
   saveResult.value = null
   try {
-    const res = await $fetch<{ ok: boolean, table: string, date: string }>('/api/labs/save-json', {
+    const res = await $fetch<{ ok: boolean, table: string, date: string, planned?: { id: number, date: string } | null }>('/api/labs/save-json', {
       method: 'POST',
       body: { ...result.value, _type: reportType.value }
     })
-    saveResult.value = { ok: true, date: res.date }
+    saveResult.value = { ok: true, date: res.date, planned: res.planned ?? null }
     // The shell summary carries the last-draw date, flag counts, PDF total and latest DEXA.
     await refreshNuxtData('overview')
     // Each table has its own narrator: a draw gets the marker-history summary, a scan the

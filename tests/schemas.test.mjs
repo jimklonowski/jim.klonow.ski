@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalSave, zLabsSave,
-  zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zProfileSave, zRedeem, zSodaAdd,
+  zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
   zSodaRemove, zSupplementSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
 
@@ -258,4 +258,21 @@ test('audit history paging and restore ids', () => {
   assert.ok(problem(zAuditList, { limit: '5000' }))
   assert.deepEqual(zAuditRestore.parse({ id: 4 }), { id: 4 })
   assert.ok(problem(zAuditRestore, { id: '4' }), 'a JSON body sends a real number')
+})
+
+test('a planned draw defaults to fasting and stores its blanks as null', () => {
+  const out = zPlannedDrawSave.parse({ date: '2026-10-17', lab: '', panel: ' LC/MS panel ', purpose: '' })
+  assert.deepEqual(out, {
+    date: '2026-10-17', lab: null, panel: 'LC/MS panel', fasting: true, purpose: null,
+    cycle_id: null, checkpoint_key: null, labs_date: null
+  })
+  // A cleared select posts '' for the cycle and the fulfilling date; both read as absent.
+  const cleared = zPlannedDrawSave.parse({ date: '2026-10-17', fasting: false, cycle_id: '', labs_date: '' })
+  assert.equal(cleared.cycle_id, null)
+  assert.equal(cleared.labs_date, null)
+  assert.equal(cleared.fasting, false)
+  assert.equal(zPlannedDrawSave.parse({ date: '2026-10-17', cycle_id: 7, checkpoint_key: 'mid' }).checkpoint_key, 'mid')
+  assert.match(problem(zPlannedDrawSave, { date: '2026-10-17', checkpoint_key: 'start' }), /^checkpoint_key:/)
+  assert.match(problem(zPlannedDrawSave, { date: '2026-10-40' }), /^date:/)
+  assert.ok(problem(zPlannedDrawSave, { date: '2026-10-17', purpose: 'x'.repeat(2001) }))
 })
