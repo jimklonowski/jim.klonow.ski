@@ -11,6 +11,11 @@ import type { DexaEntry } from '~/composables/useDexaEntries'
 //           SVG map used to carry (arms and legs on leaders in the margins, trunk and the two
 //           bands on the body, R/L lean at the hands and feet)
 //
+// `compact` is the home page's thumbnail of either mode: no view buttons, no THEN/NOW slider, no
+// legend, no standing callouts or R/L figures — at 130–230 px wide there is no margin for them —
+// only the hovered region's name and fat % on a plate over the body. Everything else (the
+// shader, the hover pick, the beam) is the same component.
+//
 // Hovering a region lights it and reports it through `highlight`, the same contract as BodyMap,
 // so the regional table stays in step either way. When the mesh carries an earlier body as a
 // morph target for the previous scan, a THEN/NOW slider blends shape, fat % and labels.
@@ -28,7 +33,9 @@ const props = withDefaults(defineProps<{
   /** Scan dates, matched against the mesh's own base/alt dates before the morph slider shows. */
   dates: { latest: string, previous?: string | null }
   mode?: 'turn' | 'flat'
-}>(), { previousRegions: null, symmetry: undefined, previousSymmetry: undefined, mode: 'turn' })
+  /** The home-page thumbnail: figure and hover only, no controls, slider, legend or standing labels. */
+  compact?: boolean
+}>(), { previousRegions: null, symmetry: undefined, previousSymmetry: undefined, mode: 'turn', compact: false })
 const emit = defineEmits<{ unsupported: [] }>()
 const highlight = defineModel<string | null>('highlight', { default: null })
 
@@ -544,8 +551,42 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
           v-for="c in placed"
           :key="c.key"
         >
+          <!-- Compact: only the hovered region, as a plate at its anchor on the body -->
           <g
-            v-if="c.visible && c.side !== 'inside'"
+            v-if="compact"
+            class="text-accent"
+          >
+            <template v-if="c.visible && highlight === c.key">
+              <rect
+                :x="c.ax - plateWidth(c) / 2"
+                :y="c.ay - 17"
+                :width="plateWidth(c)"
+                height="40"
+                fill="#070a09"
+                fill-opacity="0.82"
+                stroke="#2ce8a4"
+                stroke-width="1"
+              />
+              <text
+                :x="c.ax"
+                :y="c.ay - 4"
+                text-anchor="middle"
+                font-size="10"
+                letter-spacing="1.5"
+                fill="currentColor"
+              >{{ c.name }}</text>
+              <text
+                :x="c.ax"
+                :y="c.ay + 15"
+                text-anchor="middle"
+                font-size="18"
+                font-weight="700"
+                class="fill-hi font-display"
+              >{{ c.pct }}</text>
+            </template>
+          </g>
+          <g
+            v-else-if="c.visible && c.side !== 'inside'"
             :class="highlight === c.key ? 'text-accent' : 'text-dim'"
           >
             <line
@@ -633,21 +674,23 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
             >{{ c.pct }}</text>
           </g>
         </template>
-        <text
-          v-for="f in limbFigures.filter(l => l.visible)"
-          :key="f.text"
-          :x="f.x"
-          :y="f.y"
-          text-anchor="middle"
-          font-size="11"
-          class="fill-body"
-          :style="HALO"
-        >{{ f.text }}</text>
+        <template v-if="!compact">
+          <text
+            v-for="f in limbFigures.filter(l => l.visible)"
+            :key="f.text"
+            :x="f.x"
+            :y="f.y"
+            text-anchor="middle"
+            font-size="11"
+            class="fill-body"
+            :style="HALO"
+          >{{ f.text }}</text>
+        </template>
       </svg>
     </div>
 
     <div
-      v-if="!flat"
+      v-if="!flat && !compact"
       class="flex flex-wrap items-center gap-1.5 mt-2.5"
     >
       <button
@@ -671,7 +714,7 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
     </div>
 
     <div
-      v-if="canMorph && meshDates"
+      v-if="canMorph && meshDates && !compact"
       class="mt-3"
     >
       <div class="flex items-baseline justify-between text-[9.5px] tracking-[0.12em] uppercase text-faint">
@@ -688,7 +731,10 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
       />
     </div>
 
-    <figcaption class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-2.5 text-[9.5px] text-faint tracking-[0.06em] uppercase">
+    <figcaption
+      v-if="!compact"
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-2.5 text-[9.5px] text-faint tracking-[0.06em] uppercase"
+    >
       <span class="flex items-center gap-1.5">
         <span>fat %</span>
         <span>8</span>

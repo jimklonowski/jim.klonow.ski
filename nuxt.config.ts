@@ -154,7 +154,9 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: [
         '@unhead/schema-org/vue',
-        'exifr'
+        'exifr',
+        'three',
+        'three/examples/jsm/loaders/GLTFLoader.js'
       ]
     },
     server: {

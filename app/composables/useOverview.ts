@@ -57,6 +57,8 @@ export function useOverview(role: Ref<Role | null>) {
     [...(dexa?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
   )
   const latestDexa = computed(() => dexaScans.value.at(-1) ?? null)
+  /** The scan before the latest — what the home body row diffs against. */
+  const previousDexa = computed(() => dexaScans.value.at(-2) ?? null)
 
   const allWorkouts = computed<WorkoutEntry[]>(() =>
     [...(workouts?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
@@ -123,6 +125,7 @@ export function useOverview(role: Ref<Role | null>) {
     latestDraw,
     healthMetrics,
     latestDexa,
+    previousDexa,
     allWorkouts,
     sodasToday,
     dosesToday,
