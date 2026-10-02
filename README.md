@@ -8,9 +8,9 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 ![Overview dashboard — /](.github/screenshots/home.png)
 
-| `/labs` — bloodwork tracker | `/labs/dexa` — body composition |
+| `/labs` — bloodwork tracker | `/labs/dexa` — body composition + 3D body mesh |
 |---|---|
-| ![Bloodwork dashboard](.github/screenshots/labs.png) | ![DEXA body composition](.github/screenshots/dexa.png) |
+| ![Bloodwork dashboard](.github/screenshots/labs.png) | ![DEXA body composition — the 3D body mesh turning](.github/screenshots/dexa.gif) |
 | **`/journal` — daily log hub** | **`/journal/trends` — vitals + Whoop** |
 | ![Journal overview](.github/screenshots/journal.png) | ![Vitals and Whoop trends](.github/screenshots/journal-trends.png) |
 | **`/ask` — AI analysis console** | |
@@ -26,12 +26,18 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | ![Cycle dossier](.github/screenshots/journal-cycle.png) | ![Cycle planner](.github/screenshots/journal-cycles.png) |
 | **`/journal/entries` — day-log ledger** | **`/journal/calendar` — month view + protocol timeline** |
 | ![Entries ledger](.github/screenshots/journal-entries.png) | ![Calendar](.github/screenshots/journal-calendar.png) |
+| **`/journal/[date]` — day editor** | **`/journal/compound/[name]` — compound dossier** |
+| ![Day editor](.github/screenshots/journal-day.png) | ![Compound dossier](.github/screenshots/journal-compound.png) |
 | **`/journal/supplements` — standing stack** | **`/tools/calculator` — reconstitution & syringe units** |
 | ![Supplements](.github/screenshots/journal-supplements.png) | ![Calculator](.github/screenshots/tools-calculator.png) |
 | **`/journal/vaccines` — immunization record** | **`/tools/data` — export + change history** |
 | ![Vaccines](.github/screenshots/journal-vaccines.png) | ![Data](.github/screenshots/tools-data.png) |
+| **`/journal/photos` — progress photos + compare** | **`/tools/inventory` — vial inventory + runway** |
+| ![Progress photos](.github/screenshots/journal-photos.png) | ![Inventory](.github/screenshots/tools-inventory.png) |
 | **`/tools/sharing` — share links + sessions** | **`/tools/import` — Apple Health import + auto-sync** |
 | ![Sharing](.github/screenshots/tools-sharing.png) | ![Import](.github/screenshots/tools-import.png) |
+| **`/labs/upload` — PDF → structured results** | |
+| ![Upload](.github/screenshots/labs-upload.png) | |
 
 </details>
 
@@ -56,7 +62,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 |---|---|
 | `/` | Overview dashboard — flagged markers, vitals, today's doses + the latest day's workouts, quick links, the latest daily and weekly AI digests (daily first) beside the TICKER companion, and a cycle strip when one is planned/running/recently ended — mid-cycle it carries a one-line passive vitals watch (sign-in prompt when signed out) |
 | `/labs` | Bloodwork tracker — biomarker panels, trend charts, PDF sources, regenerable AI summaries; `?marker=<key>` deep-links to a marker's tab + detail modal (used by the home page's flagged rows and the ⌘K palette). A sticky **time scrubber** at the foot of the page rewinds the whole dashboard to any earlier draw — cards, tab counts, AI summary, and echo findings all read as they did then, markers missing from that panel carry forward dimmed and dated, and a hollow ring on each range bar marks where the newest reading sits; `?asof=<date>` deep-links a rewound view |
-| `/labs/dexa` | DEXA body composition scans |
+| `/labs/dexa` | DEXA body composition scans — headline readouts with the move since the previous scan, a **3D body mesh** (three.js, a scan-line shader carrying each region's fat %, hover-synced with the regional table; a flat front view and an SVG fallback without WebGL), lean symmetry, A/G · VAT · bone-density meters, every scan side by side, and a regenerable AI scan summary |
 | `/labs/upload` | Upload a new lab PDF (parsed server-side into structured markers) — owner only |
 | `/labs/login` | Owner password sign-in |
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
