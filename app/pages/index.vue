@@ -53,19 +53,25 @@
     v-else
     class="grid gap-px bg-line border-b border-line"
     :class="isFullAccess
-      ? 'xl:grid-cols-[minmax(0,390px)_minmax(0,1fr)_minmax(0,400px)]'
+      ? 'lg:grid-cols-[minmax(0,390px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,390px)_minmax(0,1fr)_minmax(0,400px)]'
       : 'lg:grid-cols-[minmax(0,390px)_minmax(0,1fr)]'"
   >
-    <!-- The three-column layout needs ~1270px of content, so it waits for xl: at lg (1024px)
-         those fixed tracks plus a 480px minimum overflowed the viewport and scrolled the whole
-         page sideways. Every track is minmax(0,…) for the same reason the note below describes.
+    <!-- Three breakpoints. xl (1280px+): the three columns — they need ~1270px of content, so
+         at lg those fixed tracks plus a 480px minimum overflowed the viewport and scrolled the
+         whole page sideways. lg (1024–1279): vitals + the middle column, with the digest dropping
+         below them across both tracks (daily and weekly side by side). Under lg: one column, and
+         the vitals section lays its own blocks out two-up from md so a 1000px-wide row doesn't
+         put a delta 800px from the value it belongs to. Every track is minmax(0,…) for the same
+         reason the note below describes.
 
          Panel dividers are the grid's own background showing through 1px gaps.
          Every section needs min-w-0: stacked to one auto column on mobile, the track's
          automatic minimum is its widest item's min-content width, so a long unbreakable
          row (a cycle plan line, say) widens the grid past the viewport and the page
          scrolls sideways under a header that stayed put. -->
-    <section class="bg-bg px-6 pt-4 pb-5 min-w-0">
+    <!-- Four blocks (vitals, protocol, cycle, next draw). Two-up between md and lg, where the
+         section is the full page width; one stack in the 390px column from lg. -->
+    <section class="bg-bg px-6 pt-4 pb-5 min-w-0 md:grid md:grid-cols-2 md:gap-x-8 lg:block">
       <!-- tour ids sit on the compact components, not the sections — a full-height column
            as the popover anchor pushes the tour popover to the viewport edge. -->
       <HomeVitals
@@ -74,91 +80,93 @@
         :metrics="healthMetrics"
       />
 
-      <TuiHeader
-        label="PROTOCOL · LOGGED TODAY"
-        :dashes="4"
-        class="mt-4.5"
-      />
-      <div
-        v-if="dosesToday.length"
-        class="flex flex-col gap-1.5 mt-2.5 text-[12px]"
-      >
+      <div>
+        <TuiHeader
+          label="PROTOCOL · LOGGED TODAY"
+          :dashes="4"
+          class="mt-4.5 md:mt-0 lg:mt-4.5"
+        />
         <div
-          v-for="(dose, i) in dosesToday"
-          :key="`${dose.time}-${dose.compound}-${i}`"
-          class="flex gap-2.5"
+          v-if="dosesToday.length"
+          class="flex flex-col gap-1.5 mt-2.5 text-[12px]"
         >
-          <span class="text-ghost shrink-0">{{ dose.time }}</span>
-          <NuxtLink
-            :to="`/journal/compound/${encodeURIComponent(dose.compound)}`"
-            class="text-body hover:text-accent truncate"
-          >{{ dose.compound }}</NuxtLink>
-          <span class="ml-auto shrink-0 text-muted">{{ doseLabel(dose) }}</span>
+          <div
+            v-for="(dose, i) in dosesToday"
+            :key="`${dose.time}-${dose.compound}-${i}`"
+            class="flex gap-2.5"
+          >
+            <span class="text-ghost shrink-0">{{ dose.time }}</span>
+            <NuxtLink
+              :to="`/journal/compound/${encodeURIComponent(dose.compound)}`"
+              class="text-body hover:text-accent truncate"
+            >{{ dose.compound }}</NuxtLink>
+            <span class="ml-auto shrink-0 text-muted">{{ doseLabel(dose) }}</span>
+          </div>
         </div>
-      </div>
-      <p
-        v-else
-        class="mt-2.5 text-[12px] text-muted"
-      >
-        No doses logged today.
-      </p>
+        <p
+          v-else
+          class="mt-2.5 text-[12px] text-muted"
+        >
+          No doses logged today.
+        </p>
 
-      <!-- Mirrors the dose rows above: label left, value right-aligned, stats on their own
+        <!-- Mirrors the dose rows above: label left, value right-aligned, stats on their own
            line so nothing has to wrap mid-metric in this 390px column. Lists every session
            from the most recent workout day — a three-workout day used to show only its last. -->
-      <div
-        v-if="latestWorkouts.length"
-        class="mt-3.5 text-[12px] text-muted space-y-2"
-      >
         <div
-          v-for="(w, i) in latestWorkouts"
-          :key="`${w.date}-${w.start_time ?? i}`"
+          v-if="latestWorkouts.length"
+          class="mt-3.5 text-[12px] text-muted space-y-2"
         >
-          <div class="flex items-baseline gap-2">
-            <span
-              v-if="i === 0"
-              class="shrink-0"
-            >└ {{ workoutsAreToday ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
-            <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
-          </div>
-          <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
-            <span
-              v-for="(part, j) in workoutParts(w)"
-              :key="part"
-              class="whitespace-nowrap"
-            >{{ j ? `· ${part}` : part }}</span>
+          <div
+            v-for="(w, i) in latestWorkouts"
+            :key="`${w.date}-${w.start_time ?? i}`"
+          >
+            <div class="flex items-baseline gap-2">
+              <span
+                v-if="i === 0"
+                class="shrink-0"
+              >└ {{ workoutsAreToday ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
+              <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
+            </div>
+            <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
+              <span
+                v-for="(part, j) in workoutParts(w)"
+                :key="part"
+                class="whitespace-nowrap"
+              >{{ j ? `· ${part}` : part }}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="flex gap-2 mt-4.5">
-        <NuxtLink
-          v-if="isFullAccess"
-          :to="`/journal/${today}`"
-          class="tui-btn tui-btn-accent flex-1 justify-center"
-        >
-          {{ canEdit ? '+ LOG TODAY' : 'TODAY' }}
-        </NuxtLink>
-        <NuxtLink
-          to="/journal/calendar"
-          class="tui-btn flex-1 justify-center"
-        >
-          CALENDAR
-        </NuxtLink>
-        <NuxtLink
-          v-if="isFullAccess"
-          to="/journal/photos"
-          class="tui-btn flex-1 justify-center"
-        >
-          PHOTOS
-        </NuxtLink>
-        <NuxtLink
-          v-else
-          to="/journal/supplements"
-          class="tui-btn flex-1 justify-center"
-        >
-          STACK
-        </NuxtLink>
+        <div class="flex gap-2 mt-4.5">
+          <NuxtLink
+            v-if="isFullAccess"
+            :to="`/journal/${today}`"
+            class="tui-btn tui-btn-accent flex-1 justify-center"
+          >
+            {{ canEdit ? '+ LOG TODAY' : 'TODAY' }}
+          </NuxtLink>
+          <NuxtLink
+            to="/journal/calendar"
+            class="tui-btn flex-1 justify-center"
+          >
+            CALENDAR
+          </NuxtLink>
+          <NuxtLink
+            v-if="isFullAccess"
+            to="/journal/photos"
+            class="tui-btn flex-1 justify-center"
+          >
+            PHOTOS
+          </NuxtLink>
+          <NuxtLink
+            v-else
+            to="/journal/supplements"
+            class="tui-btn flex-1 justify-center"
+          >
+            STACK
+          </NuxtLink>
+        </div>
       </div>
 
       <HomeCycle
@@ -216,6 +224,9 @@
         >sharing →</NuxtLink>
       </div>
 
+      <!-- Draw-over-draw sparklines for the markers the protocol is steered by -->
+      <HomeWatchMarkers :draws="draws" />
+
       <TuiHeader
         label="90-DAY TRENDS"
         class="mt-5"
@@ -238,19 +249,27 @@
           />
         </NuxtLink>
       </div>
+
+      <!-- The latest DEXA scan on the body mesh, with its headline figures and regions. Fills
+           the space this column used to leave empty below the trends on a wide screen. -->
+      <HomeBody
+        :latest="latestDexa"
+        :previous="previousDexa"
+      />
     </section>
 
     <!--
       The digest is the one panel with no length ceiling — a wordy weekly recap used to set the
-      row height and leave the other two columns sitting above a screen of dead space. Capped to
-      the viewport (chrome is 7.1875rem: 53px header + 31px status + 31px footer) as a flex
-      column: HomeDigest scrolls its prose region internally and keeps its action bar in flow
-      at the bottom. Stays stretched rather than self-start so the grid's gap background
-      doesn't show through below it.
+      row height and leave the other two columns sitting above a screen of dead space. As the
+      third column (xl) it is capped to the viewport (chrome is 7.1875rem: 53px header + 31px
+      status + 31px footer) as a flex column: HomeDigest scrolls its prose region internally and
+      keeps its action bar in flow at the bottom. Stays stretched rather than self-start so the
+      grid's gap background doesn't show through below it. At lg it spans both tracks under the
+      other two sections and flows at its natural height, daily and weekly side by side.
     -->
     <section
       v-if="isFullAccess"
-      class="bg-bg px-6 pt-4 pb-5 min-w-0 lg:max-h-[calc(100dvh-7.25rem)] lg:flex lg:flex-col lg:min-h-0"
+      class="bg-bg px-6 pt-4 pb-5 min-w-0 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100dvh-7.25rem)] xl:flex xl:flex-col xl:min-h-0"
     >
       <HomeDigest
         id="tour-digest"
@@ -276,7 +295,7 @@ import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
 const {
-  hasSession, entries, draws, healthMetrics, latestDraw, latestDexa,
+  hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa,
   allWorkouts, dosesToday, sodasToday, flagged, flagCounts,
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)

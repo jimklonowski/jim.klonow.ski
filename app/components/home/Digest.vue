@@ -1,49 +1,54 @@
 <template>
-  <!-- On lg the home column caps this box's height (flex column, see index.vue): the prose
-       wrapper below is the only thing that scrolls, so the action bar keeps its place in
-       normal flow at the very bottom — nothing can render behind or past it. On mobile the
-       page scrolls as usual and min-h-full just keeps the bar at the panel's foot. -->
-  <div class="flex flex-col min-h-full lg:min-h-0 lg:flex-1">
+  <!-- As the xl side column the home page caps this box's height (flex column, see index.vue):
+       the prose wrapper below is the only thing that scrolls, so the action bar keeps its place
+       in normal flow at the very bottom — nothing can render behind or past it. Below xl the
+       panel spans the page under the other sections, the page scrolls as usual, and min-h-full
+       just keeps the bar at the panel's foot. -->
+  <div class="flex flex-col min-h-full xl:min-h-0 xl:flex-1">
     <!-- pr keeps the thin scrollbar from hugging the bubble's border. mb-2 is dead
          space for the speech tail below: it pokes ~7px above the divider, and margin
          (unlike padding) ends the scrollport early so text clips before sliding under it. -->
-    <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1 mb-2">
+    <div class="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1 mb-2">
       <!-- Daily leads: it's the fresher read and short enough to stay above the fold, so the
-           long weekly recap (and its recommendations) never pushes today's note out of view. -->
-      <TickerDigestPanel
-        ref="dailyPanel"
-        label="AI DIGEST · DAILY"
-        :meta="daily ? formatDate(daily.period_end, 'monthDay').toUpperCase() : '—'"
-      >
-        <Markdown
-          v-if="daily"
-          :value="dailyParts.prose"
-        />
-        <p
-          v-else
-          class="text-muted"
+           long weekly recap (and its recommendations) never pushes today's note out of view.
+           From md to xl the panel is page-wide, so the two sit side by side instead of one
+           prose block running 150 characters a line. -->
+      <div class="md:grid md:grid-cols-2 md:gap-x-5 xl:block">
+        <TickerDigestPanel
+          ref="dailyPanel"
+          label="AI DIGEST · DAILY"
+          :meta="daily ? formatDate(daily.period_end, 'monthDay').toUpperCase() : '—'"
         >
-          No daily digest yet.
-        </p>
-      </TickerDigestPanel>
+          <Markdown
+            v-if="daily"
+            :value="dailyParts.prose"
+          />
+          <p
+            v-else
+            class="text-muted"
+          >
+            No daily digest yet.
+          </p>
+        </TickerDigestPanel>
 
-      <TickerDigestPanel
-        ref="weeklyPanel"
-        label="AI DIGEST · WEEKLY"
-        :meta="weekly ? weeklyPeriod : '—'"
-        class="mt-4.5"
-      >
-        <Markdown
-          v-if="weekly"
-          :value="weeklyParts.prose"
-        />
-        <p
-          v-else
-          class="text-muted"
+        <TickerDigestPanel
+          ref="weeklyPanel"
+          label="AI DIGEST · WEEKLY"
+          :meta="weekly ? weeklyPeriod : '—'"
+          class="mt-4.5 md:mt-0 xl:mt-4.5"
         >
-          No weekly digest yet.
-        </p>
-      </TickerDigestPanel>
+          <Markdown
+            v-if="weekly"
+            :value="weeklyParts.prose"
+          />
+          <p
+            v-else
+            class="text-muted"
+          >
+            No weekly digest yet.
+          </p>
+        </TickerDigestPanel>
+      </div>
 
       <div
         v-if="weeklyParts.recommendations.length"

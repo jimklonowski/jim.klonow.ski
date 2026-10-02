@@ -135,7 +135,7 @@ export default defineNuxtConfig({
   },
 
   // Kept equal to wrangler.jsonc's compatibility_date — two runtimes, one behavior vintage.
-  compatibilityDate: '2026-05-13',
+  compatibilityDate: '2026-10-01',
 
   nitro: {
     preset: 'cloudflare_module',
@@ -154,7 +154,9 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: [
         '@unhead/schema-org/vue',
-        'exifr'
+        'exifr',
+        'three',
+        'three/examples/jsm/loaders/GLTFLoader.js'
       ]
     },
     server: {
