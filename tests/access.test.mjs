@@ -18,6 +18,14 @@ test('the gate is case-insensitive, because the router is', () => {
   assert.equal(canAccessPage('doctor', '/LABS'), true)
 })
 
+test('the /ticker pet page: gated, full-access tier plus demo, not the doctor', () => {
+  assert.equal(isProtectedPage('/ticker'), true)
+  assert.equal(canAccessPage('owner', '/ticker'), true)
+  assert.equal(canAccessPage('friend', '/ticker'), true)
+  assert.equal(canAccessPage('demo', '/ticker'), true)
+  assert.equal(canAccessPage('doctor', '/ticker'), false, 'not on the clinical allowlist')
+})
+
 const ROLES = ['owner', 'friend', 'doctor', 'demo']
 
 /** path → the roles allowed to open it. Anything not listed is denied for that role. */

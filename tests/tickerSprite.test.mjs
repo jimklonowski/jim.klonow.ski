@@ -77,6 +77,13 @@ test('limbs and props connect to the heart (wave lines, steam and the sweat drop
   }
 })
 
+test('the pet poses: eating chews, the walk frames stride differently', () => {
+  const motions = new Set(tickerSprite('eating').cells.map(c => c.motion).filter(Boolean))
+  assert.ok(motions.has('jaw'), 'eating chews on the jaw cycle')
+  const limbs = pose => tickerSprite(pose).cells.map((c, i) => c.ink === 'limb' || c.ink === 'shoe' ? i : null).filter(n => n != null).join(',')
+  assert.notEqual(limbs('walk1'), limbs('walk2'), 'the stride alternates')
+})
+
 test('each pose looks different, and only the expected ones animate', () => {
   for (const figure of FIGURES) {
     const sig = pose => tickerSprite(pose, figure).cells.map(c => `${c.ink}:${c.motion}`).join('|')

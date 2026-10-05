@@ -3,7 +3,9 @@
 // on a 28×16 canvas; the 'face' figure (direction A, "hi-bit") is the heart alone, for tight spots.
 // Pure data: the component turns each cell's ink into a colour.
 
-export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline'] as const
+// The last four are the /ticker pet page's: eating (FEED replays the day's doses), the two
+// walk-cycle frames the page alternates while it trots, and the blissful petted face.
+export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted'] as const
 export type TickerPose = typeof TICKER_POSES[number]
 
 export type TickerInk
@@ -131,6 +133,27 @@ function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
       paint(grid, [[8, 6], [8, 7], [8, 8], [8, 9], [8, 10]], 'eye')
       paint(grid, [[9, 9], [10, 9]], 'tongue')
       break
+    case 'eating': // happy carets, mouth wide — the lower lip chews on the jaw cycle
+      paint(grid, [[4, 4], [5, 3], [5, 5], [4, 12], [5, 11], [5, 13]], 'eye')
+      paint(grid, BLUSH, 'blush')
+      paint(grid, [[8, 6], [8, 7], [8, 8], [8, 9], [8, 10], [9, 6], [9, 10]], 'eye')
+      paint(grid, [[10, 7], [10, 8], [10, 9]], 'eye', 'jaw')
+      paint(grid, [[9, 8]], 'tongue', 'jaw-tongue')
+      break
+    case 'walk1': // determined trot; the two frames swap which eye carries the glint
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'walk2':
+      eyes(grid, 4, 11, 4, 3, 1)
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'petted': // eyes shut in upward bliss arcs, wide smile, double blush
+      paint(grid, [[5, 3], [4, 4], [4, 5], [5, 6], [5, 10], [4, 11], [4, 12], [5, 13]], 'eye')
+      paint(grid, [...BLUSH, [6, 2], [6, 14]], 'blush')
+      paint(grid, [[8, 5], [9, 6], [9, 7], [9, 9], [9, 10], [8, 11]], 'eye')
+      paint(grid, [[9, 8]], 'tongue')
+      break
     default:
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, BLUSH, 'blush')
@@ -207,6 +230,41 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[8, 15], [8, 16], [8, 17]], 'limb')
       paint(grid, [[8, 18], [9, 18]], 'glove')
       legs(grid, false)
+      break
+    case 'eating': // one hand on the belly, the other lifting a capsule (clip ink) to the mouth
+      paint(grid, [[8, 1], [9, 2]], 'limb')
+      paint(grid, [[10, 2], [10, 3]], 'glove')
+      paint(grid, [[7, 16], [8, 16]], 'limb')
+      paint(grid, [[9, 14], [9, 15]], 'glove')
+      paint(grid, [[8, 15]], 'clip')
+      legs(grid, false)
+      break
+    case 'walk1': // left leg forward, right arm swinging ahead
+      paint(grid, [[7, 0], [8, -1]], 'limb')
+      paint(grid, [[9, -1], [9, -2]], 'glove')
+      paint(grid, [[7, 16], [7, 17]], 'limb')
+      paint(grid, [[6, 18], [7, 18]], 'glove')
+      paint(grid, [[13, 6], [14, 5]], 'limb')
+      paint(grid, [[15, 3], [15, 4]], 'shoe')
+      paint(grid, [[13, 10], [14, 11]], 'limb')
+      paint(grid, [[15, 12], [15, 13]], 'shoe')
+      break
+    case 'walk2': // the stride swapped
+      paint(grid, [[7, 0], [7, -1]], 'limb')
+      paint(grid, [[6, -2], [7, -2]], 'glove')
+      paint(grid, [[7, 16], [8, 17]], 'limb')
+      paint(grid, [[9, 17], [9, 18]], 'glove')
+      paint(grid, [[13, 6], [14, 6]], 'limb')
+      paint(grid, [[15, 6], [15, 7]], 'shoe')
+      paint(grid, [[13, 10], [14, 9]], 'limb')
+      paint(grid, [[15, 8], [15, 9]], 'shoe')
+      break
+    case 'petted': // hands to its cheeks, feet splayed in delight
+      paint(grid, [[7, 0], [6, -1]], 'limb')
+      paint(grid, [[5, -1], [5, -2]], 'glove')
+      paint(grid, [[7, 16], [6, 17]], 'limb')
+      paint(grid, [[5, 17], [5, 18]], 'glove')
+      legs(grid, true)
       break
     default: // waving hello
       paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')

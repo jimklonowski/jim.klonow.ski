@@ -87,6 +87,12 @@
         >
           all digests →
         </button>
+        <NuxtLink
+          to="/ticker"
+          class="self-start text-faint hover:text-accent"
+        >
+          visit ticker →
+        </NuxtLink>
         <!-- One line per digest, each with its own regenerate (owner only: it spends tokens).
              Beside the full figure a single "daily · weekly" line wrapped mid-phrase. A two-column
              grid (rows dissolve with `contents`) keeps both regen buttons in one column. -->
