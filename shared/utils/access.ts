@@ -80,6 +80,8 @@ export function isProtectedPage(path: string): boolean {
     || p === '/journal' || p.startsWith('/journal/')
     || p === '/tools' || p.startsWith('/tools/')
     || p === '/ask'
+    // The pet page reads the same journal/vitals the rest of the full-access tier does.
+    || p === '/ticker'
 }
 
 export function canAccessPage(role: Role, path: string): boolean {

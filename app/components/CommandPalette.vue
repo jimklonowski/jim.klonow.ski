@@ -138,7 +138,10 @@ const actionItems = computed(() => {
     items.push({ label: '+ log today', suffix: todayStr.value, onSelect: () => go(`/journal/${todayStr.value}`) })
   }
   if (isFullAccess.value) {
-    items.push({ label: 'view digests', suffix: 'ai recaps', onSelect: openDigests })
+    items.push(
+      { label: 'view digests', suffix: 'ai recaps', onSelect: openDigests },
+      { label: '♥ visit ticker', suffix: 'the resident companion', onSelect: () => go('/ticker') }
+    )
   }
   if (isOwner.value) {
     items.push(

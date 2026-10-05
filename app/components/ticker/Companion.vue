@@ -102,7 +102,12 @@ const props = withDefaults(defineProps<{
    * Off by default at 'md', where the heart has to fit tight spots like the phone header on /ask.
    */
   full?: boolean
-}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false })
+  /**
+   * Hold an exact pose — the /ticker pet page drives eating, the walk frames and the petted
+   * bliss through this. A one-shot event's pose still plays over it, then it resumes.
+   */
+  poseOverride?: TickerPose | null
+}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false, poseOverride: null })
 
 const isFull = computed(() => props.full || props.size === 'lg')
 
@@ -161,6 +166,7 @@ const pose = computed<TickerPose>(() => {
   if (activeEvent.value === 'celebrate') return 'happy'
   if (activeEvent.value === 'thump') return 'worried'
   if (activeEvent.value === 'flatline') return 'flatline'
+  if (props.poseOverride) return props.poseOverride
   if (props.mood) return props.mood
   return props.sluggish ? 'sleepy' : 'idle'
 })
