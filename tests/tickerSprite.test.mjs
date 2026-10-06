@@ -95,3 +95,59 @@ test('each pose looks different, and only the expected ones animate', () => {
     assert.ok(!motions('flatline').has('lid'), `${figure}: X eyes do not blink`)
   }
 })
+
+test('props compose over any pose, never over the heart, and only on the full figure', () => {
+  const plain = tickerSprite('idle')
+  const bowled = tickerSprite('idle', 'full', ['bowl-full'])
+  assert.deepEqual([bowled.cols, bowled.rows], [plain.cols, plain.rows], 'a bowl on the floor fits the base canvas')
+  const changed = bowled.cells.map((c, i) => (c.ink !== plain.cells[i].ink ? i : null)).filter(i => i != null)
+  assert.ok(changed.length > 0, 'the bowl is drawn')
+  for (const i of changed) assert.equal(BODY.has(plain.cells[i].ink), false, `cell ${i} was heart`)
+  const inks = s => s.cells.map(c => c.ink).join()
+  assert.notEqual(inks(tickerSprite('idle', 'full', ['bowl-empty'])), inks(bowled), 'full and empty bowls differ')
+  assert.deepEqual(tickerSprite('idle', 'face', ['bowl-full', 'party-hat']), tickerSprite('idle', 'face'), 'the face figure takes no props')
+  // Every pose keeps its own cells under a prop: only the prop's cells change.
+  for (const pose of TICKER_POSES) {
+    const bare = tickerSprite(pose)
+    const propped = tickerSprite(pose, 'full', ['bowl-empty'])
+    const diff = propped.cells.filter((c, i) => c.ink !== bare.cells[i].ink)
+    assert.ok(diff.every(c => c.ink === 'bowl'), `${pose}: only bowl cells differ`)
+  }
+})
+
+test('only wearables paint over the heart; everything else keeps every heart cell', () => {
+  const plain = tickerSprite('idle')
+  // Non-wearables: every body cell is where it was (allowing for rows added above the head).
+  for (const prop of ['dumbbell', 'helmet', 'disc', 'cap', 'crown', 'calendar', 'bowl-full', 'party-hat']) {
+    const s = tickerSprite('idle', 'full', [prop])
+    assert.equal(s.cols, plain.cols, `${prop}: no sideways growth`)
+    const dr = s.rows - plain.rows
+    plain.cells.forEach((c, i) => {
+      if (!BODY.has(c.ink)) return
+      const r = Math.floor(i / plain.cols)
+      const col = i % plain.cols
+      assert.deepEqual(s.cells[(r + dr) * s.cols + col], c, `${prop}: heart cell ${r},${col}`)
+    })
+  }
+  // Wearables change heart cells, nothing outside the base canvas, and the shades stop the blink.
+  for (const prop of ['sweatband', 'shades', 'medal', 'lab-coat']) {
+    const s = tickerSprite('idle', 'full', [prop])
+    assert.deepEqual([s.cols, s.rows], [plain.cols, plain.rows], `${prop}: base canvas`)
+    const over = s.cells.filter((c, i) => c.ink !== plain.cells[i].ink && BODY.has(plain.cells[i].ink))
+    assert.ok(over.length > 0, `${prop}: sits on the heart`)
+  }
+  assert.ok(!tickerSprite('idle', 'full', ['shades']).cells.some(c => c.motion === 'lid'), 'lenses cover the lids')
+  assert.ok(tickerSprite('idle', 'full', ['sweatband']).cells.some(c => c.motion === 'lid'), 'a sweatband leaves the eyes alone')
+})
+
+test('a prop above the head grows the canvas upward and leaves the figure where it stood', () => {
+  const plain = tickerSprite('idle')
+  const hatted = tickerSprite('idle', 'full', ['party-hat'])
+  assert.equal(hatted.cols, plain.cols)
+  assert.equal(hatted.rows, plain.rows + 3)
+  // The original cells sit three rows lower; the new rows hold nothing but the hat.
+  const shifted = hatted.cells.slice(3 * hatted.cols)
+  assert.deepEqual(shifted, plain.cells)
+  const hat = hatted.cells.slice(0, 3 * hatted.cols).filter(c => c.ink).map(c => c.ink)
+  assert.deepEqual(new Set(hat), new Set(['hat', 'glove']))
+})
