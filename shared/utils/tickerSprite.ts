@@ -3,14 +3,32 @@
 // on a 28×16 canvas; the 'face' figure (direction A, "hi-bit") is the heart alone, for tight spots.
 // Pure data: the component turns each cell's ink into a colour.
 
-// The last four are the /ticker pet page's: eating (FEED replays the day's doses), the two
-// walk-cycle frames the page alternates while it trots, and the blissful petted face.
-export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted'] as const
+// From 'eating' on they are the /ticker pet page's: eating (FEED replays the day's doses), the
+// two walk-cycle frames the page alternates while it trots, the blissful petted face, sitting
+// down to wait (a minute with nothing pressed), asleep (after bedtime), feverish (resting HR
+// well over its own two-week average), hungry (due doses still unlogged after dusk), nervous
+// (draw day) and impatient (a planned draw overdue — checking its watch).
+export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient'] as const
 export type TickerPose = typeof TICKER_POSES[number]
 
 export type TickerInk
   = 'rim' | 'red' | 'shade' | 'hi' | 'spec' | 'eye' | 'glint' | 'blush' | 'tongue' | 'drop'
-    | 'limb' | 'glove' | 'shoe' | 'clip' | 'line' | 'flag' | 'mug' | 'coffee'
+    | 'limb' | 'glove' | 'shoe' | 'clip' | 'line' | 'flag' | 'mug' | 'coffee' | 'bowl' | 'hat'
+
+/**
+ * Accessories the /ticker page composes over any pose — the props layer. Each is a set of cells
+ * painted after the limbs (full figure only); the canvas grows to fit one that reaches past it
+ * (a hat above the head), so the figure's feet stay put. Most props stay off the heart; the
+ * WEARABLES (a sweatband, shades, a medal, a lab coat) are the ones allowed to paint over it.
+ *
+ * Walk props (carried for the lap, by workout type): dumbbell, helmet, disc, cap. Earned
+ * (milestones): crown, sweatband, shades, medal. The vet visit: calendar, lab-coat.
+ */
+export type TickerProp
+  = 'bowl-empty' | 'bowl-full' | 'party-hat'
+    | 'dumbbell' | 'helmet' | 'disc' | 'cap'
+    | 'crown' | 'sweatband' | 'shades' | 'medal'
+    | 'calendar' | 'lab-coat'
 
 /** `lid`/`lid-glint` blink shut, `jaw`/`jaw-tongue` open and close while talking, `flicker` pulses. */
 export type TickerCellMotion = '' | 'lid' | 'lid-glint' | 'jaw' | 'jaw-tongue' | 'flicker'
@@ -154,6 +172,33 @@ function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
       paint(grid, [[8, 5], [9, 6], [9, 7], [9, 9], [9, 10], [8, 11]], 'eye')
       paint(grid, [[9, 8]], 'tongue')
       break
+    case 'sit': // content: ordinary eyes and a small cat mouth
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, BLUSH, 'blush')
+      paint(grid, [[8, 6], [9, 7], [8, 8], [9, 9], [8, 10]], 'eye')
+      break
+    case 'asleep': // eyes shut in soft downward arcs, a tiny open mouth, no blush
+      paint(grid, [[5, 3], [6, 4], [6, 5], [5, 6], [5, 10], [6, 11], [6, 12], [5, 13]], 'eye')
+      paint(grid, [[9, 8]], 'eye')
+      break
+    case 'feverish': // half-lidded, flushed, a flat mouth; the full figure adds the sweat
+      eyes(grid, 4, 11, 5, 2, 0)
+      paint(grid, BLUSH, 'blush')
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'hungry': // pale (no blush), a small frown
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, [[9, 6], [8, 7], [8, 8], [8, 9], [9, 10]], 'eye')
+      break
+    case 'nervous': // brows up, a small o of a mouth; the full figure adds sweat and clasped hands
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, [[3, 4], [2, 5], [2, 11], [3, 12]], 'rim')
+      paint(grid, [[9, 8]], 'eye')
+      break
+    case 'impatient': // eyes down and to the left, at the watch; a flat mouth
+      eyes(grid, 3, 10, 5, 2, 0)
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
     default:
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, BLUSH, 'blush')
@@ -170,6 +215,12 @@ function legs(grid: Grid, splayed: boolean) {
     paint(grid, [[13, 6], [14, 6], [13, 10], [14, 10]], 'limb')
     paint(grid, [[15, 5], [15, 6], [15, 10], [15, 11]], 'shoe')
   }
+}
+
+/** Legs straight out along the floor: the seat of the sit and asleep poses. */
+function sitLegs(grid: Grid) {
+  paint(grid, [[13, 6], [14, 5], [15, 4], [15, 3], [13, 10], [14, 11], [15, 12], [15, 13]], 'limb')
+  paint(grid, [[15, 1], [15, 2], [15, 14], [15, 15]], 'shoe')
 }
 
 function block(rows: [number, number], cols: [number, number]): Point[] {
@@ -266,6 +317,51 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[5, 17], [5, 18]], 'glove')
       legs(grid, true)
       break
+    case 'sit': // on the floor, hands on its knees
+      paint(grid, [[8, 1], [9, 2], [10, 3], [11, 4], [12, 4]], 'limb')
+      paint(grid, [[13, 4], [13, 5]], 'glove')
+      paint(grid, [[8, 15], [9, 14], [10, 13], [11, 12], [12, 12]], 'limb')
+      paint(grid, [[13, 11], [13, 12]], 'glove')
+      sitLegs(grid)
+      break
+    case 'asleep': // the same seat, arms hanging
+      paint(grid, [[8, 1], [9, 1], [10, 1], [11, 1]], 'limb')
+      paint(grid, [[12, 1], [12, 2]], 'glove')
+      paint(grid, [[8, 15], [9, 15], [10, 15], [11, 15]], 'limb')
+      paint(grid, [[12, 14], [12, 15]], 'glove')
+      sitLegs(grid)
+      break
+    case 'feverish': // one hand to its forehead, the other hanging, sweat beading on the left temple
+      paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
+      paint(grid, [[11, -2], [11, -1]], 'glove')
+      paint(grid, [[6, 17], [5, 18], [4, 18], [3, 17], [2, 17]], 'limb')
+      paint(grid, [[1, 15], [1, 16]], 'glove')
+      paint(grid, [[1, 0], [2, 0], [3, -1], [4, -1]], 'drop')
+      legs(grid, false)
+      break
+    case 'hungry': // one hand on its empty belly, the other hanging
+      paint(grid, [[8, 1], [9, 2]], 'limb')
+      paint(grid, [[10, 2], [10, 3]], 'glove')
+      paint(grid, [[8, 15], [9, 15], [10, 15], [11, 15]], 'limb')
+      paint(grid, [[12, 14], [12, 15]], 'glove')
+      legs(grid, false)
+      break
+    case 'nervous': // both hands clasped at its belly, sweat at the right temple
+      paint(grid, [[8, 1], [9, 2]], 'limb')
+      paint(grid, [[10, 2], [10, 3]], 'glove')
+      paint(grid, [[8, 15], [9, 14]], 'limb')
+      paint(grid, [[10, 13], [10, 14]], 'glove')
+      paint(grid, [[1, 17], [2, 17]], 'drop')
+      legs(grid, false)
+      break
+    case 'impatient': // checking the watch on its left wrist, the other hand on its hip
+      paint(grid, [[7, 0], [8, -1], [9, -1]], 'limb')
+      paint(grid, [[10, -1]], 'bowl')
+      paint(grid, [[10, 0], [10, 1]], 'glove')
+      paint(grid, [[7, 16], [8, 17], [9, 16]], 'limb')
+      paint(grid, [[9, 14], [9, 15]], 'glove')
+      legs(grid, false)
+      break
     default: // waving hello
       paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
       paint(grid, [[11, -2], [11, -1]], 'glove')
@@ -276,14 +372,71 @@ function limbs(grid: Grid, pose: TickerPose) {
   }
 }
 
-export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full'): TickerSprite {
+// --- props ---------------------------------------------------------------------------------------
+// Cells as [row, col, ink]. Rows above 0 and columns past the base canvas are allowed: the sprite
+// grows to hold them. A prop paints over limbs where they overlap (last painter wins); only the
+// WEARABLES may paint over the heart. Safe zones, free in every pose: above row 0 (hats), the
+// right floor from col 17 (the bowl), the left floor rows 14–15 (the worried clipboard reaches
+// row 13), and the right shoulder rows 2–4 cols 17–21 during the walk frames.
+
+type PropCell = [number, number, TickerInk]
+
+const fill = (rows: [number, number], cols: [number, number], ink: TickerInk): PropCell[] =>
+  block(rows, cols).map(([r, c]) => [r, c, ink])
+
+// A dish on the floor to the figure's right; the capsules in it are the same 'clip' ink FEED
+// lifts to its mouth.
+const BOWL: PropCell[] = [[14, 19, 'bowl'], [14, 23, 'bowl'], ...fill([15, 15], [19, 23], 'bowl')]
+
+const PROPS: Record<TickerProp, PropCell[]> = {
+  'bowl-empty': BOWL,
+  'bowl-full': [...BOWL, [14, 20, 'clip'], [14, 21, 'clip'], [14, 22, 'clip'], [13, 21, 'clip']],
+  // Hats sit on the left lobe (one at a time — the page picks); the helmet on the right lobe.
+  'party-hat': [[-3, 5, 'glove'], [-2, 4, 'hat'], [-2, 5, 'hat'], ...fill([-1, -1], [3, 6], 'hat')],
+  'crown': [[-3, 4, 'glove'], [-2, 2, 'clip'], [-2, 4, 'clip'], [-2, 6, 'clip'], ...fill([-1, -1], [2, 6], 'clip')],
+  'cap': [[-2, 4, 'shoe'], [-2, 5, 'shoe'], ...fill([-1, -1], [3, 8], 'shoe')], // the visor points the way it walks
+  'helmet': [[-2, 11, 'bowl'], [-2, 12, 'bowl'], ...fill([-1, -1], [10, 13], 'bowl')],
+  // Carried for the lap: a bar across the right shoulder, a disc in flight ahead.
+  'dumbbell': [...fill([2, 4], [17, 17], 'bowl'), ...fill([2, 4], [21, 21], 'bowl'), ...fill([3, 3], [18, 20], 'limb')],
+  'disc': [[4, 22, 'shoe'], ...fill([5, 5], [21, 23], 'shoe')],
+  // Wearables: a white band across the brow, black lenses with a bridge, a medal on a ribbon
+  // below the mouth, a coat's lapels and hem.
+  'sweatband': fill([2, 2], [1, 15], 'glove'),
+  'shades': [...fill([4, 6], [3, 6], 'eye'), ...fill([4, 6], [10, 13], 'eye'), [4, 7, 'rim'], [4, 8, 'rim'], [4, 9, 'rim']],
+  'medal': [[11, 7, 'line'], [11, 9, 'line'], [12, 7, 'clip'], [12, 8, 'clip'], [12, 9, 'clip'], [13, 8, 'clip']],
+  'lab-coat': [[7, 2, 'glove'], [8, 3, 'glove'], [9, 4, 'glove'], [7, 14, 'glove'], [8, 13, 'glove'], [9, 12, 'glove'], [12, 6, 'glove'], [12, 10, 'glove'], [13, 7, 'glove'], [13, 9, 'glove']],
+  // A page with a red header, standing on the left floor.
+  'calendar': [...fill([14, 14], [-4, -2], 'flag'), ...fill([15, 15], [-4, -2], 'glove'), [15, -3, 'eye']]
+}
+
+const WEARABLES = new Set<TickerProp>(['sweatband', 'shades', 'medal', 'lab-coat'])
+
+export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full', props: TickerProp[] = []): TickerSprite {
   const grid = body()
   face(grid, pose, figure)
   if (figure === 'full') limbs(grid, pose)
-  const { colMin, cols, rows } = CANVAS[figure]
+
+  const base = CANVAS[figure]
+  const bounds = { rMin: 0, rMax: base.rows - 1, cMin: base.colMin, cMax: base.colMin + base.cols - 1 }
+  if (figure === 'full') {
+    for (const prop of props) {
+      const wearable = WEARABLES.has(prop)
+      for (const [r, c, ink] of PROPS[prop]) {
+        if (!wearable && inHeart(r, c)) continue
+        grid.set(at(r, c), { ink, motion: '' })
+        bounds.rMin = Math.min(bounds.rMin, r)
+        bounds.rMax = Math.max(bounds.rMax, r)
+        bounds.cMin = Math.min(bounds.cMin, c)
+        bounds.cMax = Math.max(bounds.cMax, c)
+      }
+    }
+  }
+
+  const cols = bounds.cMax - bounds.cMin + 1
+  const rows = bounds.rMax - bounds.rMin + 1
   const cells: TickerCell[] = []
-  for (let r = 0; r < rows; r++) {
-    for (let c = colMin; c < colMin + cols; c++) {
+  for (let r = bounds.rMin; r <= bounds.rMax; r++) {
+    for (let c = bounds.cMin; c <= bounds.cMax; c++) {
       cells.push(grid.get(at(r, c)) ?? { ink: null, motion: '' })
     }
   }

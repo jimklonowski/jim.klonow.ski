@@ -1,7 +1,7 @@
 <template>
   <div
     class="ticker select-none cursor-pointer"
-    :class="[activeEvent ? `ev-${activeEvent}` : mood ? `mood-${mood}` : '', `size-${size}`, { sluggish, full: isFull }]"
+    :class="[activeEvent ? `ev-${activeEvent}` : mood ? `mood-${mood}` : '', `size-${size}`, { sluggish: dozing, blink: blinking, full: isFull }]"
     :style="{ '--beat': `${beatSeconds}s` }"
     role="button"
     tabindex="0"
@@ -78,14 +78,20 @@
 // below and JS-triggered event one-shots (double-beat, celebration, thump, flatline gag) that
 // each strike a pose. Pure CSS/SVG, no assets.
 import { TICKER_POSES, tickerSprite } from '#shared/utils/tickerSprite'
-import type { TickerFigure, TickerPose, TickerSprite } from '#shared/utils/tickerSprite'
+import type { TickerFigure, TickerPose, TickerProp, TickerSprite } from '#shared/utils/tickerSprite'
 
 const props = withDefaults(defineProps<{
-  /** Latest resting HR reading — drives the beat (clamped 40–100 bpm). */
+  /**
+   * Heart rate the beat runs at, clamped 40–170 bpm. Hosts pass the latest resting reading; the
+   * /ticker walk hands over a workout's average for the length of the lap.
+   */
   rhr?: number | null
   /** Short-sleep state: visual beat slows to 45 bpm, heavy lids (and the coffee when full), zzz. */
   sluggish?: boolean
-  /** Replaces the "♥ N bpm live" caption where there is no live reading to show (error page). */
+  /**
+   * Replaces the "♥ N bpm live" caption where there is no live reading to show (error page), or
+   * where the beat isn't the live one (the /ticker walk says whose heart rate it is).
+   */
   caption?: string | null
   /** Accessible name — says what clicking the heart does in this context. */
   ariaLabel?: string
@@ -103,21 +109,25 @@ const props = withDefaults(defineProps<{
    */
   full?: boolean
   /**
-   * Hold an exact pose — the /ticker pet page drives eating, the walk frames and the petted
-   * bliss through this. A one-shot event's pose still plays over it, then it resumes.
+   * Hold an exact pose — the /ticker pet page drives eating, the walk frames, the petted bliss,
+   * sitting and sleeping through this. A one-shot event's pose still plays over it, then it
+   * resumes. 'asleep' also slows the beat and floats the zzz, like the short-sleep state.
    */
   poseOverride?: TickerPose | null
-}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false, poseOverride: null })
+  /** Props composed over whatever pose is showing (full figure only): the /ticker food bowl, the birthday hat. */
+  accessories?: TickerProp[]
+}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false, poseOverride: null, accessories: () => [] })
 
 const isFull = computed(() => props.full || props.size === 'lg')
+const dozing = computed(() => props.sluggish || props.poseOverride === 'asleep')
 
 const emit = defineEmits<{ open: [] }>()
 
 const beatSeconds = computed(() => {
-  if (props.sluggish) return 60 / 45
-  const resting = 60 / Math.min(100, Math.max(40, props.rhr ?? 63))
+  if (dozing.value) return 60 / 45
+  const base = 60 / Math.min(170, Math.max(40, props.rhr ?? 63))
   // Talking gets the heart going a little — a quarter faster than resting.
-  return props.mood === 'talking' ? resting * 0.75 : resting
+  return props.mood === 'talking' ? base * 0.75 : base
 })
 
 const bpmLabel = computed(() => {
@@ -149,9 +159,26 @@ function trigger(event: TickerEvent) {
   }, DURATION[event])
 }
 
-onUnmounted(() => clearTimeout(eventTimer))
+// A double blink on demand (the /ticker fidgets). Kept apart from the events so it never knocks
+// a held mood's class off; and because it replaces the slow lid animation for half a second, the
+// idle blink cycle restarts afterwards — which is the point: the blinking stops being a metronome.
+const blinking = ref(false)
+let blinkTimer: ReturnType<typeof setTimeout> | undefined
 
-defineExpose({ trigger })
+function blink() {
+  if (blinking.value) return
+  blinking.value = true
+  blinkTimer = setTimeout(() => {
+    blinking.value = false
+  }, 440)
+}
+
+onUnmounted(() => {
+  clearTimeout(eventTimer)
+  clearTimeout(blinkTimer)
+})
+
+defineExpose({ trigger, blink })
 
 // --- Poses -----------------------------------------------------------------
 // Events that have a pose win over the held mood, and the mood over the short-sleep slump;
@@ -171,7 +198,13 @@ const pose = computed<TickerPose>(() => {
   return props.sluggish ? 'sleepy' : 'idle'
 })
 
-const sprite = computed(() => SPRITES[isFull.value ? 'full' : 'face'][pose.value])
+// Bare poses come from the cache; with props the sprite is composed on the fly (a few hundred cells).
+const sprite = computed(() => {
+  const figure: TickerFigure = isFull.value ? 'full' : 'face'
+  return figure === 'full' && props.accessories.length
+    ? tickerSprite(pose.value, figure, props.accessories)
+    : SPRITES[figure][pose.value]
+})
 
 // EKG polyline per state. The dash sweep uses a fixed dasharray (~92, matching the
 // reference demo) so all variants share one animation.
@@ -238,6 +271,8 @@ const ekgPoints = computed(() => {
 .ink-flag { background: var(--heart); }
 .ink-mug { background: var(--color-ember); }
 .ink-coffee { background: #5a3424; }
+.ink-bowl { background: #6f8aa0; }
+.ink-hat { background: #c084fc; }
 
 /* Blinks close the top rows of each eye onto the bottom one. */
 .mo-lid { animation: ticker-lid 4.7s linear infinite; }
@@ -249,6 +284,17 @@ const ekgPoints = computed(() => {
 @keyframes ticker-lid-glint {
   0%, 92%, 100% { background: var(--color-hi); }
   94%, 98% { background: var(--heart); }
+}
+/* blink(): shut–open–shut–open on a step cycle; the regular lid cycle resumes from zero after. */
+.blink .mo-lid { animation: ticker-blink-twice 0.44s steps(1); }
+.blink .mo-lid-glint { animation: ticker-blink-twice-glint 0.44s steps(1); }
+@keyframes ticker-blink-twice {
+  0%, 40% { background: var(--heart); }
+  20%, 60%, 100% { background: var(--ticker-eye); }
+}
+@keyframes ticker-blink-twice-glint {
+  0%, 40% { background: var(--heart); }
+  20%, 60%, 100% { background: var(--color-hi); }
 }
 /* Talking: the lower lip and tongue flap shut on a fast cycle. */
 .mo-jaw { animation: ticker-jaw 0.42s steps(1) infinite; }
