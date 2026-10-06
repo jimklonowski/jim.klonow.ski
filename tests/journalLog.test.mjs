@@ -2,7 +2,7 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isLoggedDay, loggedStreak } from '../shared/utils/journalLog.ts'
+import { isLoggedDay, loggedStreak, longestLoggedStreak } from '../shared/utils/journalLog.ts'
 
 const vitalsOnly = date => ({ date, weight_lbs: 190.2, rhr: 52, hrv: 61, peptides: [], reconstitutions: [], food: {}, sodas: [], notes: '' })
 const dosed = date => ({ ...vitalsOnly(date), peptides: [{ compound: 'HGH', dose: 2.5, unit: 'iu' }] })
@@ -47,4 +47,17 @@ test('month boundaries and empty input', () => {
   const entries = ['2026-08-30', '2026-08-31', '2026-09-01'].map(dosed)
   assert.equal(loggedStreak(entries, '2026-09-01'), 3)
   assert.equal(loggedStreak([], '2026-09-01'), 0)
+})
+
+test('the longest streak is the best run anywhere in the history, with the day it ended', () => {
+  const entries = ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-10', '2026-08-11', '2026-09-20'].map(dosed)
+  assert.deepEqual(longestLoggedStreak(entries), { days: 3, end: '2026-08-03' })
+  // A later run of the same length does not displace the first; a vitals-only day splits a run.
+  const tied = [...entries, dosed('2026-09-21'), dosed('2026-09-22')]
+  assert.deepEqual(longestLoggedStreak(tied), { days: 3, end: '2026-08-03' })
+  const split = ['2026-09-18', '2026-09-19', '2026-09-20'].map(dosed)
+  split[1] = vitalsOnly('2026-09-19')
+  assert.deepEqual(longestLoggedStreak(split), { days: 1, end: '2026-09-18' })
+  assert.deepEqual(longestLoggedStreak([vitalsOnly('2026-08-01')]), { days: 0, end: null })
+  assert.deepEqual(longestLoggedStreak([]), { days: 0, end: null })
 })

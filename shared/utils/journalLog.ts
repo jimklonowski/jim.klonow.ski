@@ -58,3 +58,20 @@ export function loggedStreak(entries: Array<LoggedDayFields & { date: string }>,
   }
   return count
 }
+
+/**
+ * The longest run of consecutive logged days anywhere in the history and the day it ended on —
+ * the record the /ticker pet quotes. Zero days and no end before the first logged day.
+ */
+export function longestLoggedStreak(entries: Array<LoggedDayFields & { date: string }>): { days: number, end: string | null } {
+  const logged = [...new Set(entries.filter(isLoggedDay).map(e => e.date))].sort()
+  let best: { days: number, end: string | null } = { days: 0, end: null }
+  let run = 0
+  let prev: string | null = null
+  for (const date of logged) {
+    run = prev && shiftDays(prev, 1) === date ? run + 1 : 1
+    if (run > best.days) best = { days: run, end: date }
+    prev = date
+  }
+  return best
+}

@@ -2,6 +2,7 @@
 import type { H3Event } from 'h3'
 import type { AuthContext } from './auth'
 import { normalizeForm } from '#shared/utils/vialForm'
+import { normalizeWorkoutType } from '#shared/utils/workoutTypes'
 import { zDateRange } from '#shared/utils/schemas'
 import type { CheckpointKey } from '#shared/utils/cycles'
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
@@ -288,6 +289,9 @@ export interface WorkoutUpsert {
 // overlapping windows on a schedule — so id-less rows are deduped on their natural key
 // (date + start_time + workout_type) instead of inserted unconditionally.
 export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<void> {
+  // One spelling per activity whichever source wrote it: Whoop's "disc-golf" and Apple's "Disc
+  // Sports" both land as "Disc Golf", so the read-time merge can't flip the label between syncs.
+  const workoutType = normalizeWorkoutType(w.workout_type)
   if (w.external_id) {
     await db.prepare(`
       INSERT INTO workouts (external_id, date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
@@ -301,14 +305,14 @@ export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<v
         avg_hr = excluded.avg_hr,
         max_hr = excluded.max_hr,
         distance_mi = excluded.distance_mi
-    `).bind(w.external_id, w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+    `).bind(w.external_id, w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
   }
   else {
     // `IS` instead of `=` so NULL start_time/workout_type still match their own kind.
     const existing = await db.prepare(`
       SELECT id FROM workouts
       WHERE external_id IS NULL AND date = ?1 AND start_time IS ?2 AND workout_type IS ?3
-    `).bind(w.date, w.start_time, w.workout_type).first<{ id: number }>()
+    `).bind(w.date, w.start_time, workoutType).first<{ id: number }>()
 
     if (existing) {
       await db.prepare(`
@@ -320,7 +324,7 @@ export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<v
       await db.prepare(`
         INSERT INTO workouts (date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-      `).bind(w.date, w.workout_type, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+      `).bind(w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
     }
   }
 }
