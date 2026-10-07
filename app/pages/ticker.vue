@@ -55,7 +55,7 @@
 
       <!-- the floor, measured from the figure's feet so the bowl and calendar stand on it too;
            the bed behind it after dusk (it sits on the mattress once it's asleep) -->
-      <template v-if="floorY != null">
+      <template v-if="floorY != null && !playing">
         <div
           class="floor"
           :style="{ bottom: `${floorY}px` }"
@@ -72,7 +72,20 @@
         </div>
       </template>
 
+      <!-- the runner takes the stage over for a game; the figure comes back when it quits -->
+      <TickerRunner
+        v-if="playing"
+        ref="runner"
+        :build="build"
+        :accessories="worn"
+        :night="night"
+        :hi="runnerHi?.score ?? 0"
+        @over="onRunOver"
+        @quit="onRunQuit"
+      />
+
       <div
+        v-else
         class="absolute bottom-9 left-1/2 transition-none"
         :style="{ transform: `translateX(calc(-50% + ${x}px)) scaleX(${facing})` }"
       >
@@ -145,7 +158,15 @@
       >
         ⊳ WALK{{ workoutMinutes ? ` · ${workoutMinutes}m` : '' }}
       </button>
-      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feeding and walking replay what's logged</span>
+      <button
+        type="button"
+        class="tui-btn disabled:opacity-50"
+        :disabled="busy && !playing"
+        @click="playing ? runner?.quit() : play()"
+      >
+        {{ playing ? '■ QUIT' : `⊳ PLAY${runnerHi ? ` · HI ${runnerHi.score}` : ''}` }}
+      </button>
+      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feeding and walking replay what's logged; play is just play</span>
     </div>
 
     <!-- Stats -->
@@ -425,6 +446,7 @@ const records = computed(() => {
   if (night) lines.push(`best night: ${fmtSleep(night.value)} on ${when(night.item.date)}.`)
   const calm = best(entries.value, e => e.rhr, 'min')
   if (calm) lines.push(`lowest resting HR: ${calm.value} bpm on ${when(calm.item.date)}.`)
+  if (runnerHi.value) lines.push(`best run: ${runnerHi.value.score} points on ${when(runnerHi.value.date)}.`)
   return lines
 })
 
@@ -811,6 +833,64 @@ async function talk() {
   busy.value = false
 }
 
+// --- play: the runner ------------------------------------------------------------------------
+// The one thing on the page that is not read from the data. The runner takes the stage over,
+// the pet counts as busy for the duration (no fidgets, the other buttons wait), and the high
+// score lives in this browser like the pet counter — a new one gets the hop and a line.
+
+const runner = useTemplateRef('runner')
+const playing = ref(false)
+const RUNNER_KEY = 'ticker:runner'
+const runnerHi = ref<{ score: number, date: string } | null>(null)
+let runSetRecord = false
+
+onMounted(() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RUNNER_KEY) ?? 'null') as { score?: number, date?: string } | null
+    if (raw?.score && raw.date) runnerHi.value = { score: raw.score, date: raw.date }
+  }
+  catch { /* no storage — no record to beat, then */ }
+})
+
+/** What it runs in: the wearables and the hat, not the floor props or the vet's coat. */
+const worn = computed(() => accessories.value.filter(a => !['bowl-empty', 'bowl-full', 'calendar', 'lab-coat'].includes(a)))
+
+function play() {
+  if (busy.value) return
+  wake()
+  busy.value = true
+  runSetRecord = false
+  playing.value = true
+  line.value = 'space or tap to run. esc quits.'
+}
+
+function onRunOver(score: number) {
+  if (score > (runnerHi.value?.score ?? 0)) {
+    runnerHi.value = { score, date: today.value }
+    record(RUNNER_KEY, JSON.stringify(runnerHi.value))
+    runSetRecord = true
+  }
+}
+
+async function onRunQuit(score: number) {
+  playing.value = false
+  busy.value = false
+  await nextTick()
+  measureFloor()
+  const best = runnerHi.value
+  if (runSetRecord && best) {
+    line.value = `new best: ${best.score} points. ♥`
+    pet.value?.trigger('celebrate')
+    for (let i = 0; i < 5; i++) timers.push(setTimeout(() => spawnHeart(Math.random() * 120 - 60), i * 150))
+  }
+  else if (score > 0 && best) {
+    line.value = `${score} points. best ${best.score} on ${formatDate(best.date, 'monthDay')} — it's still catching its breath.`
+  }
+  else {
+    line.value = 'next time.'
+  }
+}
+
 // --- fidgets: what it does when nobody is doing anything --------------------------------------
 // A loose timer, never during an action or while asleep: mostly a double blink (which also knocks
 // the regular blink cycle off its metronome), sometimes a chin scratch or a look over its
@@ -942,6 +1022,8 @@ function arrivalLine(): string {
     return `happy birthday — TICKER turns ${birthday.value} today. (first data point: ${hatched})`
   }
   if (fever.value) return `rhr ${fever.value.rhr} — ${fever.value.over} over its two-week average. it's running hot; go easy today`
+  if (awayDays.value >= 7) return `it's been ${awayDays.value} days. it stopped counting at a week. (it didn't.)`
+  if (awayDays.value >= 3) return `it's been ${awayDays.value} days. it sat down on day one and waited.`
   if (hunger.value === 'hungry') return `past dinner and ${missingNames.value} ${missing.value.length === 1 ? 'isn\'t' : 'aren\'t'} logged — TICKER is hungry`
   if (sluggish.value) {
     const slept = sleepMin.value != null ? `${fmtSleep(sleepMin.value)} last night` : 'short night'
@@ -1036,6 +1118,117 @@ function resultsLanded() {
   pet.value?.trigger(flags ? 'thump' : 'celebrate')
 }
 
+// --- what changed since its last look ---------------------------------------------------------
+// A snapshot of the figures TICKER saw last visit, kept per browser. On arrival the difference
+// is its news — a broken streak, a new scan, a cycle under way, a draw booked, workouts, weight,
+// days logged — at most three items, in that order of how much they matter. Absence shows too:
+// three days unseen and it has sat down to wait.
+
+interface Snapshot {
+  v: 1
+  date: string
+  streak: number
+  loggedDays: number
+  weight: number | null
+  workouts: number
+  scanDate: string | null
+  arms: 'lean' | 'built'
+  plannedIds: number[]
+  activeCycleId: number | null
+}
+const SNAPSHOT_KEY = 'ticker:snapshot'
+
+const activeCycle = computed(() => {
+  const c = relevantCycle(cyclesData.value ?? [], today.value)
+  return c && cycleStatusOn(c, today.value) === 'active' ? c : null
+})
+
+function snapshotNow(): Snapshot {
+  return {
+    v: 1,
+    date: today.value,
+    streak: streak.value,
+    loggedDays: loggedDays.value,
+    weight: weight.value,
+    workouts: (workoutsData.value ?? []).length,
+    scanDate: latestScan.value?.date ?? null,
+    arms: arms.value,
+    plannedIds: (plannedData.value ?? []).map(p => p.id),
+    activeCycleId: activeCycle.value?.id ?? null
+  }
+}
+
+function loadSnapshot(): Snapshot | null {
+  try {
+    const s = JSON.parse(localStorage.getItem(SNAPSHOT_KEY) ?? 'null') as Snapshot | null
+    return s?.v === 1 ? s : null
+  }
+  catch {
+    return null
+  }
+}
+
+const lastVisit = ref<Snapshot | null>(null)
+const awayDays = computed(() => lastVisit.value ? diffDays(lastVisit.value.date, today.value) : 0)
+
+interface News { line: string, pose?: TickerPose, event?: 'celebrate' | 'thump' }
+
+function newsSince(snap: Snapshot): News[] {
+  const news: News[] = []
+  const broke = snap.streak >= 3 && streak.value < snap.streak
+  if (broke) {
+    news.push({ line: `the ${snap.streak}-day streak broke while it wasn't looking. ${streak.value} now — it'll count again.`, pose: 'worried' })
+  }
+  const scan = latestScan.value
+  if (scan && scan.date !== snap.scanDate) {
+    const prev = scans.value.at(-2)
+    const bf = scan.total.body_fat_pct
+    const parts = [`new scan ${formatDate(scan.date, 'monthDay')}: body fat ${bf}%${prev ? ` (${prev.total.body_fat_pct}% before)` : ''}`]
+    if (prev) {
+      const d = Math.round((scan.total.lean_mass_lbs - prev.total.lean_mass_lbs) * 10) / 10
+      parts.push(`lean ${d >= 0 ? '+' : ''}${d} lb`)
+    }
+    const better = !prev || bf < prev.total.body_fat_pct || scan.total.lean_mass_lbs > prev.total.lean_mass_lbs
+    const armsNews = arms.value === 'built' && snap.arms !== 'built' ? ' …and the arms filled in.' : ''
+    news.push({ line: `${parts.join(', ')}.${armsNews}`, event: better ? 'celebrate' : undefined, pose: better ? undefined : 'thinking' })
+  }
+  const cycle = activeCycle.value
+  if (cycle && cycle.id !== snap.activeCycleId) {
+    const p = cycleProgress(cycle, today.value)
+    news.push({ line: `the ${cycle.name} cycle is under way — week ${p.week} of ${p.totalWeeks}.`, event: 'celebrate' })
+  }
+  const booked = (plannedData.value ?? [])
+    .filter(p => !snap.plannedIds.includes(p.id) && p.date >= today.value)
+    .sort((a, b) => a.date.localeCompare(b.date))[0]
+  if (booked) {
+    news.push({ line: `a draw's been booked — ${drawLabel(booked)}, ${countdownLabel(diffDays(today.value, booked.date))}. it marked the calendar.`, pose: 'nervous' })
+  }
+  const workouts = workoutsData.value ?? []
+  const newWorkouts = workouts.length - snap.workouts
+  if (newWorkouts >= 1) {
+    const minutes = Math.round(workouts.filter(w => w.date >= snap.date).reduce((s, w) => s + (w.duration_min ?? 0), 0))
+    news.push({ line: `${newWorkouts} workout${newWorkouts === 1 ? '' : 's'} since its last look${minutes ? ` — ${minutes} min` : ''}. WALK walks it off.`, pose: 'happy' })
+  }
+  if (snap.weight != null && weight.value != null) {
+    const d = Math.round((weight.value - snap.weight) * 10) / 10
+    if (Math.abs(d) >= 1.5) news.push({ line: `${d < 0 ? 'down' : 'up'} ${Math.abs(d)} lb since its last look — ${snap.weight} → ${weight.value}.`, pose: 'thinking' })
+  }
+  const newDays = loggedDays.value - snap.loggedDays
+  if (!broke && newDays >= 2) {
+    news.push({ line: `${newDays} days logged since its last look — ${streak.value} in a row now.`, event: newDays >= 5 ? 'celebrate' : undefined })
+  }
+  return news.slice(0, 3)
+}
+
+async function tell(item: News) {
+  line.value = item.line
+  if (item.event) pet.value?.trigger(item.event)
+  if (!item.pose || busy.value) return
+  actionPose.value = item.pose
+  await wait(1500)
+  if (actionPose.value === item.pose) actionPose.value = null
+}
+
 // A clean week: one salute a day while it lasts (the gold star stays on regardless).
 const SALUTE_KEY = 'ticker:saluted'
 
@@ -1070,17 +1263,22 @@ function announceUnlocks() {
 
 // Greet (the clock above has ticked by now, so a late visit finds it asleep), then react to each
 // thing that has happened in turn once it has settled in — the home digest's stagger, then a
-// beat between reactions so each line gets read.
+// beat between reactions so each line gets read. The snapshot is written last, so the next
+// visit's news starts from what it saw today.
 onMounted(() => {
   quoteIdx = Math.floor(Math.random() * 1000)
+  lastVisit.value = loadSnapshot()
+  if (awayDays.value >= 3) sitting.value = true // it sat down to wait; any press stands it up
   line.value = arrivalLine()
   const reactions: Array<() => void> = []
   if (sodasToday.value) reactions.push(flinch)
+  if (lastVisit.value) for (const item of newsSince(lastVisit.value)) reactions.push(() => tell(item))
   if (birthday.value && firstTime(BIRTHDAY_KEY, today.value)) reactions.push(celebrateBirthday)
   if (landedPending.value) reactions.push(resultsLanded)
   if (cleanWeek.value && firstTime(SALUTE_KEY, today.value)) reactions.push(salute)
   if (freshUnlocks.value.length) reactions.push(announceUnlocks)
   reactions.forEach((react, i) => timers.push(setTimeout(react, 800 + i * 2200)))
+  record(SNAPSHOT_KEY, JSON.stringify(snapshotNow()))
 })
 </script>
 
