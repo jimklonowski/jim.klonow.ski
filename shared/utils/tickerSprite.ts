@@ -7,9 +7,25 @@
 // two walk-cycle frames the page alternates while it trots, the blissful petted face, sitting
 // down to wait (a minute with nothing pressed), asleep (after bedtime), feverish (resting HR
 // well over its own two-week average), hungry (due doses still unlogged after dusk), nervous
-// (draw day) and impatient (a planned draw overdue — checking its watch).
-export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient'] as const
+// (draw day), impatient (a planned draw overdue — checking its watch) and salute (a clean week
+// of doses).
+export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute'] as const
 export type TickerPose = typeof TICKER_POSES[number]
+
+/**
+ * The figure's build — the body under the pose, read from the data. The tier is how much has
+ * been logged: a hatchling has no limbs yet, the grown figure is the one every pose describes,
+ * an elder leans on a cane in the poses whose left arm hangs. 'built' arms are drawn two cells
+ * thick (lean mass up since the first DEXA scan). The belly is the body-fat read: a soft
+ * highlight when it is high, lines of definition when it is low, nothing in between.
+ */
+export type TickerTier = 'hatchling' | 'grown' | 'elder'
+export type TickerBelly = 'soft' | 'lean' | 'cut'
+export interface TickerBuild {
+  tier?: TickerTier
+  arms?: 'lean' | 'built'
+  belly?: TickerBelly
+}
 
 export type TickerInk
   = 'rim' | 'red' | 'shade' | 'hi' | 'spec' | 'eye' | 'glint' | 'blush' | 'tongue' | 'drop'
@@ -27,7 +43,7 @@ export type TickerInk
 export type TickerProp
   = 'bowl-empty' | 'bowl-full' | 'party-hat'
     | 'dumbbell' | 'helmet' | 'disc' | 'cap'
-    | 'crown' | 'sweatband' | 'shades' | 'medal'
+    | 'crown' | 'sweatband' | 'shades' | 'medal' | 'gold-star'
     | 'calendar' | 'lab-coat'
 
 /** `lid`/`lid-glint` blink shut, `jaw`/`jaw-tongue` open and close while talking, `flicker` pulses. */
@@ -199,6 +215,11 @@ function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
       eyes(grid, 3, 10, 5, 2, 0)
       paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
       break
+    case 'salute': // attentive: straight brows, a flat determined mouth
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, [[3, 4], [3, 5], [3, 11], [3, 12]], 'rim')
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
     default:
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, BLUSH, 'blush')
@@ -362,6 +383,13 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[9, 14], [9, 15]], 'glove')
       legs(grid, false)
       break
+    case 'salute': // right hand to the brow, the left arm straight down at its side
+      paint(grid, [[7, 0], [8, 0], [9, 0], [10, 0]], 'limb')
+      paint(grid, [[11, -1], [11, 0]], 'glove')
+      paint(grid, [[6, 17], [5, 18], [4, 18]], 'limb')
+      paint(grid, [[3, 17], [2, 16]], 'glove')
+      legs(grid, false)
+      break
     default: // waving hello
       paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
       paint(grid, [[11, -2], [11, -1]], 'glove')
@@ -370,6 +398,39 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[1, 21], [3, 21]], 'line', 'flicker')
       legs(grid, false)
   }
+}
+
+// --- build -------------------------------------------------------------------------------------
+
+/** The poses whose left arm is the plain hanging one — where an elder's cane goes. */
+const CANE_POSES = new Set<TickerPose>(['idle', 'feverish'])
+
+/** The hanging left hand grips a cane instead: the handle at the glove, the shaft to the floor. */
+function cane(grid: Grid) {
+  grid.delete(at(11, -1))
+  paint(grid, [[10, -2], [10, -1]], 'glove')
+  paint(grid, [[10, -3], [11, -2], [12, -2], [13, -2], [14, -2], [15, -2]], 'coffee')
+}
+
+/** Built arms: every arm cell gains a neighbour toward the body, so the limb reads two cells thick. */
+function thicken(grid: Grid) {
+  const extra: Point[] = []
+  for (const [key, cell] of grid) {
+    if (cell.ink !== 'limb') continue
+    const [r, c] = key.split(',').map(Number) as [number, number]
+    if (r >= 13) continue // legs stay as they are
+    const n: Point = [r, c < 8 ? c + 1 : c - 1]
+    if (inHeart(n[0], n[1]) || grid.has(at(n[0], n[1]))) continue
+    extra.push(n)
+  }
+  paint(grid, extra, 'limb')
+}
+
+/** The lower heart by body fat: a lighter round patch when soft, one crease of definition down
+ * the middle when cut (the heart is only five cells wide there — two creases read as a band). */
+function belly(grid: Grid, read: TickerBelly) {
+  if (read === 'soft') paint(grid, [[11, 6], [11, 7], [11, 8], [11, 9], [11, 10], [12, 7], [12, 8], [12, 9]], 'hi')
+  else if (read === 'cut') paint(grid, [[11, 8], [12, 8]], 'rim')
 }
 
 // --- props ---------------------------------------------------------------------------------------
@@ -404,17 +465,24 @@ const PROPS: Record<TickerProp, PropCell[]> = {
   'sweatband': fill([2, 2], [1, 15], 'glove'),
   'shades': [...fill([4, 6], [3, 6], 'eye'), ...fill([4, 6], [10, 13], 'eye'), [4, 7, 'rim'], [4, 8, 'rim'], [4, 9, 'rim']],
   'medal': [[11, 7, 'line'], [11, 9, 'line'], [12, 7, 'clip'], [12, 8, 'clip'], [12, 9, 'clip'], [13, 8, 'clip']],
+  // A gold star stuck on the right cheek — the sticker-chart kind, for a clean week of doses.
+  'gold-star': [[4, 14, 'clip'], [5, 13, 'clip'], [5, 14, 'clip'], [5, 15, 'clip'], [6, 14, 'clip']],
   'lab-coat': [[7, 2, 'glove'], [8, 3, 'glove'], [9, 4, 'glove'], [7, 14, 'glove'], [8, 13, 'glove'], [9, 12, 'glove'], [12, 6, 'glove'], [12, 10, 'glove'], [13, 7, 'glove'], [13, 9, 'glove']],
   // A page with a red header, standing on the left floor.
   'calendar': [...fill([14, 14], [-4, -2], 'flag'), ...fill([15, 15], [-4, -2], 'glove'), [15, -3, 'eye']]
 }
 
-const WEARABLES = new Set<TickerProp>(['sweatband', 'shades', 'medal', 'lab-coat'])
+const WEARABLES = new Set<TickerProp>(['sweatband', 'shades', 'medal', 'gold-star', 'lab-coat'])
 
-export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full', props: TickerProp[] = []): TickerSprite {
+export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full', props: TickerProp[] = [], build: TickerBuild = {}): TickerSprite {
   const grid = body()
   face(grid, pose, figure)
-  if (figure === 'full') limbs(grid, pose)
+  belly(grid, build.belly ?? 'lean')
+  if (figure === 'full' && build.tier !== 'hatchling') {
+    limbs(grid, pose)
+    if (build.tier === 'elder' && CANE_POSES.has(pose)) cane(grid)
+    if (build.arms === 'built') thicken(grid)
+  }
 
   const base = CANVAS[figure]
   const bounds = { rMin: 0, rMax: base.rows - 1, cMin: base.colMin, cMax: base.colMin + base.cols - 1 }

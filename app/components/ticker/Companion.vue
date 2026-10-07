@@ -78,7 +78,7 @@
 // below and JS-triggered event one-shots (double-beat, celebration, thump, flatline gag) that
 // each strike a pose. Pure CSS/SVG, no assets.
 import { TICKER_POSES, tickerSprite } from '#shared/utils/tickerSprite'
-import type { TickerFigure, TickerPose, TickerProp, TickerSprite } from '#shared/utils/tickerSprite'
+import type { TickerBuild, TickerFigure, TickerPose, TickerProp, TickerSprite } from '#shared/utils/tickerSprite'
 
 const props = withDefaults(defineProps<{
   /**
@@ -116,7 +116,9 @@ const props = withDefaults(defineProps<{
   poseOverride?: TickerPose | null
   /** Props composed over whatever pose is showing (full figure only): the /ticker food bowl, the birthday hat. */
   accessories?: TickerProp[]
-}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false, poseOverride: null, accessories: () => [] })
+  /** The body under the pose — tier, arms, belly — as the /ticker page reads it from the data. */
+  build?: TickerBuild
+}>(), { rhr: null, sluggish: false, caption: null, ariaLabel: 'TICKER — open all digests', mood: null, size: 'md', full: false, poseOverride: null, accessories: () => [], build: () => ({}) })
 
 const isFull = computed(() => props.full || props.size === 'lg')
 const dozing = computed(() => props.sluggish || props.poseOverride === 'asleep')
@@ -198,11 +200,13 @@ const pose = computed<TickerPose>(() => {
   return props.sluggish ? 'sleepy' : 'idle'
 })
 
-// Bare poses come from the cache; with props the sprite is composed on the fly (a few hundred cells).
+// Bare poses come from the cache; with props or a build the sprite is composed on the fly (a few
+// hundred cells).
 const sprite = computed(() => {
   const figure: TickerFigure = isFull.value ? 'full' : 'face'
-  return figure === 'full' && props.accessories.length
-    ? tickerSprite(pose.value, figure, props.accessories)
+  const custom = props.accessories.length > 0 || Object.keys(props.build).length > 0
+  return custom
+    ? tickerSprite(pose.value, figure, props.accessories, props.build)
     : SPRITES[figure][pose.value]
 })
 

@@ -140,6 +140,34 @@ test('only wearables paint over the heart; everything else keeps every heart cel
   assert.ok(tickerSprite('idle', 'full', ['sweatband']).cells.some(c => c.motion === 'lid'), 'a sweatband leaves the eyes alone')
 })
 
+test('the build: a hatchling has no limbs, an elder carries a cane, built arms are thicker, the belly follows body fat', () => {
+  const inks = s => s.cells.map(c => c.ink)
+  const count = (s, ink) => inks(s).filter(i => i === ink).length
+  const plain = tickerSprite('idle')
+  assert.deepEqual(tickerSprite('idle', 'full', [], {}), plain, 'an empty build is the grown figure')
+  assert.deepEqual(tickerSprite('idle', 'full', [], { tier: 'grown', arms: 'lean', belly: 'lean' }), plain)
+
+  const hatchling = tickerSprite('idle', 'full', [], { tier: 'hatchling' })
+  assert.equal(inks(hatchling).some(i => ATTACHED.has(i)), false, 'no limbs or props on a hatchling')
+  assert.deepEqual([hatchling.cols, hatchling.rows], [plain.cols, plain.rows])
+
+  const elder = tickerSprite('idle', 'full', [], { tier: 'elder' })
+  assert.ok(count(elder, 'coffee') >= 6, 'the cane')
+  assert.equal(elder.cells[15 * elder.cols + (-2 + 4)].ink, 'coffee', 'the cane reaches the floor')
+  assert.deepEqual(inks(tickerSprite('sit', 'full', [], { tier: 'elder' })), inks(tickerSprite('sit')), 'no cane while sitting')
+
+  const built = tickerSprite('idle', 'full', [], { arms: 'built' })
+  assert.ok(count(built, 'limb') > count(plain, 'limb'), 'thicker arms')
+  assert.equal(count(built, 'shoe'), count(plain, 'shoe'), 'legs untouched')
+
+  for (const figure of FIGURES) {
+    const soft = tickerSprite('idle', figure, [], { belly: 'soft' })
+    const cut = tickerSprite('idle', figure, [], { belly: 'cut' })
+    assert.ok(count(soft, 'hi') > count(tickerSprite('idle', figure), 'hi'), `${figure}: a soft belly is a highlight`)
+    assert.ok(count(cut, 'rim') > count(tickerSprite('idle', figure), 'rim'), `${figure}: a cut belly is creases`)
+  }
+})
+
 test('a prop above the head grows the canvas upward and leaves the figure where it stood', () => {
   const plain = tickerSprite('idle')
   const hatted = tickerSprite('idle', 'full', ['party-hat'])

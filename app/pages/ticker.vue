@@ -11,7 +11,7 @@
          the beat's upward stretch and the celebrate hop, with ~25px to spare above the hat. -->
     <div
       ref="stage"
-      class="stage relative mt-3 h-[17rem] bg-raised border border-line-soft overflow-hidden"
+      class="stage relative mt-3 h-68 bg-raised border border-line-soft overflow-hidden"
       :class="{ night }"
       @mousemove="glance"
       @mouseleave="unglance"
@@ -31,19 +31,45 @@
         <path d="M0 0L27 6M0 0L20 20M0 0L6 27M10 0A10 10 0 0 1 0 10M18 0A18 18 0 0 1 0 18M26 0A26 26 0 0 1 0 26" />
       </svg>
 
-      <!-- after dusk: a moon and a few stars; from bedtime until dawn it sleeps -->
-      <template v-if="night">
+      <!-- the window: the sky by the hour (sun, golden hour, moon and stars), a clock under it -->
+      <div
+        class="window"
+        :class="`sky-${sky}`"
+        aria-hidden="true"
+      >
         <span
-          class="moon"
+          v-if="sky !== 'golden'"
+          class="pane-glyph"
+        >{{ sky === 'night' ? '☾' : '☼' }}</span>
+        <template v-if="sky === 'night'">
+          <span class="star star-1">·</span>
+          <span class="star star-2">·</span>
+        </template>
+      </div>
+      <p
+        class="clock"
+        aria-hidden="true"
+      >
+        {{ clock }}
+      </p>
+
+      <!-- the floor, measured from the figure's feet so the bowl and calendar stand on it too;
+           the bed behind it after dusk (it sits on the mattress once it's asleep) -->
+      <template v-if="floorY != null">
+        <div
+          class="floor"
+          :style="{ bottom: `${floorY}px` }"
           aria-hidden="true"
-        >☾</span>
-        <span
-          v-for="n in 3"
-          :key="n"
-          class="star"
-          :class="`star-${n}`"
+        />
+        <div
+          v-if="night"
+          class="bed"
+          :style="{ bottom: `${floorY - 6}px` }"
           aria-hidden="true"
-        >·</span>
+        >
+          <span class="headboard" />
+          <span class="pillow" />
+        </div>
       </template>
 
       <div
@@ -58,6 +84,7 @@
           :sluggish="sluggish && !poseOverride"
           :pose-override="poseOverride"
           :accessories="accessories"
+          :build="build"
           :mood="talking ? 'talking' : null"
           aria-label="Pet TICKER"
           :caption="caption"
@@ -158,8 +185,9 @@
 import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
-import { scheduledFor } from '#shared/utils/protocolRules'
-import type { TickerPose, TickerProp } from '#shared/utils/tickerSprite'
+import { scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
+import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
+import type { TickerBelly, TickerBuild, TickerPose, TickerProp, TickerTier } from '#shared/utils/tickerSprite'
 
 useSeoMeta({ title: 'Ticker' })
 
@@ -171,6 +199,7 @@ const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: plannedData } = await usePlannedDraws()
 const { data: cyclesData } = await useCycles()
+const { data: dexaData } = await useDexaEntries()
 // The vial list is owner/demo only (the API says so); a friend's TICKER has no pantry to mention.
 const vialsData = canEdit.value ? await useVials() : null
 const today = useToday()
@@ -179,26 +208,46 @@ const entries = computed(() => journalData.value ?? [])
 const rhr = computed(() => overview.value?.latestRhr ?? null)
 
 // --- the clock on the wall --------------------------------------------------------------------
-// The viewer's local hour, not the home timezone: it is the viewer's evening the stage darkens
+// The viewer's local time, not the home timezone: it is the viewer's evening the stage darkens
 // for. Null until mounted, so the server and the first client paint agree on a daytime stage.
 
 const DUSK_HOUR = 19
 const BEDTIME_HOUR = 22
 const WAKE_HOUR = 6
 
-const hour = ref<number | null>(null)
+const now = ref<number | null>(null)
+const hour = computed(() => now.value == null ? null : new Date(now.value).getHours())
 const night = computed(() => hour.value != null && (hour.value >= DUSK_HOUR || hour.value < WAKE_HOUR))
 const asleep = computed(() => hour.value != null && (hour.value >= BEDTIME_HOUR || hour.value < WAKE_HOUR))
 
-let clock: ReturnType<typeof setInterval> | undefined
+/** What the window shows: the sun by day, amber around dawn and dusk, the moon and stars at night. */
+const sky = computed<'day' | 'golden' | 'night'>(() => {
+  const h = hour.value
+  if (h == null) return 'day'
+  if (night.value) return 'night'
+  return h < 8 || h >= 17 ? 'golden' : 'day'
+})
+const clock = computed(() => now.value == null
+  ? ''
+  : new Date(now.value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase())
+
+let clockTimer: ReturnType<typeof setTimeout> | undefined
+let clockInterval: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   const tick = () => {
-    hour.value = new Date().getHours()
+    now.value = Date.now()
   }
   tick()
-  clock = setInterval(tick, 60_000)
+  // Then on the minute, so the clock under the window never lags.
+  clockTimer = setTimeout(() => {
+    tick()
+    clockInterval = setInterval(tick, 60_000)
+  }, 60_000 - (Date.now() % 60_000))
 })
-onUnmounted(() => clearInterval(clock))
+onUnmounted(() => {
+  clearTimeout(clockTimer)
+  clearInterval(clockInterval)
+})
 
 // --- today, as the pet experiences it ---------------------------------------------------------
 
@@ -323,7 +372,8 @@ const fever = computed(() => {
 type Hunger = 'fed' | 'waiting' | 'hungry' | 'rest'
 
 const rulesApply = role.value !== 'demo'
-const dueToday = computed(() => rulesApply ? scheduledFor(today.value, effectiveRules(cyclesData.value ?? [])) : [])
+const rules = computed(() => rulesApply ? effectiveRules(cyclesData.value ?? []) : [])
+const dueToday = computed(() => scheduledFor(today.value, rules.value))
 const loggedCompounds = computed(() => new Set((todayEntry.value?.peptides ?? []).map(p => p.compound)))
 const eaten = computed(() => dueToday.value.filter(r => loggedCompounds.value.has(r.compound)))
 const missing = computed(() => dueToday.value.filter(r => !loggedCompounds.value.has(r.compound)))
@@ -399,6 +449,61 @@ const nextUnlock = computed(() => unlocks.value
   .filter(u => u.progress < u.goal)
   .sort((a, b) => (b.progress / b.goal) - (a.progress / a.goal))[0] ?? null)
 
+// --- the build: tier by logged days, arms and belly by DEXA -----------------------------------
+// A hatchling (no limbs yet) until a month of logged days, grown after, an elder with a cane
+// from five hundred. The arms fill in once lean mass is up five pounds on the first scan; the
+// belly reads the latest body-fat figure — soft from twenty percent, cut under thirteen.
+
+const TIER_DAYS = { grown: 30, elder: 500 }
+const tier = computed<TickerTier>(() => loggedDays.value >= TIER_DAYS.elder ? 'elder' : loggedDays.value >= TIER_DAYS.grown ? 'grown' : 'hatchling')
+
+const LEAN_GAIN_LBS = 5
+const SOFT_BF = 20
+const CUT_BF = 13
+const scans = computed(() => [...(dexaData.value ?? [])].sort((a, b) => a.date.localeCompare(b.date)))
+const latestScan = computed(() => scans.value.at(-1) ?? null)
+const leanGain = computed(() => {
+  const first = scans.value[0]
+  const latest = latestScan.value
+  return first && latest && first !== latest ? Math.round((latest.total.lean_mass_lbs - first.total.lean_mass_lbs) * 10) / 10 : null
+})
+const arms = computed<'lean' | 'built'>(() => leanGain.value != null && leanGain.value >= LEAN_GAIN_LBS ? 'built' : 'lean')
+const bellyRead = computed<TickerBelly>(() => {
+  const bf = latestScan.value?.total.body_fat_pct
+  if (bf == null) return 'lean'
+  return bf >= SOFT_BF ? 'soft' : bf < CUT_BF ? 'cut' : 'lean'
+})
+const build = computed<TickerBuild>(() => ({ tier: tier.value, arms: arms.value, belly: bellyRead.value }))
+
+// --- discipline: a clean week of doses earns the gold star ----------------------------------
+// The trailing seven days scored against the same merged rules as the hunger meter; today only
+// counts once logged (tallySchedule's rule), so a morning never reads as a miss.
+
+const weekTally = computed(() => {
+  if (!rulesApply) return null
+  const doseDates = new Map<string, Set<string>>()
+  for (const e of entries.value) {
+    for (const p of e.peptides ?? []) {
+      if (!p.compound) continue
+      let set = doseDates.get(p.compound)
+      if (!set) doseDates.set(p.compound, set = new Set())
+      set.add(e.date)
+    }
+  }
+  const tallies = tallySchedule(rules.value, shiftDays(today.value, -6), today.value, doseDates, today.value)
+  const hit = tallies.reduce((s, t) => s + t.hit.length, 0)
+  const missed = tallies.flatMap(t => t.missed.map(date => ({ compound: t.rule.compound, date })))
+  return { hit, missed }
+})
+const cleanWeek = computed(() => !!weekTally.value && weekTally.value.hit > 0 && weekTally.value.missed.length === 0)
+/** "week 3 of 8 of <name>" while a cycle runs, for the adherence line. */
+const cycleClause = computed(() => {
+  const cycle = relevantCycle(cyclesData.value ?? [], today.value)
+  if (!cycle || cycleStatusOn(cycle, today.value) !== 'active') return ''
+  const p = cycleProgress(cycle, today.value)
+  return ` — week ${p.week} of ${p.totalWeeks} of ${cycle.name}`
+})
+
 // --- mood: the held pose between interactions -------------------------------------------------
 
 const heldPose = computed<TickerPose | null>(() => {
@@ -433,6 +538,21 @@ const pet = useTemplateRef('pet')
 const stage = ref<HTMLElement | null>(null)
 const reducedMotion = usePreferredReducedMotion()
 
+// The floor is wherever the figure's feet are: the bottom of the sprite grid, measured once it
+// has rendered and again on resize. The beat scales the grid about its bottom edge and a hat
+// only adds rows above, so the line holds still through both.
+const floorY = ref<number | null>(null)
+function measureFloor() {
+  const heart = (pet.value?.$el as HTMLElement | undefined)?.querySelector('.heart')
+  if (!heart || !stage.value) return
+  floorY.value = Math.round(stage.value.getBoundingClientRect().bottom - 1 - heart.getBoundingClientRect().bottom)
+}
+onMounted(() => {
+  nextTick(measureFloor)
+  window.addEventListener('resize', measureFloor)
+})
+onUnmounted(() => window.removeEventListener('resize', measureFloor))
+
 const busy = ref(false)
 const actionPose = ref<TickerPose | null>(null)
 /** Sat down to wait (see fidgets); stands back up on any press. Never while asleep — that has its own seat. */
@@ -457,6 +577,7 @@ const accessories = computed<TickerProp[]>(() => {
   else if (worn.has('crown')) out.push('crown')
   if (carried && carried !== 'cap') out.push(carried)
   for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) out.push(p)
+  if (cleanWeek.value) out.push('gold-star')
   const d = nextDraw.value
   if (d && (d.status === 'today' || d.status === 'overdue' || d.inDays <= 3)) out.push('calendar')
   if (d?.status === 'today') out.push('lab-coat')
@@ -644,6 +765,24 @@ const quotes = computed(() => {
       : 'no sodas this week. it\'s proud of you.',
     oldestOpen.value ? `the ${oldestOpen.value.compound} vial has been open ${oldestOpen.value.days} days.` : null,
     ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')} days since the first data point. it remembers all of them.` : null,
+    weekTally.value
+      ? weekTally.value.missed.length
+        ? `${weekTally.value.hit} of ${weekTally.value.hit + weekTally.value.missed.length} due doses this week — missed ${weekTally.value.missed.map(m => `${m.compound} ${new Date(`${m.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}`).join(', ')}${cycleClause.value}.`
+        : weekTally.value.hit
+          ? `${weekTally.value.hit} of ${weekTally.value.hit} due doses this week. a clean week — hence the star${cycleClause.value}.`
+          : null
+      : null,
+    tier.value === 'elder'
+      ? `${loggedDays.value.toLocaleString('en-US')} logged days — an elder now. it earned the cane.`
+      : tier.value === 'grown'
+        ? `${loggedDays.value} logged days — grown. an elder at ${TIER_DAYS.elder}; ${TIER_DAYS.elder - loggedDays.value} to go.`
+        : `${loggedDays.value} logged days — still a hatchling. it grows limbs at ${TIER_DAYS.grown}.`,
+    latestScan.value
+      ? `body fat ${latestScan.value.total.body_fat_pct}% on the ${formatDate(latestScan.value.date, 'monthDay')} scan — ${bellyRead.value === 'soft' ? 'a bit of belly, it admits' : bellyRead.value === 'cut' ? 'cut. look at that' : 'lean'}.`
+      : null,
+    leanGain.value != null
+      ? `lean mass ${leanGain.value >= 0 ? '+' : ''}${leanGain.value} lb since the first scan — ${arms.value === 'built' ? 'the arms show it' : `the arms fill in at +${LEAN_GAIN_LBS}`}.`
+      : null,
     earned.value.length
       ? `wearing ${earned.value.map(u => u.name.replace(/^the /, '')).join(', ')} — earned at ${earned.value.map(u => `${u.goal.toLocaleString('en-US')} ${u.unit}`).join(', ')}.`
       : null,
@@ -897,6 +1036,19 @@ function resultsLanded() {
   pet.value?.trigger(flags ? 'thump' : 'celebrate')
 }
 
+// A clean week: one salute a day while it lasts (the gold star stays on regardless).
+const SALUTE_KEY = 'ticker:saluted'
+
+async function salute() {
+  record(SALUTE_KEY, today.value)
+  const n = weekTally.value?.hit ?? 0
+  line.value = `clean week — ${n} of ${n} due doses logged${cycleClause.value}. (salute)`
+  if (busy.value) return
+  actionPose.value = 'salute'
+  await wait(1700)
+  if (actionPose.value === 'salute') actionPose.value = null
+}
+
 // Newly earned accessories: announced once each, then simply worn.
 const UNLOCKS_KEY = 'ticker:unlocks'
 const freshUnlocks = computed(() => {
@@ -926,6 +1078,7 @@ onMounted(() => {
   if (sodasToday.value) reactions.push(flinch)
   if (birthday.value && firstTime(BIRTHDAY_KEY, today.value)) reactions.push(celebrateBirthday)
   if (landedPending.value) reactions.push(resultsLanded)
+  if (cleanWeek.value && firstTime(SALUTE_KEY, today.value)) reactions.push(salute)
   if (freshUnlocks.value.length) reactions.push(announceUnlocks)
   reactions.forEach((react, i) => timers.push(setTimeout(react, 800 + i * 2200)))
 })
@@ -938,27 +1091,101 @@ onMounted(() => {
 .stage.night {
   background: var(--color-bg);
 }
-.moon {
+
+/* The window: a four-pane frame on the left wall whose glass follows the hour. */
+.window {
   position: absolute;
-  top: 10px;
-  right: 44px;
-  font-size: 16px;
-  color: var(--color-faint);
+  top: 22px;
+  left: 44px;
+  width: 46px;
+  height: 38px;
+  border: 2px solid var(--color-line-accent);
+  background: var(--sky);
   pointer-events: none;
+  transition: background-color 0.6s ease;
+}
+.window::before,
+.window::after {
+  content: '';
+  position: absolute;
+  background: var(--color-line-accent);
+}
+.window::before { left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; }
+.window::after { top: 50%; left: 0; right: 0; height: 2px; margin-top: -1px; }
+.sky-day { --sky: #1c3a47; }
+.sky-golden { --sky: #4a3418; }
+.sky-night { --sky: #0a1020; }
+.pane-glyph {
+  position: absolute;
+  top: 1px;
+  left: 5px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-warn);
+}
+.sky-night .pane-glyph {
+  left: auto;
+  right: 5px;
+  color: var(--color-faint);
 }
 .star {
   position: absolute;
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 1;
   color: var(--color-ghost);
-  pointer-events: none;
   animation: star-twinkle 3.4s ease-in-out infinite;
 }
-.star-1 { top: 18px; left: 14%; }
-.star-2 { top: 34px; left: 31%; animation-delay: 1.1s; }
-.star-3 { top: 14px; right: 29%; animation-delay: 2.2s; }
+.star-1 { top: 2px; left: 6px; }
+.star-2 { bottom: 3px; right: 7px; animation-delay: 1.4s; }
 @keyframes star-twinkle {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }
+}
+.clock {
+  position: absolute;
+  top: 64px;
+  left: 44px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-ghost);
+  pointer-events: none;
+}
+
+/* The floor line, and the bed that stands on it at night: a mattress the feet rest on, a pillow
+   at the head end, a headboard. */
+.floor {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 0;
+  border-top: 1px dashed var(--color-line-accent);
+  pointer-events: none;
+}
+.bed {
+  position: absolute;
+  left: 50%;
+  width: 120px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: #22303d;
+  pointer-events: none;
+}
+.bed .headboard {
+  position: absolute;
+  left: -3px;
+  bottom: 0;
+  width: 3px;
+  height: 28px;
+  background: var(--color-line-accent);
+}
+.bed .pillow {
+  position: absolute;
+  left: 4px;
+  bottom: 6px;
+  width: 22px;
+  height: 6px;
+  border-radius: 2px;
+  background: #6f8aa0;
 }
 
 /* Corner cobwebs: spokes and three sagging strands, drawn once and flipped into each corner. */
@@ -987,7 +1214,8 @@ onMounted(() => {
   100% { opacity: 0; transform: translateY(-26px) scale(1.15); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .stage { transition: none; }
+  .stage,
+  .window { transition: none; }
   .star { animation: none; opacity: 0.7; }
   .pet-heart { animation: none; opacity: 0.8; }
 }
