@@ -256,7 +256,8 @@ const ekgPoints = computed(() => {
 .full .heart { --px: 3px; --px-gap: 1px; }
 .size-lg .heart { --px: 6px; --px-gap: 1px; }
 
-/* Inks: theme tokens where one fits, sprite-only shades otherwise. */
+/* Inks: theme tokens where one fits, sprite-only shades otherwise. Mirrored as colours in
+   app/utils/tickerPalette.ts for the runner's canvas — change both. */
 .ink-rim { background: #6e1f2c; }
 .ink-red { background: var(--heart); }
 .ink-shade { background: #c2493f; }
