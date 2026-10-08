@@ -7,9 +7,12 @@
 // two walk-cycle frames the page alternates while it trots, the blissful petted face, sitting
 // down to wait (a minute with nothing pressed), asleep (after bedtime), feverish (resting HR
 // well over its own two-week average), hungry (due doses still unlogged after dusk), nervous
-// (draw day), impatient (a planned draw overdue — checking its watch) and salute (a clean week
-// of doses).
-export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute'] as const
+// (draw day), impatient (a planned draw overdue — checking its watch), salute (a clean week of
+// doses), and the feed's own frames: jab1/jab2 (an injectable — syringe raised, then in, with a
+// wince and then the brave face) and gulp (a pill going down with a glass of water; 'eating' is
+// the lift that comes before it) and mixing (a reconstitution day: a vial in one hand, the bac
+// water in the other, swirled — the page rocks it).
+export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute', 'jab1', 'jab2', 'gulp', 'mixing'] as const
 export type TickerPose = typeof TICKER_POSES[number]
 
 /**
@@ -41,7 +44,7 @@ export type TickerInk
  * (milestones): crown, sweatband, shades, medal. The vet visit: calendar, lab-coat.
  */
 export type TickerProp
-  = 'bowl-empty' | 'bowl-full' | 'party-hat'
+  = 'bowl-empty' | 'bowl-full' | 'bowl-shots' | 'bowl-mixed' | 'party-hat'
     | 'dumbbell' | 'helmet' | 'disc' | 'cap'
     | 'crown' | 'sweatband' | 'shades' | 'medal' | 'gold-star'
     | 'calendar' | 'lab-coat'
@@ -220,6 +223,25 @@ function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
       paint(grid, [[3, 4], [3, 5], [3, 11], [3, 12]], 'rim')
       paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
       break
+    case 'jab1': // the wince: eyes squeezed to dots, brows knitted, mouth a tight line
+      paint(grid, [[5, 4], [5, 12]], 'eye')
+      paint(grid, [[3, 5], [4, 6], [4, 10], [3, 11]], 'rim')
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'jab2': // the brave face: ordinary eyes, a flat mouth, a little colour in the cheeks
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, BLUSH, 'blush')
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'gulp': // eyes shut, cheeks puffed, the mouth a single tight cell
+      paint(grid, [[5, 4], [5, 5], [5, 11], [5, 12]], 'eye')
+      paint(grid, [...BLUSH, [6, 2], [7, 2], [6, 14], [7, 14]], 'blush')
+      paint(grid, [[9, 8]], 'eye')
+      break
+    case 'mixing': // eyes down on the vial, a small concentrating mouth, no blush
+      eyes(grid, 4, 11, 5, 2, 0)
+      paint(grid, [[9, 8]], 'eye')
+      break
     default:
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, BLUSH, 'blush')
@@ -390,6 +412,48 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[3, 17], [2, 16]], 'glove')
       legs(grid, false)
       break
+    // The syringe is drawn with the arm: a white barrel the hand grips from above, a steel
+    // plunger, a needle. jab1 holds it a couple of cells off the lower-right lobe; jab2 is the
+    // same arm two cells in, needle to the rim, a bead at the site.
+    case 'jab1':
+      paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
+      paint(grid, [[11, -2], [11, -1]], 'glove')
+      paint(grid, [[7, 16], [8, 17]], 'limb')
+      paint(grid, [[9, 18], [9, 19], [10, 17], [10, 18], [10, 19], [10, 20]], 'glove')
+      paint(grid, [[10, 21], [10, 22]], 'bowl')
+      paint(grid, [[10, 15], [10, 16]], 'line')
+      legs(grid, false)
+      break
+    case 'jab2':
+      paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
+      paint(grid, [[11, -2], [11, -1]], 'glove')
+      paint(grid, [[7, 16], [8, 16]], 'limb')
+      paint(grid, [[9, 16], [9, 17], [10, 15], [10, 16], [10, 17], [10, 18]], 'glove')
+      paint(grid, [[10, 19], [10, 20]], 'bowl')
+      paint(grid, [[10, 13], [10, 14]], 'line')
+      paint(grid, [[11, 13]], 'drop')
+      legs(grid, false)
+      break
+    case 'gulp': // a glass of water held up in the left hand, the right hand on its belly
+      paint(grid, [[7, 0], [8, -1], [9, -2]], 'limb')
+      paint(grid, [[9, -4], [9, -3]], 'glove')
+      paint(grid, [[6, -4], [7, -4], [8, -4], [6, -2], [7, -2], [8, -2], [8, -3]], 'bowl')
+      paint(grid, [[7, -3]], 'drop')
+      paint(grid, [[8, 15], [9, 14]], 'limb')
+      paint(grid, [[10, 13], [10, 14]], 'glove')
+      legs(grid, false)
+      break
+    case 'mixing': // both hands up: the powder vial on the left (amber at the bottom), the bac water on the right
+      paint(grid, [[7, 0], [8, -1]], 'limb')
+      paint(grid, [[9, -3], [9, -2], [7, -3], [7, -2], [8, -2]], 'glove')
+      paint(grid, [[8, -3]], 'clip')
+      paint(grid, [[6, -3], [6, -2]], 'line')
+      paint(grid, [[7, 16], [8, 16]], 'limb')
+      paint(grid, [[9, 17], [9, 18], [7, 17], [7, 18], [8, 18]], 'glove')
+      paint(grid, [[8, 17]], 'drop')
+      paint(grid, [[6, 17], [6, 18]], 'line')
+      legs(grid, false)
+      break
     default: // waving hello
       paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
       paint(grid, [[11, -2], [11, -1]], 'glove')
@@ -449,9 +513,15 @@ const fill = (rows: [number, number], cols: [number, number], ink: TickerInk): P
 // lifts to its mouth.
 const BOWL: PropCell[] = [[14, 19, 'bowl'], [14, 23, 'bowl'], ...fill([15, 15], [19, 23], 'bowl')]
 
+// A small syringe lying in the bowl: needle, white barrel.
+const BOWL_SHOT = (r: number): PropCell[] => [[r, 20, 'line'], [r, 21, 'glove'], [r, 22, 'glove']]
+
 const PROPS: Record<TickerProp, PropCell[]> = {
   'bowl-empty': BOWL,
+  // What the plate held: capsules, syringes, or one of each.
   'bowl-full': [...BOWL, [14, 20, 'clip'], [14, 21, 'clip'], [14, 22, 'clip'], [13, 21, 'clip']],
+  'bowl-shots': [...BOWL, ...BOWL_SHOT(14), ...BOWL_SHOT(13)],
+  'bowl-mixed': [...BOWL, [14, 20, 'clip'], [14, 21, 'line'], [14, 22, 'glove'], [13, 21, 'clip']],
   // Hats sit on the left lobe (one at a time — the page picks); the helmet on the right lobe.
   'party-hat': [[-3, 5, 'glove'], [-2, 4, 'hat'], [-2, 5, 'hat'], ...fill([-1, -1], [3, 6], 'hat')],
   'crown': [[-3, 4, 'glove'], [-2, 2, 'clip'], [-2, 4, 'clip'], [-2, 6, 'clip'], ...fill([-1, -1], [2, 6], 'clip')],

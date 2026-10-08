@@ -97,10 +97,11 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string
   /**
    * A held state, unlike the one-shot events: 'thinking' while an answer is being worked out
-   * (a slow rock and a trail of dots), 'talking' while it streams (quicker beat, busy EKG).
+   * (a slow rock and a trail of dots), 'talking' while it streams (quicker beat, busy EKG),
+   * 'mixing' while the /ticker feed reconstitutes a vial (a quicker rock, no dots — the swirl).
    * A one-shot event plays over it and it resumes after.
    */
-  mood?: 'thinking' | 'talking' | null
+  mood?: 'thinking' | 'talking' | 'mixing' | null
   /** 'lg' doubles the pixels for pages TICKER hosts (/ask); it always draws the full figure. */
   size?: 'md' | 'lg'
   /**
@@ -544,6 +545,12 @@ const ekgPoints = computed(() => {
   100% { opacity: 0.9; clip-path: inset(0 0 0 0); }
 }
 /* TALKING — the beat quickens (see beatSeconds) and the EKG runs the busy burst trace. */
+/* MIXING — the swirl: the ponder rock at twice the pace, no dots. */
+.mood-mixing .heart {
+  animation:
+    ticker-ponder 1.1s ease-in-out infinite,
+    ticker-glow var(--beat) ease-in-out infinite;
+}
 
 /* ── Reduced motion: static sprite, glow pulse only ─────────────────────── */
 @media (prefers-reduced-motion: reduce) {
@@ -553,7 +560,8 @@ const ekgPoints = computed(() => {
   .ev-thump .heart,
   .ev-flatline .heart,
   .ev-bigbeat .heart,
-  .mood-thinking .heart {
+  .mood-thinking .heart,
+  .mood-mixing .heart {
     animation: ticker-glow var(--beat) ease-in-out infinite;
   }
   .ekg-line,

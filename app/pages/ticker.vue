@@ -98,7 +98,7 @@
           :pose-override="poseOverride"
           :accessories="accessories"
           :build="build"
-          :mood="talking ? 'talking' : null"
+          :mood="mixing ? 'mixing' : talking ? 'talking' : null"
           aria-label="Pet TICKER"
           :caption="caption"
           @open="petIt"
@@ -207,7 +207,7 @@
 import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
-import { scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
+import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
 import type { TickerBelly, TickerBuild, TickerPose, TickerProp, TickerTier } from '#shared/utils/tickerSprite'
 import type { TickerPets, TickerRecord, TickerRunResponse, TickerStateResponse } from '#shared/types/ticker'
@@ -635,9 +635,19 @@ const actionPose = ref<TickerPose | null>(null)
 /** Sat down to wait (see fidgets); stands back up on any press. Never while asleep — that has its own seat. */
 const sitting = ref(false)
 const talking = ref(false)
+/** True while the feed reconstitutes a vial: the companion rocks it (the swirl). */
+const mixing = ref(false)
 const poseOverride = computed(() => actionPose.value ?? (sitting.value && !asleep.value ? 'sit' : heldPose.value))
 /** True for the length of a walk with a workout behind it: the carried prop shows. */
 const walking = ref(false)
+
+/** The bowl shows what the plate held once it is fed: capsules, syringes, or one of each. */
+const bowl = computed<TickerProp>(() => {
+  if (hunger.value !== 'fed') return 'bowl-empty'
+  const shots = dosesToday.value.some(d => isInjected(d.compound))
+  const pills = dosesToday.value.some(d => !isInjected(d.compound))
+  return shots && pills ? 'bowl-mixed' : shots ? 'bowl-shots' : 'bowl-full'
+})
 
 /**
  * The props layer, in paint order. The bowl shows what has been served today; one thing on the
@@ -646,7 +656,7 @@ const walking = ref(false)
  * the vet visit's calendar from three days out, with the lab coat on the day.
  */
 const accessories = computed<TickerProp[]>(() => {
-  const out: TickerProp[] = [hunger.value === 'fed' ? 'bowl-full' : 'bowl-empty']
+  const out: TickerProp[] = [bowl.value]
   const worn = new Set(earned.value.map(u => u.prop))
   const carried = walking.value ? walkProp.value : null
   if (birthday.value) out.push('party-hat')
@@ -725,20 +735,72 @@ async function petIt() {
   if (actionPose.value === 'petted') actionPose.value = null
 }
 
+// The feed walks the day's doses one at a time. An injectable (the standing rule says so, or the
+// compound comes as a vial) is a two-frame jab — syringe raised with a wince, then in with the
+// brave face and one big beat; a pill is the capsule lift, then a gulp with a glass of water.
+// Each dose gets its own line, with a word for the compounds it knows.
+const FEED_QUIPS: Array<{ match: RegExp, jab?: string, swallow?: string }> = [
+  { match: /testosterone/i, jab: 'oil — it took a second to push.' },
+  { match: /hgh|growth/i, jab: 'the small one. barely a pinch.' },
+  { match: /hcg/i, jab: 'quick one. it didn\'t look.' },
+  { match: /bpc/i, jab: 'right where it was sore.' },
+  { match: /finasteride/i, swallow: 'the little one. for the mane, someday.' }
+]
+
+function isInjected(compound: string): boolean {
+  return PROTOCOL_RULES.some(r => r.compound === compound && r.injected) || defaultVialForm(compound) === 'vial'
+}
+
+/** The vials reconstituted on the meal day — mixed before anything is eaten. */
+const mixesToday = computed(() => entries.value.find(e => e.date === mealDay.value)?.reconstitutions ?? [])
+const unitLabel = (u: string) => u === 'iu' ? 'IU' : u
+
 async function feed() {
   if (busy.value || !dosesToday.value.length) return
   busy.value = true
   wake()
-  const menu = dosesToday.value
-    .map(d => `${d.compound} ${d.dose} ${d.unit === 'iu' ? 'IU' : d.unit}`)
-    .join(' · ')
-  line.value = `fed: ${menu}${mealIsYesterday.value ? ' (yesterday\'s plate)' : ''}`
-  actionPose.value = 'eating'
-  await wait(2600)
+  const plate = dosesToday.value
+  const served = mealIsYesterday.value ? ' (yesterday\'s plate)' : ''
+
+  // A reconstitution day: the vial and the bac water, swirled, never shaken.
+  for (const [i, m] of mixesToday.value.entries()) {
+    const recipe = `${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL`
+    line.value = `reconstituting ${m.compound} — ${recipe}…${i === 0 ? served : ''}`
+    actionPose.value = 'mixing'
+    mixing.value = true
+    await wait(1700)
+    mixing.value = false
+    line.value = `${m.compound} mixed: ${recipe}. swirled, didn't shake.`
+    await wait(600)
+  }
+
+  for (const [i, d] of plate.entries()) {
+    const label = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
+    const quip = FEED_QUIPS.find(q => q.match.test(d.compound))
+    const note = i === 0 && !mixesToday.value.length ? served : ''
+    if (isInjected(d.compound)) {
+      line.value = `${label} — jab…${note}`
+      actionPose.value = 'jab1'
+      await wait(650)
+      actionPose.value = 'jab2'
+      pet.value?.trigger('bigbeat')
+      await wait(750)
+      line.value = `${label} — in. ${quip?.jab ?? (i === 0 ? 'didn\'t flinch.' : 'still didn\'t flinch.')}`
+    }
+    else {
+      line.value = `${label} — down the hatch…${note}`
+      actionPose.value = 'eating'
+      await wait(700)
+      actionPose.value = 'gulp'
+      await wait(650)
+      line.value = `${label} — swallowed. ${quip?.swallow ?? 'with water, like a grown-up.'}`
+    }
+    await wait(500)
+  }
   actionPose.value = null
   line.value = rulesApply && missing.value.length
-    ? `${dosesToday.value.length} down. still waiting on ${missingNames.value}.`
-    : `all ${dosesToday.value.length} dose${dosesToday.value.length === 1 ? '' : 's'} down. ♥`
+    ? `${plate.length} down. still waiting on ${missingNames.value}.`
+    : `all ${plate.length} dose${plate.length === 1 ? '' : 's'} down. ♥`
   busy.value = false
 }
 
@@ -846,6 +908,9 @@ const quotes = computed(() => {
       ? `${sodasThisWeek.value} soda${sodasThisWeek.value === 1 ? '' : 's'} this week. it noticed every one.`
       : 'no sodas this week. it\'s proud of you.',
     oldestOpen.value ? `the ${oldestOpen.value.compound} vial has been open ${oldestOpen.value.days} days.` : null,
+    mixesToday.value.length
+      ? `reconstituted ${mixesToday.value.map(m => `${m.compound} (${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL)`).join(', ')}${mealIsYesterday.value ? ' yesterday' : ' today'}. FEED mixes it again.`
+      : null,
     ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')} days since the first logged day. it remembers all of them.` : null,
     weekTally.value
       ? weekTally.value.missed.length
@@ -917,7 +982,7 @@ onMounted(() => {
 const houseBest = computed(() => Math.max(runnerHi.value?.score ?? 0, keeper ? 0 : visitorsBest.value?.score ?? 0))
 
 /** What it runs in: the wearables and the hat, not the floor props or the vet's coat. */
-const worn = computed(() => accessories.value.filter(a => !['bowl-empty', 'bowl-full', 'calendar', 'lab-coat'].includes(a)))
+const worn = computed(() => accessories.value.filter(a => !a.startsWith('bowl-') && !['calendar', 'lab-coat'].includes(a)))
 
 function play() {
   if (busy.value) return
