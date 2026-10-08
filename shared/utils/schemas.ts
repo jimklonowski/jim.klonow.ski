@@ -270,6 +270,20 @@ export const zCycleSave = z.object({
 
 // The checkpoint link is both halves or neither; that cross-field rule stays in the handler.
 // `fasting` defaults on: nearly every planned panel is, and the prep reminders hang off it.
+// --- /ticker: the pet's memory (migration 0009) ---
+// The keys the page may write; `pets` is deliberately absent (server/api/ticker/pet.post.ts
+// counts, nobody sets). Values are small JSON — stamps are strings, the snapshot an object.
+export const TICKER_STATE_KEYS = ['runner', 'unlocks', 'flinched', 'birthday', 'saluted', 'landed', 'snapshot', 'visitsSeen'] as const
+
+export const zTickerStateSave = z.object({
+  key: z.enum(TICKER_STATE_KEYS, 'Bad key'),
+  value: z.unknown().refine(v => JSON.stringify(v ?? null).length <= 8000, 'Too large')
+})
+
+export const zTickerRun = z.object({
+  score: z.number().int().min(0).max(99999)
+})
+
 export const zPlannedDrawSave = z.object({
   id: zId.optional(),
   date: zIsoDate,
