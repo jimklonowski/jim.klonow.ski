@@ -86,8 +86,9 @@
 
       <div
         v-else
-        class="absolute bottom-9 left-1/2 transition-none"
-        :style="{ transform: `translateX(calc(-50% + ${x}px)) scaleX(${facing})` }"
+        class="absolute bottom-9 left-1/2 origin-bottom"
+        :class="stretching ? 'transition-transform duration-300 ease-out' : 'transition-none'"
+        :style="{ transform: `translateX(calc(-50% + ${x}px)) scaleX(${facing}) scaleY(${stretch})` }"
       >
         <TickerCompanion
           ref="pet"
@@ -204,7 +205,7 @@
 // forget to do. Petting is the one pure interaction. What it remembers (the pet counter, the
 // runner's record, which things it has already reacted to) lives in the database for the owner
 // and in the browser for the demo pet — see the memory section.
-import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
+import { doseStreak, isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
@@ -641,6 +642,29 @@ const poseOverride = computed(() => actionPose.value ?? (sitting.value && !aslee
 /** True for the length of a walk with a workout behind it: the carried prop shows. */
 const walking = ref(false)
 
+// --- what the compounds leave on it ---------------------------------------------------------
+// The finasteride mane grows with the finasteride streak — stubble after a week, a mane after a
+// month, luscious after three — and the feed animates it in tier by tier. The BPC bandage is on
+// for any day BPC was logged. The flex, the stretch, the proud beat and the glow are one-shots in
+// afterEffect() below.
+
+const MANE_TIERS: Array<{ days: number, prop: TickerProp, name: string }> = [
+  { days: 7, prop: 'mane-1', name: 'stubble' },
+  { days: 30, prop: 'mane-2', name: 'a mane' },
+  { days: 90, prop: 'mane-3', name: 'luscious' }
+]
+const finasterideStreak = computed(() => doseStreak(entries.value, 'Finasteride', today.value))
+/** 0–3: how many mane tiers the streak has reached. */
+const maneTier = computed(() => MANE_TIERS.filter(t => finasterideStreak.value >= t.days).length)
+const nextMane = computed(() => MANE_TIERS.find(t => finasterideStreak.value < t.days) ?? null)
+/** While the feed grows the mane in, the tier on show; null means the earned one. */
+const maneGrow = ref<number | null>(null)
+const bandaged = computed(() => dosesToday.value.some(d => /bpc/i.test(d.compound)))
+
+/** The HGH stretch: a scaleY on the figure for a beat, with a transition only while it plays. */
+const stretch = ref(1)
+const stretching = ref(false)
+
 /** The bowl shows what the plate held once it is fed: capsules, syringes, or one of each. */
 const bowl = computed<TickerProp>(() => {
   if (hunger.value !== 'fed') return 'bowl-empty'
@@ -659,12 +683,15 @@ const accessories = computed<TickerProp[]>(() => {
   const out: TickerProp[] = [bowl.value]
   const worn = new Set(earned.value.map(u => u.prop))
   const carried = walking.value ? walkProp.value : null
+  const mane = maneGrow.value ?? maneTier.value
+  if (mane) out.push(MANE_TIERS[mane - 1]!.prop) // before the hats, so a hat sits on the hair
   if (birthday.value) out.push('party-hat')
   else if (carried === 'cap') out.push('cap')
   else if (worn.has('crown')) out.push('crown')
   if (carried && carried !== 'cap') out.push(carried)
   for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) out.push(p)
   if (cleanWeek.value) out.push('gold-star')
+  if (bandaged.value) out.push('bandage')
   const d = nextDraw.value
   if (d && (d.status === 'today' || d.status === 'overdue' || d.inDays <= 3)) out.push('calendar')
   if (d?.status === 'today') out.push('lab-coat')
@@ -747,8 +774,72 @@ const FEED_QUIPS: Array<{ match: RegExp, jab?: string, swallow?: string }> = [
   { match: /finasteride/i, swallow: 'the little one. for the mane, someday.' }
 ]
 
+// Anything the compound catalogue doesn't know defaults to a vial, so the pills it has never heard
+// of (the iron protocol, a vitamin) are named here rather than jabbed.
+const ORAL_WORDS = /iron|ferr|vitamin|magnesium|zinc|omega|creatine|berberine|melatonin|caffeine|aspirin|nac\b|tablet|capsule|gummy/i
+
 function isInjected(compound: string): boolean {
-  return PROTOCOL_RULES.some(r => r.compound === compound && r.injected) || defaultVialForm(compound) === 'vial'
+  if (PROTOCOL_RULES.some(r => r.compound === compound && r.injected)) return true
+  if (ORAL_WORDS.test(compound)) return false
+  return defaultVialForm(compound) === 'vial'
+}
+
+/** What a compound does to it once it's in: a beat of theatre per family, nothing for the rest. */
+async function afterEffect(compound: string) {
+  if (/testosterone/i.test(compound)) {
+    line.value = 'testosterone. (flex)'
+    actionPose.value = 'flex'
+    await wait(1100)
+    if (actionPose.value === 'flex') actionPose.value = null
+  }
+  else if (/hgh|growth/i.test(compound)) {
+    line.value = 'growth hormone. it felt taller for a second.'
+    stretching.value = true
+    stretch.value = 1.15
+    await wait(700)
+    stretch.value = 1
+    await wait(350)
+    stretching.value = false
+  }
+  else if (/hcg/i.test(compound)) {
+    line.value = 'hCG. the heart beats a little prouder.'
+    pet.value?.trigger('bigbeat')
+    await wait(750)
+    pet.value?.trigger('bigbeat')
+    await wait(750)
+  }
+  else if (/bpc/i.test(compound)) {
+    line.value = 'BPC-157 — bandage on, right where it was sore.'
+    await wait(900)
+  }
+  else if (/ghk/i.test(compound)) {
+    line.value = 'GHK-Cu. skin glow. (the sparkles are not a metaphor.)'
+    pet.value?.trigger('celebrate')
+    await wait(1400)
+  }
+  else if (/finasteride/i.test(compound)) {
+    await growMane()
+  }
+}
+
+/** The mane grows in tier by tier up to the earned one, then the streak gets its line. */
+async function growMane() {
+  const tier = maneTier.value
+  const days = finasterideStreak.value
+  if (!tier) {
+    line.value = `finasteride. ${days ? `day ${days} — ` : ''}the mane takes a week to show.`
+    await wait(900)
+    return
+  }
+  for (let t = 1; t <= tier; t++) {
+    maneGrow.value = t
+    line.value = `the mane: ${MANE_TIERS[t - 1]!.name}…`
+    await wait(300)
+  }
+  maneGrow.value = null
+  const next = nextMane.value
+  line.value = `the mane: ${MANE_TIERS[tier - 1]!.name}. ${days} days of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.`
+  await wait(900)
 }
 
 /** The vials reconstituted on the meal day — mixed before anything is eaten. */
@@ -796,6 +887,7 @@ async function feed() {
       line.value = `${label} — swallowed. ${quip?.swallow ?? 'with water, like a grown-up.'}`
     }
     await wait(500)
+    await afterEffect(d.compound)
   }
   actionPose.value = null
   line.value = rulesApply && missing.value.length
@@ -910,6 +1002,11 @@ const quotes = computed(() => {
     oldestOpen.value ? `the ${oldestOpen.value.compound} vial has been open ${oldestOpen.value.days} days.` : null,
     mixesToday.value.length
       ? `reconstituted ${mixesToday.value.map(m => `${m.compound} (${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL)`).join(', ')}${mealIsYesterday.value ? ' yesterday' : ' today'}. FEED mixes it again.`
+      : null,
+    finasterideStreak.value
+      ? maneTier.value
+        ? `the mane: ${MANE_TIERS[maneTier.value - 1]!.name} — ${finasterideStreak.value} days of finasteride${nextMane.value ? `; ${nextMane.value.name} at ${nextMane.value.days}` : '. it combs it.'}`
+        : `finasteride, day ${finasterideStreak.value}. the mane shows at ${MANE_TIERS[0]!.days}.`
       : null,
     ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')} days since the first logged day. it remembers all of them.` : null,
     weekTally.value

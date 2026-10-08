@@ -60,6 +60,25 @@ export function loggedStreak(entries: Array<LoggedDayFields & { date: string }>,
 }
 
 /**
+ * Consecutive days of a compound ending today (or yesterday, when today hasn't been dosed yet),
+ * the same convention as loggedStreak — what the /ticker pet's finasteride mane grows on.
+ */
+export function doseStreak(
+  entries: Array<{ date: string, peptides?: Array<{ compound?: string | null }> | null }>,
+  compound: string,
+  today: string
+): number {
+  const dosed = new Set(entries.filter(e => (e.peptides ?? []).some(p => p.compound === compound)).map(e => e.date))
+  let cursor = dosed.has(today) ? today : shiftDays(today, -1)
+  let count = 0
+  while (dosed.has(cursor)) {
+    count++
+    cursor = shiftDays(cursor, -1)
+  }
+  return count
+}
+
+/**
  * The longest run of consecutive logged days anywhere in the history and the day it ended on —
  * the record the /ticker pet quotes. Zero days and no end before the first logged day.
  */

@@ -279,6 +279,7 @@ const ekgPoints = computed(() => {
 .ink-coffee { background: #5a3424; }
 .ink-bowl { background: #6f8aa0; }
 .ink-hat { background: #c084fc; }
+.ink-hair { background: #a8702f; }
 
 /* Blinks close the top rows of each eye onto the bottom one. */
 .mo-lid { animation: ticker-lid 4.7s linear infinite; }

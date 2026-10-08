@@ -2,7 +2,7 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isLoggedDay, loggedStreak, longestLoggedStreak } from '../shared/utils/journalLog.ts'
+import { doseStreak, isLoggedDay, loggedStreak, longestLoggedStreak } from '../shared/utils/journalLog.ts'
 
 const vitalsOnly = date => ({ date, weight_lbs: 190.2, rhr: 52, hrv: 61, peptides: [], reconstitutions: [], food: {}, sodas: [], notes: '' })
 const dosed = date => ({ ...vitalsOnly(date), peptides: [{ compound: 'HGH', dose: 2.5, unit: 'iu' }] })
@@ -47,6 +47,16 @@ test('month boundaries and empty input', () => {
   const entries = ['2026-08-30', '2026-08-31', '2026-09-01'].map(dosed)
   assert.equal(loggedStreak(entries, '2026-09-01'), 3)
   assert.equal(loggedStreak([], '2026-09-01'), 0)
+})
+
+test('a compound streak counts only days that compound was dosed, with the same morning grace', () => {
+  const fin = date => ({ ...vitalsOnly(date), peptides: [{ compound: 'Finasteride', dose: 1, unit: 'mg' }] })
+  const entries = [fin('2026-09-18'), fin('2026-09-19'), dosed('2026-09-20'), fin('2026-09-21'), fin('2026-09-22')]
+  assert.equal(doseStreak(entries, 'Finasteride', '2026-09-22'), 2, 'the HGH-only day broke it')
+  assert.equal(doseStreak(entries, 'Finasteride', '2026-09-23'), 2, 'an undosed today falls back to yesterday')
+  assert.equal(doseStreak(entries, 'Finasteride', '2026-09-24'), 0)
+  assert.equal(doseStreak(entries, 'HGH', '2026-09-20'), 1)
+  assert.equal(doseStreak([], 'Finasteride', '2026-09-22'), 0)
 })
 
 test('the longest streak is the best run anywhere in the history, with the day it ended', () => {

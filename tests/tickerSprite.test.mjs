@@ -98,6 +98,15 @@ test('the feed frames: the jab closes in and leaves a bead, the gulp holds a gla
     const face = tickerSprite(pose, 'face')
     assert.equal(face.cells.some(c => c.motion === 'jaw'), false, `${pose}: mouth held, not chewing`)
   }
+  // The mane grows tier by tier and sits under a hat; the bandage is a strip on the right lobe.
+  const hair = prop => tickerSprite('idle', 'full', [prop]).cells.filter(c => c.ink === 'hair').length
+  assert.ok(hair('mane-1') > 0 && hair('mane-1') < hair('mane-2') && hair('mane-2') < hair('mane-3'), 'three growing tiers')
+  const crowned = tickerSprite('idle', 'full', ['mane-3', 'crown'])
+  assert.ok(crowned.cells.some(c => c.ink === 'clip') && crowned.cells.some(c => c.ink === 'hair'), 'a crown on the hair')
+  assert.equal(tickerSprite('idle', 'full', ['bandage']).cells.filter(c => c.ink === 'blush').length, tickerSprite('idle').cells.filter(c => c.ink === 'blush').length + 1, 'the pad')
+  const flex = tickerSprite('flex')
+  const glovesOnRow4 = flex.cells.filter((c, i) => c.ink === 'glove' && Math.floor(i / flex.cols) === 4).length
+  assert.equal(glovesOnRow4, 4, 'the flex: both gloves up at shoulder height')
   // The bowl shows what the plate held (checked on the sitting pose, which has no wave lines or capsule of its own).
   const bowlInks = prop => new Set(tickerSprite('sit', 'full', [prop]).cells.map(c => c.ink))
   assert.ok(bowlInks('bowl-full').has('clip') && !bowlInks('bowl-full').has('line'), 'capsules only')

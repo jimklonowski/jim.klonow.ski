@@ -24,7 +24,8 @@ export const INK_COLORS: Record<TickerInk, string> = {
   mug: 'var(--color-ember)',
   coffee: '#5a3424',
   bowl: '#6f8aa0',
-  hat: '#c084fc'
+  hat: '#c084fc',
+  hair: '#a8702f'
 }
 
 /** Every ink resolved against the live theme — call once per game, not per cell. */
