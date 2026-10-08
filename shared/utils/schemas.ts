@@ -273,7 +273,7 @@ export const zCycleSave = z.object({
 // --- /ticker: the pet's memory (migration 0009) ---
 // The keys the page may write; `pets` is deliberately absent (server/api/ticker/pet.post.ts
 // counts, nobody sets). Values are small JSON — stamps are strings, the snapshot an object.
-export const TICKER_STATE_KEYS = ['runner', 'unlocks', 'flinched', 'birthday', 'saluted', 'landed', 'snapshot', 'visitsSeen'] as const
+export const TICKER_STATE_KEYS = ['runner', 'unlocks', 'flinched', 'birthday', 'saluted', 'landed', 'snapshot', 'visitsSeen', 'mane', 'fed'] as const
 
 export const zTickerStateSave = z.object({
   key: z.enum(TICKER_STATE_KEYS, 'Bad key'),
