@@ -682,11 +682,15 @@ const bowl = computed<TickerProp>(() => {
   return shots && pills ? 'bowl-mixed' : shots ? 'bowl-shots' : 'bowl-full'
 })
 
+/** Poses whose face is the point: the shades come off for them and go back on after. */
+const BARE_EYED = new Set<TickerPose>(['eating', 'gulp', 'jab1', 'jab2', 'mixing', 'petted', 'asleep'])
+
 /**
  * The props layer, in paint order. The bowl shows what has been served today; one thing on the
  * left lobe at a time (the party hat on its birthday, the cap on a walk, else the crown if
- * earned); the other walk props and the earned wearables; the gold star for a clean week; and
- * the vet visit's calendar from three days out, with the lab coat on the day.
+ * earned); the other walk props and the earned wearables — the shades except where the eyes
+ * matter; the gold star for a clean week; and the vet visit's calendar from three days out, with
+ * the lab coat on the day.
  */
 const accessories = computed<TickerProp[]>(() => {
   const out: TickerProp[] = [bowl.value]
@@ -698,7 +702,9 @@ const accessories = computed<TickerProp[]>(() => {
   else if (carried === 'cap') out.push('cap')
   else if (worn.has('crown')) out.push('crown')
   if (carried && carried !== 'cap') out.push(carried)
-  for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) out.push(p)
+  if (worn.has('sweatband')) out.push('sweatband')
+  if (worn.has('shades') && !BARE_EYED.has(poseOverride.value ?? 'idle')) out.push('shades')
+  if (worn.has('medal')) out.push('medal')
   if (cleanWeek.value) out.push('gold-star')
   if (bandaged.value) out.push('bandage')
   const d = nextDraw.value
@@ -831,23 +837,46 @@ async function afterEffect(compound: string) {
   }
 }
 
-/** The mane grows in tier by tier up to the earned one, then the streak gets its line. */
+/**
+ * The mane after a finasteride swallow. It remembers the tier it last showed: a new tier grows
+ * in from there, tier by tier; the same tier just gets a comb (one big beat); a lower one — the
+ * streak broke — is noted and remembered, so it can grow again.
+ */
+const MANE_KEY = 'mane'
+
 async function growMane() {
   const tier = maneTier.value
   const days = finasterideStreak.value
+  const shown = Math.min(recall<number>(MANE_KEY) ?? 0, 3)
+  const next = nextMane.value
+  const standing = tier ? `the mane: ${MANE_TIERS[tier - 1]!.name}. ${days} days of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.` : ''
+
   if (!tier) {
-    line.value = `finasteride. ${days ? `day ${days} — ` : ''}the mane takes a week to show.`
+    if (shown) remember(MANE_KEY, 0)
+    line.value = shown
+      ? `the mane's gone — the streak broke. ${days ? `day ${days} of the next one` : 'it starts again'}; stubble at ${MANE_TIERS[0]!.days}.`
+      : `finasteride. ${days ? `day ${days} — ` : ''}the mane takes a week to show.`
     await wait(900)
     return
   }
-  for (let t = 1; t <= tier; t++) {
-    maneGrow.value = t
-    line.value = `the mane: ${MANE_TIERS[t - 1]!.name}…`
-    await wait(300)
+  if (tier > shown) {
+    for (let t = shown + 1; t <= tier; t++) {
+      maneGrow.value = t
+      line.value = `the mane: ${MANE_TIERS[t - 1]!.name}…`
+      await wait(360)
+    }
+    maneGrow.value = null
+    remember(MANE_KEY, tier)
+    line.value = standing
   }
-  maneGrow.value = null
-  const next = nextMane.value
-  line.value = `the mane: ${MANE_TIERS[tier - 1]!.name}. ${days} days of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.`
+  else if (tier < shown) {
+    remember(MANE_KEY, tier)
+    line.value = `the mane thinned to ${MANE_TIERS[tier - 1]!.name} — the streak broke. ${days} days on the new one.`
+  }
+  else {
+    pet.value?.trigger('bigbeat')
+    line.value = `${standing} it combed it.`
+  }
   await wait(900)
 }
 
@@ -856,11 +885,36 @@ const mixesToday = computed(() => entries.value.find(e => e.date === mealDay.val
 const unitLabel = (u: string) => u === 'iu' ? 'IU' : u
 const recipeOf = (m: { vial_amount: number, vial_unit: string, bac_water_ml: number }) => `${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL`
 
-/** The plate rows fed on this visit, by index — the menu checks them off; a new meal day clears it. */
-const fedThisVisit = ref(new Set<number>())
-watch(mealDay, () => {
-  fedThisVisit.value = new Set()
+// What's been fed off today's plate, remembered with the meal day so a reload (or the phone
+// later) still shows the checks. Doses are keyed by label and running number rather than index,
+// which holds when a dose is logged later in the day.
+const FED_KEY = 'fed'
+const doseKeys = computed(() => {
+  const seen = new Map<string, number>()
+  return dosesToday.value.map((d) => {
+    const base = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
+    const nth = (seen.get(base) ?? 0) + 1
+    seen.set(base, nth)
+    return `${base}#${nth}`
+  })
 })
+function fedFromMemory(): Set<string> {
+  const saved = recall<{ date: string, keys: string[] }>(FED_KEY)
+  return new Set(saved?.date === mealDay.value && Array.isArray(saved.keys) ? saved.keys : [])
+}
+const fedKeys = ref(fedFromMemory())
+onMounted(() => {
+  if (!remote) fedKeys.value = fedFromMemory()
+})
+watch(mealDay, () => {
+  fedKeys.value = fedFromMemory()
+})
+/** Plate indices fed today. */
+const fedThisVisit = computed(() => new Set(doseKeys.value.map((k, i) => fedKeys.value.has(k) ? i : -1).filter(i => i >= 0)))
+function markFed(i: number) {
+  fedKeys.value = new Set([...fedKeys.value, doseKeys.value[i]!])
+  remember(FED_KEY, { date: mealDay.value, keys: [...fedKeys.value] })
+}
 
 /** A reconstitution: the vial and the bac water, swirled, never shaken. */
 async function mixOne(i: number, note = '') {
@@ -902,7 +956,7 @@ async function doseOne(i: number, note = '') {
   }
   await wait(500)
   await afterEffect(d.compound)
-  fedThisVisit.value = new Set([...fedThisVisit.value, i])
+  markFed(i)
 }
 
 /** What to say once the plate is (or isn't) clear. */
@@ -949,13 +1003,9 @@ const feedItems = computed<DropdownMenuItem[][]>(() => {
     onSelect: () => feedOne('mix', i)
   }))
   // A compound dosed more than once in the day (the iron protocol's three) gets a running number.
-  const plate = dosesToday.value.map(d => `${d.compound} ${d.dose} ${unitLabel(d.unit)}`)
-  const seen = new Map<string, number>()
   const doses: DropdownMenuItem[] = dosesToday.value.map((d, i) => {
-    const base = plate[i]!
-    const nth = (seen.get(base) ?? 0) + 1
-    seen.set(base, nth)
-    const repeats = plate.filter(l => l === base).length
+    const [base, nth] = doseKeys.value[i]!.split('#')
+    const repeats = doseKeys.value.filter(k => k.startsWith(`${base}#`)).length
     return {
       label: `${base}${repeats > 1 ? ` #${nth}` : ''}${fedThisVisit.value.has(i) ? ' ✓' : ''}`,
       icon: isInjected(d.compound) ? 'i-lucide-syringe' : 'i-lucide-pill',

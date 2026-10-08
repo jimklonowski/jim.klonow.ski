@@ -148,7 +148,9 @@ function prepare() {
   font = canvas.value ? getComputedStyle(canvas.value).fontFamily : font
   sprites.clear()
   for (const pose of ['idle', 'walk1', 'walk2', 'happy', 'flatline'] as const) {
-    const s = tickerSprite(pose, 'full', props.accessories, props.build)
+    // The shades fly off in the crash — the X eyes are the point.
+    const worn = pose === 'flatline' ? props.accessories.filter(a => a !== 'shades') : props.accessories
+    const s = tickerSprite(pose, 'full', worn, props.build)
     const cells: Cells = []
     s.cells.forEach((cell, i) => {
       if (cell.ink) cells.push([Math.floor(i / s.cols), i % s.cols, cell.ink])
