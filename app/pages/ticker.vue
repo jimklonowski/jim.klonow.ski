@@ -79,7 +79,7 @@
         :build="build"
         :accessories="worn"
         :night="night"
-        :hi="runnerHi?.score ?? 0"
+        :hi="houseBest"
         @over="onRunOver"
         @quit="onRunQuit"
       />
@@ -164,7 +164,7 @@
         :disabled="busy && !playing"
         @click="playing ? runner?.quit() : play()"
       >
-        {{ playing ? '■ QUIT' : `⊳ PLAY${runnerHi ? ` · HI ${runnerHi.score}` : ''}` }}
+        {{ playing ? '■ QUIT' : `⊳ PLAY${houseBest ? ` · HI ${houseBest}` : ''}` }}
       </button>
       <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feeding and walking replay what's logged; play is just play</span>
     </div>
@@ -201,14 +201,16 @@
 <script setup lang="ts">
 // The resident companion as a pet. Everything it feels is DERIVED from streams that already
 // exist — doses fed, workouts walked, sodas regretted, sleep slept — so there is nothing to
-// forget to do. Petting is the one pure interaction; the only local state is its counter and the
-// once-a-day stamps that keep the soda flinch and the birthday from replaying on every visit.
+// forget to do. Petting is the one pure interaction. What it remembers (the pet counter, the
+// runner's record, which things it has already reacted to) lives in the database for the owner
+// and in the browser for the demo pet — see the memory section.
 import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
 import type { TickerBelly, TickerBuild, TickerPose, TickerProp, TickerTier } from '#shared/utils/tickerSprite'
+import type { TickerPets, TickerRecord, TickerRunResponse, TickerStateResponse } from '#shared/types/ticker'
 
 useSeoMeta({ title: 'Ticker' })
 
@@ -227,6 +229,59 @@ const today = useToday()
 
 const entries = computed(() => journalData.value ?? [])
 const rhr = computed(() => overview.value?.latestRhr ?? null)
+
+// --- memory: where the pet keeps what it remembers --------------------------------------------
+// The owner's TICKER remembers in the database (migration 0009, /api/ticker/state), so it is the
+// same pet on the phone and the desktop. The demo sandbox is shared by every demo visitor, so its
+// pet keeps its memory in the browser, as it always did. A guest holds no memory of their own:
+// they leave footprints, pets and runs through their own endpoints, and the owner's pet mentions
+// them on its next look.
+
+/** Whose pet it is: the keeper gets the reactions, the news and the stamps; a guest gets a hello. */
+const keeper = role.value === 'owner' || role.value === 'demo'
+/** Memory on the server (owner and guests) or in this browser (demo). */
+const remote = role.value != null && role.value !== 'demo'
+const requestFetch = useRequestFetch()
+const { data: memoryData } = remote
+  ? await useAsyncData('ticker-state', () => requestFetch<TickerStateResponse>('/api/ticker/state'), {
+      getCachedData: (key, app, ctx) => ctx.cause === 'initial' ? app.payload.data[key] : undefined
+    })
+  : { data: ref<TickerStateResponse | null>(null) }
+const memory = reactive<Record<string, unknown>>({ ...(memoryData.value?.state ?? {}) })
+const visits = computed(() => memoryData.value?.visits ?? null)
+const visitorLabel = computed(() => memoryData.value?.me.label ?? null)
+
+/** What it remembers under a key: the server's copy, or the browser's for the demo pet. */
+function recall<T>(key: string): T | null {
+  if (remote) return (memory[key] as T | undefined) ?? null
+  try {
+    const raw = localStorage.getItem(`ticker:${key}`)
+    if (raw == null) return null
+    try {
+      return JSON.parse(raw) as T
+    }
+    catch {
+      return raw as unknown as T // a plain stamp from before the memory was JSON
+    }
+  }
+  catch {
+    return null
+  }
+}
+
+/** Remember something: the server for the owner, the browser for the demo pet, nowhere for a guest. */
+function remember(key: string, value: unknown) {
+  memory[key] = value
+  if (remote) {
+    if (role.value === 'owner') $fetch('/api/ticker/state', { method: 'POST', body: { key, value } }).catch(() => { /* it'll remember next time */ })
+  }
+  else {
+    try {
+      localStorage.setItem(`ticker:${key}`, JSON.stringify(value))
+    }
+    catch { /* a private window — the demo pet forgets on close, which is fine */ }
+  }
+}
 
 // --- the clock on the wall --------------------------------------------------------------------
 // The viewer's local time, not the home timezone: it is the viewer's evening the stage darkens
@@ -339,14 +394,14 @@ function latestJournal(key: 'weight_lbs' | 'hrv'): number | null {
 const weight = computed(() => latestJournal('weight_lbs'))
 const latestHrv = computed(() => latestJournal('hrv'))
 
-/** The first recorded anything: the pet's hatch date. */
-const firstDate = computed(() => {
-  const firsts = [entries.value[0]?.date, (healthData.value ?? [])[0]?.date, (workoutsData.value ?? [])[0]?.date]
-    .filter((d): d is string => !!d)
-  return firsts.sort()[0] ?? null
-})
+/**
+ * The first hand-logged day: the pet's hatch date. The watch's vitals go back years further
+ * (the Apple Health import), but that is its prehistory, not its life — it was born when the
+ * journal started.
+ */
+const firstDate = computed(() => entries.value.find(isLoggedDay)?.date ?? null)
 const ageDays = computed(() => firstDate.value ? diffDays(firstDate.value, today.value) : null)
-/** How old it turns today, when today is the anniversary of the first data point; null otherwise. */
+/** How old it turns today, when today is the anniversary of the first logged day; null otherwise. */
 const birthday = computed(() => {
   const f = firstDate.value
   if (!f || f === today.value || f.slice(5) !== today.value.slice(5)) return null
@@ -442,8 +497,8 @@ const records = computed(() => {
   if (light) lines.push(`lightest: ${light.value} lb on ${when(light.item.date)}.`)
   const long = best(workoutsData.value ?? [], w => w.duration_min, 'max')
   if (long) lines.push(`longest workout: ${Math.round(long.value)} min${long.item.workout_type ? ` of ${long.item.workout_type}` : ''} on ${when(long.item.date)}.`)
-  const night = best(health, h => h.sleep_total_min, 'max')
-  if (night) lines.push(`best night: ${fmtSleep(night.value)} on ${when(night.item.date)}.`)
+  const nightBest = best(health, h => h.sleep_total_min, 'max')
+  if (nightBest) lines.push(`best night: ${fmtSleep(nightBest.value)} on ${when(nightBest.item.date)}.`)
   const calm = best(entries.value, e => e.rhr, 'min')
   if (calm) lines.push(`lowest resting HR: ${calm.value} bpm on ${when(calm.item.date)}.`)
   if (runnerHi.value) lines.push(`best run: ${runnerHi.value.score} points on ${when(runnerHi.value.date)}.`)
@@ -451,8 +506,8 @@ const records = computed(() => {
 })
 
 // --- earned accessories: milestones unlock things to wear -------------------------------------
-// Derived like everything else, so they are never lost — localStorage only remembers which ones
-// have been announced (see announceUnlocks).
+// Derived like everything else, so they are never lost — the memory only holds which ones have
+// been announced (see announceUnlocks).
 
 interface Unlock { prop: TickerProp, name: string, goal: number, progress: number, unit: string }
 
@@ -462,7 +517,7 @@ const loggedDays = computed(() => entries.value.filter(isLoggedDay).length)
 const unlocks = computed<Unlock[]>(() => [
   { prop: 'crown', name: 'the crown', goal: 100, progress: longestLoggedStreak(entries.value).days, unit: 'days logged in a row' },
   { prop: 'sweatband', name: 'the sweatband', goal: 6000, progress: totalWorkoutMinutes.value, unit: 'workout minutes' },
-  { prop: 'shades', name: 'the shades', goal: 2000, progress: ageDays.value ?? 0, unit: 'days old' },
+  { prop: 'shades', name: 'the shades', goal: 365, progress: ageDays.value ?? 0, unit: 'days old' },
   { prop: 'medal', name: 'the medal', goal: 250, progress: loggedDays.value, unit: 'logged days' }
 ])
 const earned = computed(() => unlocks.value.filter(u => u.progress >= u.goal))
@@ -587,8 +642,8 @@ const walking = ref(false)
 /**
  * The props layer, in paint order. The bowl shows what has been served today; one thing on the
  * left lobe at a time (the party hat on its birthday, the cap on a walk, else the crown if
- * earned); the other walk props and the earned wearables; and the vet visit's calendar from
- * three days out, with the lab coat on the day.
+ * earned); the other walk props and the earned wearables; the gold star for a clean week; and
+ * the vet visit's calendar from three days out, with the lab coat on the day.
  */
 const accessories = computed<TickerProp[]>(() => {
   const out: TickerProp[] = [hunger.value === 'fed' ? 'bowl-full' : 'bowl-empty']
@@ -623,15 +678,12 @@ function wait(ms: number) {
 }
 onUnmounted(() => timers.forEach(clearTimeout))
 
-// Petting: the counter is a per-viewer convenience, so localStorage is exactly enough.
-const PETS_KEY = 'ticker:pets'
-const pets = ref({ total: 0, today: 0 })
+// Petting. The count is the server's for the owner and for guests (whose pats also land in their
+// footprint for the day); the demo pet counts in the browser, read after hydration.
+const pets = ref<TickerPets>(recall<TickerPets>('pets') ?? { total: 0, date: today.value, today: 0 })
+const petsToday = computed(() => pets.value.date === today.value ? pets.value.today : 0)
 onMounted(() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(PETS_KEY) ?? '{}') as { total?: number, date?: string, today?: number }
-    pets.value = { total: raw.total ?? 0, today: raw.date === today.value ? raw.today ?? 0 : 0 }
-  }
-  catch { /* private windows etc. — the counter just starts fresh */ }
+  if (!remote) pets.value = recall<TickerPets>('pets') ?? pets.value
 })
 
 const SQUEAKS = ['♥!', 'squeak!', 'hehe — ok', 'that\'s the spot', 'ok, that\'s plenty', '…there IS a digest to write, you know', '(happy wiggle)']
@@ -651,14 +703,21 @@ function spawnHeart(dx: number) {
 
 async function petIt() {
   wake()
-  pets.value = { total: pets.value.total + 1, today: pets.value.today + 1 }
-  try {
-    localStorage.setItem(PETS_KEY, JSON.stringify({ ...pets.value, date: today.value }))
+  const next: TickerPets = { total: pets.value.total + 1, date: today.value, today: petsToday.value + 1 }
+  pets.value = next
+  if (remote) {
+    $fetch<TickerPets>('/api/ticker/pet', { method: 'POST' })
+      .then((p) => {
+        pets.value = p
+      })
+      .catch(() => { /* counted here for now; the server's figure wins next load */ })
   }
-  catch { /* fine */ }
+  else {
+    remember('pets', next)
+  }
 
   spawnHeart(Math.random() * 36 - 18)
-  line.value = asleep.value ? '(it stirs, smiles… and goes back to sleep)' : SQUEAKS[Math.min(pets.value.today - 1, SQUEAKS.length - 1)]!
+  line.value = asleep.value ? '(it stirs, smiles… and goes back to sleep)' : SQUEAKS[Math.min(petsToday.value - 1, SQUEAKS.length - 1)]!
   pet.value?.trigger('celebrate')
   if (busy.value) return // mid-walk pats are allowed; don't fight the walk's poses
   actionPose.value = 'petted'
@@ -760,6 +819,7 @@ const quotes = computed(() => {
   const r = recovery.value
   const draw = nextDraw.value
   const flags = latestDraw.value ? flagCounts.value : null
+  const v = visits.value
   const lines: Array<string | null> = [
     weight.value != null ? `${weight.value} lb at the last weigh-in. it's holding that for you.` : null,
     r != null
@@ -786,7 +846,7 @@ const quotes = computed(() => {
       ? `${sodasThisWeek.value} soda${sodasThisWeek.value === 1 ? '' : 's'} this week. it noticed every one.`
       : 'no sodas this week. it\'s proud of you.',
     oldestOpen.value ? `the ${oldestOpen.value.compound} vial has been open ${oldestOpen.value.days} days.` : null,
-    ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')} days since the first data point. it remembers all of them.` : null,
+    ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')} days since the first logged day. it remembers all of them.` : null,
     weekTally.value
       ? weekTally.value.missed.length
         ? `${weekTally.value.hit} of ${weekTally.value.hit + weekTally.value.missed.length} due doses this week — missed ${weekTally.value.missed.map(m => `${m.compound} ${new Date(`${m.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}`).join(', ')}${cycleClause.value}.`
@@ -811,6 +871,11 @@ const quotes = computed(() => {
     nextUnlock.value
       ? `next unlock: ${nextUnlock.value.name} at ${nextUnlock.value.goal.toLocaleString('en-US')} ${nextUnlock.value.unit} — ${(nextUnlock.value.goal - nextUnlock.value.progress).toLocaleString('en-US')} to go.`
       : 'every accessory earned. there is nothing left to unlock, only to keep.',
+    keeper && v?.total
+      ? `visitors: ${v.total} footprint${v.total === 1 ? '' : 's'}${v.recent[0] ? ` — last ${v.recent[0].label ?? `a ${v.recent[0].role}`} on ${formatDate(v.recent[0].date, 'monthDay')}` : ''}.`
+      : null,
+    v?.best ? `visitors' best run: ${v.best.label ?? 'a friend'}, ${v.best.score} points.` : null,
+    !keeper ? `you're on file as ${visitorLabel.value ?? 'a friend'}. it's keeping a footprint.` : null,
     ...records.value.map(r => `for the record — ${r}`)
   ]
   return lines.filter((l): l is string => !!l)
@@ -835,22 +900,21 @@ async function talk() {
 
 // --- play: the runner ------------------------------------------------------------------------
 // The one thing on the page that is not read from the data. The runner takes the stage over,
-// the pet counts as busy for the duration (no fidgets, the other buttons wait), and the high
-// score lives in this browser like the pet counter — a new one gets the hop and a line.
+// the pet counts as busy for the duration (no fidgets, the other buttons wait). The owner's
+// record is the house record; a guest's best goes to their footprint, which is the visitors'
+// leaderboard, and the HUD shows them the house record to chase.
 
 const runner = useTemplateRef('runner')
 const playing = ref(false)
-const RUNNER_KEY = 'ticker:runner'
-const runnerHi = ref<{ score: number, date: string } | null>(null)
+const runnerHi = ref<TickerRecord | null>(recall<TickerRecord>('runner'))
+const visitorsBest = ref(visits.value?.best ?? null)
 let runSetRecord = false
-
 onMounted(() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(RUNNER_KEY) ?? 'null') as { score?: number, date?: string } | null
-    if (raw?.score && raw.date) runnerHi.value = { score: raw.score, date: raw.date }
-  }
-  catch { /* no storage — no record to beat, then */ }
+  if (!remote) runnerHi.value = recall<TickerRecord>('runner')
 })
+
+/** The HI on the runner's HUD: the owner's record, or for a guest the house record whoever holds it. */
+const houseBest = computed(() => Math.max(runnerHi.value?.score ?? 0, keeper ? 0 : visitorsBest.value?.score ?? 0))
 
 /** What it runs in: the wearables and the hat, not the floor props or the vet's coat. */
 const worn = computed(() => accessories.value.filter(a => !['bowl-empty', 'bowl-full', 'calendar', 'lab-coat'].includes(a)))
@@ -865,11 +929,25 @@ function play() {
 }
 
 function onRunOver(score: number) {
-  if (score > (runnerHi.value?.score ?? 0)) {
-    runnerHi.value = { score, date: today.value }
-    record(RUNNER_KEY, JSON.stringify(runnerHi.value))
+  if (!remote) {
+    if (score > (runnerHi.value?.score ?? 0)) {
+      runnerHi.value = { score, date: today.value }
+      remember('runner', runnerHi.value)
+      runSetRecord = true
+    }
+    return
+  }
+  if (keeper && score > (runnerHi.value?.score ?? 0)) {
+    runnerHi.value = { score, date: today.value } // the server confirms below
     runSetRecord = true
   }
+  $fetch<TickerRunResponse>('/api/ticker/run', { method: 'POST', body: { score } })
+    .then((r) => {
+      runnerHi.value = r.record
+      visitorsBest.value = r.visitorsBest
+      if (!keeper) runSetRecord = r.isRecord
+    })
+    .catch(() => { /* the run still happened; the record just isn't written yet */ })
 }
 
 async function onRunQuit(score: number) {
@@ -877,14 +955,17 @@ async function onRunQuit(score: number) {
   busy.value = false
   await nextTick()
   measureFloor()
-  const best = runnerHi.value
-  if (runSetRecord && best) {
-    line.value = `new best: ${best.score} points. ♥`
+  const bestRun = runnerHi.value
+  if (runSetRecord) {
+    line.value = keeper && bestRun ? `new best: ${bestRun.score} points. ♥` : `new best: ${score} points. ♥`
     pet.value?.trigger('celebrate')
     for (let i = 0; i < 5; i++) timers.push(setTimeout(() => spawnHeart(Math.random() * 120 - 60), i * 150))
   }
-  else if (score > 0 && best) {
-    line.value = `${score} points. best ${best.score} on ${formatDate(best.date, 'monthDay')} — it's still catching its breath.`
+  else if (score > 0 && keeper && bestRun) {
+    line.value = `${score} points. best ${bestRun.score} on ${formatDate(bestRun.date, 'monthDay')} — it's still catching its breath.`
+  }
+  else if (score > 0 && houseBest.value) {
+    line.value = `${score} points. the house record is ${houseBest.value}.`
   }
   else {
     line.value = 'next time.'
@@ -982,7 +1063,7 @@ const stats = computed<Stat[]>(() => [
   {
     label: 'AGE',
     value: ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')}d` : '—',
-    hint: birthday.value ? `turns ${birthday.value} today ♥` : 'since the first data point'
+    hint: birthday.value ? `turns ${birthday.value} today ♥` : 'since the first logged day'
   },
   { label: 'WEIGHT', value: weight.value != null ? `${weight.value} lb` : '—', hint: 'yours, borrowed' },
   { label: 'STREAK', value: `${streak.value}d`, hint: 'logged days' },
@@ -995,7 +1076,11 @@ const stats = computed<Stat[]>(() => [
       ? `rhr ${fever.value.rhr} vs ${fever.value.baseline} avg`
       : recovery.value != null ? `recovery ${recovery.value}%` : undefined
   },
-  { label: 'PETS', value: String(pets.value.today), hint: `${pets.value.total.toLocaleString('en-US')} all-time` }
+  {
+    label: 'PETS',
+    value: String(petsToday.value),
+    hint: `${pets.value.total.toLocaleString('en-US')} all-time${visits.value?.pets ? ` · ${visits.value.pets} from visitors` : ''}`
+  }
 ])
 
 const todaySummary = computed(() => {
@@ -1019,7 +1104,7 @@ function arrivalLine(): string {
   if (asleep.value) return `(asleep — it's late. up at ${WAKE_HOUR})`
   if (birthday.value) {
     const hatched = `${formatDate(firstDate.value!, 'monthDay')} ${firstDate.value!.slice(0, 4)}`
-    return `happy birthday — TICKER turns ${birthday.value} today. (first data point: ${hatched})`
+    return `happy birthday — TICKER turns ${birthday.value} today. (first logged day: ${hatched})`
   }
   if (fever.value) return `rhr ${fever.value.rhr} — ${fever.value.over} over its two-week average. it's running hot; go easy today`
   if (awayDays.value >= 7) return `it's been ${awayDays.value} days. it stopped counting at a week. (it didn't.)`
@@ -1050,27 +1135,19 @@ function arrivalLine(): string {
   return everyday[Number(today.value.slice(-2)) % everyday.length]!
 }
 
-// The one-shots below each play once per thing-that-happened: a stamp in localStorage says what
-// has already been reacted to. No storage (a private window) means every visit is a first.
+// The one-shots below each play once per thing-that-happened: a stamp in the memory says what
+// has already been reacted to.
 function firstTime(key: string, stamp: string): boolean {
-  try {
-    return localStorage.getItem(key) !== stamp
-  }
-  catch {
-    return true
-  }
+  return recall<string>(key) !== stamp
 }
 function record(key: string, stamp: string) {
-  try {
-    localStorage.setItem(key, stamp)
-  }
-  catch { /* fine */ }
+  remember(key, stamp)
 }
 
 // The soda reaction. The home digest's flatline fires on the live count crossing three; here the
 // count is whatever was logged before the visit, so the one-shot plays once per count per day —
 // a fresh soda earns a fresh flinch, a second look at the same tally only gets the line.
-const FLINCH_KEY = 'ticker:flinched'
+const FLINCH_KEY = 'flinched'
 
 async function flinch() {
   const n = sodasToday.value
@@ -1093,7 +1170,7 @@ async function flinch() {
 
 // The birthday: the celebrate hop and a rain of hearts, once per visit-day (the greeting says it
 // every time).
-const BIRTHDAY_KEY = 'ticker:birthday'
+const BIRTHDAY_KEY = 'birthday'
 
 function celebrateBirthday() {
   record(BIRTHDAY_KEY, today.value)
@@ -1103,7 +1180,7 @@ function celebrateBirthday() {
 
 // Results landing: the newest draw on file is a week old or less and hasn't been reacted to —
 // the thump if anything is flagged (it read the report twice), the hop for a clean sheet.
-const LANDED_KEY = 'ticker:landed'
+const LANDED_KEY = 'landed'
 const landedPending = computed(() => latestDraw.value != null && diffDays(latestDraw.value.date, today.value) <= 7 && firstTime(LANDED_KEY, latestDraw.value.date))
 
 function resultsLanded() {
@@ -1119,7 +1196,7 @@ function resultsLanded() {
 }
 
 // --- what changed since its last look ---------------------------------------------------------
-// A snapshot of the figures TICKER saw last visit, kept per browser. On arrival the difference
+// A snapshot of the figures TICKER saw last visit, kept in its memory. On arrival the difference
 // is its news — a broken streak, a new scan, a cycle under way, a draw booked, workouts, weight,
 // days logged — at most three items, in that order of how much they matter. Absence shows too:
 // three days unseen and it has sat down to wait.
@@ -1136,7 +1213,7 @@ interface Snapshot {
   plannedIds: number[]
   activeCycleId: number | null
 }
-const SNAPSHOT_KEY = 'ticker:snapshot'
+const SNAPSHOT_KEY = 'snapshot'
 
 const activeCycle = computed(() => {
   const c = relevantCycle(cyclesData.value ?? [], today.value)
@@ -1159,13 +1236,8 @@ function snapshotNow(): Snapshot {
 }
 
 function loadSnapshot(): Snapshot | null {
-  try {
-    const s = JSON.parse(localStorage.getItem(SNAPSHOT_KEY) ?? 'null') as Snapshot | null
-    return s?.v === 1 ? s : null
-  }
-  catch {
-    return null
-  }
+  const s = recall<Snapshot>(SNAPSHOT_KEY)
+  return s?.v === 1 ? s : null
 }
 
 const lastVisit = ref<Snapshot | null>(null)
@@ -1220,6 +1292,21 @@ function newsSince(snap: Snapshot): News[] {
   return news.slice(0, 3)
 }
 
+/** New footprints since the owner's last look: who came by and what they left. */
+function visitorsNews(): News | null {
+  const v = visits.value
+  if (!v || !keeper) return null
+  const fresh = v.total - (recall<number>('visitsSeen') ?? 0)
+  if (fresh <= 0) return null
+  const latest = v.recent.slice(0, fresh)
+  const who = [...new Set(latest.map(r => r.label ?? `a ${r.role}`))].join(', ')
+  const petted = latest.reduce((s, r) => s + r.pets, 0)
+  return {
+    line: `${fresh} visit${fresh === 1 ? '' : 's'} since its last look — ${who}.${petted ? ` ${petted} pet${petted === 1 ? '' : 's'} given.` : ''} it waved.`,
+    event: 'celebrate'
+  }
+}
+
 async function tell(item: News) {
   line.value = item.line
   if (item.event) pet.value?.trigger(item.event)
@@ -1230,7 +1317,7 @@ async function tell(item: News) {
 }
 
 // A clean week: one salute a day while it lasts (the gold star stays on regardless).
-const SALUTE_KEY = 'ticker:saluted'
+const SALUTE_KEY = 'saluted'
 
 async function salute() {
   record(SALUTE_KEY, today.value)
@@ -1243,20 +1330,17 @@ async function salute() {
 }
 
 // Newly earned accessories: announced once each, then simply worn.
-const UNLOCKS_KEY = 'ticker:unlocks'
+const UNLOCKS_KEY = 'unlocks'
 const freshUnlocks = computed(() => {
-  let seen: string[] = []
-  try {
-    seen = JSON.parse(localStorage.getItem(UNLOCKS_KEY) ?? '[]') as string[]
-  }
-  catch { /* every unlock is news, then */ }
-  return earned.value.filter(u => !seen.includes(u.prop))
+  const seen = recall<string[]>(UNLOCKS_KEY)
+  const known = Array.isArray(seen) ? seen : []
+  return earned.value.filter(u => !known.includes(u.prop))
 })
 
 function announceUnlocks() {
   const fresh = freshUnlocks.value
   if (!fresh.length) return
-  record(UNLOCKS_KEY, JSON.stringify(earned.value.map(u => u.prop)))
+  remember(UNLOCKS_KEY, earned.value.map(u => u.prop))
   line.value = `TICKER earned ${fresh.map(u => u.name).join(', ')} — ${fresh.map(u => `${u.goal.toLocaleString('en-US')} ${u.unit}`).join('; ')}. ♥`
   pet.value?.trigger('celebrate')
 }
@@ -1264,21 +1348,39 @@ function announceUnlocks() {
 // Greet (the clock above has ticked by now, so a late visit finds it asleep), then react to each
 // thing that has happened in turn once it has settled in — the home digest's stagger, then a
 // beat between reactions so each line gets read. The snapshot is written last, so the next
-// visit's news starts from what it saw today.
+// visit's news starts from what it saw today. A guest gets a hello and leaves a footprint; the
+// reactions, the news and the stamps are the keeper's.
 onMounted(() => {
   quoteIdx = Math.floor(Math.random() * 1000)
+
+  if (!keeper) {
+    const name = visitorLabel.value
+    const hello: News = role.value === 'doctor'
+      ? { line: `the doctor${name ? ` — ${name}` : ''}. TICKER sits up straight.`, pose: 'nervous' }
+      : { line: `a friend${name ? ` — ${name}` : ''}! TICKER waves. (it's Jim's; be gentle.)`, event: 'celebrate' }
+    line.value = hello.line
+    timers.push(setTimeout(() => tell(hello), 800))
+    $fetch('/api/ticker/visit', { method: 'POST' }).catch(() => { /* no footprint today, then */ })
+    return
+  }
+
   lastVisit.value = loadSnapshot()
   if (awayDays.value >= 3) sitting.value = true // it sat down to wait; any press stands it up
   line.value = arrivalLine()
   const reactions: Array<() => void> = []
   if (sodasToday.value) reactions.push(flinch)
   if (lastVisit.value) for (const item of newsSince(lastVisit.value)) reactions.push(() => tell(item))
+  const footprints = visitorsNews()
+  if (footprints) {
+    reactions.push(() => tell(footprints))
+    remember('visitsSeen', visits.value!.total)
+  }
   if (birthday.value && firstTime(BIRTHDAY_KEY, today.value)) reactions.push(celebrateBirthday)
   if (landedPending.value) reactions.push(resultsLanded)
   if (cleanWeek.value && firstTime(SALUTE_KEY, today.value)) reactions.push(salute)
   if (freshUnlocks.value.length) reactions.push(announceUnlocks)
   reactions.forEach((react, i) => timers.push(setTimeout(react, 800 + i * 2200)))
-  record(SNAPSHOT_KEY, JSON.stringify(snapshotNow()))
+  remember(SNAPSHOT_KEY, snapshotNow())
 })
 </script>
 

@@ -352,3 +352,31 @@ CREATE TABLE IF NOT EXISTS ask_messages (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ask_messages_thread ON ask_messages(thread_id, id);
+
+-- TICKER's memory (2026-10-08, migration 0009): the /ticker pet's counter, the runner's high
+-- score and its once-only reaction stamps, as key/value JSON like `profile`, so the pet is the
+-- same on every device. The allowlisted keys are in shared/utils/schemas.ts (zTickerStateSave);
+-- `pets` is written only by server/api/ticker/pet.post.ts. The demo sandbox has the table but keeps
+-- its memory in the browser — it is shared by every demo visitor.
+CREATE TABLE IF NOT EXISTS ticker_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,        -- JSON
+  updated_at TEXT NOT NULL
+);
+
+-- Visitors' footprints: one row per guest (share-link session) per home-timezone day, created the
+-- first time the guest opens /ticker that day. pets and best_run are what they left behind: the
+-- owner's TICKER mentions them on its next look, and best_run is the visitors' leaderboard. label
+-- is copied from the invite at the time (invites can be deleted; the footprint stays).
+CREATE TABLE IF NOT EXISTS ticker_visits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,         -- YYYY-MM-DD, home timezone
+  invite_id TEXT NOT NULL,    -- invites.id (sha256 hex) the session was minted from
+  role TEXT NOT NULL,         -- 'friend' | 'doctor'
+  label TEXT,
+  pets INTEGER NOT NULL DEFAULT 0,
+  best_run INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ticker_visits_day ON ticker_visits(invite_id, date);
