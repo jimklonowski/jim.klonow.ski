@@ -142,15 +142,23 @@
       >
         ⊳ TALK
       </button>
-      <button
-        type="button"
-        class="tui-btn disabled:opacity-50 disabled:cursor-not-allowed"
+      <!-- FEED opens the plate: one row per dose (and per vial to mix), each fed on its own, or
+           all of them in order. Rows fed this visit carry a check. -->
+      <UDropdownMenu
+        :items="feedItems"
+        :content="{ align: 'start' }"
         :disabled="busy || !dosesToday.length"
-        :title="dosesToday.length ? undefined : 'Nothing logged today yet — TICKER only eats what the journal says'"
-        @click="feed"
+        :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-[12px]' }"
       >
-        ⊳ FEED{{ dosesToday.length ? ` · ${dosesToday.length}` : '' }}
-      </button>
+        <button
+          type="button"
+          class="tui-btn disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="busy || !dosesToday.length"
+          :title="dosesToday.length ? 'Pick a dose to feed, or feed the whole plate' : 'Nothing logged today yet — TICKER only eats what the journal says'"
+        >
+          ⊳ FEED{{ dosesToday.length ? ` · ${fedThisVisit.size ? `${fedThisVisit.size}/` : ''}${dosesToday.length}` : '' }}
+        </button>
+      </UDropdownMenu>
       <button
         type="button"
         class="tui-btn disabled:opacity-50"
@@ -167,7 +175,7 @@
       >
         {{ playing ? '■ QUIT' : `⊳ PLAY${houseBest ? ` · HI ${houseBest}` : ''}` }}
       </button>
-      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feeding and walking replay what's logged; play is just play</span>
+      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feed picks a dose (or the whole plate), walking replays what's logged; play is just play</span>
     </div>
 
     <!-- Stats -->
@@ -212,6 +220,7 @@ import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/proto
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
 import type { TickerBelly, TickerBuild, TickerPose, TickerProp, TickerTier } from '#shared/utils/tickerSprite'
 import type { TickerPets, TickerRecord, TickerRunResponse, TickerStateResponse } from '#shared/types/ticker'
+import type { DropdownMenuItem } from '@nuxt/ui'
 
 useSeoMeta({ title: 'Ticker' })
 
@@ -845,56 +854,121 @@ async function growMane() {
 /** The vials reconstituted on the meal day — mixed before anything is eaten. */
 const mixesToday = computed(() => entries.value.find(e => e.date === mealDay.value)?.reconstitutions ?? [])
 const unitLabel = (u: string) => u === 'iu' ? 'IU' : u
+const recipeOf = (m: { vial_amount: number, vial_unit: string, bac_water_ml: number }) => `${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL`
 
+/** The plate rows fed on this visit, by index — the menu checks them off; a new meal day clears it. */
+const fedThisVisit = ref(new Set<number>())
+watch(mealDay, () => {
+  fedThisVisit.value = new Set()
+})
+
+/** A reconstitution: the vial and the bac water, swirled, never shaken. */
+async function mixOne(i: number, note = '') {
+  const m = mixesToday.value[i]
+  if (!m) return
+  const recipe = recipeOf(m)
+  line.value = `reconstituting ${m.compound} — ${recipe}…${note}`
+  actionPose.value = 'mixing'
+  mixing.value = true
+  await wait(1700)
+  mixing.value = false
+  line.value = `${m.compound} mixed: ${recipe}. swirled, didn't shake.`
+  await wait(600)
+}
+
+/** One dose off the plate: the jab or the swallow, its line, then whatever the compound does to it. */
+async function doseOne(i: number, note = '') {
+  const d = dosesToday.value[i]
+  if (!d) return
+  const label = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
+  const quip = FEED_QUIPS.find(q => q.match.test(d.compound))
+  const again = fedThisVisit.value.size > 0
+  if (isInjected(d.compound)) {
+    line.value = `${label} — jab…${note}`
+    actionPose.value = 'jab1'
+    await wait(650)
+    actionPose.value = 'jab2'
+    pet.value?.trigger('bigbeat')
+    await wait(750)
+    line.value = `${label} — in. ${quip?.jab ?? (again ? 'still didn\'t flinch.' : 'didn\'t flinch.')}`
+  }
+  else {
+    line.value = `${label} — down the hatch…${note}`
+    actionPose.value = 'eating'
+    await wait(700)
+    actionPose.value = 'gulp'
+    await wait(650)
+    line.value = `${label} — swallowed. ${quip?.swallow ?? 'with water, like a grown-up.'}`
+  }
+  await wait(500)
+  await afterEffect(d.compound)
+  fedThisVisit.value = new Set([...fedThisVisit.value, i])
+}
+
+/** What to say once the plate is (or isn't) clear. */
+function plateLine(): string {
+  const left = dosesToday.value.length - fedThisVisit.value.size
+  if (left > 0) return `${left} more on the plate.`
+  return rulesApply && missing.value.length
+    ? `plate clear. still waiting on ${missingNames.value}.`
+    : `all ${dosesToday.value.length} dose${dosesToday.value.length === 1 ? '' : 's'} down. ♥`
+}
+
+const servedNote = () => mealIsYesterday.value && !fedThisVisit.value.size ? ' (yesterday\'s plate)' : ''
+
+/** The menu's "feed all": every mix, then every dose, in order. */
 async function feed() {
   if (busy.value || !dosesToday.value.length) return
   busy.value = true
   wake()
-  const plate = dosesToday.value
-  const served = mealIsYesterday.value ? ' (yesterday\'s plate)' : ''
-
-  // A reconstitution day: the vial and the bac water, swirled, never shaken.
-  for (const [i, m] of mixesToday.value.entries()) {
-    const recipe = `${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL`
-    line.value = `reconstituting ${m.compound} — ${recipe}…${i === 0 ? served : ''}`
-    actionPose.value = 'mixing'
-    mixing.value = true
-    await wait(1700)
-    mixing.value = false
-    line.value = `${m.compound} mixed: ${recipe}. swirled, didn't shake.`
-    await wait(600)
-  }
-
-  for (const [i, d] of plate.entries()) {
-    const label = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
-    const quip = FEED_QUIPS.find(q => q.match.test(d.compound))
-    const note = i === 0 && !mixesToday.value.length ? served : ''
-    if (isInjected(d.compound)) {
-      line.value = `${label} — jab…${note}`
-      actionPose.value = 'jab1'
-      await wait(650)
-      actionPose.value = 'jab2'
-      pet.value?.trigger('bigbeat')
-      await wait(750)
-      line.value = `${label} — in. ${quip?.jab ?? (i === 0 ? 'didn\'t flinch.' : 'still didn\'t flinch.')}`
-    }
-    else {
-      line.value = `${label} — down the hatch…${note}`
-      actionPose.value = 'eating'
-      await wait(700)
-      actionPose.value = 'gulp'
-      await wait(650)
-      line.value = `${label} — swallowed. ${quip?.swallow ?? 'with water, like a grown-up.'}`
-    }
-    await wait(500)
-    await afterEffect(d.compound)
-  }
+  const note = servedNote()
+  for (let i = 0; i < mixesToday.value.length; i++) await mixOne(i, i === 0 ? note : '')
+  for (let i = 0; i < dosesToday.value.length; i++) await doseOne(i, i === 0 && !mixesToday.value.length ? note : '')
   actionPose.value = null
-  line.value = rulesApply && missing.value.length
-    ? `${plate.length} down. still waiting on ${missingNames.value}.`
-    : `all ${plate.length} dose${plate.length === 1 ? '' : 's'} down. ♥`
+  line.value = plateLine()
   busy.value = false
 }
+
+/** A single row from the menu: one dose, or one vial to mix. */
+async function feedOne(kind: 'dose' | 'mix', i: number) {
+  if (busy.value) return
+  busy.value = true
+  wake()
+  if (kind === 'mix') await mixOne(i, servedNote())
+  else await doseOne(i, servedNote())
+  actionPose.value = null
+  if (kind === 'dose') line.value = plateLine()
+  busy.value = false
+}
+
+/** The plate as a menu: the vials to mix, the doses with a check once fed, and feed-all. */
+const feedItems = computed<DropdownMenuItem[][]>(() => {
+  const mixes: DropdownMenuItem[] = mixesToday.value.map((m, i) => ({
+    label: `mix ${m.compound} — ${recipeOf(m)}`,
+    icon: 'i-lucide-flask-conical',
+    onSelect: () => feedOne('mix', i)
+  }))
+  // A compound dosed more than once in the day (the iron protocol's three) gets a running number.
+  const plate = dosesToday.value.map(d => `${d.compound} ${d.dose} ${unitLabel(d.unit)}`)
+  const seen = new Map<string, number>()
+  const doses: DropdownMenuItem[] = dosesToday.value.map((d, i) => {
+    const base = plate[i]!
+    const nth = (seen.get(base) ?? 0) + 1
+    seen.set(base, nth)
+    const repeats = plate.filter(l => l === base).length
+    return {
+      label: `${base}${repeats > 1 ? ` #${nth}` : ''}${fedThisVisit.value.has(i) ? ' ✓' : ''}`,
+      icon: isInjected(d.compound) ? 'i-lucide-syringe' : 'i-lucide-pill',
+      onSelect: () => feedOne('dose', i)
+    }
+  })
+  const all: DropdownMenuItem[] = [{
+    label: `feed all · ${dosesToday.value.length}${mealIsYesterday.value ? ' (yesterday\'s plate)' : ''}`,
+    icon: 'i-lucide-utensils',
+    onSelect: feed
+  }]
+  return [...(mixes.length ? [mixes] : []), doses, all]
+})
 
 async function walk() {
   if (busy.value) return
