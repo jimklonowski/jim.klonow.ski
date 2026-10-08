@@ -4,7 +4,8 @@
       label="TICKER · RESIDENT COMPANION"
       :dashes="8"
     >
-      <span class="text-[10.5px] text-muted normal-case">it lives off the data you already log — nothing here to maintain</span>
+      <!-- The tagline is wider than a phone; the header keeps its title there and the hint under the buttons says the same. -->
+      <span class="hidden sm:inline text-[10.5px] text-muted normal-case">it lives off the data you already log — nothing here to maintain</span>
     </TuiHeader>
 
     <!-- Stage. Tall enough for the lg figure with a hat on (19 sprite rows), its EKG and captions,
@@ -194,7 +195,7 @@
         </p>
         <p
           v-if="s.hint"
-          class="mt-0.5 text-[10px] text-faint"
+          class="mt-0.5 text-[10px] leading-tight text-faint"
         >
           {{ s.hint }}
         </p>
@@ -204,6 +205,32 @@
     <p class="mt-2.5 text-[11.5px] leading-[1.7] text-muted">
       TICKER's day, read from the data: {{ todaySummary }}
     </p>
+
+    <!-- The log: the remark line above truncates and each line replaces the last, so the last ten
+         are kept here in full, newest first, for a quote that ran long or a reaction you missed. -->
+    <section
+      v-if="log.length"
+      class="mt-4"
+      aria-label="TICKER's recent remarks"
+    >
+      <TuiHeader
+        label="TICKER · LOG"
+        :dashes="4"
+      >
+        <span class="text-[10.5px] text-faint">last {{ log.length }} of today</span>
+      </TuiHeader>
+      <ol class="mt-2 border-l border-line-soft pl-3 text-[11px] leading-[1.6]">
+        <li
+          v-for="(entry, i) in log"
+          :key="entry.id"
+          class="flex gap-2.5"
+          :class="i === 0 ? 'text-dim' : 'text-faint'"
+        >
+          <span class="shrink-0 tabular-nums text-ghost">{{ entry.at }}</span>
+          <span>{{ entry.text }}</span>
+        </li>
+      </ol>
+    </section>
   </div>
 </template>
 
@@ -215,6 +242,7 @@
 // and in the browser for the demo pet — see the memory section.
 import { doseStreak, isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
+import { localTimeNow } from '#shared/utils/time'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
@@ -294,15 +322,17 @@ function remember(key: string, value: unknown) {
 }
 
 // --- the clock on the wall --------------------------------------------------------------------
-// The viewer's local time, not the home timezone: it is the viewer's evening the stage darkens
-// for. Null until mounted, so the server and the first client paint agree on a daytime stage.
+// The HOME timezone's clock (shared/utils/time.ts), not the viewer's: it is one pet in one place,
+// so a friend visiting from another timezone finds it awake or asleep by its own evening, not
+// theirs. Null until mounted, so the server and the first client paint agree on a daytime stage.
 
 const DUSK_HOUR = 19
 const BEDTIME_HOUR = 22
 const WAKE_HOUR = 6
 
-const now = ref<number | null>(null)
-const hour = computed(() => now.value == null ? null : new Date(now.value).getHours())
+/** "HH:MM" in the home timezone, 24-hour. */
+const now = ref<string | null>(null)
+const hour = computed(() => now.value == null ? null : Number(now.value.slice(0, 2)))
 const night = computed(() => hour.value != null && (hour.value >= DUSK_HOUR || hour.value < WAKE_HOUR))
 const asleep = computed(() => hour.value != null && (hour.value >= BEDTIME_HOUR || hour.value < WAKE_HOUR))
 
@@ -313,15 +343,18 @@ const sky = computed<'day' | 'golden' | 'night'>(() => {
   if (night.value) return 'night'
   return h < 8 || h >= 17 ? 'golden' : 'day'
 })
-const clock = computed(() => now.value == null
-  ? ''
-  : new Date(now.value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase())
+/** The clock under the window, 12-hour: "3:14 pm". */
+const clock = computed(() => {
+  if (now.value == null || hour.value == null) return ''
+  const h12 = hour.value % 12 || 12
+  return `${h12}:${now.value.slice(3, 5)} ${hour.value < 12 ? 'am' : 'pm'}`
+})
 
 let clockTimer: ReturnType<typeof setTimeout> | undefined
 let clockInterval: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   const tick = () => {
-    now.value = Date.now()
+    now.value = localTimeNow()
   }
   tick()
   // Then on the minute, so the clock under the window never lags.
@@ -715,6 +748,17 @@ const accessories = computed<TickerProp[]>(() => {
 const x = ref(0)
 const facing = ref(1)
 const line = ref('')
+
+// The log keeps the last ten distinct remarks of this visit with the clock they were said at.
+interface LogEntry { id: number, at: string, text: string }
+const LOG_MAX = 10
+const log = ref<LogEntry[]>([])
+let logId = 0
+watch(line, (text) => {
+  const said = text.trim()
+  if (!said || log.value[0]?.text === said) return
+  log.value = [{ id: ++logId, at: clock.value, text: said }, ...log.value].slice(0, LOG_MAX)
+})
 /** Set for the length of a walk: the beat runs at the workout's average instead of the resting reading. */
 const walkHr = ref<number | null>(null)
 const caption = computed(() => {
@@ -1345,13 +1389,15 @@ const fedTile = computed(() => {
 
 interface Stat { label: string, value: string, hint?: string, title?: string }
 
+// Hints are a few words — seven tiles leave ~100px each — with the longer wording as the tooltip.
 const stats = computed<Stat[]>(() => [
   {
     label: 'AGE',
     value: ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')}d` : '—',
-    hint: birthday.value ? `turns ${birthday.value} today ♥` : 'since the first logged day'
+    hint: birthday.value ? `turns ${birthday.value} ♥` : 'since day one',
+    title: firstDate.value ? `days since the first logged day, ${formatDate(firstDate.value, 'monthDay')} ${firstDate.value.slice(0, 4)}` : undefined
   },
-  { label: 'WEIGHT', value: weight.value != null ? `${weight.value} lb` : '—', hint: 'yours, borrowed' },
+  { label: 'WEIGHT', value: weight.value != null ? `${weight.value} lb` : '—', hint: 'borrowed', title: 'yours — it borrows the number' },
   { label: 'STREAK', value: `${streak.value}d`, hint: 'logged days' },
   { label: 'FED', ...fedTile.value },
   { label: 'NEXT DRAW', value: drawTile.value.value, hint: drawTile.value.hint },
@@ -1359,13 +1405,15 @@ const stats = computed<Stat[]>(() => [
     label: 'MOOD',
     value: moodWord.value,
     hint: fever.value
-      ? `rhr ${fever.value.rhr} vs ${fever.value.baseline} avg`
-      : recovery.value != null ? `recovery ${recovery.value}%` : undefined
+      ? `rhr ${fever.value.rhr} vs ${fever.value.baseline}`
+      : recovery.value != null ? `recovery ${recovery.value}%` : undefined,
+    title: fever.value ? `resting HR ${fever.value.rhr} against a two-week average of ${fever.value.baseline}` : undefined
   },
   {
     label: 'PETS',
     value: String(petsToday.value),
-    hint: `${pets.value.total.toLocaleString('en-US')} all-time${visits.value?.pets ? ` · ${visits.value.pets} from visitors` : ''}`
+    hint: `${pets.value.total.toLocaleString('en-US')} all-time`,
+    title: visits.value?.pets ? `${visits.value.pets} of them from visitors` : undefined
   }
 ])
 
@@ -1640,10 +1688,11 @@ onMounted(() => {
   quoteIdx = Math.floor(Math.random() * 1000)
 
   if (!keeper) {
+    // A friend. (The doctor role can't open this page — its curated view leaves out sodas and
+    // daily doses, both of which TICKER chatters about — so there is no doctor greeting; the
+    // endpoints still accept the role in case that policy changes.)
     const name = visitorLabel.value
-    const hello: News = role.value === 'doctor'
-      ? { line: `the doctor${name ? ` — ${name}` : ''}. TICKER sits up straight.`, pose: 'nervous' }
-      : { line: `a friend${name ? ` — ${name}` : ''}! TICKER waves. (it's Jim's; be gentle.)`, event: 'celebrate' }
+    const hello: News = { line: `a friend${name ? ` — ${name}` : ''}! TICKER waves. (it's Jim's; be gentle.)`, event: 'celebrate' }
     line.value = hello.line
     timers.push(setTimeout(() => tell(hello), 800))
     $fetch('/api/ticker/visit', { method: 'POST' }).catch(() => { /* no footprint today, then */ })
@@ -1735,6 +1784,12 @@ onMounted(() => {
   letter-spacing: 0.06em;
   color: var(--color-ghost);
   pointer-events: none;
+}
+/* A phone's stage is ~358px: the figure's canvas starts ~80px in, so the window and the clock
+   tuck into the left margin, under the corner cobweb, instead of sitting on its shoulder. */
+@media (max-width: 639px) {
+  .window { left: 10px; top: 34px; }
+  .clock { left: 10px; top: 76px; }
 }
 
 /* The floor line, and the bed that stands on it at night: a mattress the feet rest on, a pillow
