@@ -4,7 +4,8 @@
       label="TICKER · RESIDENT COMPANION"
       :dashes="8"
     >
-      <span class="text-[10.5px] text-muted normal-case">it lives off the data you already log — nothing here to maintain</span>
+      <!-- The tagline is wider than a phone; the header keeps its title there and the hint under the buttons says the same. -->
+      <span class="hidden sm:inline text-[10.5px] text-muted normal-case">it lives off the data you already log — nothing here to maintain</span>
     </TuiHeader>
 
     <!-- Stage. Tall enough for the lg figure with a hat on (19 sprite rows), its EKG and captions,
@@ -142,15 +143,23 @@
       >
         ⊳ TALK
       </button>
-      <button
-        type="button"
-        class="tui-btn disabled:opacity-50 disabled:cursor-not-allowed"
+      <!-- FEED opens the plate: one row per dose (and per vial to mix), each fed on its own, or
+           all of them in order. Rows fed this visit carry a check. -->
+      <UDropdownMenu
+        :items="feedItems"
+        :content="{ align: 'start' }"
         :disabled="busy || !dosesToday.length"
-        :title="dosesToday.length ? undefined : 'Nothing logged today yet — TICKER only eats what the journal says'"
-        @click="feed"
+        :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-[12px]' }"
       >
-        ⊳ FEED{{ dosesToday.length ? ` · ${dosesToday.length}` : '' }}
-      </button>
+        <button
+          type="button"
+          class="tui-btn disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="busy || !dosesToday.length"
+          :title="dosesToday.length ? 'Pick a dose to feed, or feed the whole plate' : 'Nothing logged today yet — TICKER only eats what the journal says'"
+        >
+          ⊳ FEED{{ dosesToday.length ? ` · ${fedThisVisit.size ? `${fedThisVisit.size}/` : ''}${dosesToday.length}` : '' }}
+        </button>
+      </UDropdownMenu>
       <button
         type="button"
         class="tui-btn disabled:opacity-50"
@@ -167,7 +176,7 @@
       >
         {{ playing ? '■ QUIT' : `⊳ PLAY${houseBest ? ` · HI ${houseBest}` : ''}` }}
       </button>
-      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feeding and walking replay what's logged; play is just play</span>
+      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feed picks a dose (or the whole plate), walking replays what's logged; play is just play</span>
     </div>
 
     <!-- Stats -->
@@ -186,7 +195,7 @@
         </p>
         <p
           v-if="s.hint"
-          class="mt-0.5 text-[10px] text-faint"
+          class="mt-0.5 text-[10px] leading-tight text-faint"
         >
           {{ s.hint }}
         </p>
@@ -196,6 +205,32 @@
     <p class="mt-2.5 text-[11.5px] leading-[1.7] text-muted">
       TICKER's day, read from the data: {{ todaySummary }}
     </p>
+
+    <!-- The log: the remark line above truncates and each line replaces the last, so the last ten
+         are kept here in full, newest first, for a quote that ran long or a reaction you missed. -->
+    <section
+      v-if="log.length"
+      class="mt-4"
+      aria-label="TICKER's recent remarks"
+    >
+      <TuiHeader
+        label="TICKER · LOG"
+        :dashes="4"
+      >
+        <span class="text-[10.5px] text-faint">last {{ log.length }} of today</span>
+      </TuiHeader>
+      <ol class="mt-2 border-l border-line-soft pl-3 text-[11px] leading-[1.6]">
+        <li
+          v-for="(entry, i) in log"
+          :key="entry.id"
+          class="flex gap-2.5"
+          :class="i === 0 ? 'text-dim' : 'text-faint'"
+        >
+          <span class="shrink-0 tabular-nums text-ghost">{{ entry.at }}</span>
+          <span>{{ entry.text }}</span>
+        </li>
+      </ol>
+    </section>
   </div>
 </template>
 
@@ -207,11 +242,13 @@
 // and in the browser for the demo pet — see the memory section.
 import { doseStreak, isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
+import { localTimeNow } from '#shared/utils/time'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
 import type { TickerBelly, TickerBuild, TickerPose, TickerProp, TickerTier } from '#shared/utils/tickerSprite'
 import type { TickerPets, TickerRecord, TickerRunResponse, TickerStateResponse } from '#shared/types/ticker'
+import type { DropdownMenuItem } from '@nuxt/ui'
 
 useSeoMeta({ title: 'Ticker' })
 
@@ -285,15 +322,17 @@ function remember(key: string, value: unknown) {
 }
 
 // --- the clock on the wall --------------------------------------------------------------------
-// The viewer's local time, not the home timezone: it is the viewer's evening the stage darkens
-// for. Null until mounted, so the server and the first client paint agree on a daytime stage.
+// The HOME timezone's clock (shared/utils/time.ts), not the viewer's: it is one pet in one place,
+// so a friend visiting from another timezone finds it awake or asleep by its own evening, not
+// theirs. Null until mounted, so the server and the first client paint agree on a daytime stage.
 
 const DUSK_HOUR = 19
 const BEDTIME_HOUR = 22
 const WAKE_HOUR = 6
 
-const now = ref<number | null>(null)
-const hour = computed(() => now.value == null ? null : new Date(now.value).getHours())
+/** "HH:MM" in the home timezone, 24-hour. */
+const now = ref<string | null>(null)
+const hour = computed(() => now.value == null ? null : Number(now.value.slice(0, 2)))
 const night = computed(() => hour.value != null && (hour.value >= DUSK_HOUR || hour.value < WAKE_HOUR))
 const asleep = computed(() => hour.value != null && (hour.value >= BEDTIME_HOUR || hour.value < WAKE_HOUR))
 
@@ -304,15 +343,18 @@ const sky = computed<'day' | 'golden' | 'night'>(() => {
   if (night.value) return 'night'
   return h < 8 || h >= 17 ? 'golden' : 'day'
 })
-const clock = computed(() => now.value == null
-  ? ''
-  : new Date(now.value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase())
+/** The clock under the window, 12-hour: "3:14 pm". */
+const clock = computed(() => {
+  if (now.value == null || hour.value == null) return ''
+  const h12 = hour.value % 12 || 12
+  return `${h12}:${now.value.slice(3, 5)} ${hour.value < 12 ? 'am' : 'pm'}`
+})
 
 let clockTimer: ReturnType<typeof setTimeout> | undefined
 let clockInterval: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   const tick = () => {
-    now.value = Date.now()
+    now.value = localTimeNow()
   }
   tick()
   // Then on the minute, so the clock under the window never lags.
@@ -673,11 +715,15 @@ const bowl = computed<TickerProp>(() => {
   return shots && pills ? 'bowl-mixed' : shots ? 'bowl-shots' : 'bowl-full'
 })
 
+/** Poses whose face is the point: the shades come off for them and go back on after. */
+const BARE_EYED = new Set<TickerPose>(['eating', 'gulp', 'jab1', 'jab2', 'mixing', 'petted', 'asleep'])
+
 /**
  * The props layer, in paint order. The bowl shows what has been served today; one thing on the
  * left lobe at a time (the party hat on its birthday, the cap on a walk, else the crown if
- * earned); the other walk props and the earned wearables; the gold star for a clean week; and
- * the vet visit's calendar from three days out, with the lab coat on the day.
+ * earned); the other walk props and the earned wearables — the shades except where the eyes
+ * matter; the gold star for a clean week; and the vet visit's calendar from three days out, with
+ * the lab coat on the day.
  */
 const accessories = computed<TickerProp[]>(() => {
   const out: TickerProp[] = [bowl.value]
@@ -689,7 +735,9 @@ const accessories = computed<TickerProp[]>(() => {
   else if (carried === 'cap') out.push('cap')
   else if (worn.has('crown')) out.push('crown')
   if (carried && carried !== 'cap') out.push(carried)
-  for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) out.push(p)
+  if (worn.has('sweatband')) out.push('sweatband')
+  if (worn.has('shades') && !BARE_EYED.has(poseOverride.value ?? 'idle')) out.push('shades')
+  if (worn.has('medal')) out.push('medal')
   if (cleanWeek.value) out.push('gold-star')
   if (bandaged.value) out.push('bandage')
   const d = nextDraw.value
@@ -700,6 +748,17 @@ const accessories = computed<TickerProp[]>(() => {
 const x = ref(0)
 const facing = ref(1)
 const line = ref('')
+
+// The log keeps the last ten distinct remarks of this visit with the clock they were said at.
+interface LogEntry { id: number, at: string, text: string }
+const LOG_MAX = 10
+const log = ref<LogEntry[]>([])
+let logId = 0
+watch(line, (text) => {
+  const said = text.trim()
+  if (!said || log.value[0]?.text === said) return
+  log.value = [{ id: ++logId, at: clock.value, text: said }, ...log.value].slice(0, LOG_MAX)
+})
 /** Set for the length of a walk: the beat runs at the workout's average instead of the resting reading. */
 const walkHr = ref<number | null>(null)
 const caption = computed(() => {
@@ -822,79 +881,188 @@ async function afterEffect(compound: string) {
   }
 }
 
-/** The mane grows in tier by tier up to the earned one, then the streak gets its line. */
+/**
+ * The mane after a finasteride swallow. It remembers the tier it last showed: a new tier grows
+ * in from there, tier by tier; the same tier just gets a comb (one big beat); a lower one — the
+ * streak broke — is noted and remembered, so it can grow again.
+ */
+const MANE_KEY = 'mane'
+
 async function growMane() {
   const tier = maneTier.value
   const days = finasterideStreak.value
+  const shown = Math.min(recall<number>(MANE_KEY) ?? 0, 3)
+  const next = nextMane.value
+  const standing = tier ? `the mane: ${MANE_TIERS[tier - 1]!.name}. ${days} days of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.` : ''
+
   if (!tier) {
-    line.value = `finasteride. ${days ? `day ${days} — ` : ''}the mane takes a week to show.`
+    if (shown) remember(MANE_KEY, 0)
+    line.value = shown
+      ? `the mane's gone — the streak broke. ${days ? `day ${days} of the next one` : 'it starts again'}; stubble at ${MANE_TIERS[0]!.days}.`
+      : `finasteride. ${days ? `day ${days} — ` : ''}the mane takes a week to show.`
     await wait(900)
     return
   }
-  for (let t = 1; t <= tier; t++) {
-    maneGrow.value = t
-    line.value = `the mane: ${MANE_TIERS[t - 1]!.name}…`
-    await wait(300)
+  if (tier > shown) {
+    for (let t = shown + 1; t <= tier; t++) {
+      maneGrow.value = t
+      line.value = `the mane: ${MANE_TIERS[t - 1]!.name}…`
+      await wait(360)
+    }
+    maneGrow.value = null
+    remember(MANE_KEY, tier)
+    line.value = standing
   }
-  maneGrow.value = null
-  const next = nextMane.value
-  line.value = `the mane: ${MANE_TIERS[tier - 1]!.name}. ${days} days of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.`
+  else if (tier < shown) {
+    remember(MANE_KEY, tier)
+    line.value = `the mane thinned to ${MANE_TIERS[tier - 1]!.name} — the streak broke. ${days} days on the new one.`
+  }
+  else {
+    pet.value?.trigger('bigbeat')
+    line.value = `${standing} it combed it.`
+  }
   await wait(900)
 }
 
 /** The vials reconstituted on the meal day — mixed before anything is eaten. */
 const mixesToday = computed(() => entries.value.find(e => e.date === mealDay.value)?.reconstitutions ?? [])
 const unitLabel = (u: string) => u === 'iu' ? 'IU' : u
+const recipeOf = (m: { vial_amount: number, vial_unit: string, bac_water_ml: number }) => `${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL`
 
+// What's been fed off today's plate, remembered with the meal day so a reload (or the phone
+// later) still shows the checks. Doses are keyed by label and running number rather than index,
+// which holds when a dose is logged later in the day.
+const FED_KEY = 'fed'
+const doseKeys = computed(() => {
+  const seen = new Map<string, number>()
+  return dosesToday.value.map((d) => {
+    const base = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
+    const nth = (seen.get(base) ?? 0) + 1
+    seen.set(base, nth)
+    return `${base}#${nth}`
+  })
+})
+function fedFromMemory(): Set<string> {
+  const saved = recall<{ date: string, keys: string[] }>(FED_KEY)
+  return new Set(saved?.date === mealDay.value && Array.isArray(saved.keys) ? saved.keys : [])
+}
+const fedKeys = ref(fedFromMemory())
+onMounted(() => {
+  if (!remote) fedKeys.value = fedFromMemory()
+})
+watch(mealDay, () => {
+  fedKeys.value = fedFromMemory()
+})
+/** Plate indices fed today. */
+const fedThisVisit = computed(() => new Set(doseKeys.value.map((k, i) => fedKeys.value.has(k) ? i : -1).filter(i => i >= 0)))
+function markFed(i: number) {
+  fedKeys.value = new Set([...fedKeys.value, doseKeys.value[i]!])
+  remember(FED_KEY, { date: mealDay.value, keys: [...fedKeys.value] })
+}
+
+/** A reconstitution: the vial and the bac water, swirled, never shaken. */
+async function mixOne(i: number, note = '') {
+  const m = mixesToday.value[i]
+  if (!m) return
+  const recipe = recipeOf(m)
+  line.value = `reconstituting ${m.compound} — ${recipe}…${note}`
+  actionPose.value = 'mixing'
+  mixing.value = true
+  await wait(1700)
+  mixing.value = false
+  line.value = `${m.compound} mixed: ${recipe}. swirled, didn't shake.`
+  await wait(600)
+}
+
+/** One dose off the plate: the jab or the swallow, its line, then whatever the compound does to it. */
+async function doseOne(i: number, note = '') {
+  const d = dosesToday.value[i]
+  if (!d) return
+  const label = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
+  const quip = FEED_QUIPS.find(q => q.match.test(d.compound))
+  const again = fedThisVisit.value.size > 0
+  if (isInjected(d.compound)) {
+    line.value = `${label} — jab…${note}`
+    actionPose.value = 'jab1'
+    await wait(650)
+    actionPose.value = 'jab2'
+    pet.value?.trigger('bigbeat')
+    await wait(750)
+    line.value = `${label} — in. ${quip?.jab ?? (again ? 'still didn\'t flinch.' : 'didn\'t flinch.')}`
+  }
+  else {
+    line.value = `${label} — down the hatch…${note}`
+    actionPose.value = 'eating'
+    await wait(700)
+    actionPose.value = 'gulp'
+    await wait(650)
+    line.value = `${label} — swallowed. ${quip?.swallow ?? 'with water, like a grown-up.'}`
+  }
+  await wait(500)
+  await afterEffect(d.compound)
+  markFed(i)
+}
+
+/** What to say once the plate is (or isn't) clear. */
+function plateLine(): string {
+  const left = dosesToday.value.length - fedThisVisit.value.size
+  if (left > 0) return `${left} more on the plate.`
+  return rulesApply && missing.value.length
+    ? `plate clear. still waiting on ${missingNames.value}.`
+    : `all ${dosesToday.value.length} dose${dosesToday.value.length === 1 ? '' : 's'} down. ♥`
+}
+
+const servedNote = () => mealIsYesterday.value && !fedThisVisit.value.size ? ' (yesterday\'s plate)' : ''
+
+/** The menu's "feed all": every mix, then every dose, in order. */
 async function feed() {
   if (busy.value || !dosesToday.value.length) return
   busy.value = true
   wake()
-  const plate = dosesToday.value
-  const served = mealIsYesterday.value ? ' (yesterday\'s plate)' : ''
-
-  // A reconstitution day: the vial and the bac water, swirled, never shaken.
-  for (const [i, m] of mixesToday.value.entries()) {
-    const recipe = `${m.vial_amount} ${unitLabel(m.vial_unit)} in ${m.bac_water_ml} mL`
-    line.value = `reconstituting ${m.compound} — ${recipe}…${i === 0 ? served : ''}`
-    actionPose.value = 'mixing'
-    mixing.value = true
-    await wait(1700)
-    mixing.value = false
-    line.value = `${m.compound} mixed: ${recipe}. swirled, didn't shake.`
-    await wait(600)
-  }
-
-  for (const [i, d] of plate.entries()) {
-    const label = `${d.compound} ${d.dose} ${unitLabel(d.unit)}`
-    const quip = FEED_QUIPS.find(q => q.match.test(d.compound))
-    const note = i === 0 && !mixesToday.value.length ? served : ''
-    if (isInjected(d.compound)) {
-      line.value = `${label} — jab…${note}`
-      actionPose.value = 'jab1'
-      await wait(650)
-      actionPose.value = 'jab2'
-      pet.value?.trigger('bigbeat')
-      await wait(750)
-      line.value = `${label} — in. ${quip?.jab ?? (i === 0 ? 'didn\'t flinch.' : 'still didn\'t flinch.')}`
-    }
-    else {
-      line.value = `${label} — down the hatch…${note}`
-      actionPose.value = 'eating'
-      await wait(700)
-      actionPose.value = 'gulp'
-      await wait(650)
-      line.value = `${label} — swallowed. ${quip?.swallow ?? 'with water, like a grown-up.'}`
-    }
-    await wait(500)
-    await afterEffect(d.compound)
-  }
+  const note = servedNote()
+  for (let i = 0; i < mixesToday.value.length; i++) await mixOne(i, i === 0 ? note : '')
+  for (let i = 0; i < dosesToday.value.length; i++) await doseOne(i, i === 0 && !mixesToday.value.length ? note : '')
   actionPose.value = null
-  line.value = rulesApply && missing.value.length
-    ? `${plate.length} down. still waiting on ${missingNames.value}.`
-    : `all ${plate.length} dose${plate.length === 1 ? '' : 's'} down. ♥`
+  line.value = plateLine()
   busy.value = false
 }
+
+/** A single row from the menu: one dose, or one vial to mix. */
+async function feedOne(kind: 'dose' | 'mix', i: number) {
+  if (busy.value) return
+  busy.value = true
+  wake()
+  if (kind === 'mix') await mixOne(i, servedNote())
+  else await doseOne(i, servedNote())
+  actionPose.value = null
+  if (kind === 'dose') line.value = plateLine()
+  busy.value = false
+}
+
+/** The plate as a menu: the vials to mix, the doses with a check once fed, and feed-all. */
+const feedItems = computed<DropdownMenuItem[][]>(() => {
+  const mixes: DropdownMenuItem[] = mixesToday.value.map((m, i) => ({
+    label: `mix ${m.compound} — ${recipeOf(m)}`,
+    icon: 'i-lucide-flask-conical',
+    onSelect: () => feedOne('mix', i)
+  }))
+  // A compound dosed more than once in the day (the iron protocol's three) gets a running number.
+  const doses: DropdownMenuItem[] = dosesToday.value.map((d, i) => {
+    const [base, nth] = doseKeys.value[i]!.split('#')
+    const repeats = doseKeys.value.filter(k => k.startsWith(`${base}#`)).length
+    return {
+      label: `${base}${repeats > 1 ? ` #${nth}` : ''}${fedThisVisit.value.has(i) ? ' ✓' : ''}`,
+      icon: isInjected(d.compound) ? 'i-lucide-syringe' : 'i-lucide-pill',
+      onSelect: () => feedOne('dose', i)
+    }
+  })
+  const all: DropdownMenuItem[] = [{
+    label: `feed all · ${dosesToday.value.length}${mealIsYesterday.value ? ' (yesterday\'s plate)' : ''}`,
+    icon: 'i-lucide-utensils',
+    onSelect: feed
+  }]
+  return [...(mixes.length ? [mixes] : []), doses, all]
+})
 
 async function walk() {
   if (busy.value) return
@@ -1221,13 +1389,15 @@ const fedTile = computed(() => {
 
 interface Stat { label: string, value: string, hint?: string, title?: string }
 
+// Hints are a few words — seven tiles leave ~100px each — with the longer wording as the tooltip.
 const stats = computed<Stat[]>(() => [
   {
     label: 'AGE',
     value: ageDays.value != null ? `${ageDays.value.toLocaleString('en-US')}d` : '—',
-    hint: birthday.value ? `turns ${birthday.value} today ♥` : 'since the first logged day'
+    hint: birthday.value ? `turns ${birthday.value} ♥` : 'since day one',
+    title: firstDate.value ? `days since the first logged day, ${formatDate(firstDate.value, 'monthDay')} ${firstDate.value.slice(0, 4)}` : undefined
   },
-  { label: 'WEIGHT', value: weight.value != null ? `${weight.value} lb` : '—', hint: 'yours, borrowed' },
+  { label: 'WEIGHT', value: weight.value != null ? `${weight.value} lb` : '—', hint: 'borrowed', title: 'yours — it borrows the number' },
   { label: 'STREAK', value: `${streak.value}d`, hint: 'logged days' },
   { label: 'FED', ...fedTile.value },
   { label: 'NEXT DRAW', value: drawTile.value.value, hint: drawTile.value.hint },
@@ -1235,13 +1405,15 @@ const stats = computed<Stat[]>(() => [
     label: 'MOOD',
     value: moodWord.value,
     hint: fever.value
-      ? `rhr ${fever.value.rhr} vs ${fever.value.baseline} avg`
-      : recovery.value != null ? `recovery ${recovery.value}%` : undefined
+      ? `rhr ${fever.value.rhr} vs ${fever.value.baseline}`
+      : recovery.value != null ? `recovery ${recovery.value}%` : undefined,
+    title: fever.value ? `resting HR ${fever.value.rhr} against a two-week average of ${fever.value.baseline}` : undefined
   },
   {
     label: 'PETS',
     value: String(petsToday.value),
-    hint: `${pets.value.total.toLocaleString('en-US')} all-time${visits.value?.pets ? ` · ${visits.value.pets} from visitors` : ''}`
+    hint: `${pets.value.total.toLocaleString('en-US')} all-time`,
+    title: visits.value?.pets ? `${visits.value.pets} of them from visitors` : undefined
   }
 ])
 
@@ -1516,10 +1688,11 @@ onMounted(() => {
   quoteIdx = Math.floor(Math.random() * 1000)
 
   if (!keeper) {
+    // A friend. (The doctor role can't open this page — its curated view leaves out sodas and
+    // daily doses, both of which TICKER chatters about — so there is no doctor greeting; the
+    // endpoints still accept the role in case that policy changes.)
     const name = visitorLabel.value
-    const hello: News = role.value === 'doctor'
-      ? { line: `the doctor${name ? ` — ${name}` : ''}. TICKER sits up straight.`, pose: 'nervous' }
-      : { line: `a friend${name ? ` — ${name}` : ''}! TICKER waves. (it's Jim's; be gentle.)`, event: 'celebrate' }
+    const hello: News = { line: `a friend${name ? ` — ${name}` : ''}! TICKER waves. (it's Jim's; be gentle.)`, event: 'celebrate' }
     line.value = hello.line
     timers.push(setTimeout(() => tell(hello), 800))
     $fetch('/api/ticker/visit', { method: 'POST' }).catch(() => { /* no footprint today, then */ })
@@ -1611,6 +1784,12 @@ onMounted(() => {
   letter-spacing: 0.06em;
   color: var(--color-ghost);
   pointer-events: none;
+}
+/* A phone's stage is ~358px: the figure's canvas starts ~80px in, so the window and the clock
+   tuck into the left margin, under the corner cobweb, instead of sitting on its shoulder. */
+@media (max-width: 639px) {
+  .window { left: 10px; top: 34px; }
+  .clock { left: 10px; top: 76px; }
 }
 
 /* The floor line, and the bed that stands on it at night: a mattress the feet rest on, a pillow
