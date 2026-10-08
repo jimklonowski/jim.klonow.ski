@@ -281,6 +281,8 @@
         :sodas-today="sodasToday"
         :latest-draw-date="latestDraw?.date ?? null"
         :flag-count="flagCounts.high + flagCounts.low"
+        :accessories="wardrobe.accessories"
+        :build="wardrobe.build"
         @refresh="refreshDigests"
       />
     </section>
@@ -291,11 +293,12 @@
 import { diffDays } from '#shared/utils/dates'
 import { isFullAccessRole } from '#shared/utils/access'
 import { REPO_URL } from '#shared/utils/site'
+import { wardrobeOf } from '#shared/utils/tickerWardrobe'
 import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
 const {
-  hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa,
+  hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
   allWorkouts, dosesToday, sodasToday, flagged, flagCounts,
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)
@@ -310,6 +313,9 @@ const drawDates = computed(() => draws.value.map(d => d.date))
 
 // Reactive: the overnight PWA used to keep yesterday as today until a reload.
 const today = useToday()
+
+// What TICKER has earned and how it is built, so the digest's companion is the same pet as /ticker.
+const wardrobe = computed(() => wardrobeOf({ entries: entries.value, workouts: allWorkouts.value, scans: dexaScans.value, today: today.value }))
 
 // The doctor role gets a curated clinical view: no daily entries, photos, or AI digests
 // (the digest endpoint would 403), so those panels and links are hidden rather than

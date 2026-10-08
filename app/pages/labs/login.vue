@@ -99,7 +99,28 @@ import { REPO_URL } from '#shared/utils/site'
 definePageMeta({ layout: false })
 // One of only two pages a signed-out visitor can reach, so it's the one place a crawler could
 // actually index — and a sign-in form is nothing anyone should find in search results.
-useSeoMeta({ title: () => 'Labs · Sign In', robots: 'noindex, nofollow' })
+//
+// A signed-out /ticker redirects here with `for=ticker` (server/middleware/auth.ts): the pet
+// page is gated, so this is where a pasted link's preview card has to live. The card itself is
+// drawn live by /ticker/og.png.
+const route = useRoute()
+const forTicker = route.query.for === 'ticker'
+useSeoMeta({
+  title: () => 'Labs · Sign In',
+  robots: 'noindex, nofollow',
+  ...(forTicker
+    ? {
+        ogTitle: 'TICKER · resident companion',
+        ogDescription: 'A pixel heart that lives off the data already logged — fed by the dose log, walked by the workouts, dressed by the milestones.',
+        ogUrl: 'https://jim.klonow.ski/ticker',
+        ogImage: 'https://jim.klonow.ski/ticker/og.png',
+        ogImageWidth: 1200,
+        ogImageHeight: 630,
+        ogImageAlt: 'TICKER, the pixel heart, standing on its stage',
+        twitterCard: 'summary_large_image'
+      }
+    : {})
+})
 
 const form = reactive({ password: '' })
 const loading = ref(false)
@@ -111,7 +132,7 @@ async function handleSubmit() {
   try {
     await $fetch('/api/labs/auth', { method: 'POST', body: { password: form.password } })
     // Hard navigation so the page SSR-renders with full data instead of hydrating empty
-    window.location.href = '/labs'
+    window.location.href = forTicker ? '/ticker' : '/labs'
   }
   catch {
     error.value = 'Incorrect password. Try again.'

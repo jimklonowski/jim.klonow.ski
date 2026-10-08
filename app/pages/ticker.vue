@@ -206,6 +206,64 @@
       TICKER's day, read from the data: {{ todaySummary }}
     </p>
 
+    <!-- Achievements: every milestone it can reach, earned (dated) or with its progress; the four
+         wearables are the rewards on four of them. All derived, none can be lost. -->
+    <section
+      class="mt-4"
+      aria-label="TICKER's achievements"
+    >
+      <TuiHeader
+        label="TICKER · ACHIEVEMENTS"
+        :dashes="4"
+      >
+        <span class="text-[10.5px] text-faint">{{ earnedCount }} of {{ achievementCards.length }}</span>
+      </TuiHeader>
+      <ul class="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-px bg-line-soft border border-line-soft">
+        <li
+          v-for="a in achievementCards"
+          :key="a.id"
+          class="bg-raised px-2.5 py-2 flex gap-2.5 min-w-0"
+          :class="a.earned ? '' : 'opacity-75'"
+          :title="a.earned ? `${a.name} — ${a.desc}` : `${a.progress.toLocaleString('en-US')} of ${a.goal.toLocaleString('en-US')} ${a.unit}`"
+        >
+          <UIcon
+            :name="a.icon"
+            class="size-4 shrink-0 mt-0.5"
+            :class="a.earned ? 'text-accent' : 'text-faint'"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="text-[12px] text-hi flex items-baseline gap-1.5 min-w-0">
+              <span class="truncate">{{ a.name }}</span>
+              <span
+                v-if="a.reward"
+                class="tui-label text-[8.5px] shrink-0"
+              >wearable</span>
+            </p>
+            <p class="text-[10.5px] leading-tight text-faint">
+              {{ a.desc }}
+            </p>
+            <p
+              v-if="a.earned"
+              class="mt-1 text-[10px] text-accent"
+            >
+              earned{{ a.date ? ` ${formatDate(a.date, 'monthDay')}${a.date.slice(0, 4) !== today.slice(0, 4) ? ` ${a.date.slice(0, 4)}` : ''}` : '' }}
+            </p>
+            <template v-else>
+              <UProgress
+                :model-value="a.progress"
+                :max="a.goal"
+                size="2xs"
+                class="mt-1.5"
+              />
+              <p class="mt-0.5 text-[10px] text-faint tabular-nums">
+                {{ a.progress.toLocaleString('en-US') }} / {{ a.goal.toLocaleString('en-US') }} {{ a.unit }}
+              </p>
+            </template>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <!-- The log: the remark line above truncates and each line replaces the last, so the last ten
          are kept here in full, newest first, for a quote that ran long or a reaction you missed. -->
     <section
@@ -240,17 +298,34 @@
 // forget to do. Petting is the one pure interaction. What it remembers (the pet counter, the
 // runner's record, which things it has already reacted to) lives in the database for the owner
 // and in the browser for the demo pet — see the memory section.
-import { doseStreak, isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
+import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { localTimeNow } from '#shared/utils/time'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
-import type { TickerBelly, TickerBuild, TickerPose, TickerProp, TickerTier } from '#shared/utils/tickerSprite'
+import {
+  LEAN_GAIN_LBS, MANE_TIERS, TIER_DAYS, ageDays as ageDaysOf, buildOf, firstLoggedDay,
+  finasterideStreak as finasterideStreakOf, leanGain as leanGainOf, loggedDayCount, maneTier as maneTierOf,
+  nextManeTier, sortedScans, wearableMilestones
+} from '#shared/utils/tickerWardrobe'
+import type { WardrobeInputs } from '#shared/utils/tickerWardrobe'
+import type { TickerBuild, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
 import type { TickerPets, TickerRecord, TickerRunResponse, TickerStateResponse } from '#shared/types/ticker'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
-useSeoMeta({ title: 'Ticker' })
+// The card a pasted link shows (crawlers actually read it off /labs/login?for=ticker, where a
+// signed-out /ticker lands); the image is drawn live by server/routes/ticker/og.png.get.ts.
+useSeoMeta({
+  title: 'Ticker',
+  ogTitle: 'TICKER · resident companion',
+  ogDescription: 'A pixel heart that lives off the data already logged — fed by the dose log, walked by the workouts, dressed by the milestones.',
+  ogImage: 'https://jim.klonow.ski/ticker/og.png',
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageAlt: 'TICKER, the pixel heart, standing on its stage',
+  twitterCard: 'summary_large_image'
+})
 
 const { role, canEdit } = await useAuth()
 const { data: overview, latestDraw, flagCounts } = useOverviewSummary(role)
@@ -437,13 +512,10 @@ function latestJournal(key: 'weight_lbs' | 'hrv'): number | null {
 const weight = computed(() => latestJournal('weight_lbs'))
 const latestHrv = computed(() => latestJournal('hrv'))
 
-/**
- * The first hand-logged day: the pet's hatch date. The watch's vitals go back years further
- * (the Apple Health import), but that is its prehistory, not its life — it was born when the
- * journal started.
- */
-const firstDate = computed(() => entries.value.find(isLoggedDay)?.date ?? null)
-const ageDays = computed(() => firstDate.value ? diffDays(firstDate.value, today.value) : null)
+// The first hand-logged day is the pet's hatch date (shared/utils/tickerWardrobe.ts): the
+// watch's vitals go back years further, but that is its prehistory — it was born with the journal.
+const firstDate = computed(() => firstLoggedDay(entries.value))
+const ageDays = computed(() => ageDaysOf(entries.value, today.value))
 /** How old it turns today, when today is the anniversary of the first logged day; null otherwise. */
 const birthday = computed(() => {
   const f = firstDate.value
@@ -548,52 +620,88 @@ const records = computed(() => {
   return lines
 })
 
-// --- earned accessories: milestones unlock things to wear -------------------------------------
-// Derived like everything else, so they are never lost — the memory only holds which ones have
-// been announced (see announceUnlocks).
+// --- the wardrobe and the build (shared/utils/tickerWardrobe.ts) -------------------------------
+// The four wearables, the tier, the arms and the belly all come from the data through the module
+// the home dashboard's companion reads too, so it is the same pet on both pages.
 
-interface Unlock { prop: TickerProp, name: string, goal: number, progress: number, unit: string }
+const wardrobeInputs = computed<WardrobeInputs>(() => ({
+  entries: entries.value,
+  workouts: workoutsData.value ?? [],
+  scans: dexaData.value ?? [],
+  today: today.value
+}))
+const loggedDays = computed(() => loggedDayCount(entries.value))
+const milestones = computed(() => wearableMilestones(wardrobeInputs.value))
+const earned = computed(() => milestones.value.filter(m => m.progress >= m.goal))
 
-const totalWorkoutMinutes = computed(() => Math.round((workoutsData.value ?? []).reduce((s, w) => s + (w.duration_min ?? 0), 0)))
-const loggedDays = computed(() => entries.value.filter(isLoggedDay).length)
-
-const unlocks = computed<Unlock[]>(() => [
-  { prop: 'crown', name: 'the crown', goal: 100, progress: longestLoggedStreak(entries.value).days, unit: 'days logged in a row' },
-  { prop: 'sweatband', name: 'the sweatband', goal: 6000, progress: totalWorkoutMinutes.value, unit: 'workout minutes' },
-  { prop: 'shades', name: 'the shades', goal: 365, progress: ageDays.value ?? 0, unit: 'days old' },
-  { prop: 'medal', name: 'the medal', goal: 250, progress: loggedDays.value, unit: 'logged days' }
-])
-const earned = computed(() => unlocks.value.filter(u => u.progress >= u.goal))
-/** The unearned one it is closest to, by share of the way there. */
-const nextUnlock = computed(() => unlocks.value
-  .filter(u => u.progress < u.goal)
-  .sort((a, b) => (b.progress / b.goal) - (a.progress / a.goal))[0] ?? null)
-
-// --- the build: tier by logged days, arms and belly by DEXA -----------------------------------
-// A hatchling (no limbs yet) until a month of logged days, grown after, an elder with a cane
-// from five hundred. The arms fill in once lean mass is up five pounds on the first scan; the
-// belly reads the latest body-fat figure — soft from twenty percent, cut under thirteen.
-
-const TIER_DAYS = { grown: 30, elder: 500 }
-const tier = computed<TickerTier>(() => loggedDays.value >= TIER_DAYS.elder ? 'elder' : loggedDays.value >= TIER_DAYS.grown ? 'grown' : 'hatchling')
-
-const LEAN_GAIN_LBS = 5
-const SOFT_BF = 20
-const CUT_BF = 13
-const scans = computed(() => [...(dexaData.value ?? [])].sort((a, b) => a.date.localeCompare(b.date)))
+const build = computed<TickerBuild>(() => buildOf(wardrobeInputs.value))
+const tier = computed(() => build.value.tier!)
+const arms = computed(() => build.value.arms!)
+const bellyRead = computed(() => build.value.belly!)
+const scans = computed(() => sortedScans(dexaData.value ?? []))
 const latestScan = computed(() => scans.value.at(-1) ?? null)
-const leanGain = computed(() => {
-  const first = scans.value[0]
-  const latest = latestScan.value
-  return first && latest && first !== latest ? Math.round((latest.total.lean_mass_lbs - first.total.lean_mass_lbs) * 10) / 10 : null
+const leanGain = computed(() => leanGainOf(scans.value))
+
+// --- achievements -------------------------------------------------------------------------------
+// The four wearables are the rewards on four of these; the rest are just achievements. All are
+// derived, so none can be lost; the memory holds the day each was first noticed (see
+// announceAchievements), which is the date the panel shows. The older 'unlocks' key (a list of
+// the four props) reads as earned on an unknown day.
+
+interface Achievement {
+  id: string
+  name: string
+  desc: string
+  icon: string
+  goal: number
+  progress: number
+  unit: string
+  reward?: TickerProp
+}
+
+const WEARABLE_META: Partial<Record<TickerProp, { id: string, name: string, desc: string, icon: string }>> = {
+  crown: { id: 'crown', name: 'Hundred Days', desc: 'a hundred logged days in a row — the crown', icon: 'i-lucide-crown' },
+  sweatband: { id: 'sweatband', name: 'Hundred Hours', desc: 'six thousand workout minutes — the sweatband', icon: 'i-lucide-dumbbell' },
+  shades: { id: 'shades', name: 'A Year Together', desc: 'a year since the first logged day — the shades', icon: 'i-lucide-glasses' },
+  medal: { id: 'medal', name: 'Two Fifty', desc: 'two hundred and fifty logged days — the medal', icon: 'i-lucide-medal' }
+}
+
+const achievements = computed<Achievement[]>(() => [
+  ...milestones.value.map(m => ({ ...WEARABLE_META[m.prop]!, goal: m.goal, progress: m.progress, unit: m.unit, reward: m.prop })),
+  { id: 'grown', name: 'Hatched', desc: 'thirty logged days — it grew limbs', icon: 'i-lucide-egg', goal: TIER_DAYS.grown, progress: loggedDays.value, unit: 'logged days' },
+  { id: 'elder', name: 'Elder', desc: 'five hundred logged days — the cane', icon: 'i-lucide-hourglass', goal: TIER_DAYS.elder, progress: loggedDays.value, unit: 'logged days' },
+  { id: 'clean-week', name: 'Clean Week', desc: 'seven days with every due dose logged', icon: 'i-lucide-star', goal: 1, progress: cleanWeek.value ? 1 : 0, unit: 'clean week' },
+  { id: 'luscious', name: 'Luscious', desc: 'ninety days of finasteride — the full mane', icon: 'i-lucide-sparkles', goal: 90, progress: finasterideStreak.value, unit: 'days of finasteride' },
+  { id: 'runner-500', name: 'Runner', desc: 'five hundred points on the runner', icon: 'i-lucide-footprints', goal: 500, progress: runnerHi.value?.score ?? 0, unit: 'points' },
+  { id: 'runner-1000', name: 'Marathon', desc: 'a thousand points on the runner', icon: 'i-lucide-trophy', goal: 1000, progress: runnerHi.value?.score ?? 0, unit: 'points' },
+  { id: 'petted', name: 'Well Petted', desc: 'a hundred pats, all time', icon: 'i-lucide-hand-heart', goal: 100, progress: pets.value.total, unit: 'pets' },
+  { id: 'open-house', name: 'Open House', desc: 'five visits from friends', icon: 'i-lucide-door-open', goal: 5, progress: visits.value?.total ?? 0, unit: 'visits' },
+  { id: 'pincushion', name: 'Pincushion', desc: 'ten blood draws on file', icon: 'i-lucide-test-tube', goal: 10, progress: drawDates.value.length, unit: 'draws' },
+  { id: 'before-after', name: 'Before and After', desc: 'two DEXA scans to compare', icon: 'i-lucide-scan', goal: 2, progress: scans.value.length, unit: 'scans' }
+])
+
+const ACHIEVEMENTS_KEY = 'achievements'
+function achievementDatesFromMemory(): Record<string, string> {
+  const saved = recall<Record<string, string>>(ACHIEVEMENTS_KEY)
+  if (saved && typeof saved === 'object' && !Array.isArray(saved)) return saved
+  const old = recall<string[]>('unlocks')
+  return Array.isArray(old) ? Object.fromEntries(old.map(p => [p, ''])) : {}
+}
+/** id → the day it was first noticed; '' for ones carried over from before the ledger. */
+const achievementDates = ref<Record<string, string>>(achievementDatesFromMemory())
+onMounted(() => {
+  if (!remote) achievementDates.value = achievementDatesFromMemory()
 })
-const arms = computed<'lean' | 'built'>(() => leanGain.value != null && leanGain.value >= LEAN_GAIN_LBS ? 'built' : 'lean')
-const bellyRead = computed<TickerBelly>(() => {
-  const bf = latestScan.value?.total.body_fat_pct
-  if (bf == null) return 'lean'
-  return bf >= SOFT_BF ? 'soft' : bf < CUT_BF ? 'cut' : 'lean'
-})
-const build = computed<TickerBuild>(() => ({ tier: tier.value, arms: arms.value, belly: bellyRead.value }))
+
+const achievementCards = computed(() => achievements.value.map((a) => {
+  const date = achievementDates.value[a.id]
+  return { ...a, earned: date != null || a.progress >= a.goal, date: date || null }
+}))
+const earnedCount = computed(() => achievementCards.value.filter(a => a.earned).length)
+/** The unearned one it is closest to, by share of the way there. */
+const nextAchievement = computed(() => achievementCards.value
+  .filter(a => !a.earned)
+  .sort((a, b) => (b.progress / b.goal) - (a.progress / a.goal))[0] ?? null)
 
 // --- discipline: a clean week of doses earns the gold star ----------------------------------
 // The trailing seven days scored against the same merged rules as the hunger meter; today only
@@ -690,15 +798,10 @@ const walking = ref(false)
 // for any day BPC was logged. The flex, the stretch, the proud beat and the glow are one-shots in
 // afterEffect() below.
 
-const MANE_TIERS: Array<{ days: number, prop: TickerProp, name: string }> = [
-  { days: 7, prop: 'mane-1', name: 'stubble' },
-  { days: 30, prop: 'mane-2', name: 'a mane' },
-  { days: 90, prop: 'mane-3', name: 'luscious' }
-]
-const finasterideStreak = computed(() => doseStreak(entries.value, 'Finasteride', today.value))
+const finasterideStreak = computed(() => finasterideStreakOf(entries.value, today.value))
 /** 0–3: how many mane tiers the streak has reached. */
-const maneTier = computed(() => MANE_TIERS.filter(t => finasterideStreak.value >= t.days).length)
-const nextMane = computed(() => MANE_TIERS.find(t => finasterideStreak.value < t.days) ?? null)
+const maneTier = computed(() => maneTierOf(entries.value, today.value))
+const nextMane = computed(() => nextManeTier(entries.value, today.value))
 /** While the feed grows the mane in, the tier on show; null means the earned one. */
 const maneGrow = ref<number | null>(null)
 const bandaged = computed(() => dosesToday.value.some(d => /bpc/i.test(d.compound)))
@@ -727,7 +830,7 @@ const BARE_EYED = new Set<TickerPose>(['eating', 'gulp', 'jab1', 'jab2', 'mixing
  */
 const accessories = computed<TickerProp[]>(() => {
   const out: TickerProp[] = [bowl.value]
-  const worn = new Set(earned.value.map(u => u.prop))
+  const worn = new Set(earned.value.map(m => m.prop))
   const carried = walking.value ? walkProp.value : null
   const mane = maneGrow.value ?? maneTier.value
   if (mane) out.push(MANE_TIERS[mane - 1]!.prop) // before the hats, so a hat sits on the hair
@@ -1196,11 +1299,9 @@ const quotes = computed(() => {
       ? `lean mass ${leanGain.value >= 0 ? '+' : ''}${leanGain.value} lb since the first scan — ${arms.value === 'built' ? 'the arms show it' : `the arms fill in at +${LEAN_GAIN_LBS}`}.`
       : null,
     earned.value.length
-      ? `wearing ${earned.value.map(u => u.name.replace(/^the /, '')).join(', ')} — earned at ${earned.value.map(u => `${u.goal.toLocaleString('en-US')} ${u.unit}`).join(', ')}.`
+      ? `wearing ${earned.value.map(m => m.name.replace(/^the /, '')).join(', ')} — earned at ${earned.value.map(m => `${m.goal.toLocaleString('en-US')} ${m.unit}`).join(', ')}.`
       : null,
-    nextUnlock.value
-      ? `next unlock: ${nextUnlock.value.name} at ${nextUnlock.value.goal.toLocaleString('en-US')} ${nextUnlock.value.unit} — ${(nextUnlock.value.goal - nextUnlock.value.progress).toLocaleString('en-US')} to go.`
-      : 'every accessory earned. there is nothing left to unlock, only to keep.',
+    `achievements: ${earnedCount.value} of ${achievementCards.value.length}.${nextAchievement.value ? ` next: ${nextAchievement.value.name} — ${(nextAchievement.value.goal - nextAchievement.value.progress).toLocaleString('en-US')} ${nextAchievement.value.unit} to go.` : ' every one. there is nothing left to earn, only to keep.'}`,
     keeper && v?.total
       ? `visitors: ${v.total} footprint${v.total === 1 ? '' : 's'}${v.recent[0] ? ` — last ${v.recent[0].label ?? `a ${v.recent[0].role}`} on ${formatDate(v.recent[0].date, 'monthDay')}` : ''}.`
       : null,
@@ -1663,19 +1764,16 @@ async function salute() {
   if (actionPose.value === 'salute') actionPose.value = null
 }
 
-// Newly earned accessories: announced once each, then simply worn.
-const UNLOCKS_KEY = 'unlocks'
-const freshUnlocks = computed(() => {
-  const seen = recall<string[]>(UNLOCKS_KEY)
-  const known = Array.isArray(seen) ? seen : []
-  return earned.value.filter(u => !known.includes(u.prop))
-})
+// Newly completed achievements: announced once each and dated, then simply listed (and worn).
+const freshAchievements = computed(() => achievements.value.filter(a => a.progress >= a.goal && achievementDates.value[a.id] == null))
 
-function announceUnlocks() {
-  const fresh = freshUnlocks.value
+function announceAchievements() {
+  const fresh = freshAchievements.value
   if (!fresh.length) return
-  remember(UNLOCKS_KEY, earned.value.map(u => u.prop))
-  line.value = `TICKER earned ${fresh.map(u => u.name).join(', ')} — ${fresh.map(u => `${u.goal.toLocaleString('en-US')} ${u.unit}`).join('; ')}. ♥`
+  achievementDates.value = { ...achievementDates.value, ...Object.fromEntries(fresh.map(a => [a.id, today.value])) }
+  remember(ACHIEVEMENTS_KEY, achievementDates.value)
+  const rewards = fresh.filter(a => a.reward).map(a => WEARABLE_META[a.reward!]!.id)
+  line.value = `achievement${fresh.length === 1 ? '' : 's'}: ${fresh.map(a => a.name).join(', ')}${rewards.length ? ` — it put on the ${rewards.join(' and the ')}` : ''}. ♥`
   pet.value?.trigger('celebrate')
 }
 
@@ -1713,7 +1811,7 @@ onMounted(() => {
   if (birthday.value && firstTime(BIRTHDAY_KEY, today.value)) reactions.push(celebrateBirthday)
   if (landedPending.value) reactions.push(resultsLanded)
   if (cleanWeek.value && firstTime(SALUTE_KEY, today.value)) reactions.push(salute)
-  if (freshUnlocks.value.length) reactions.push(announceUnlocks)
+  if (freshAchievements.value.length) reactions.push(announceAchievements)
   reactions.forEach((react, i) => timers.push(setTimeout(react, 800 + i * 2200)))
   remember(SNAPSHOT_KEY, snapshotNow())
 })

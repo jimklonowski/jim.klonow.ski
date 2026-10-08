@@ -77,6 +77,8 @@
         full
         :rhr="rhr"
         :sluggish="sluggish"
+        :accessories="accessories"
+        :build="build"
         @open="digestOpen = true"
       />
       <div class="flex-1 min-w-0 flex flex-col gap-1.5 text-[11.5px]">
@@ -135,6 +137,7 @@
 <script setup lang="ts">
 import { diffDays } from '#shared/utils/dates'
 import type { Digest } from '~/composables/useDigests'
+import type { TickerBuild, TickerProp } from '#shared/utils/tickerSprite'
 
 const props = withDefaults(defineProps<{
   digests: Digest[]
@@ -150,13 +153,18 @@ const props = withDefaults(defineProps<{
   /** Latest lab draw with out-of-range markers, for the thump. */
   latestDrawDate?: string | null
   flagCount?: number
+  /** What it has earned and how it is built (shared/utils/tickerWardrobe.ts) — the same pet as /ticker. */
+  accessories?: TickerProp[]
+  build?: TickerBuild
 }>(), {
   rhr: null,
   sluggish: false,
   recovery: null,
   sodasToday: 0,
   latestDrawDate: null,
-  flagCount: 0
+  flagCount: 0,
+  accessories: () => [],
+  build: () => ({})
 })
 
 const emit = defineEmits<{ refresh: [] }>()

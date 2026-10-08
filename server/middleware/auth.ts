@@ -28,6 +28,8 @@ export default defineEventHandler(async (event) => {
 
   if (isApi) return // endpoints enforce their own requirements
   if (path === LOGIN_PATH) return
-  if (!auth) return sendRedirect(event, LOGIN_PATH, 302)
+  // A signed-out /ticker (a pasted link, a crawler) lands on the sign-in page carrying its
+  // Open Graph card: the login page reads `for=ticker` and points at /ticker/og.png.
+  if (!auth) return sendRedirect(event, path === '/ticker' ? `${LOGIN_PATH}?for=ticker` : LOGIN_PATH, 302)
   if (!canAccessPage(auth.role, path)) return sendRedirect(event, '/labs', 302)
 })

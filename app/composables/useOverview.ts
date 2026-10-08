@@ -124,6 +124,7 @@ export function useOverview(role: Ref<Role | null>) {
     draws,
     latestDraw,
     healthMetrics,
+    dexaScans,
     latestDexa,
     previousDexa,
     allWorkouts,
