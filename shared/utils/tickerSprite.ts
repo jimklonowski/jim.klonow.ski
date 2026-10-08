@@ -7,9 +7,13 @@
 // two walk-cycle frames the page alternates while it trots, the blissful petted face, sitting
 // down to wait (a minute with nothing pressed), asleep (after bedtime), feverish (resting HR
 // well over its own two-week average), hungry (due doses still unlogged after dusk), nervous
-// (draw day), impatient (a planned draw overdue — checking its watch) and salute (a clean week
-// of doses).
-export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute'] as const
+// (draw day), impatient (a planned draw overdue — checking its watch), salute (a clean week of
+// doses), and the feed's own frames: jab1/jab2 (an injectable — syringe raised, then in, with a
+// wince and then the brave face) and gulp (a pill going down with a glass of water; 'eating' is
+// the lift that comes before it), mixing (a reconstitution day: a vial in one hand, the bac
+// water in the other, swirled — the page rocks it) and flex (the beat after a testosterone jab:
+// both biceps up).
+export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute', 'jab1', 'jab2', 'gulp', 'mixing', 'flex'] as const
 export type TickerPose = typeof TICKER_POSES[number]
 
 /**
@@ -29,7 +33,7 @@ export interface TickerBuild {
 
 export type TickerInk
   = 'rim' | 'red' | 'shade' | 'hi' | 'spec' | 'eye' | 'glint' | 'blush' | 'tongue' | 'drop'
-    | 'limb' | 'glove' | 'shoe' | 'clip' | 'line' | 'flag' | 'mug' | 'coffee' | 'bowl' | 'hat'
+    | 'limb' | 'glove' | 'shoe' | 'clip' | 'line' | 'flag' | 'mug' | 'coffee' | 'bowl' | 'hat' | 'hair'
 
 /**
  * Accessories the /ticker page composes over any pose — the props layer. Each is a set of cells
@@ -38,13 +42,16 @@ export type TickerInk
  * WEARABLES (a sweatband, shades, a medal, a lab coat) are the ones allowed to paint over it.
  *
  * Walk props (carried for the lap, by workout type): dumbbell, helmet, disc, cap. Earned
- * (milestones): crown, sweatband, shades, medal. The vet visit: calendar, lab-coat.
+ * (milestones): crown, sweatband, shades, medal. The vet visit: calendar, lab-coat. The
+ * compounds' marks: the finasteride mane in three tiers (stubble, a mane, luscious) and the
+ * BPC bandage.
  */
 export type TickerProp
-  = 'bowl-empty' | 'bowl-full' | 'party-hat'
+  = 'bowl-empty' | 'bowl-full' | 'bowl-shots' | 'bowl-mixed' | 'party-hat'
     | 'dumbbell' | 'helmet' | 'disc' | 'cap'
     | 'crown' | 'sweatband' | 'shades' | 'medal' | 'gold-star'
     | 'calendar' | 'lab-coat'
+    | 'mane-1' | 'mane-2' | 'mane-3' | 'bandage'
 
 /** `lid`/`lid-glint` blink shut, `jaw`/`jaw-tongue` open and close while talking, `flicker` pulses. */
 export type TickerCellMotion = '' | 'lid' | 'lid-glint' | 'jaw' | 'jaw-tongue' | 'flicker'
@@ -220,6 +227,29 @@ function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
       paint(grid, [[3, 4], [3, 5], [3, 11], [3, 12]], 'rim')
       paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
       break
+    case 'jab1': // the wince: eyes squeezed to dots, brows knitted, mouth a tight line
+      paint(grid, [[5, 4], [5, 12]], 'eye')
+      paint(grid, [[3, 5], [4, 6], [4, 10], [3, 11]], 'rim')
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'jab2': // the brave face: ordinary eyes, a flat mouth, a little colour in the cheeks
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, BLUSH, 'blush')
+      paint(grid, [[9, 7], [9, 8], [9, 9]], 'eye')
+      break
+    case 'gulp': // eyes shut, cheeks puffed, the mouth a single tight cell
+      paint(grid, [[5, 4], [5, 5], [5, 11], [5, 12]], 'eye')
+      paint(grid, [...BLUSH, [6, 2], [7, 2], [6, 14], [7, 14]], 'blush')
+      paint(grid, [[9, 8]], 'eye')
+      break
+    case 'mixing': // eyes down on the vial, a small concentrating mouth, no blush
+      eyes(grid, 4, 11, 5, 2, 0)
+      paint(grid, [[9, 8]], 'eye')
+      break
+    case 'flex': // ordinary eyes and the widest grin, no blush — pure confidence
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, [[8, 5], [9, 6], [9, 7], [9, 8], [9, 9], [9, 10], [8, 11]], 'eye')
+      break
     default:
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, BLUSH, 'blush')
@@ -390,6 +420,55 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[3, 17], [2, 16]], 'glove')
       legs(grid, false)
       break
+    // The syringe is drawn with the arm: a white barrel the hand grips from above, a steel
+    // plunger, a needle. jab1 holds it a couple of cells off the lower-right lobe; jab2 is the
+    // same arm two cells in, needle to the rim, a bead at the site.
+    case 'jab1':
+      paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
+      paint(grid, [[11, -2], [11, -1]], 'glove')
+      paint(grid, [[7, 16], [8, 17]], 'limb')
+      paint(grid, [[9, 18], [9, 19], [10, 17], [10, 18], [10, 19], [10, 20]], 'glove')
+      paint(grid, [[10, 21], [10, 22]], 'bowl')
+      paint(grid, [[10, 15], [10, 16]], 'line')
+      legs(grid, false)
+      break
+    case 'jab2':
+      paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
+      paint(grid, [[11, -2], [11, -1]], 'glove')
+      paint(grid, [[7, 16], [8, 16]], 'limb')
+      paint(grid, [[9, 16], [9, 17], [10, 15], [10, 16], [10, 17], [10, 18]], 'glove')
+      paint(grid, [[10, 19], [10, 20]], 'bowl')
+      paint(grid, [[10, 13], [10, 14]], 'line')
+      paint(grid, [[11, 13]], 'drop')
+      legs(grid, false)
+      break
+    case 'gulp': // a glass of water held up in the left hand, the right hand on its belly
+      paint(grid, [[7, 0], [8, -1], [9, -2]], 'limb')
+      paint(grid, [[9, -4], [9, -3]], 'glove')
+      paint(grid, [[6, -4], [7, -4], [8, -4], [6, -2], [7, -2], [8, -2], [8, -3]], 'bowl')
+      paint(grid, [[7, -3]], 'drop')
+      paint(grid, [[8, 15], [9, 14]], 'limb')
+      paint(grid, [[10, 13], [10, 14]], 'glove')
+      legs(grid, false)
+      break
+    case 'flex': // both arms bent up, biceps bulging outward, gloves at shoulder height
+      paint(grid, [[7, 0], [6, -1], [5, -1], [5, -2]], 'limb')
+      paint(grid, [[4, -2], [4, -1]], 'glove')
+      paint(grid, [[7, 16], [6, 17], [5, 17], [5, 18]], 'limb')
+      paint(grid, [[4, 17], [4, 18]], 'glove')
+      legs(grid, true)
+      break
+    case 'mixing': // both hands up: the powder vial on the left (amber at the bottom), the bac water on the right
+      paint(grid, [[7, 0], [8, -1]], 'limb')
+      paint(grid, [[9, -3], [9, -2], [7, -3], [7, -2], [8, -2]], 'glove')
+      paint(grid, [[8, -3]], 'clip')
+      paint(grid, [[6, -3], [6, -2]], 'line')
+      paint(grid, [[7, 16], [8, 16]], 'limb')
+      paint(grid, [[9, 17], [9, 18], [7, 17], [7, 18], [8, 18]], 'glove')
+      paint(grid, [[8, 17]], 'drop')
+      paint(grid, [[6, 17], [6, 18]], 'line')
+      legs(grid, false)
+      break
     default: // waving hello
       paint(grid, [[7, 0], [8, -1], [9, -1], [10, -1]], 'limb')
       paint(grid, [[11, -2], [11, -1]], 'glove')
@@ -449,9 +528,24 @@ const fill = (rows: [number, number], cols: [number, number], ink: TickerInk): P
 // lifts to its mouth.
 const BOWL: PropCell[] = [[14, 19, 'bowl'], [14, 23, 'bowl'], ...fill([15, 15], [19, 23], 'bowl')]
 
+// A small syringe lying in the bowl: needle, white barrel.
+const BOWL_SHOT = (r: number): PropCell[] => [[r, 20, 'line'], [r, 21, 'glove'], [r, 22, 'glove']]
+
+// The middle mane tier, which the luscious one builds on.
+const MANE: PropCell[] = [
+  ...fill([-1, -1], [3, 6], 'hair'), ...fill([-1, -1], [10, 13], 'hair'),
+  ...fill([-2, -2], [4, 5], 'hair'), ...fill([-2, -2], [11, 12], 'hair'),
+  [0, 7, 'hair'], [0, 8, 'hair'], [0, 9, 'hair'], [1, 8, 'hair'],
+  [1, 1, 'hair'], [2, 0, 'hair'], [3, -1, 'hair'], [4, -1, 'hair'],
+  [1, 15, 'hair'], [2, 16, 'hair'], [3, 17, 'hair'], [4, 17, 'hair']
+]
+
 const PROPS: Record<TickerProp, PropCell[]> = {
   'bowl-empty': BOWL,
+  // What the plate held: capsules, syringes, or one of each.
   'bowl-full': [...BOWL, [14, 20, 'clip'], [14, 21, 'clip'], [14, 22, 'clip'], [13, 21, 'clip']],
+  'bowl-shots': [...BOWL, ...BOWL_SHOT(14), ...BOWL_SHOT(13)],
+  'bowl-mixed': [...BOWL, [14, 20, 'clip'], [14, 21, 'line'], [14, 22, 'glove'], [13, 21, 'clip']],
   // Hats sit on the left lobe (one at a time — the page picks); the helmet on the right lobe.
   'party-hat': [[-3, 5, 'glove'], [-2, 4, 'hat'], [-2, 5, 'hat'], ...fill([-1, -1], [3, 6], 'hat')],
   'crown': [[-3, 4, 'glove'], [-2, 2, 'clip'], [-2, 4, 'clip'], [-2, 6, 'clip'], ...fill([-1, -1], [2, 6], 'clip')],
@@ -469,10 +563,24 @@ const PROPS: Record<TickerProp, PropCell[]> = {
   'gold-star': [[4, 14, 'clip'], [5, 13, 'clip'], [5, 14, 'clip'], [5, 15, 'clip'], [6, 14, 'clip']],
   'lab-coat': [[7, 2, 'glove'], [8, 3, 'glove'], [9, 4, 'glove'], [7, 14, 'glove'], [8, 13, 'glove'], [9, 12, 'glove'], [12, 6, 'glove'], [12, 10, 'glove'], [13, 7, 'glove'], [13, 9, 'glove']],
   // A page with a red header, standing on the left floor.
-  'calendar': [...fill([14, 14], [-4, -2], 'flag'), ...fill([15, 15], [-4, -2], 'glove'), [15, -3, 'eye']]
+  'calendar': [...fill([14, 14], [-4, -2], 'flag'), ...fill([15, 15], [-4, -2], 'glove'), [15, -3, 'eye']],
+  // The finasteride mane. Stubble: tufts on each lobe and one in the dip. A mane: the tops
+  // covered, the dip filled, locks down past the cheeks. Luscious: higher, a fringe over the
+  // brow, locks to the jaw. The page paints a hat after it, so a hat sits on the hair.
+  'mane-1': [[-1, 4, 'hair'], [-1, 5, 'hair'], [-1, 11, 'hair'], [-1, 12, 'hair'], [0, 8, 'hair']],
+  'mane-2': MANE,
+  'mane-3': [
+    ...MANE,
+    ...fill([-3, -3], [4, 5], 'hair'), ...fill([-3, -3], [11, 12], 'hair'),
+    ...fill([-2, -2], [3, 6], 'hair'), ...fill([-2, -2], [10, 13], 'hair'),
+    ...fill([1, 1], [3, 6], 'hair'), ...fill([1, 1], [10, 13], 'hair'),
+    [5, -1, 'hair'], [5, 17, 'hair']
+  ],
+  // A strip across the right lobe with the pad in the middle: BPC-157, right where it was sore.
+  'bandage': [[3, 12, 'glove'], [3, 13, 'blush'], [3, 14, 'glove']]
 }
 
-const WEARABLES = new Set<TickerProp>(['sweatband', 'shades', 'medal', 'gold-star', 'lab-coat'])
+const WEARABLES = new Set<TickerProp>(['sweatband', 'shades', 'medal', 'gold-star', 'lab-coat', 'mane-1', 'mane-2', 'mane-3', 'bandage'])
 
 export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full', props: TickerProp[] = [], build: TickerBuild = {}): TickerSprite {
   const grid = body()
