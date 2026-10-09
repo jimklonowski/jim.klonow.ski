@@ -40,6 +40,91 @@ export function sanitizeMarkers(input: unknown): { markers: Record<string, numbe
   return { markers, dropped }
 }
 
+/**
+ * Every DEXA figure the site stores, as a dotted path into the row's JSON columns. The extraction
+ * schema's enum (process-pdf) and the save sanitizer below read this one list, so a figure the
+ * model can name is a figure the pages can show, and nothing else gets written.
+ */
+export const DEXA_FIELDS: readonly string[] = [
+  'weight_lbs',
+  ...['body_fat_pct', 'total_mass_lbs', 'fat_mass_lbs', 'lean_mass_lbs', 'bmc_lbs', 'fat_free_lbs'].map(f => `total.${f}`),
+  ...['arms', 'legs', 'trunk'].flatMap(r => ['fat_pct', 'fat_lbs', 'lean_lbs'].map(f => `regions.${r}.${f}`)),
+  ...['android', 'gynoid'].flatMap(r => ['fat_pct', 'fat_lbs'].map(f => `regions.${r}.${f}`)),
+  'vat.volume_in3', 'vat.fat_mass_lbs',
+  'ag_ratio',
+  'bone_density.total_bmd', 'bone_density.t_score', 'bone_density.z_score',
+  'symmetry.right_arm_lean', 'symmetry.left_arm_lean', 'symmetry.right_leg_lean', 'symmetry.left_leg_lean'
+]
+const DEXA_PATHS: ReadonlySet<string> = new Set(DEXA_FIELDS)
+
+type Figures = Record<string, number>
+
+export interface SanitizedDexa {
+  total: Figures
+  regions: Record<string, Figures>
+  vat: Figures | null
+  bone_density: Figures | null
+  symmetry: Figures | null
+  ag_ratio: number | null
+  dropped: string[]
+}
+
+/**
+ * The nested twin of sanitizeMarkers for a DEXA save: only the paths in DEXA_FIELDS, only finite
+ * numbers (a numeric string is coerced, like a marker). Every figure is optional — the pages read
+ * them that way — but a string, an object or an invented key where a number belongs would still
+ * be a crash at read time, and a hand-edited JSON can carry any of those. A block with nothing
+ * left in it is null (stored as NULL), not `{}`. Returns the paths it refused.
+ */
+export function sanitizeDexa(input: Record<string, unknown>): SanitizedDexa {
+  const dropped: string[] = []
+  const figure = (path: string, raw: unknown): number | null => {
+    if (raw == null) return null
+    if (!DEXA_PATHS.has(path)) {
+      dropped.push(path)
+      return null
+    }
+    const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : Number.NaN
+    if (Number.isFinite(value)) return value
+    dropped.push(path)
+    return null
+  }
+  const block = (prefix: string, raw: unknown): Figures => {
+    const out: Figures = {}
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      if (raw != null) dropped.push(prefix)
+      return out
+    }
+    for (const [key, v] of Object.entries(raw as Record<string, unknown>)) {
+      const value = figure(`${prefix}.${key}`, v)
+      if (value != null) out[key] = value
+    }
+    return out
+  }
+  const orNull = (figures: Figures) => (Object.keys(figures).length ? figures : null)
+
+  const regions: Record<string, Figures> = {}
+  if (input.regions && typeof input.regions === 'object' && !Array.isArray(input.regions)) {
+    for (const [region, raw] of Object.entries(input.regions as Record<string, unknown>)) {
+      const figures = block(`regions.${region}`, raw)
+      if (Object.keys(figures).length) regions[region] = figures
+    }
+  }
+  else if (input.regions != null) {
+    dropped.push('regions')
+  }
+
+  return {
+    total: block('total', input.total),
+    regions,
+    vat: orNull(block('vat', input.vat)),
+    bone_density: orNull(block('bone_density', input.bone_density)),
+    symmetry: orNull(block('symmetry', input.symmetry)),
+    ag_ratio: figure('ag_ratio', input.ag_ratio),
+    dropped
+  }
+}
+
 /** Bounded {name, result} pairs; anything without both as non-empty strings is discarded. */
 export function sanitizeQualitative(input: unknown): Array<{ name: string, result: string }> {
   if (!Array.isArray(input)) return []

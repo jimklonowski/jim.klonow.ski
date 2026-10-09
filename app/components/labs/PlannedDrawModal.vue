@@ -76,12 +76,22 @@
           />
         </UFormField>
 
-        <p
-          v-if="form.labs_date"
-          class="text-[11px] text-muted"
+        <!-- The link to the draw on file. The upload save sets it when a draw lands inside the
+             match window; this is where a wrong link is corrected or cleared. Only offered when
+             there is a draw near the date, or a link to show. -->
+        <UFormField
+          v-if="fulfilledOptions.length > 1"
+          label="Fulfilled by"
+          help="Set by the upload when a draw lands within 3 days of the date. Change it if it picked the wrong draw, or clear it to wait for the right one."
         >
-          Fulfilled by the {{ formatDate(form.labs_date, 'long') }} draw.
-        </p>
+          <USelect
+            v-model="fulfilled"
+            :items="fulfilledOptions"
+            value-key="value"
+            label-key="label"
+            class="w-full"
+          />
+        </UFormField>
 
         <div class="flex justify-end gap-2 pt-2">
           <button
@@ -109,14 +119,22 @@ import type { CheckpointKey, Cycle } from '#shared/utils/cycles'
 import { cycleCheckpoints } from '#shared/utils/cycles'
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
 import { KNOWN_LABS } from '#shared/utils/plannedDraws'
+import { diffDays } from '#shared/utils/dates'
 
 // The add/edit form for a planned draw (see shared/utils/plannedDraws.ts). Mounted by the /labs
 // planned-draws section; the cycle dossier may open it straight into a checkpoint window.
-const props = defineProps<{ cycles: Cycle[] }>()
+const props = withDefaults(defineProps<{
+  cycles: Cycle[]
+  /** Every draw on file, for the "fulfilled by" picker. */
+  drawDates?: string[]
+}>(), { drawDates: () => [] })
 const emit = defineEmits<{ saved: [] }>()
 
 const SELECT_UI = { item: 'text-[12px]' }
 const NO_CHECKPOINT = 'none'
+const NO_DRAW = 'none'
+/** Draws this far either side of the plan's date are offered as its fulfilment — wider than the automatic window, since this is the manual override. */
+const LINK_PICK_WINDOW_DAYS = 14
 
 // UInput v-models want strings where the API uses null; the save endpoint's zod schema turns
 // '' back into null. The checkpoint is one select carrying both halves ("<cycleId>:<key>").
@@ -189,6 +207,22 @@ const checkpointOptions = computed(() => {
     }
   }
   return options
+})
+
+// The select wants a string where the row holds null; `labs_date` itself stays the saved shape.
+const fulfilled = computed({
+  get: () => form.labs_date ?? NO_DRAW,
+  set: (v: string) => {
+    form.labs_date = v === NO_DRAW ? null : v
+  }
+})
+const fulfilledOptions = computed(() => {
+  const near = form.date ? props.drawDates.filter(d => Math.abs(diffDays(form.date, d)) <= LINK_PICK_WINDOW_DAYS) : []
+  const dates = [...new Set([...near, ...(form.labs_date ? [form.labs_date] : [])])].sort()
+  return [
+    { value: NO_DRAW, label: 'No draw yet' },
+    ...dates.map(d => ({ value: d, label: `the ${formatDate(d, 'long')} draw` }))
+  ]
 })
 
 // Picking a checkpoint moves a date that sits outside its window into it (the window's start,

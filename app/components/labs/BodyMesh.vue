@@ -23,7 +23,7 @@ import type { DexaEntry } from '~/composables/useDexaEntries'
 // three.js is imported lazily inside onMounted, so it is a separate chunk only this page pays for.
 
 type Regions = DexaEntry['regions']
-type RegionFigures = { fat_pct: number, fat_lbs: number, lean_lbs?: number }
+type RegionFigures = { fat_pct?: number, fat_lbs?: number, lean_lbs?: number }
 
 const props = withDefaults(defineProps<{
   regions: Regions
@@ -178,7 +178,23 @@ const FRAGMENT = /* glsl */ `
   }
 `
 
-let dispose: (() => void) | null = null
+// Teardown is incremental: each resource registers its own release the moment it exists, and an
+// unmount runs whatever has been registered so far. The setup below awaits twice (the three.js
+// chunk, then the 644 KB GLB), and the DEXA page's 3D/FLAT toggle remounts this component while
+// the home row can be navigated away from mid-load — with one `dispose` assigned at the very end,
+// an unmount during the GLB download left the renderer, its canvas and a requestAnimationFrame
+// loop drawing to a detached element for the life of the tab, and every such unmount held
+// another WebGL context toward the browser's cap. `cancelled` stops the continuation after each
+// await from building on what the unmount has already released.
+const cleanups: Array<() => void> = []
+let cancelled = false
+function teardown() {
+  while (cleanups.length) cleanups.pop()!()
+}
+onBeforeUnmount(() => {
+  cancelled = true
+  teardown()
+})
 
 onMounted(async () => {
   const host = stage.value
@@ -192,14 +208,9 @@ onMounted(async () => {
   try {
     const THREE = await import('three')
     const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
+    if (cancelled) return
 
-    const probe = document.createElement('canvas')
-    if (!probe.getContext('webgl2') && !probe.getContext('webgl')) {
-      status.value = 'error'
-      emit('unsupported')
-      return
-    }
-
+    // Without WebGL 2 the constructor throws, and the catch below hands the page to the SVG map.
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setClearColor(0x000000, 0)
@@ -207,10 +218,18 @@ onMounted(async () => {
     el.style.width = '100%'
     el.style.height = '100%'
     el.style.display = 'block'
-    el.style.touchAction = 'none'
+    // A drag turns the body sideways only, so vertical touches stay the page's scroll.
+    el.style.touchAction = 'pan-y'
     host.appendChild(el)
+    cleanups.push(() => {
+      // dispose() alone leaves the context to the garbage collector; losing it frees it now.
+      renderer.forceContextLoss()
+      renderer.dispose()
+      el.remove()
+    })
 
     const gltf = await new GLTFLoader().loadAsync('/models/body.glb')
+    if (cancelled) return
     gltf.scene.updateMatrixWorld(true)
     const source = gltf.scene.getObjectByProperty('type', 'Mesh') as InstanceType<typeof THREE.Mesh> | undefined
     if (!source) throw new Error('body.glb has no mesh')
@@ -305,6 +324,10 @@ onMounted(async () => {
     }
     const material = new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms, vertexColors: true })
     const mesh = new THREE.Mesh(geometry, material)
+    cleanups.push(() => {
+      material.dispose()
+      geometry.dispose()
+    })
     mesh.position.y = -height / 2
     const pivot = new THREE.Group()
     pivot.add(mesh)
@@ -366,8 +389,8 @@ onMounted(async () => {
           ay: a.y,
           x,
           y: a.y,
-          pct: f ? `${fmt(f.fat_pct)}%` : '—',
-          fat: f ? `${fmt(f.fat_lbs)} fat` : '',
+          pct: f?.fat_pct != null ? `${fmt(f.fat_pct)}%` : '—',
+          fat: f?.fat_lbs != null ? `${fmt(f.fat_lbs)} fat` : '',
           lean: f?.lean_lbs != null ? `${fmt(f.lean_lbs)} lean` : '',
           visible: facing(c.anchor)
         }
@@ -391,6 +414,7 @@ onMounted(async () => {
     resize()
     const ro = new ResizeObserver(resize)
     ro.observe(host)
+    cleanups.push(() => ro.disconnect())
 
     // Pointer: in turn mode a drag turns the body; a still pointer picks the region under it.
     const raycaster = new THREE.Raycaster()
@@ -446,14 +470,26 @@ onMounted(async () => {
     el.addEventListener('pointerup', onUp)
     el.addEventListener('pointercancel', onUp)
     el.addEventListener('pointerleave', onLeave)
+    cleanups.push(() => {
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
+      el.removeEventListener('pointerleave', onLeave)
+    })
 
     const stopHighlight = watch(highlight, (key) => {
       uniforms.uHighlight.value = key ? REGION_IDS[key] ?? -1 : -1
     }, { immediate: true })
     const stopLabels = watch([yaw, morph, regionsShown], placeLabels)
+    cleanups.push(() => {
+      stopHighlight()
+      stopLabels()
+    })
 
     const timer = new THREE.Timer()
     let raf = 0
+    cleanups.push(() => cancelAnimationFrame(raf))
     const loop = () => {
       timer.update()
       const dt = timer.getDelta()
@@ -477,31 +513,15 @@ onMounted(async () => {
     loop()
     status.value = 'ready'
     placeLabels()
-
-    dispose = () => {
-      cancelAnimationFrame(raf)
-      stopHighlight()
-      stopLabels()
-      ro.disconnect()
-      el.removeEventListener('pointerdown', onDown)
-      el.removeEventListener('pointermove', onMove)
-      el.removeEventListener('pointerup', onUp)
-      el.removeEventListener('pointercancel', onUp)
-      el.removeEventListener('pointerleave', onLeave)
-      material.dispose()
-      geometry.dispose()
-      renderer.dispose()
-      el.remove()
-    }
   }
   catch (err) {
     console.error('[body mesh]', err)
+    // Whatever was built before the failure (a renderer waiting on a GLB that 404'd) goes too.
+    teardown()
     status.value = 'error'
     emit('unsupported')
   }
 })
-
-onBeforeUnmount(() => dispose?.())
 
 const VIEWS = [
   { label: 'FRONT', yaw: 0 },

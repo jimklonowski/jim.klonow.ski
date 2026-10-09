@@ -20,7 +20,7 @@ const props = defineProps<{
 const highlight = defineModel<string | null>('highlight', { default: null })
 
 type RegionKey = 'arms' | 'legs' | 'trunk' | 'android' | 'gynoid'
-type RegionFigures = { fat_pct: number, fat_lbs: number, lean_lbs?: number }
+type RegionFigures = { fat_pct?: number, fat_lbs?: number, lean_lbs?: number }
 
 // --- geometry (viewBox units) -----------------------------------------------------------------
 // The figure is symmetric about C. The margins either side hold the arm and leg callouts.
@@ -74,7 +74,7 @@ const fmt = (v: number | undefined, decimals = 1) => (v == null ? '—' : v.toFi
 const region = (key: RegionKey) => (props.regions as Record<string, RegionFigures | undefined>)[key]
 const wash = (key: RegionKey) => {
   const r = region(key)
-  return r ? washOpacity(r.fat_pct) : 0
+  return r?.fat_pct != null ? washOpacity(r.fat_pct) : 0
 }
 const pctText = (key: RegionKey) => {
   const r = region(key)
@@ -88,8 +88,8 @@ const callouts = computed(() => CALLOUTS.flatMap((c) => {
     ...c,
     textX: TEXT_X[c.side],
     leaderEndX: LEADER_END_X[c.side],
-    pct: `${fmt(r.fat_pct)}%`,
-    fat: `${fmt(r.fat_lbs)} fat`,
+    pct: r.fat_pct != null ? `${fmt(r.fat_pct)}%` : '—',
+    fat: r.fat_lbs != null ? `${fmt(r.fat_lbs)} fat` : '',
     lean: r.lean_lbs != null ? `${fmt(r.lean_lbs)} lean` : ''
   }]
 }))
