@@ -151,3 +151,14 @@ export function wardrobeOf(inputs: WardrobeInputs): { accessories: TickerProp[],
   for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) accessories.push(p)
   return { accessories, build: buildOf(inputs) }
 }
+
+/**
+ * The outfit for where anyone can see it: the /ticker Open Graph card is fetched with no session
+ * (server/routes/ticker/og.png.get.ts). Only the four wearables and the tier, which are counts of
+ * logging and exercise. The mane is a finasteride streak and the arms and belly are DEXA readings
+ * — a medication and a body-composition bracket, both documented in this public repo — so those
+ * stay behind the login with the rest of the log.
+ */
+export function publicWardrobeOf(inputs: WardrobeInputs): { accessories: TickerProp[], build: TickerBuild } {
+  return { accessories: earnedWearables(inputs), build: { tier: tierOf(inputs.entries) } }
+}
