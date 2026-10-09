@@ -14,7 +14,12 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 
 const DISCARD_PROMPT = 'You have unsaved changes. Discard them?'
 
-export function useDirtyGuard(source: () => unknown) {
+interface DirtyGuardOptions {
+  /** The confirm's wording, when "unsaved changes" undersells what is about to go (a paid extraction). */
+  prompt?: string
+}
+
+export function useDirtyGuard(source: () => unknown, { prompt = DISCARD_PROMPT }: DirtyGuardOptions = {}) {
   const snapshot = ref(JSON.stringify(source()))
   const isDirty = computed(() => JSON.stringify(source()) !== snapshot.value)
 
@@ -31,7 +36,7 @@ export function useDirtyGuard(source: () => unknown) {
   /** True when it's fine to throw the edits away: nothing changed, or the user said so. */
   function confirmDiscard(): boolean {
     if (!isDirty.value) return true
-    if (!window.confirm(DISCARD_PROMPT)) return false
+    if (!window.confirm(prompt)) return false
     markClean()
     return true
   }
