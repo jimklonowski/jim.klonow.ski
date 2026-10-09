@@ -13,7 +13,8 @@ export interface WardrobeEntry extends Omit<LoggedDayFields, 'peptides'> {
   peptides?: Array<{ compound?: string | null }> | null
 }
 export interface WardrobeWorkout { duration_min?: number | null }
-export interface WardrobeScan { date: string, total: { body_fat_pct: number, lean_mass_lbs: number } }
+/** A DEXA scan's two figures the build reads; either can be missing from an older report format. */
+export interface WardrobeScan { date: string, total: { body_fat_pct?: number, lean_mass_lbs?: number } }
 
 export interface WardrobeInputs {
   /** Journal days, oldest first. */
@@ -115,9 +116,9 @@ export function sortedScans<T extends WardrobeScan>(scans: T[]): T[] {
 /** Lean mass on the latest scan against the first, to a tenth of a pound; null with fewer than two scans. */
 export function leanGain(scans: WardrobeScan[]): number | null {
   const sorted = sortedScans(scans)
-  const first = sorted[0]
-  const latest = sorted.at(-1)
-  return first && latest && first !== latest ? Math.round((latest.total.lean_mass_lbs - first.total.lean_mass_lbs) * 10) / 10 : null
+  const first = sorted[0]?.total.lean_mass_lbs
+  const latest = sorted.at(-1)?.total.lean_mass_lbs
+  return sorted.length >= 2 && first != null && latest != null ? Math.round((latest - first) * 10) / 10 : null
 }
 
 export function armsOf(scans: WardrobeScan[]): 'lean' | 'built' {
@@ -150,4 +151,15 @@ export function wardrobeOf(inputs: WardrobeInputs): { accessories: TickerProp[],
   if (worn.has('crown')) accessories.push('crown')
   for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) accessories.push(p)
   return { accessories, build: buildOf(inputs) }
+}
+
+/**
+ * The outfit for where anyone can see it: the /ticker Open Graph card is fetched with no session
+ * (server/routes/ticker/og.png.get.ts). Only the four wearables and the tier, which are counts of
+ * logging and exercise. The mane is a finasteride streak and the arms and belly are DEXA readings
+ * — a medication and a body-composition bracket, both documented in this public repo — so those
+ * stay behind the login with the rest of the log.
+ */
+export function publicWardrobeOf(inputs: WardrobeInputs): { accessories: TickerProp[], build: TickerBuild } {
+  return { accessories: earnedWearables(inputs), build: { tier: tierOf(inputs.entries) } }
 }

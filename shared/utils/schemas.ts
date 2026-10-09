@@ -84,6 +84,17 @@ export const zSodaEntry = z.object({
 
 const MEAL_KEYS = ['breakfast', 'snack', 'lunch', 'dinner'] as const
 
+/**
+ * A day moved to another date (journal/move): the row is renamed, so everything in it travels.
+ * `replace` says the user confirmed replacing what `to` already holds; without it an occupied
+ * day is a 409, so a row that appeared since the page loaded is never silently lost.
+ */
+export const zJournalMove = z.object({
+  from: zIsoDate,
+  to: zIsoDate,
+  replace: z.boolean().default(false)
+}).refine(v => v.from !== v.to, { message: 'from and to are the same day', path: ['to'] })
+
 export const zJournalSave = z.object({
   date: zIsoDate,
   weight_lbs: zOptNum,

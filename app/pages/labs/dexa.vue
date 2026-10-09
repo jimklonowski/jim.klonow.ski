@@ -379,10 +379,10 @@ const prevLabel = computed(() => (previous.value ? formatDate(previous.value.dat
 // One accessor per cell so VAT and bone density — which live outside `total` — read, diff and
 // click through to their scan history exactly like the mass metrics.
 const CELL_ACCESSORS: Record<string, (e: DexaEntry) => number | null> = {
-  body_fat_pct: e => e.total.body_fat_pct,
-  lean_mass_lbs: e => e.total.lean_mass_lbs,
-  fat_mass_lbs: e => e.total.fat_mass_lbs,
-  total_mass_lbs: e => e.total.total_mass_lbs,
+  body_fat_pct: e => e.total.body_fat_pct ?? null,
+  lean_mass_lbs: e => e.total.lean_mass_lbs ?? null,
+  fat_mass_lbs: e => e.total.fat_mass_lbs ?? null,
+  total_mass_lbs: e => e.total.total_mass_lbs ?? null,
   vat_volume: e => e.vat?.volume_in3 ?? null,
   bmd_total: e => e.bone_density?.total_bmd ?? null
 }
@@ -455,7 +455,7 @@ const statCells = computed(() =>
       cell.caption = VAT_CAPTIONS[tone]
       cell.captionClass = TONE_CLASS[tone]
     }
-    else if (spec.key === 'bmd_total' && entry.bone_density) {
+    else if (spec.key === 'bmd_total' && entry.bone_density?.t_score != null) {
       cell.caption = `T-score ${entry.bone_density.t_score}`
     }
     else if (spec.key === 'total_mass_lbs') {
@@ -492,14 +492,15 @@ const regionRows = computed(() => {
   const prior = (previous.value?.regions ?? {}) as Record<string, DexaRegion | undefined>
   const rows = REGION_ORDER.flatMap((key) => {
     const r = current[key]
-    if (!r) return []
+    // A region the scan didn't carry has no row; a figure within one reads as a dash.
+    if (r?.fat_pct == null) return []
     const delta = deltaInfo(r.fat_pct, prior[key]?.fat_pct, 1, 'down', NOISE.regionPct)
     return [{
       key,
       label: REGION_SHORT[key] ?? REGION_LABELS[key]?.toUpperCase() ?? key.toUpperCase(),
       pct: `${r.fat_pct.toFixed(1)}%`,
       fat: formatLbs(r.fat_lbs),
-      lean: r.lean_lbs != null ? formatLbs(r.lean_lbs) : '—',
+      lean: formatLbs(r.lean_lbs),
       delta: delta?.text ?? '—',
       deltaClass: delta?.class ?? 'text-faint',
       subregion: SUBREGIONS.has(key)
@@ -521,7 +522,8 @@ const LEG_TYPICAL_GAP_LBS = 1.5
 const symmetryRows = computed(() => {
   const s = latest.value?.symmetry
   if (!s) return []
-  const row = (label: string, right: number, left: number, typical: number) => {
+  const row = (label: string, right: number | undefined, left: number | undefined, typical: number) => {
+    if (right == null || left == null) return null
     const max = Math.max(right, left) || 1
     const gap = Math.abs(right - left)
     // The report expresses the gap against the smaller side.
@@ -540,7 +542,7 @@ const symmetryRows = computed(() => {
   return [
     row('ARMS', s.right_arm_lean, s.left_arm_lean, ARM_TYPICAL_GAP_LBS),
     row('LEGS', s.right_leg_lean, s.left_leg_lean, LEG_TYPICAL_GAP_LBS)
-  ]
+  ].filter((r): r is NonNullable<typeof r> => r !== null)
 })
 
 // --- distribution & bone meters -------------------------------------------------------------
@@ -585,7 +587,7 @@ const meters = computed(() => {
       bands: VAT_BANDS,
       ticks: [{ at: 0, label: '0' }, { at: VAT_IDEAL_MAX, label: `${VAT_IDEAL_MAX}` }, { at: VAT_ELEVATED_MAX, label: `${VAT_ELEVATED_MAX}` }, { at: 160, label: '160+' }],
       captions: VAT_CAPTIONS,
-      note: e.vat ? `Visceral fat inside the android region · ${formatLbs(e.vat.fat_mass_lbs)} lbs of VAT mass.` : 'Visceral fat inside the android region.'
+      note: e.vat?.fat_mass_lbs != null ? `Visceral fat inside the android region · ${formatLbs(e.vat.fat_mass_lbs)} lbs of VAT mass.` : 'Visceral fat inside the android region.'
     },
     {
       key: 't_score',
@@ -597,8 +599,8 @@ const meters = computed(() => {
       bands: [{ from: -3.5, to: -2.5, tone: 'danger' }, { from: -2.5, to: -1, tone: 'warn' }, { from: -1, to: 1.5, tone: 'good' }],
       ticks: [{ at: -3.5, label: '-3.5' }, { at: -2.5, label: '-2.5' }, { at: -1, label: '-1.0' }, { at: 1.5, label: '+1.5' }],
       captions: { good: 'NORMAL', warn: 'OSTEOPENIA', danger: 'OSTEOPOROSIS', neutral: '—' },
-      note: e.bone_density
-        ? `Total-body BMD ${e.bone_density.total_bmd} g/cm² · Z ${e.bone_density.z_score}. Not the hip/spine screening DEXA.`
+      note: e.bone_density?.total_bmd != null
+        ? `Total-body BMD ${e.bone_density.total_bmd} g/cm²${e.bone_density.z_score != null ? ` · Z ${e.bone_density.z_score}` : ''}. Not the hip/spine screening DEXA.`
         : 'Total-body bone density against a young-adult reference.'
     }
   ]

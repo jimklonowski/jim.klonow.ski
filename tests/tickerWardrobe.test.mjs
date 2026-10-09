@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   MANE_TIERS, TIER_DAYS, ageDays, bellyOf, armsOf, buildOf, earnedWearables, firstLoggedDay, leanGain,
-  maneTier, nextManeTier, wardrobeOf, wearableMilestones
+  maneTier, nextManeTier, publicWardrobeOf, wardrobeOf, wearableMilestones
 } from '../shared/utils/tickerWardrobe.ts'
 import { shiftDays } from '../shared/utils/dates.ts'
 
@@ -71,4 +71,18 @@ test('the outfit paints the mane before the crown and leaves the day props to th
   assert.deepEqual(outfit.accessories, ['mane-2', 'crown'])
   assert.deepEqual(outfit.build, { tier: 'grown', arms: 'lean', belly: 'lean' })
   assert.deepEqual(wardrobeOf(inputs()).accessories, [])
+})
+
+test('the public outfit keeps the wearables and the tier, never the mane or the DEXA build', () => {
+  // A pet with everything to hide: a 90-day finasteride streak, lean mass up on the second scan,
+  // and a latest body fat over the soft line.
+  const data = inputs({ entries: days(100, 90), scans: [scan('2026-06-12', 20.2, 125.3), scan('2026-09-30', 21.5, 139.2)] })
+  const full = wardrobeOf(data)
+  assert.deepEqual(full.accessories, ['mane-3', 'crown'])
+  assert.deepEqual(full.build, { tier: 'grown', arms: 'built', belly: 'soft' })
+
+  const shown = publicWardrobeOf(data)
+  assert.deepEqual(shown.accessories, ['crown'], 'the crown is a logging streak; the mane is a medication')
+  assert.deepEqual(shown.build, { tier: 'grown' }, 'the tier is a logged-day count; arms and belly are scan readings')
+  assert.deepEqual(publicWardrobeOf(inputs()), { accessories: [], build: { tier: 'hatchling' } })
 })

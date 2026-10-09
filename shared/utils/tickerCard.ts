@@ -1,7 +1,8 @@
-// The Open Graph card for /ticker: TICKER as it is today — its wardrobe and build, asleep after
+// The Open Graph card for /ticker: TICKER as it is today — its outfit and tier, asleep after
 // bedtime — on the stage's dark ground with its EKG and a few pixel-font lines. Drawn into a
-// raster (pixelCanvas.ts) so the Worker can serve it as a PNG with no image library. Only the
-// pet and two harmless figures (its age and the logged streak) appear: the card is public.
+// raster (pixelCanvas.ts) so the Worker can serve it as a PNG with no image library. The card is
+// public, so the route hands it the PUBLIC outfit (tickerWardrobe.ts publicWardrobeOf: earned
+// wearables and tier only, no mane, no DEXA build) and two figures, its age and the logged streak.
 import { createRaster, drawCells, drawLine, drawText, fillRect, hexToRgb, textWidth } from './pixelCanvas.ts'
 import type { Raster } from './pixelCanvas.ts'
 import { INK_HEX, TOKEN_HEX } from './tickerInks.ts'

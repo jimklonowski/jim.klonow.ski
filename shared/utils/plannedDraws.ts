@@ -12,6 +12,7 @@
 // Kept app-import-free (like cycles.ts) so the plain-node tests can run it; relative imports
 // carry an explicit .ts for the same reason.
 import { diffDays, shiftDays } from './dates.ts'
+import { localDayOf } from './time.ts'
 import type { CheckpointKey } from './cycles.ts'
 
 export interface PlannedDraw {
@@ -57,9 +58,23 @@ export interface PlannedDrawState {
 }
 
 /**
+ * Whether a draw on file can be the one a plan was booked for: inside MATCH_WINDOW_DAYS either
+ * side of the plan's date (appointments move), but never before the day the plan was made. A
+ * plan is booked ahead of its draw, so a draw that predates the booking is some other draw —
+ * without this, a clinic draw three days before the Quest date read as the Quest plan done, and
+ * the real draw then had no plan to answer. The booking day is the home-zone day of
+ * `created_at`; a plan without one (seeded, or older than the column) goes by the window alone.
+ */
+export function canFulfil(plan: Pick<PlannedDraw, 'date' | 'created_at'>, drawDate: string): boolean {
+  if (Math.abs(diffDays(plan.date, drawDate)) > MATCH_WINDOW_DAYS) return false
+  return !plan.created_at || drawDate >= localDayOf(plan.created_at)
+}
+
+/**
  * The draw on file that fulfils a plan, or null. An explicit `labs_date` (set by the upload
- * save) wins; otherwise the nearest draw within MATCH_WINDOW_DAYS, so a plan made before the
- * link existed — or a draw uploaded from another device — still reads as done.
+ * save, or picked in the edit form) wins; otherwise the nearest draw that canFulfil it, so a
+ * plan made before the link existed — or a draw uploaded from another device — still reads as
+ * done.
  */
 export function matchDraw(plan: PlannedDraw, drawDates: string[]): string | null {
   if (plan.labs_date) return plan.labs_date
@@ -67,7 +82,7 @@ export function matchDraw(plan: PlannedDraw, drawDates: string[]): string | null
   let bestGap = Infinity
   for (const d of drawDates) {
     const gap = Math.abs(diffDays(plan.date, d))
-    if (gap <= MATCH_WINDOW_DAYS && gap < bestGap) {
+    if (gap < bestGap && canFulfil(plan, d)) {
       best = d
       bestGap = gap
     }
