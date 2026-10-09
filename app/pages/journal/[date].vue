@@ -30,7 +30,7 @@
           :disabled="saving || !canSave"
           @click="save"
         >
-          {{ saving ? 'SAVING…' : '✓ SAVE' }}
+          {{ saveLabel }}
         </button>
         <span
           v-else
@@ -66,6 +66,7 @@
             <UFormField
               label="Date"
               :ui="FIELD_UI"
+              :help="dateHelp"
             >
               <UInput
                 v-model="form.date"
@@ -680,7 +681,7 @@
           :disabled="saving || !canSave"
           @click="save"
         >
-          {{ saving ? 'SAVING…' : '✓ SAVE ENTRY' }}
+          {{ saveLabel === '✓ SAVE' ? '✓ SAVE ENTRY' : saveLabel }}
         </button>
       </div>
     </div>
@@ -740,11 +741,11 @@ const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 
 const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
 
-/** "MON 2026-08-24" — the terminal heading form. */
+/** "MON 2026-08-24" — the terminal heading form. The day being edited, even while the Date field holds a move. */
 const headingLabel = computed(() => {
   if (isNew.value) return 'NEW ENTRY'
-  const weekday = new Date(form.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })
-  return `${weekday.toUpperCase()} ${form.date}`
+  const weekday = new Date(dateParam.value + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })
+  return `${weekday.toUpperCase()} ${dateParam.value}`
 })
 
 function workoutMeta(w: WorkoutEntry) {
@@ -823,8 +824,35 @@ const existingEntry = computed(() =>
 const isNew = computed(() => allEntries.value != null && !existingEntry.value)
 
 // Saving needs the list: without it we can't tell a genuinely new day from a row we simply
-// failed to load, and journal/save would overwrite that row with the blank form.
-const canSave = computed(() => !entriesError.value && allEntries.value != null)
+// failed to load, and journal/save would overwrite that row with the blank form. And a real
+// date — a cleared date input reads as '' and would be a 400 from the schema.
+const canSave = computed(() => !entriesError.value && allEntries.value != null && isIsoDate(form.date))
+
+// The Date field moves the day. Saving under a changed date used to be a silent overwrite:
+// journal/save upserts on the body's date, so the target day's row was replaced and this one
+// left behind with no record of it. Now an existing row is saved under the day it was opened
+// from, journal/move renames it in one audited transaction, and the page follows it. A day that
+// already holds an entry is replaced only after a confirm, and `replace` goes to the server only
+// when the list showed the day occupied — a row that appeared since the page loaded (the Apple
+// Health webhook writes today's weight) is a 409 and a toast, not a loss.
+const dateMoved = computed(() => form.date !== dateParam.value)
+const targetEntry = computed(() => (dateMoved.value ? allEntries.value?.find(e => e.date === form.date) ?? null : null))
+const dateHelp = computed(() => {
+  if (!dateMoved.value || !isIsoDate(form.date)) return undefined
+  if (targetEntry.value) return `${form.date} already has an entry (${entrySummary(targetEntry.value)}) — saving replaces it`
+  return isNew.value ? `Saves under ${form.date}` : `Saving moves this entry to ${form.date}`
+})
+
+/** "3 doses, weight 169.8, 2 sodas, notes" — what a day holds, for the replace confirm. */
+function entrySummary(e: NonNullable<typeof allEntries.value>[number]): string {
+  const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+  return [
+    e.peptides?.length ? n(e.peptides.length, 'dose') : null,
+    e.weight_lbs != null ? `weight ${e.weight_lbs}` : null,
+    e.sodas?.length ? n(e.sodas.length, 'soda') : null,
+    e.notes?.trim() ? 'notes' : null
+  ].filter(Boolean).join(', ') || 'vitals only'
+}
 
 const prevEntry = computed(() => {
   if (!allEntries.value?.length) return null
@@ -948,17 +976,41 @@ function removeSoda(i: number) {
   form.sodas.splice(i, 1)
 }
 
-const { run: save, pending: saving } = useSaveAction(async () => {
+/** The confirm stays with the caller (see useSaveAction): replacing an occupied day is asked here, once. */
+function save() {
+  const target = targetEntry.value
+  if (target && !window.confirm(
+    `${form.date} already has an entry (${entrySummary(target)}). Replace it with this one? The replaced day can be restored from Tools → Data.`
+  )) return
+  runSave()
+}
+
+const { run: runSave, pending: saving } = useSaveAction(async () => {
+  const from = dateParam.value
+  const to = form.date
+  // An existing row moves: saved under the day it was opened from, then renamed. A new day is
+  // simply written under the date chosen. Either way the page follows the entry.
+  const moving = to !== from && existingEntry.value != null
   const payload = {
     ...form,
+    date: moving ? from : to,
     food: Object.fromEntries(
       Object.entries(form.food).filter(([, v]) => v !== '')
     )
   }
   await $fetch('/api/journal/save', { method: 'POST', body: payload })
+  if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
   // What was just saved is now the baseline, so the refresh below may rebuild from the row.
   formGuard.markClean()
   // The shell's streak / logged / soda figures come from the scalar summary, not this list.
   await Promise.all([refresh(), refreshNuxtData('overview')])
-}, { success: 'Entry saved' })
+  if (to !== from) await navigateTo(`/journal/${to}`)
+  return { moved: moving, to }
+}, { success: r => (r.moved ? `Entry moved to ${r.to}` : 'Entry saved') })
+
+const saveLabel = computed(() => {
+  if (saving.value) return 'SAVING…'
+  if (dateMoved.value && isIsoDate(form.date)) return isNew.value ? `✓ SAVE AS ${form.date}` : `✓ MOVE TO ${form.date}`
+  return '✓ SAVE'
+})
 </script>

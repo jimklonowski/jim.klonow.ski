@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalSave, zLabsSave,
+  zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalMove, zJournalSave, zLabsSave,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
   zSodaRemove, zSupplementSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
@@ -42,6 +42,15 @@ test('vitals reject the shapes that used to reach a D1 bind', () => {
   assert.ok(problem(zJournalSave, { ...day, hrv: Number.POSITIVE_INFINITY }))
   // Explicit null stays null — that is how the form clears a reading.
   assert.equal(zJournalSave.parse({ ...day, weight_lbs: null }).weight_lbs, null)
+})
+
+test('a journal move needs two different real days, and replace is off unless the client says so', () => {
+  assert.deepEqual(zJournalMove.parse({ from: '2026-10-07', to: '2026-10-08' }), { from: '2026-10-07', to: '2026-10-08', replace: false })
+  assert.equal(zJournalMove.parse({ from: '2026-10-07', to: '2026-10-08', replace: true }).replace, true)
+  assert.match(problem(zJournalMove, { from: '2026-10-07', to: '2026-10-07' }), /to: from and to are the same day/)
+  assert.match(problem(zJournalMove, { from: '2026-10-07', to: '2026-02-30' }), /to: expected a YYYY-MM-DD date/)
+  assert.match(problem(zJournalMove, { to: '2026-10-08' }), /from/)
+  assert.ok(problem(zJournalMove, { from: '2026-10-07', to: '2026-10-08', replace: 'yes' }), 'replace is a boolean, not a string')
 })
 
 test('a cleared number input reads as absent, not as a type error', () => {
