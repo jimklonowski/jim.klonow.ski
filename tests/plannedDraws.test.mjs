@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  activePrep, checkpointPlan, countdownLabel, drawLabel, matchDraw, nextPlannedDraw, planInWindow,
+  activePrep, canFulfil, checkpointPlan, countdownLabel, drawLabel, matchDraw, nextPlannedDraw, planInWindow,
   plannedDrawState, plannedDrawStates, prepReminders, purposeLines
 } from '../shared/utils/plannedDraws.ts'
 
@@ -32,10 +32,25 @@ test('a draw inside the match window fulfils the plan; the stored link wins over
   assert.equal(matchDraw(p, ['2026-10-21']), null) // +4 does not
   assert.equal(matchDraw(p, ['2026-10-15', '2026-10-18']), '2026-10-18') // the nearest of two
   assert.equal(matchDraw(plan({ labs_date: '2026-10-24' }), ['2026-10-17']), '2026-10-24')
-  // Drawn a day early, before the booked date: done, not "upcoming" with a stray draw.
-  const s = plannedDrawState(p, ['2026-10-16'], '2026-10-02')
+  // Drawn a day early, after the booking but before the booked date: done, not "upcoming" with a stray draw.
+  const s = plannedDrawState(plan({ created_at: '2026-10-02T14:00:00Z' }), ['2026-10-16'], '2026-10-02')
   assert.equal(s.status, 'done')
   assert.equal(s.drawDate, '2026-10-16')
+})
+
+test('a draw that predates the plan is some other draw, however close the dates fall', () => {
+  // Booked Oct 4 for Oct 5. The Oct 3 clinic draw sits inside the window but came before the booking.
+  const p = plan({ date: '2026-10-05', created_at: '2026-10-04T15:00:00Z' })
+  assert.equal(canFulfil(p, '2026-10-03'), false)
+  assert.equal(canFulfil(p, '2026-10-04'), true, 'drawn the day it was booked: an appointment moved earlier')
+  assert.equal(canFulfil(p, '2026-10-08'), true, '+3 days: the appointment slipped')
+  assert.equal(canFulfil(p, '2026-10-09'), false, 'past the window')
+  assert.equal(matchDraw(p, ['2026-10-03']), null)
+  assert.equal(plannedDrawState(p, ['2026-10-03'], '2026-10-04').status, 'upcoming')
+  // The booking day is the home-zone day: 03:30Z on Oct 4 is still the evening of Oct 3 in Chicago.
+  assert.equal(canFulfil(plan({ date: '2026-10-05', created_at: '2026-10-04T03:30:00Z' }), '2026-10-03'), true)
+  // A plan without a creation stamp (seeded, or older than the column) goes by the window alone.
+  assert.equal(canFulfil(plan({ date: '2026-10-05' }), '2026-10-03'), true)
 })
 
 test('the next draw is the soonest open plan; overdue outranks upcoming, done and missed drop out', () => {

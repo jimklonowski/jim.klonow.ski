@@ -54,9 +54,8 @@ export default defineNuxtConfig({
     '/tools/**': { robots: false },
     '/ask': { robots: false },
     '/share/**': { robots: false },
-    // Rate limiting is off everywhere except the two credential endpoints below (the '/**'
-    // rule disables the module's default global limiter, which would otherwise write to KV on
-    // every request). Counters live in the RATE_LIMIT KV namespace so they survive Worker
+    // Rate limiting is off everywhere except the routes listed below (the '/**' rule disables
+    // the module's default global limiter, which would otherwise write to KV on every request). Counters live in the RATE_LIMIT KV namespace so they survive Worker
     // isolate recycling; limits are per IP via cf-connecting-ip (set by Cloudflare, unspoofable).
     '/**': { security: { rateLimiter: false } },
     '/api/labs/auth': {
@@ -100,6 +99,15 @@ export default defineNuxtConfig({
         rateLimiter: {
           tokensPerInterval: 10,
           interval: 300000, // demo sessions are free to mint, but don't let one IP spray cookies
+          ipHeader: 'cf-connecting-ip'
+        }
+      }
+    },
+    '/ticker/og.png': {
+      security: {
+        rateLimiter: {
+          tokensPerInterval: 60,
+          interval: 60000, // the public OG card is edge-cached for an hour (see server/routes/ticker/og.png.get.ts); this caps what one IP can make of the misses
           ipHeader: 'cf-connecting-ip'
         }
       }

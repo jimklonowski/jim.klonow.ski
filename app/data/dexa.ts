@@ -78,7 +78,9 @@ export const REGION_LABELS: Record<string, string> = {
   gynoid: 'Gynoid (Hips)'
 }
 
-export function formatLbs(v: number) {
+/** "139.2" / "140" — and "—" for a figure the scan didn't carry. */
+export function formatLbs(v: number | null | undefined) {
+  if (v == null) return '—'
   return v % 1 === 0 ? `${v}` : v.toFixed(1)
 }
 

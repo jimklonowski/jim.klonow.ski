@@ -1292,7 +1292,7 @@ const quotes = computed(() => {
       : tier.value === 'grown'
         ? `${loggedDays.value} logged days — grown. an elder at ${TIER_DAYS.elder}; ${TIER_DAYS.elder - loggedDays.value} to go.`
         : `${loggedDays.value} logged days — still a hatchling. it grows limbs at ${TIER_DAYS.grown}.`,
-    latestScan.value
+    latestScan.value?.total.body_fat_pct != null
       ? `body fat ${latestScan.value.total.body_fat_pct}% on the ${formatDate(latestScan.value.date, 'monthDay')} scan — ${bellyRead.value === 'soft' ? 'a bit of belly, it admits' : bellyRead.value === 'cut' ? 'cut. look at that' : 'lean'}.`
       : null,
     leanGain.value != null
@@ -1688,14 +1688,18 @@ function newsSince(snap: Snapshot): News[] {
   }
   const scan = latestScan.value
   if (scan && scan.date !== snap.scanDate) {
+    // Every scan figure is optional (an older report format can leave one out): compare what both scans carry.
     const prev = scans.value.at(-2)
     const bf = scan.total.body_fat_pct
-    const parts = [`new scan ${formatDate(scan.date, 'monthDay')}: body fat ${bf}%${prev ? ` (${prev.total.body_fat_pct}% before)` : ''}`]
-    if (prev) {
-      const d = Math.round((scan.total.lean_mass_lbs - prev.total.lean_mass_lbs) * 10) / 10
+    const prevBf = prev?.total.body_fat_pct
+    const lean = scan.total.lean_mass_lbs
+    const prevLean = prev?.total.lean_mass_lbs
+    const parts = [`new scan ${formatDate(scan.date, 'monthDay')}: body fat ${bf ?? '—'}%${prevBf != null ? ` (${prevBf}% before)` : ''}`]
+    if (lean != null && prevLean != null) {
+      const d = Math.round((lean - prevLean) * 10) / 10
       parts.push(`lean ${d >= 0 ? '+' : ''}${d} lb`)
     }
-    const better = !prev || bf < prev.total.body_fat_pct || scan.total.lean_mass_lbs > prev.total.lean_mass_lbs
+    const better = !prev || (bf != null && prevBf != null && bf < prevBf) || (lean != null && prevLean != null && lean > prevLean)
     const armsNews = arms.value === 'built' && snap.arms !== 'built' ? ' …and the arms filled in.' : ''
     news.push({ line: `${parts.join(', ')}.${armsNews}`, event: better ? 'celebrate' : undefined, pose: better ? undefined : 'thinking' })
   }

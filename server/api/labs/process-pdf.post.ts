@@ -163,20 +163,11 @@ const date: JsonSchema = { type: 'string', format: 'date' }
 
 const BLOODWORK_SCHEMA = obj({ date, fasting: { type: 'boolean' }, markers: markerList(BLOODWORK_KEYS), qualitative: qualitativeList })
 const ECHO_SCHEMA = obj({ date, markers: markerList(ECHO_KEYS), qualitative: qualitativeList })
-/** Every DEXA figure as a dotted path into the stored shape (dexa_entries' JSON columns). */
-const DEXA_FIELDS = [
-  'weight_lbs',
-  ...['body_fat_pct', 'total_mass_lbs', 'fat_mass_lbs', 'lean_mass_lbs', 'bmc_lbs', 'fat_free_lbs'].map(f => `total.${f}`),
-  ...['arms', 'legs', 'trunk'].flatMap(r => ['fat_pct', 'fat_lbs', 'lean_lbs'].map(f => `regions.${r}.${f}`)),
-  ...['android', 'gynoid'].flatMap(r => ['fat_pct', 'fat_lbs'].map(f => `regions.${r}.${f}`)),
-  'vat.volume_in3', 'vat.fat_mass_lbs',
-  'ag_ratio',
-  'bone_density.total_bmd', 'bone_density.t_score', 'bone_density.z_score',
-  'symmetry.right_arm_lean', 'symmetry.left_arm_lean', 'symmetry.right_leg_lean', 'symmetry.left_leg_lean'
-]
+// Every DEXA figure as a dotted path into the stored shape: DEXA_FIELDS in server/utils/labs.ts,
+// which sanitizeDexa also enforces on the save.
 const DEXA_SCHEMA = obj({
   date,
-  measurements: { type: 'array', items: obj({ field: { type: 'string', enum: DEXA_FIELDS }, value: num }) }
+  measurements: { type: 'array', items: obj({ field: { type: 'string', enum: [...DEXA_FIELDS] }, value: num }) }
 })
 
 /** [{ field: 'total.body_fat_pct', value }] → { total: { body_fat_pct } }, the stored shape. */

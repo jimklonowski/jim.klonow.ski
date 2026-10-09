@@ -165,10 +165,11 @@ const cells = computed(() => {
   if (!e) return []
   const p = props.previous
   const spec = [
-    { key: 'body_fat_pct', label: 'Body fat %', unit: '', decimals: 1, good: 'down' as const, noise: DEXA_NOISE.pct, read: (x: DexaEntry) => x.total.body_fat_pct },
-    { key: 'lean_mass_lbs', label: 'Lean mass', unit: 'lbs', decimals: 1, good: 'up' as const, noise: DEXA_NOISE.mass, read: (x: DexaEntry) => x.total.lean_mass_lbs },
-    { key: 'fat_mass_lbs', label: 'Fat mass', unit: 'lbs', decimals: 1, good: 'down' as const, noise: DEXA_NOISE.mass, read: (x: DexaEntry) => x.total.fat_mass_lbs }
+    { key: 'body_fat_pct', label: 'Body fat %', unit: '', decimals: 1, good: 'down' as const, noise: DEXA_NOISE.pct, read: (x: DexaEntry) => x.total.body_fat_pct ?? null },
+    { key: 'lean_mass_lbs', label: 'Lean mass', unit: 'lbs', decimals: 1, good: 'up' as const, noise: DEXA_NOISE.mass, read: (x: DexaEntry) => x.total.lean_mass_lbs ?? null },
+    { key: 'fat_mass_lbs', label: 'Fat mass', unit: 'lbs', decimals: 1, good: 'down' as const, noise: DEXA_NOISE.mass, read: (x: DexaEntry) => x.total.fat_mass_lbs ?? null }
   ]
+  // A figure the scan didn't carry is a dash, not a crash: every DEXA field is optional.
   return spec.map((s) => {
     const raw = s.read(e)
     const delta = deltaInfo(raw, p ? s.read(p) : null, s.decimals, s.good, s.noise)
@@ -176,8 +177,8 @@ const cells = computed(() => {
       key: s.key,
       label: s.label,
       unit: s.unit,
-      value: raw.toFixed(s.decimals),
-      accent: s.key === 'body_fat_pct' && raw <= BODY_FAT_IDEAL_MAX,
+      value: raw == null ? '—' : raw.toFixed(s.decimals),
+      accent: s.key === 'body_fat_pct' && raw != null && raw <= BODY_FAT_IDEAL_MAX,
       delta: delta ? { text: `${delta.text}${prevLabel.value}`, class: delta.class } : null
     }
   })
@@ -193,7 +194,7 @@ const regions = computed(() => {
   const prior = (props.previous?.regions ?? {}) as Record<string, DexaRegion | undefined>
   return REGION_ORDER.flatMap((key) => {
     const r = current[key]
-    if (!r) return []
+    if (r?.fat_pct == null) return []
     const delta = deltaInfo(r.fat_pct, prior[key]?.fat_pct, 1, 'down', DEXA_NOISE.regionPct)
     return [{
       key,
@@ -218,11 +219,13 @@ const facts = computed(() => {
     const ok = e.ag_ratio <= AG_OPTIMAL_MAX
     out.push({ text: `A/G ${e.ag_ratio.toFixed(2)}`, tag: ok ? 'optimal' : 'high', tagClass: ok ? 'text-accent' : 'text-warn' })
   }
-  if (e.vat) {
+  if (e.vat?.volume_in3 != null) {
     const ok = e.vat.volume_in3 <= VAT_IDEAL_MAX
     out.push({ text: `VAT ${e.vat.volume_in3.toFixed(2)} in³`, tag: ok ? 'ideal' : 'elevated', tagClass: ok ? 'text-accent' : 'text-warn' })
   }
-  if (e.bone_density) out.push({ text: `BMD ${e.bone_density.total_bmd.toFixed(3)} g/cm² · T ${e.bone_density.t_score}` })
+  if (e.bone_density?.total_bmd != null) {
+    out.push({ text: `BMD ${e.bone_density.total_bmd.toFixed(3)} g/cm²${e.bone_density.t_score != null ? ` · T ${e.bone_density.t_score}` : ''}` })
+  }
   if (props.previous) out.push({ text: `${diffDays(props.previous.date, e.date)} days between scans` })
   return out
 })

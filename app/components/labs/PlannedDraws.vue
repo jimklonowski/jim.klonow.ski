@@ -183,6 +183,7 @@
     <LabsPlannedDrawModal
       ref="modal"
       :cycles="cycles"
+      :draw-dates="drawDates"
       @saved="emit('refresh')"
     />
   </section>
