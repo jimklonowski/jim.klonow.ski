@@ -191,7 +191,7 @@
 
 <script setup lang="ts">
 import type { PlannedDraw, PlannedDrawState, PrepReminder } from '#shared/utils/plannedDraws'
-import { countdownLabel, drawLabel, isOpen, plannedDrawStates, prepReminders, purposeLines } from '#shared/utils/plannedDraws'
+import { countdownLabel, drawLabel, nextOpen, plannedDrawStates, prepReminders, purposeLines } from '#shared/utils/plannedDraws'
 import { cycleCheckpoints } from '#shared/utils/cycles'
 import { diffDays } from '#shared/utils/dates'
 
@@ -216,7 +216,8 @@ const modal = useTemplateRef('modal')
 const today = useToday()
 
 const states = computed(() => plannedDrawStates(props.plans, props.drawDates, today.value))
-const next = computed(() => states.value.find(isOpen) ?? null)
+// The same pick as the home strip and the labs header (nextOpen), so the three can't disagree.
+const next = computed(() => nextOpen(states.value))
 const others = computed(() => states.value.filter(s => s !== next.value).reverse())
 const historyOpen = ref(false)
 

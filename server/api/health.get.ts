@@ -24,6 +24,11 @@ interface LatestRow {
   error: string | null
 }
 
+/** The error as one bounded line of detail. */
+function reason(err: unknown): string {
+  return (err instanceof Error ? err.message : String(err)).slice(0, 200)
+}
+
 async function taskChecks(db: D1Database, now: number): Promise<HealthCheck[]> {
   let runs: RunRow[]
   let latest: LatestRow[]
@@ -45,8 +50,13 @@ async function taskChecks(db: D1Database, now: number): Promise<HealthCheck[]> {
     latest = (b!.results ?? []) as LatestRow[]
     logSince = ((c!.results ?? [])[0] as { since: string | null } | undefined)?.since ?? null
   }
-  catch {
-    return [{ name: 'task_runs', status: 'failing', detail: 'task_runs table missing — run pnpm db:migrate:remote' }]
+  catch (err) {
+    // A missing table is a forgotten migration; anything else is D1 itself (or the query), and
+    // the report should say which — every failure used to read as the migration.
+    const detail = isMissingTable(err)
+      ? 'task_runs table missing — run pnpm db:migrate:remote'
+      : `task_runs query failed: ${reason(err)}`
+    return [{ name: 'task_runs', status: 'failing', detail }]
   }
 
   const tasks = [...new Set(Object.values(SCHEDULED_TASKS).flat())]
@@ -64,12 +74,20 @@ async function taskChecks(db: D1Database, now: number): Promise<HealthCheck[]> {
 }
 
 async function feedChecks(db: D1Database, today: string): Promise<HealthCheck[]> {
-  const row = await db.prepare(`
-    SELECT
-      (SELECT MAX(date) FROM health_metrics WHERE sleep_total_min IS NOT NULL) AS sleep,
-      (SELECT MAX(date) FROM journal_entries WHERE weight_lbs IS NOT NULL) AS weight,
-      (SELECT MAX(date) FROM health_metrics WHERE recovery_score IS NOT NULL) AS recovery
-  `).first<{ sleep: string | null, weight: string | null, recovery: string | null }>()
+  let row: { sleep: string | null, weight: string | null, recovery: string | null } | null
+  try {
+    row = await db.prepare(`
+      SELECT
+        (SELECT MAX(date) FROM health_metrics WHERE sleep_total_min IS NOT NULL) AS sleep,
+        (SELECT MAX(date) FROM journal_entries WHERE weight_lbs IS NOT NULL) AS weight,
+        (SELECT MAX(date) FROM health_metrics WHERE recovery_score IS NOT NULL) AS recovery
+    `).first<{ sleep: string | null, weight: string | null, recovery: string | null }>()
+  }
+  catch (err) {
+    // One failing check, not a bare 500 the monitor can't read. Named outside the `feed:` family
+    // on purpose: a D1 failure is the site's health, not the owner's, so anonymous callers see it.
+    return [{ name: 'feeds', status: 'failing', detail: `feed query failed: ${reason(err)}` }]
+  }
   return [
     feedCheck({ name: 'apple:sleep', latest: row?.sleep ?? null, staleAfterDays: FEED_STALE_AFTER_DAYS['apple:sleep'] }, today),
     feedCheck({ name: 'apple:weight', latest: row?.weight ?? null, staleAfterDays: FEED_STALE_AFTER_DAYS['apple:weight'] }, today),

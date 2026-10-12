@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  activePrep, canFulfil, checkpointPlan, countdownLabel, drawLabel, matchDraw, nextPlannedDraw, planInWindow,
+  activePrep, canFulfil, checkpointPlan, countdownLabel, drawLabel, matchDraw, nextOpen, nextPlannedDraw, planInWindow,
   plannedDrawState, plannedDrawStates, prepReminders, purposeLines
 } from '../shared/utils/plannedDraws.ts'
 
@@ -68,6 +68,17 @@ test('the next draw is the soonest open plan; overdue outranks upcoming, done an
     ['missed', 'done', 'overdue', 'upcoming']
   )
   assert.equal(nextPlannedDraw([plans[0], plans[3]], ['2026-09-09'], '2026-10-02'), null)
+})
+
+test('on draw day the plan booked for today outranks an overdue one; otherwise the overdue one leads', () => {
+  // A missed Oct 7 appointment, rebooked as a new plan for Oct 17 rather than by moving the date.
+  const plans = [plan({ id: 1, date: '2026-10-07' }), plan({ id: 2, date: '2026-10-17' })]
+  assert.equal(nextPlannedDraw(plans, [], '2026-10-16').plan.id, 1, 'the day before: the overdue plan still needs attention')
+  const onTheDay = nextPlannedDraw(plans, [], '2026-10-17')
+  assert.equal(onTheDay.plan.id, 2)
+  assert.equal(onTheDay.status, 'today')
+  assert.equal(nextOpen(plannedDrawStates(plans, [], '2026-10-17')).plan.id, 2, 'the section component picks the same way')
+  assert.equal(nextPlannedDraw(plans, ['2026-10-17'], '2026-10-17').plan.id, 1, 'once today is drawn, back to the overdue one')
 })
 
 test('prep reminders carry the day they start and whether that day has come', () => {
