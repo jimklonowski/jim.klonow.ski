@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.12b",
+  "version": "2026.10.12c",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -42,7 +42,7 @@
     "nuxt-security": "^2.6.0",
     "three": "^0.186.1",
     "uqr": "^0.1.3",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@comark/nuxt": "0.7.0",
