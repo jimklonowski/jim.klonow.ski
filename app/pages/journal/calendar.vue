@@ -204,13 +204,16 @@ const workoutCountByDate = computed(() => countByDate(workoutsData.value))
 const photoCountByDate = computed(() => countByDate(photosData.value))
 const drawDates = computed(() => new Set((labsData.value ?? []).map(l => l.date)))
 
-const todayDate = localToday()
-const today = new Date(todayDate + 'T12:00:00')
+// Reactive: the overnight PWA used to keep yesterday as today until a reload — "+ NEW ENTRY"
+// opened the wrong day, yesterday stayed outlined TODAY and today's cell dimmed as future.
+const todayDate = useToday()
+// The month shown on arrival; the arrows move it from there, so a snapshot is right for this one.
+const today = new Date(todayDate.value + 'T12:00:00')
 
 // Booked draws still waiting on results — a hollow marker on the day, the way scheduled doses
 // get rings. A plan a draw has fulfilled shows as that draw instead.
 const plannedDates = computed(() => {
-  const open = plannedDrawStates(plannedData.value ?? [], [...drawDates.value], todayDate).filter(isOpen)
+  const open = plannedDrawStates(plannedData.value ?? [], [...drawDates.value], todayDate.value).filter(isOpen)
   return new Set(open.map(s => s.plan.date))
 })
 
@@ -315,7 +318,7 @@ const calendarCells = computed((): CalendarCell[] => {
     const titleParts: string[] = []
     if (entry?.compounds.length) titleParts.push(entry.compounds.join(', '))
     if (scheduled.length) {
-      const tense = dateStr > todayDate ? 'scheduled' : dateStr === todayDate ? 'due' : 'not logged'
+      const tense = dateStr > todayDate.value ? 'scheduled' : dateStr === todayDate.value ? 'due' : 'not logged'
       titleParts.push(`${tense}: ${scheduled.join(', ')}`)
     }
     if (entry?.reconCount) titleParts.push(`${entry.reconCount} reconstitution${entry.reconCount > 1 ? 's' : ''}`)
@@ -326,8 +329,8 @@ const calendarCells = computed((): CalendarCell[] => {
     cells.push({
       date: dateStr,
       day: d,
-      isToday: dateStr === todayDate,
-      isFuture: dateStr > todayDate,
+      isToday: dateStr === todayDate.value,
+      isFuture: dateStr > todayDate.value,
       isDraw: drawDates.value.has(dateStr),
       isPlannedDraw: plannedDates.value.has(dateStr),
       hasEntry: !!entry,
@@ -377,7 +380,7 @@ const firstPeptideDate = computed(() =>
 const timelineLabel = computed(() => {
   if (!firstPeptideDate.value) return 'PROTOCOL TIMELINE'
   const from = formatDate(firstPeptideDate.value, 'monthDay').toUpperCase()
-  const to = formatDate(todayDate, 'monthDay').toUpperCase()
+  const to = formatDate(todayDate.value, 'monthDay').toUpperCase()
   return `PROTOCOL TIMELINE · ${from} → ${to}`
 })
 

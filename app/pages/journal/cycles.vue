@@ -144,10 +144,11 @@ const cycleForm = useTemplateRef('cycleForm')
 
 const cycles = computed(() => data.value ?? [])
 const entries = computed(() => journalData.value ?? [])
-const today = localToday()
+// Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
 
 function status(c: Cycle) {
-  return cycleStatusOn(c, today)
+  return cycleStatusOn(c, today.value)
 }
 
 // Tentative cycles are all 'upcoming' by status but belong in their own bucket: they're plans
@@ -186,17 +187,17 @@ function statusLabel(c: Cycle): string {
   if (tentative) return `${tentative.toUpperCase()} · NO DATE`
   const s = status(c)
   if (s === 'active') {
-    const p = cycleProgress(c, today)
+    const p = cycleProgress(c, today.value)
     return `ACTIVE · DAY ${p.day}/${p.totalDays}`
   }
-  if (s === 'upcoming') return `STARTS IN ${diffDays(today, c.start_date)}D`
+  if (s === 'upcoming') return `STARTS IN ${diffDays(today.value, c.start_date)}D`
   return `ENDED ${formatDate(cycleEnd(c), 'monthDay').toUpperCase()}`
 }
 
 /** Whole-cycle adherence — shown once a cycle has expected days behind it. */
 function pctOf(c: Cycle): number | null {
   if (status(c) === 'upcoming') return null
-  return cycleAdherence(entries.value, c, today).pct
+  return cycleAdherence(entries.value, c, today.value).pct
 }
 
 function pctClass(pct: number | null): string {

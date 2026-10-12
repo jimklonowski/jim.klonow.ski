@@ -55,8 +55,9 @@
       @retry="refresh"
     />
 
+    <!-- Only once the list loaded: a failed fetch is the error state above, not a missing cycle. -->
     <p
-      v-if="!cycle"
+      v-if="!error && !cycle"
       class="px-4 sm:px-6 py-5 text-[12px] text-muted"
     >
       No cycle with this id. <NuxtLink
@@ -65,7 +66,7 @@
       >all cycles →</NuxtLink>
     </p>
 
-    <template v-else>
+    <template v-else-if="cycle">
       <!-- Stat cells -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-b border-line">
         <div class="bg-bg px-4 sm:px-6 py-3.5">
@@ -350,14 +351,16 @@ const { data: plannedData } = await usePlannedDraws()
 
 const cycleForm = useTemplateRef('cycleForm')
 
-const today = localToday()
+// Reactive: a dossier left open overnight used to keep yesterday as today — END TODAY wrote
+// yesterday's date, and the day count and checkpoints sat a day behind until a reload.
+const today = useToday()
 const cycle = computed(() => (data.value ?? []).find(c => c.id === Number(route.params.id)) ?? null)
 const entries = computed(() => journalData.value ?? [])
 const draws = computed(() => [...(labsData.value ?? [])].sort((a, b) => a.date.localeCompare(b.date)))
 
-const status = computed(() => cycle.value ? cycleStatusOn(cycle.value, today) : 'upcoming')
-const endDate = computed(() => cycle.value ? cycleEnd(cycle.value) : today)
-const progress = computed(() => cycle.value ? cycleProgress(cycle.value, today) : null)
+const status = computed(() => cycle.value ? cycleStatusOn(cycle.value, today.value) : 'upcoming')
+const endDate = computed(() => cycle.value ? cycleEnd(cycle.value) : today.value)
+const progress = computed(() => cycle.value ? cycleProgress(cycle.value, today.value) : null)
 const totalWeeks = computed(() => progress.value?.totalWeeks ?? 0)
 
 const STATUS_CHIP: Record<string, string> = {
@@ -376,7 +379,7 @@ const statusLabel = computed(() => {
   if (!cycle.value) return ''
   if (tentativeStart.value) return `${tentativeStart.value.toUpperCase()} · NO DATE SET`
   if (status.value === 'active') return `DAY ${progress.value!.day}/${progress.value!.totalDays} · WK ${progress.value!.week} OF ${totalWeeks.value}`
-  if (status.value === 'upcoming') return `STARTS IN ${diffDays(today, cycle.value.start_date)}D`
+  if (status.value === 'upcoming') return `STARTS IN ${diffDays(today.value, cycle.value.start_date)}D`
   return `DONE · ${progress.value!.totalDays}D`
 })
 
@@ -385,7 +388,7 @@ const statusLabel = computed(() => {
 const progressStat = computed(() => {
   if (!cycle.value) return ''
   if (tentativeStart.value) return durationLabel(cycle.value).toUpperCase()
-  if (status.value === 'upcoming') return `${diffDays(today, cycle.value.start_date)}D`
+  if (status.value === 'upcoming') return `${diffDays(today.value, cycle.value.start_date)}D`
   if (status.value === 'active') return `${progress.value!.pct}%`
   // A day-exact plan reports days: "2 WKS" would overstate a run that ends on day 10.
   return cycle.value.planned_days != null ? `${cycle.value.planned_days} DAYS` : `${totalWeeks.value} WKS`
@@ -394,7 +397,7 @@ const progressStat = computed(() => {
 // --- adherence (cycle rules only, finished runs included) ---
 
 const adherence = computed(() =>
-  cycle.value ? cycleAdherence(entries.value, cycle.value, today) : { rows: [], pct: null }
+  cycle.value ? cycleAdherence(entries.value, cycle.value, today.value) : { rows: [], pct: null }
 )
 
 // The scorer runs start-week → current week; for a finished cycle that tail is all dead
@@ -447,7 +450,7 @@ const overlayRows = computed(() => {
   if (tentativeStart.value) return []
   const from = shiftDays(cycle.value.start_date, -RUN_IN_DAYS)
   const to = endDate.value
-  const actualCap = today < to ? today : to
+  const actualCap = today.value < to ? today.value : to
   const rows: Array<{ compound: string, planned: Array<{ date: string, pct: number }>, actual: Array<{ date: string, pct: number }> }> = []
 
   for (const compound of new Set(cycle.value.compounds.map(c => c.compound))) {
@@ -528,7 +531,7 @@ const CP_CLASSES: Record<string, string> = {
 
 const checkpoints = computed(() => {
   if (!cycle.value) return []
-  const states = checkpointStates(cycle.value, draws.value.map(d => d.date), today)
+  const states = checkpointStates(cycle.value, draws.value.map(d => d.date), today.value)
   const baselineDate = states.find(s => s.key === 'baseline')?.drawDate ?? null
   return states.map(cp => ({
     ...cp,
@@ -589,7 +592,7 @@ const nextCheckpointLabel = computed(() => {
 const baselineAdvice = computed(() => {
   const last = draws.value.at(-1) ?? null
   if (!last) return { text: 'No draw on file — get a baseline before you start.', class: 'text-warn' }
-  const age = diffDays(last.date, today)
+  const age = diffDays(last.date, today.value)
   return age <= BASELINE_LOOKBACK_DAYS
     ? { text: `The ${formatDate(last.date, 'monthDay')} draw is ${age}d old — it still works as a baseline if you start within ${BASELINE_LOOKBACK_DAYS}d of it.`, class: 'text-muted' }
     : { text: `Last draw was ${age}d ago — get a fresh baseline before you start.`, class: 'text-warn' }
@@ -598,12 +601,16 @@ const baselineAdvice = computed(() => {
 // --- passive vitals watch (shared/utils/cycleSignals) ---
 
 const signals = computed(() =>
-  cycle.value ? computeCycleSignals(cycle.value, today, entries.value, healthData.value ?? []) : []
+  cycle.value ? computeCycleSignals(cycle.value, today.value, entries.value, healthData.value ?? []) : []
 )
 
 /** "5h42m" for sleep, plain numbers elsewhere — minutes-as-a-number reads worse than it is. */
 function fmtSignalValue(s: CycleSignal, v: number): string {
-  if (s.key === 'sleep') return `${Math.floor(v / 60)}h${String(Math.round(v % 60)).padStart(2, '0')}m`
+  if (s.key === 'sleep') {
+    // Round the total BEFORE splitting: floor/round separately turned 419.7 into "6h60m".
+    const total = Math.round(v)
+    return `${Math.floor(total / 60)}h${String(total % 60).padStart(2, '0')}m`
+  }
   return v.toFixed(s.decimals)
 }
 
@@ -671,7 +678,7 @@ const weightStat = computed(() => {
 async function endToday() {
   if (!cycle.value) return
   if (!confirm(`End ${cycle.value.name} today? The plan called for ${formatDate(plannedEndOf(cycle.value))}.`)) return
-  await saveEnd(today)
+  await saveEnd(today.value)
 }
 
 async function clearEnd() {

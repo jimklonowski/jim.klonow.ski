@@ -81,9 +81,12 @@ const emit = defineEmits<{
 // Home timezone on both sides: the server renders in UTC otherwise, and a time that differs
 // between the SSR pass and the browser breaks hydration. Days are CALENDAR days in HOME_TZ —
 // elapsed-ms ÷ 86 400 000 counted hours, so a thread from 11:50pm read as "today" at 8am.
+// Reactive: a render-time helper reading localToday() went stale on an open list after midnight.
+const today = useToday()
+
 function when(iso: string) {
   const d = new Date(iso)
-  const days = diffDays(localDayOf(iso), localToday())
+  const days = diffDays(localDayOf(iso), today.value)
   if (days <= 0) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: HOME_TZ })
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days}d ago`

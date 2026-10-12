@@ -163,8 +163,9 @@
       />
     </div>
 
+    <!-- A failed load is the error state above (TuiDataState), not an empty category. -->
     <UEmpty
-      v-if="!photosForCategory.length"
+      v-if="!error && !photosForCategory.length"
       icon="i-lucide-image-off"
       title="No photos yet"
       :description="emptyDescription"
@@ -175,7 +176,7 @@
       }"
     />
 
-    <template v-else>
+    <template v-else-if="!error">
       <!-- Before / After picker + comparison -->
       <section class="px-4 sm:px-6 py-4">
         <TuiHeader

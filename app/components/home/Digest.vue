@@ -195,8 +195,12 @@ const weeklyPeriod = computed(() => {
   return sameMonth ? `${start}–${endDay}` : `${start}–${formatDate(d.period_end, 'monthDay').toUpperCase()}`
 })
 
+// Reactive: these render-time helpers read a date that moves at midnight, and a template only
+// re-renders when a reactive input changes.
+const today = useToday()
+
 function relative(date: string) {
-  const days = diffDays(date, localToday())
+  const days = diffDays(date, today.value)
   if (days <= 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days}d ago`
@@ -276,17 +280,17 @@ onMounted(() => {
       companion.value?.trigger('thump')
       return
     }
-    const today = localToday()
+    const day = today.value
     if (props.recovery != null && props.recovery > 80
-      && localStorage.getItem('ticker:celebrated') !== today) {
-      localStorage.setItem('ticker:celebrated', today)
+      && localStorage.getItem('ticker:celebrated') !== day) {
+      localStorage.setItem('ticker:celebrated', day)
       companion.value?.trigger('celebrate')
     }
   }, 800)
 })
 
 function isRecent(date: string) {
-  return diffDays(date, localToday()) <= 7
+  return diffDays(date, today.value) <= 7
 }
 </script>
 

@@ -315,7 +315,7 @@ const whoop = computed(() => {
 
 // --- spoke shortcut cards ---
 const activeCompounds = computed(() => {
-  const from = localDaysAgo(21)
+  const from = shiftDays(today.value, -21)
   const set = new Set<string>()
   for (const e of entries.value) {
     if (e.date < from) continue
@@ -333,7 +333,7 @@ const trackedCompounds = computed(() => {
 })
 
 const workoutsThisWeek = computed(() => {
-  const from = localDaysAgo(7)
+  const from = shiftDays(today.value, -7)
   return (workoutsData.value ?? []).filter(w => w.date >= from).length
 })
 

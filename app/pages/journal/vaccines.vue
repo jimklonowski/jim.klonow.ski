@@ -306,9 +306,10 @@ const [{ data, refresh, error }, { data: profileData, refresh: refreshProfile }]
   useProfile()
 ])
 
-const today = localToday()
+// Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
 const vaccinations = computed(() => data.value ?? [])
-const coverage = computed(() => vaccineCoverage(vaccinations.value, today))
+const coverage = computed(() => vaccineCoverage(vaccinations.value, today.value))
 const profile = computed(() => profileData.value ?? {})
 
 // "3 DOSES · NEXT DUE SEP 2027 · BLOOD TYPE O+" — the soonest booster and the card fact most
@@ -373,7 +374,7 @@ interface VaccinationForm {
 }
 
 function emptyForm(): VaccinationForm {
-  return { id: undefined, date: today, vaccine: '', product: '', notes: '' }
+  return { id: undefined, date: today.value, vaccine: '', product: '', notes: '' }
 }
 
 const form = reactive<VaccinationForm>(emptyForm())

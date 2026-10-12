@@ -54,7 +54,9 @@ function pair<T>(list: T[], pick: (row: T) => number | null | undefined) {
 }
 
 function fmtSleep(min: number) {
-  return `${Math.floor(min / 60)}h${String(Math.round(min % 60)).padStart(2, '0')}m`
+  // Round the total BEFORE splitting: floor/round separately turned 419.7 into "6h60m".
+  const total = Math.round(min)
+  return `${Math.floor(total / 60)}h${String(total % 60).padStart(2, '0')}m`
 }
 
 // A rising weight/RHR is a "watch" (warn) rather than a failure; a falling HRV or

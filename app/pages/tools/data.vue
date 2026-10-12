@@ -116,8 +116,9 @@
         </button>
       </div>
 
+      <!-- Not on a failed load: the error above is the state, and this would read as "nothing to undo". -->
       <UEmpty
-        v-else-if="!entries.length"
+        v-else-if="!auditError && !entries.length"
         icon="i-lucide-history"
         variant="naked"
         title="No changes recorded yet"
