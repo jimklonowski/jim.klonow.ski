@@ -31,6 +31,8 @@ import { CELL, FIGURE_H, PLAYER_X, createRunner, jump, runnerPose, step } from '
 import type { Obstacle, ObstacleKind, RunnerState } from '#shared/utils/tickerRunner'
 import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
+import { FLAG, cansRow, renderCells } from '~/utils/tickerArt'
+import type { Cells } from '~/utils/tickerArt'
 
 const props = defineProps<{
   build: TickerBuild
@@ -59,29 +61,11 @@ const BLINK_SECONDS = 0.55
 const SQUASH_SECONDS = 0.09
 const PAD = (n: number) => String(Math.min(99999, n)).padStart(5, '0')
 
-type Cells = Array<[number, number, TickerInk]>
-
-// Obstacle art in sprite cells: a can is 4×7 with a red band, a flag is a pole with a pennant.
-const CAN: Cells = [
-  [0, 1, 'bowl'], [0, 2, 'bowl'],
-  [1, 0, 'bowl'], [1, 1, 'glove'], [1, 2, 'bowl'], [1, 3, 'bowl'],
-  [2, 0, 'bowl'], [2, 1, 'flag'], [2, 2, 'flag'], [2, 3, 'bowl'],
-  [3, 0, 'bowl'], [3, 1, 'flag'], [3, 2, 'flag'], [3, 3, 'bowl'],
-  [4, 0, 'bowl'], [4, 1, 'glove'], [4, 2, 'bowl'], [4, 3, 'bowl'],
-  [5, 0, 'bowl'], [5, 1, 'bowl'], [5, 2, 'bowl'], [5, 3, 'bowl'],
-  [6, 1, 'bowl'], [6, 2, 'bowl']
-]
-const FLAG: Cells = [
-  [0, 0, 'line'], [1, 0, 'line'], [2, 0, 'line'], [3, 0, 'line'], [4, 0, 'line'],
-  [0, 1, 'flag'], [0, 2, 'flag'], [0, 3, 'flag'], [0, 4, 'flag'],
-  [1, 1, 'flag'], [1, 2, 'flag'], [1, 3, 'flag'],
-  [2, 1, 'flag'], [2, 2, 'flag']
-]
-const cans = (n: number): Cells => Array.from({ length: n }, (_, i) => CAN.map(([r, c, ink]) => [r, c + i * 5, ink] as [number, number, TickerInk])).flat()
+// Obstacle art in sprite cells (app/utils/tickerArt.ts, shared with the crusher's wall).
 const OBSTACLE_ART: Record<ObstacleKind, { cells: Cells, cols: number, rows: number }> = {
-  'can': { cells: cans(1), cols: 4, rows: 7 },
-  'cans2': { cells: cans(2), cols: 9, rows: 7 },
-  'cans3': { cells: cans(3), cols: 14, rows: 7 },
+  'can': { cells: cansRow(1), cols: 4, rows: 7 },
+  'cans2': { cells: cansRow(2), cols: 9, rows: 7 },
+  'cans3': { cells: cansRow(3), cols: 14, rows: 7 },
   'flag-low': { cells: FLAG, cols: 5, rows: 5 },
   'flag-high': { cells: FLAG, cols: 5, rows: 5 }
 }
@@ -123,18 +107,7 @@ const sprites = new Map<TickerPose, { image: HTMLCanvasElement, rows: number }>(
 const art = new Map<ObstacleKind, HTMLCanvasElement>()
 let ro: ResizeObserver | undefined
 
-/** A cell list to a 1× canvas; the main context scales it with smoothing off, so pixels stay pixels. */
-function render(cells: Cells, cols: number, rows: number): HTMLCanvasElement {
-  const c = document.createElement('canvas')
-  c.width = cols * CELL
-  c.height = rows * CELL
-  const g = c.getContext('2d')!
-  for (const [r, col, ink] of cells) {
-    g.fillStyle = inks[ink]
-    g.fillRect(col * CELL, r * CELL, CELL - 1, CELL - 1)
-  }
-  return c
-}
+const render = (cells: Cells, cols: number, rows: number) => renderCells(cells, cols, rows, inks)
 
 function prepare() {
   inks = resolveInks()

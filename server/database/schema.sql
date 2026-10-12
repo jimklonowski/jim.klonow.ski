@@ -377,6 +377,7 @@ CREATE TABLE IF NOT EXISTS ticker_visits (
   pets INTEGER NOT NULL DEFAULT 0,
   best_run INTEGER,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  bests TEXT                  -- JSON {game: best score} for every game after the runner (migration 0010)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ticker_visits_day ON ticker_visits(invite_id, date);

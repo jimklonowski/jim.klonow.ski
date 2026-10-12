@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import {
   zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalMove, zJournalSave, zLabsSave,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
-  zSodaRemove, zSupplementSave, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
+  zSodaRemove, zSupplementSave, zTickerRun, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
 
 /** The first failure message, or null when the value parsed. */
@@ -42,6 +42,14 @@ test('vitals reject the shapes that used to reach a D1 bind', () => {
   assert.ok(problem(zJournalSave, { ...day, hrv: Number.POSITIVE_INFINITY }))
   // Explicit null stays null — that is how the form clears a reading.
   assert.equal(zJournalSave.parse({ ...day, weight_lbs: null }).weight_lbs, null)
+})
+
+test('a finished game names its game (the runner for older clients) and whether the wall went', () => {
+  assert.deepEqual(zTickerRun.parse({ score: 412 }), { score: 412, game: 'runner', cleared: false })
+  assert.deepEqual(zTickerRun.parse({ score: 300, game: 'crusher', cleared: true }), { score: 300, game: 'crusher', cleared: true })
+  assert.match(problem(zTickerRun, { score: 1, game: 'pong' }), /game: Bad game/)
+  assert.ok(problem(zTickerRun, { score: -1 }))
+  assert.ok(problem(zTickerRun, { score: 100000 }))
 })
 
 test('a ticker memory write needs a value: absence is refused, an explicit null forgets the key', () => {

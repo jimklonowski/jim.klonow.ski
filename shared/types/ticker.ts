@@ -4,6 +4,10 @@ import type { Role } from '#shared/utils/access'
 // visitors' footprints. The owner sees all of it; a guest sees the house figures only (the pet
 // counter and the records), never the owner's reaction stamps or another guest's name.
 
+/** The mini-games (the PLAY menu). Each keeps its own record key and leaderboard. */
+export type TickerGame = 'runner' | 'crusher'
+export const TICKER_GAMES: readonly TickerGame[] = ['runner', 'crusher']
+
 export interface TickerPets {
   total: number
   /** The home-timezone day `today` was counted for. */
@@ -14,6 +18,15 @@ export interface TickerPets {
 export interface TickerRecord {
   score: number
   date: string
+  /** The crusher: whether a whole wall has ever been cleared (sticky, for the achievement). */
+  cleared?: boolean
+}
+
+/** A leaderboard's top entry. `label` is the invite label the owner gave that guest — shown to the owner and to that guest alone (shared/utils/tickerVisits.ts). */
+export interface TickerBest {
+  label: string | null
+  score: number
+  date: string
 }
 
 export interface TickerVisit {
@@ -22,6 +35,8 @@ export interface TickerVisit {
   label: string | null
   pets: number
   best_run: number | null
+  /** Per-game bests other than the runner's (migration 0010): { crusher: 412 }. */
+  bests: Partial<Record<TickerGame, number>>
 }
 
 export interface TickerVisitsSummary {
@@ -31,27 +46,30 @@ export interface TickerVisitsSummary {
   pets: number
   /** Newest first; empty for a guest. */
   recent: TickerVisit[]
-  /** The visitors' leaderboard's top entry. `label` is the invite label the owner gave that guest — shown to the owner and to that guest alone (shared/utils/tickerVisits.ts). */
-  best: { label: string | null, score: number, date: string } | null
+  /** The runner's leaderboard top — the same entry as `bests.runner`, kept by name for the page. */
+  best: TickerBest | null
+  /** Every game's leaderboard top. */
+  bests: Partial<Record<TickerGame, TickerBest | null>>
 }
 
-/** readVisits' full read: the summary plus who holds the leaderboard, which never leaves the server. */
+/** readVisits' full read: the summary plus who holds each leaderboard, which never leaves the server. */
 export interface TickerVisitsRead extends TickerVisitsSummary {
-  bestInviteId: string | null
+  bestInviteIds: Partial<Record<TickerGame, string | null>>
 }
 
 export interface TickerStateResponse {
-  /** Key → parsed JSON. For a guest only `pets` and `runner`. */
+  /** Key → parsed JSON. For a guest only `pets` and the game records. */
   state: Record<string, unknown>
   visits: TickerVisitsSummary
   me: { role: Role, label: string | null }
 }
 
 export interface TickerRunResponse {
-  /** The owner's record after this run. */
+  game: TickerGame
+  /** The owner's record for that game after this run. */
   record: TickerRecord | null
-  /** The visitors' leaderboard's top entry after this run. */
-  visitorsBest: { label: string | null, score: number, date: string } | null
+  /** The visitors' leaderboard's top entry for that game after this run. */
+  visitorsBest: TickerBest | null
   /** Whether this run set a new record for the caller (the owner's, or the caller's own as a guest). */
   isRecord: boolean
 }
