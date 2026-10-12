@@ -64,7 +64,10 @@ export function useOverview(role: Ref<Role | null>) {
     [...(workouts?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
   )
 
-  const todayEntry = computed(() => entries.value.find(e => e.date === localToday()) ?? null)
+  // useToday, not localToday(): a computed only re-runs when a reactive input changes, so the
+  // home page's "today" stayed yesterday on an open tab until a reload.
+  const today = useToday()
+  const todayEntry = computed(() => entries.value.find(e => e.date === today.value) ?? null)
   const sodasToday = computed(() => todayEntry.value?.sodas?.length ?? 0)
 
   /** Doses logged today, earliest first. Falls back to the newest entry's doses when today is blank. */

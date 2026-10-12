@@ -182,7 +182,9 @@ function openForm(plan?: PlannedDraw, preset?: { date?: string, cycle_id?: numbe
 
 defineExpose({ open: openForm })
 
-const today = localToday()
+// Reactive (useToday): the modal lives for the page's life, and a window that closed overnight
+// used to still be offered.
+const today = useToday()
 
 function checkpointFor(value: string) {
   if (value === NO_CHECKPOINT) return null
@@ -199,7 +201,7 @@ const checkpointOptions = computed(() => {
   for (const cycle of props.cycles) {
     for (const cp of cycleCheckpoints(cycle)) {
       const value = `${cycle.id}:${cp.key}`
-      if (cp.windowTo < today && form.checkpoint !== value) continue
+      if (cp.windowTo < today.value && form.checkpoint !== value) continue
       options.push({
         value,
         label: `${cycle.name} · ${cp.label} (${formatDate(cp.windowFrom, 'monthDay')}–${formatDate(cp.windowTo, 'monthDay')})`
@@ -233,7 +235,7 @@ watch(() => form.checkpoint, (value) => {
   const cp = checkpointFor(value)
   if (!cp) return
   if (form.date < cp.windowFrom || form.date > cp.windowTo) {
-    form.date = cp.windowFrom > today ? cp.windowFrom : today
+    form.date = cp.windowFrom > today.value ? cp.windowFrom : today.value
   }
 }, { flush: 'sync' })
 

@@ -607,7 +607,8 @@ useSeoMeta({ title: 'Tools · Inventory' })
 
 // Home-timezone day (shared/utils/time.ts) — the UTC slice this used to be made every vial's
 // days-open, expiry and run-out math, and the open-vial default date, roll over at 7pm Central.
-const today: string = localToday()
+// Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
 
 // Stock-dump parsing spends Anthropic tokens — owner-only, like digests and lab summaries.
 const { isOwner } = await useAuth()
@@ -635,7 +636,7 @@ const expiringNoun = computed(() => stockNoun(vials.value.filter(v => v.status !
 
 const activeProjections = computed(() =>
   activeVials.value
-    .map(vial => ({ vial, proj: projectVial(vial, entries.value, today) }))
+    .map(vial => ({ vial, proj: projectVial(vial, entries.value, today.value) }))
     .sort((a, b) => (a.proj.daysLeft ?? Infinity) - (b.proj.daysLeft ?? Infinity))
 )
 
@@ -649,15 +650,15 @@ const nextOutDays = computed(() => {
 })
 
 const expiringCount = computed(() =>
-  vials.value.filter(v => v.status !== 'finished' && (isExpired(v.expiry, today) || isExpiringSoon(v.expiry, today))).length
+  vials.value.filter(v => v.status !== 'finished' && (isExpired(v.expiry, today.value) || isExpiringSoon(v.expiry, today.value))).length
 )
 
 /** Expiry read-out for a sealed row: a colored badge when it needs attention, plain text otherwise. */
 function expiryTag(v: Vial): { text: string, color: 'error' | 'warning' | null } {
   if (!v.expiry) return { text: '', color: null }
-  if (isExpired(v.expiry, today)) return { text: 'expired', color: 'error' }
+  if (isExpired(v.expiry, today.value)) return { text: 'expired', color: 'error' }
   const text = `exp ${formatDate(v.expiry, 'monthDay')}`
-  return { text, color: isExpiringSoon(v.expiry, today) ? 'warning' : null }
+  return { text, color: isExpiringSoon(v.expiry, today.value) ? 'warning' : null }
 }
 
 const sealedGroups = computed(() => {
@@ -715,7 +716,7 @@ function remainingOf(v: Vial): string {
 
 function daysSinceOpened(v: Vial) {
   if (!v.opened_date) return 0
-  return diffDays(v.opened_date, today)
+  return diffDays(v.opened_date, today.value)
 }
 
 function daysLeftText(proj: VialProjection): string {
@@ -847,7 +848,7 @@ const { run: saveVial, pending: saving } = useSaveAction(async () => {
 // --- open / reconstitute ---
 const openModalOpen = ref(false)
 const openTarget = ref<Vial | null>(null)
-const openForm = reactive<{ opened_date: string, bac_water_ml: number | null }>({ opened_date: today, bac_water_ml: 2 })
+const openForm = reactive<{ opened_date: string, bac_water_ml: number | null }>({ opened_date: today.value, bac_water_ml: 2 })
 
 const openIsPill = computed(() => isPillForm(openTarget.value?.form))
 const openTitle = computed(() => `Open ${cap(containerNoun(openTarget.value?.form))}`)
@@ -886,7 +887,7 @@ const openOutcomeText = computed(() => {
 
 function openReconstituteModal(v: Vial) {
   openTarget.value = v
-  openForm.opened_date = today
+  openForm.opened_date = today.value
   openForm.bac_water_ml = 2
   openModalOpen.value = true
 }

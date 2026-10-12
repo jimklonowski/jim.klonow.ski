@@ -332,7 +332,7 @@
 
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import { diffDays, eachDay } from '#shared/utils/dates'
+import { diffDays, eachDay, shiftDays } from '#shared/utils/dates'
 import { getCompoundColor, isInjectedSite } from '~/data/journal'
 import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
@@ -394,10 +394,14 @@ const avgDoseEquiv = computed(() =>
   unit.value === 'iu' ? iuEquivalentLabel(compoundName.value, avgDose.value) : null
 )
 
+// Reactive: these computeds only re-ran when the doses changed, so "last today" and the
+// exposure window stayed a day behind on an open tab.
+const today = useToday()
+
 const daysAgo = computed(() => {
   const last = onDays.value.at(-1)?.date
   if (!last) return null
-  return diffDays(last, localToday())
+  return diffDays(last, today.value)
 })
 
 /** "18 days used · last -3d" — the title-row usage note, assembled here so Vue's whitespace
@@ -503,11 +507,11 @@ const dailyTotals = computed(() =>
 
 const chartWindow = computed(() => {
   if (!pkModel.value) return null
-  const floor = localDaysAgo(EXPOSURE_DAYS - 1)
+  const floor = shiftDays(today.value, -(EXPOSURE_DAYS - 1))
   const first = dailyTotals.value[0]?.date
   // Nothing left to model once the last dose fell out of the window.
   if (!first || !dailyTotals.value.some(d => d.date >= floor)) return null
-  return { from: first > floor ? first : floor, to: localToday() }
+  return { from: first > floor ? first : floor, to: today.value }
 })
 
 // --- Dose chart ---

@@ -257,10 +257,13 @@ function fmt(d: string) {
 function periodLabel(d: Digest) {
   return d.type === 'weekly' ? `${fmt(d.period_start)} – ${fmt(d.period_end)}` : fmt(d.period_end)
 }
+// Reactive: a render-time helper reading localToday() went stale on an open panel after midnight.
+const today = useToday()
+
 function relativeTime(iso: string | null) {
   if (!iso) return ''
   // Calendar days in HOME_TZ, not elapsed hours: 11:50pm yesterday is "yesterday" at 8am.
-  const days = diffDays(localDayOf(iso), localToday())
+  const days = diffDays(localDayOf(iso), today.value)
   if (days <= 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7) return `${days}d ago`

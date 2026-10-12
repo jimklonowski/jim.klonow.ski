@@ -152,10 +152,11 @@ const workouts = computed(() =>
   )
 )
 
-const today = localToday()
+// Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
 
 function daysAgo(date: string) {
-  return diffDays(date, today)
+  return diffDays(date, today.value)
 }
 
 // --- stat cells (trailing 7 days vs the 7 before it) ---

@@ -178,7 +178,8 @@ const { data: cyclesData } = await useCycles()
 const { canEdit, role } = await useAuth()
 
 const entries = computed(() => data.value ?? [])
-const today = localToday()
+// Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
 
 /**
  * A compound counts as "active protocol" if it was dosed inside this window. Two weeks: long
@@ -220,7 +221,7 @@ const usage = computed(() => {
 const trackedCount = computed(() => new Set([...KNOWN_COMPOUNDS, ...usage.value.keys()]).size)
 
 function daysAgo(date: string) {
-  return diffDays(date, today)
+  return diffDays(date, today.value)
 }
 
 /**
@@ -255,7 +256,7 @@ function doseShorthand(u: Usage): string {
       .sort((a, b) => b[1].n - a[1].n || b[1].lastIdx - a[1].lastIdx)[0]?.[0] ?? '—'
   }
 
-  const rule = scheduleRules.value.find(r => r.compound === u.compound && ruleActiveOn(r, today))
+  const rule = scheduleRules.value.find(r => r.compound === u.compound && ruleActiveOn(r, today.value))
   if (rule) return rule.weekdays.length === 7 ? `${dose} qd` : `${dose} ${rule.weekdays.length}×/wk`
 
   const windowDates = u.dates.filter(d => daysAgo(d) <= ACTIVE_WINDOW)
@@ -294,7 +295,7 @@ const historyStart = computed(() => {
   for (const e of entries.value) {
     if ((e.peptides ?? []).length) return e.date
   }
-  return today
+  return today.value
 })
 
 const active = computed(() =>
@@ -322,7 +323,7 @@ const exposureSeriesRows = computed(() => {
   for (const [compound, model] of Object.entries(PK_MODELS)) {
     const doses = pkDosesFor(entries.value, compound, model)
     if (!doses.some(d => d.date >= from)) continue
-    const points = exposureSeries(doses, model, from, today)
+    const points = exposureSeries(doses, model, from, today.value)
     const max = Math.max(...points.map(p => p.level))
     if (max <= 0) continue
     rows.push({
@@ -353,7 +354,7 @@ const exposureChart = computed(() => {
 const exposureMarks = computed(() => {
   const from = localDaysAgo(EXPOSURE_DAYS - 1)
   return (labsData.value ?? [])
-    .filter(l => l.date >= from && l.date <= today)
+    .filter(l => l.date >= from && l.date <= today.value)
     .map(l => formatDate(l.date, 'monthDay'))
 })
 
@@ -362,7 +363,7 @@ const ADHERENCE_WEEKS = 8
 
 // scheduleRules is already empty for the demo persona, which makes this [] there.
 const adherence = computed(() =>
-  computeAdherence(entries.value, today, ADHERENCE_WEEKS, scheduleRules.value)
+  computeAdherence(entries.value, today.value, ADHERENCE_WEEKS, scheduleRules.value)
 )
 
 /** Hover tooltip with the mass equivalence for IU dose labels ("2iu qd", "250 IU"). */

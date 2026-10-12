@@ -282,8 +282,11 @@ const drawsBack = computed(() => latest.value ? drawDates.value.length - 1 - dra
 
 // --- planned draws ---
 // The soonest plan still waiting on results, for the title row; the section below has the rest.
+// Reactive: a computed reading localToday() only re-ran when its other inputs changed, so a draw
+// planned for "today" stayed today on an open tab until a reload.
+const today = useToday()
 const plannedDraws = computed(() => plannedData.value ?? [])
-const nextPlanned = computed(() => nextPlannedDraw(plannedDraws.value, drawDates.value, localToday()))
+const nextPlanned = computed(() => nextPlannedDraw(plannedDraws.value, drawDates.value, today.value))
 
 // --- category tabs ---
 const CATEGORY_SHORT: Record<Category, string> = {
@@ -358,7 +361,7 @@ const latestSummary = computed(() => {
 
 const isRecentDraw = computed(() => {
   if (!latestSummary.value) return false
-  return diffDays(latestSummary.value.date, localToday()) <= 7
+  return diffDays(latestSummary.value.date, today.value) <= 7
 })
 
 // --- sources ---

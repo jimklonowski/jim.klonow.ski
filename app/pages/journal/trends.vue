@@ -186,6 +186,7 @@ const { data: cyclesData } = await useCycles()
 const { role } = await useAuth()
 
 const { inRange, smoothRows, notes } = useTrendRange()
+const today = useToday()
 
 const entries = computed(() => journalData.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
@@ -196,10 +197,10 @@ const healthEntries = computed(() => healthData.value ?? [])
 const annotationsAvailable = computed(() => role.value != null && role.value !== 'demo')
 const annotations = computed(() => {
   if (!notes.value || !annotationsAvailable.value) return []
-  const today = localToday()
+  const day = today.value
   const cycles = (cyclesData.value ?? [])
-    .filter(c => !isTentative(c) && c.start_date <= today)
-    .map(c => ({ name: c.name, from: c.start_date, to: cycleEnd(c) < today ? cycleEnd(c) : today }))
+    .filter(c => !isTentative(c) && c.start_date <= day)
+    .map(c => ({ name: c.name, from: c.start_date, to: cycleEnd(c) < day ? cycleEnd(c) : day }))
   return [...ruleAnnotations(PROTOCOL_RULES), ...eventAnnotations(PROTOCOL_EVENTS), ...cycleAnnotations(cycles)]
 })
 

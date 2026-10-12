@@ -120,8 +120,9 @@
         </span>
       </NuxtLink>
 
+      <!-- A failed load is the error state above, not an empty log. -->
       <p
-        v-if="!entries.length"
+        v-if="!error && !entries.length"
         class="py-5 text-[12px] text-muted"
       >
         No entries logged yet.
