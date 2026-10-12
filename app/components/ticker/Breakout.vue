@@ -28,8 +28,8 @@
 // The polish — a shake on a lost life, a trail on the ball, a flash on a hit, NEW BEST — is
 // cosmetic and skipped under reduced motion; the short lockout after the end is not (a mashed
 // key must not start another game by accident).
-import { CELL, FIGURE_W, makeRng } from '#shared/utils/tickerRunner'
-import { BALL, CAN_COLS, CAN_ROWS, autoPlay, breakoutPose, createBreakout, launch, move, stepBreakout } from '#shared/utils/tickerBreakout'
+import { CELL, FIGURE_H, FIGURE_W, makeRng } from '#shared/utils/tickerRunner'
+import { BALL, CAN_COLS, CAN_ROWS, autoPlay, breakoutPose, createBreakout, launch, move, stepBreakout, wallBottom } from '#shared/utils/tickerBreakout'
 import type { BreakoutState, CanInput } from '#shared/utils/tickerBreakout'
 import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
@@ -60,6 +60,11 @@ const emit = defineEmits<{
   over: [score: number, cleared: boolean]
   /** The player left (Escape or the page's QUIT); the score is the last game's. */
   quit: [score: number]
+  /**
+   * The stage height this wall needs, in px — the wall, room for the prompts and the ball, the
+   * figure and the ground. The runner's stage is 17rem; a month of cans is about twice that.
+   */
+  fit: [height: number]
 }>()
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -67,6 +72,10 @@ const announce = ref('press space or tap to launch; arrows or the pointer move; 
 
 /** The ground line sits this far above the canvas bottom — clear of the page's remark line. */
 const GROUND_FROM_BOTTOM = 56
+/** Between the wall's lowest can and the figure's head: the prompt lines, then room for the ball to fly. */
+const PROMPT_SPACE = 76
+const FLIGHT_SPACE = 40
+const MIN_STAGE = 420
 /** Presses this soon after the end are the tail of the game, not a restart. */
 const RESTART_LOCKOUT = 0.6
 const SHAKE_SECONDS = 0.3
@@ -91,6 +100,7 @@ let livesSeen = 0
 let bestAt = -1
 let bestShown = false
 let trail: Array<{ x: number, y: number }> = []
+let fitted = 0
 let inks: Record<TickerInk, string>
 let font = 'monospace'
 let colors = { ground: '#333', text: '#888', faint: '#666', star: '#444', accent: '#4c6', life: '#c33' }
@@ -157,6 +167,12 @@ function resize() {
   if (!state || (state.score === 0 && (state.status === 'ready' || state.status === 'empty'))) {
     state = fresh()
     livesSeen = state.lives
+    // Tell the page how tall the stage has to be for this wall; it answers with a resize.
+    const needed = Math.max(MIN_STAGE, wallBottom(state.cans) + PROMPT_SPACE + FLIGHT_SPACE + FIGURE_H + GROUND_FROM_BOTTOM)
+    if (needed !== fitted) {
+      fitted = needed
+      emit('fit', needed)
+    }
   }
   else {
     state.width = W
@@ -233,23 +249,24 @@ function draw() {
     g.drawImage(sprite.image, Math.round(s.paddle.x - FIGURE_W / 2), Math.round(ground - sprite.rows * CELL))
   }
 
-  // HUD: lives as hearts on the left, the scores on the right, NEW BEST the moment it passes.
+  // HUD, top right (the page's window and clock sit top left): the scores, the lives as hearts
+  // under them, then the combo or NEW BEST the moment it passes.
   g.font = `11px ${font}`
   g.textBaseline = 'top'
-  for (let i = 0; i < s.lives; i++) {
-    g.fillStyle = colors.life
-    g.fillRect(12 + i * 12, 12, 6, 6)
-  }
   g.textAlign = 'right'
   g.fillStyle = colors.faint
   g.fillText(`HI ${PAD(props.hi)}  ${PAD(s.score)}`, W - 12, 10)
+  for (let i = 0; i < s.lives; i++) {
+    g.fillStyle = colors.life
+    g.fillRect(W - 18 - i * 10, 27, 6, 6)
+  }
   if (s.combo >= 2 && s.status === 'running') {
     g.fillStyle = colors.accent
-    g.fillText(`×${s.combo}`, W - 12, 26)
+    g.fillText(`×${s.combo}`, W - 12, 40)
   }
   else if (bestAt >= 0 && now - bestAt < 1.6 && s.status === 'running') {
     g.fillStyle = colors.accent
-    g.fillText('NEW BEST', W - 12, 26)
+    g.fillText('NEW BEST', W - 12, 40)
   }
 
   // Prompts, above the figure's head.

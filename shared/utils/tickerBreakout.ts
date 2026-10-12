@@ -128,6 +128,11 @@ export function paddleTop(s: BreakoutState): number {
   return s.height - FIGURE_H
 }
 
+/** The lowest edge of the wall, for sizing a stage around it; WALL_TOP when there is no wall. */
+export function wallBottom(cans: Can[]): number {
+  return cans.reduce((low, c) => Math.max(low, c.y + c.h), WALL_TOP)
+}
+
 export function createBreakout(o: BreakoutOptions): BreakoutState {
   const paddleScale = o.paddleScale ?? 1
   const lives = o.lives ?? BASE_LIVES
