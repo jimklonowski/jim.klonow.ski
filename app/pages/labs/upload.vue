@@ -593,6 +593,7 @@ async function upload(file: File) {
 /** Clears the page for another PDF — after asking, when the result on screen was never saved. */
 function reset() {
   if (!parsedGuard.confirmDiscard()) return
+  summaryRun++ // orphan a summary still being written for the result going away
   result.value = null
   error.value = ''
   filename.value = ''
@@ -640,19 +641,23 @@ async function saveToSite() {
   }
 }
 
+// A run counter: RESET or UPLOAD ANOTHER during the (10–30 s) summary call used to let the old
+// result land under the next PDF's preview as its "✦ AI SUMMARY". A superseded run is dropped.
+let summaryRun = 0
 async function generateSummary(endpoint: string, date: string) {
+  const run = ++summaryRun
   summarizing.value = true
   summary.value = ''
   summaryError.value = ''
   try {
     const res = await $fetch<{ summary: string }>(endpoint, { method: 'POST', body: { date } })
-    summary.value = res.summary
+    if (run === summaryRun) summary.value = res.summary
   }
   catch {
-    summaryError.value = 'Summary generation failed — your results were still saved.'
+    if (run === summaryRun) summaryError.value = 'Summary generation failed — your results were still saved.'
   }
   finally {
-    summarizing.value = false
+    if (run === summaryRun) summarizing.value = false
   }
 }
 </script>

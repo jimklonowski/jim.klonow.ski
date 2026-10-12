@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DexaEntry } from '~/composables/useDexaEntries'
+import { scanTag } from '#shared/utils/scanTag'
 
 // The scan on a body: public/models/body.glb (a CC0 MakeHuman mesh sized to Jim's numbers, built
 // by scripts/body/build-body-glb.mjs) rendered with a phosphor scan-line shader — a screen-space
@@ -48,7 +49,13 @@ const auto = ref(true)
 /** 0 = the latest body, 1 = the previous one. */
 const morph = ref(0)
 const meshDates = ref<{ base: string, alt: string | null } | null>(null)
-const canMorph = computed(() => !!meshDates.value?.alt && meshDates.value.base === props.dates.latest && meshDates.value.alt === props.dates.previous)
+// The mesh names the scans it was built from by tag (shared/utils/scanTag.ts), not by date: the
+// GLB is a public asset. The slider appears only when the tags match the scans on screen.
+const canMorph = computed(() =>
+  !!meshDates.value?.alt
+  && meshDates.value.base === scanTag(props.dates.latest)
+  && !!props.dates.previous && meshDates.value.alt === scanTag(props.dates.previous)
+)
 // The slider runs in time order, THEN on the left and NOW on the right, so its value is the inverse
 // of the morph weight.
 const morphPct = computed({
@@ -93,7 +100,8 @@ const MARGIN = 10
 const fmt = (v: number | undefined, decimals = 1) => (v == null ? '—' : v.toFixed(decimals))
 const regionsShown = computed(() => (canMorph.value && morph.value >= 0.5 && props.previousRegions ? props.previousRegions : props.regions))
 const figures = (key: string) => (regionsShown.value as Record<string, RegionFigures | undefined>)[key]
-const fatPct = (regions: Regions | null | undefined, key: string) => ((regions as Record<string, RegionFigures | undefined> | null | undefined)?.[key]?.fat_pct ?? 0)
+/** A region's fat % for the shader; -1 when the scan has no figure for it, which the shader draws as "no data", not as 0 % (the darkest wash). */
+const fatPct = (regions: Regions | null | undefined, key: string) => ((regions as Record<string, RegionFigures | undefined> | null | undefined)?.[key]?.fat_pct ?? -1)
 
 const VERTEX = /* glsl */ `
   #include <common>
@@ -136,8 +144,9 @@ const FRAGMENT = /* glsl */ `
   void main() {
     float region = floor(vColor.r * 255.0 + 0.5);
     float band = floor(vColor.g * 255.0 + 0.5);
-    float fat = region < 0.5 ? 0.0 : uFat[int(region)];
-    if (band > 0.5) fat = uBandFat[int(band)];
+    float fat = region < 0.5 ? -1.0 : uFat[int(region)];
+    // A band the scan has no figure for (-1) keeps its trunk's wash instead of reading as 0 %.
+    if (band > 0.5 && uBandFat[int(band)] >= 0.0) fat = uBandFat[int(band)];
 
     vec3 n = normalize(vNormalV);
     // An orthographic view has one view direction for every fragment.
@@ -154,7 +163,7 @@ const FRAGMENT = /* glsl */ `
     vec3 surface = vec3(0.039, 0.059, 0.047);
     vec3 amber = vec3(0.910, 0.702, 0.294);
     vec3 green = vec3(0.173, 0.910, 0.643);
-    float w = region < 0.5 ? 0.10 : wash(fat);
+    float w = (region < 0.5 || fat < 0.0) ? 0.10 : wash(fat);
     float shade = 0.55 + 0.45 * lambert;
     vec3 col = surface + amber * (w * shade) * (0.14 + 0.86 * line);
 
@@ -392,7 +401,8 @@ onMounted(async () => {
           pct: f?.fat_pct != null ? `${fmt(f.fat_pct)}%` : '—',
           fat: f?.fat_lbs != null ? `${fmt(f.fat_lbs)} fat` : '',
           lean: f?.lean_lbs != null ? `${fmt(f.lean_lbs)} lean` : '',
-          visible: facing(c.anchor)
+          // An on-body plate for a band the scan has no figure for would read "ANDROID —".
+          visible: facing(c.anchor) && (c.side !== 'inside' || f?.fat_pct != null)
         }
       })
       // The R/L lean figures follow the slider like the regions do, from whichever scan is showing.
@@ -429,7 +439,9 @@ onMounted(async () => {
       if (!hit?.face) return null
       const vi = hit.face.a
       const band = Math.round(colorAttr.getY(vi) * 255)
-      return band > 0 ? ID_REGIONS[band + 3] ?? null : ID_REGIONS[regionOf(vi)] ?? null
+      const key = band > 0 ? ID_REGIONS[band + 3] ?? null : ID_REGIONS[regionOf(vi)] ?? null
+      // A band the scan has no figure for reads as its trunk, which the table does have a row for.
+      return key && band > 0 && figures(key)?.fat_pct == null ? 'trunk' : key
     }
     const pick = (e: PointerEvent) => pickAt(e.clientX, e.clientY)
     if (import.meta.dev) {
@@ -534,6 +546,42 @@ function view(v: number) {
   auto.value = false
 }
 
+// --- keyboard and assistive access ------------------------------------------------------------
+// The canvas is pixels and the overlay is decoration (aria-hidden), so the stage itself carries
+// what the hand-drawn map's focusable regions used to: one description of the whole figure, and
+// a live readout of the highlighted region. ↑ ↓ walk the regions, ← → turn the body (turn mode),
+// Escape clears — the same highlight the pointer sets, so the table lights up in step.
+const REGION_NAMES: Record<string, string> = { arms: 'Arms', legs: 'Legs', trunk: 'Trunk', android: 'Android (abdomen)', gynoid: 'Gynoid (hips)' }
+const REGION_ORDER = ['arms', 'legs', 'trunk', 'android', 'gynoid']
+function describe(key: string): string | null {
+  const f = figures(key)
+  if (f?.fat_pct == null) return null
+  return `${REGION_NAMES[key] ?? key}: ${fmt(f.fat_pct)}% fat${f.fat_lbs != null ? `, ${fmt(f.fat_lbs)} lbs fat` : ''}${f.lean_lbs != null ? `, ${fmt(f.lean_lbs)} lbs lean` : ''}`
+}
+const ariaLabel = computed(() => {
+  const parts = REGION_ORDER.map(describe).filter((s): s is string => !!s)
+  return `Body mesh of the ${props.dates.latest} DEXA scan: fat percentage by region. ${parts.join('. ')}${parts.length ? '.' : ''} Up and down arrows walk the regions${flat.value ? '' : ', left and right turn the body'}.`
+})
+const highlightText = computed(() => (highlight.value ? describe(highlight.value) ?? REGION_NAMES[highlight.value] ?? highlight.value : ''))
+function onStageKey(e: KeyboardEvent) {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    const shown = REGION_ORDER.filter(k => figures(k)?.fat_pct != null)
+    if (!shown.length) return
+    const down = e.key === 'ArrowDown'
+    const i = highlight.value ? shown.indexOf(highlight.value) : (down ? -1 : 0)
+    highlight.value = shown[(i + (down ? 1 : -1) + shown.length) % shown.length] ?? null
+  }
+  else if (!flat.value && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault()
+    auto.value = false
+    yaw.value += e.key === 'ArrowLeft' ? -0.15 : 0.15
+  }
+  else if (e.key === 'Escape') {
+    highlight.value = null
+  }
+}
+
 // Text over the body gets a surface-colour halo so it clears contrast on any shade, and the
 // on-body labels sit on a backplate so the raster doesn't run through the digits.
 const HALO = 'paint-order: stroke; stroke: #070a09; stroke-width: 4px; stroke-linejoin: round;'
@@ -550,9 +598,17 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
   <figure class="m-0">
     <div
       ref="stage"
-      class="relative w-full aspect-3/4 bg-inset border border-line-soft select-none overflow-hidden"
+      class="relative w-full aspect-3/4 bg-inset border border-line-soft select-none overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-accent"
       :class="flat ? '' : 'cursor-grab active:cursor-grabbing'"
+      role="img"
+      :aria-label="ariaLabel"
+      tabindex="0"
+      @keydown="onStageKey"
     >
+      <span
+        class="sr-only"
+        aria-live="polite"
+      >{{ highlightText }}</span>
       <p
         v-if="status !== 'ready'"
         class="absolute inset-0 flex items-center justify-center text-[10.5px] tracking-[0.12em] uppercase text-faint"
@@ -738,8 +794,8 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
       class="mt-3"
     >
       <div class="flex items-baseline justify-between text-[9.5px] tracking-[0.12em] uppercase text-faint">
-        <span :class="morph >= 0.5 ? 'text-hi' : ''">then · {{ formatDateTerse(meshDates.alt!) }}</span>
-        <span :class="morph < 0.5 ? 'text-hi' : ''">now · {{ formatDateTerse(meshDates.base) }}</span>
+        <span :class="morph >= 0.5 ? 'text-hi' : ''">then · {{ formatDateTerse(props.dates.previous!) }}</span>
+        <span :class="morph < 0.5 ? 'text-hi' : ''">now · {{ formatDateTerse(props.dates.latest) }}</span>
       </div>
       <USlider
         v-model="morphPct"

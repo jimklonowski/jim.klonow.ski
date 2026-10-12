@@ -19,7 +19,11 @@ export default defineEventHandler(async (event) => {
   // after removing the redundant server-side EXIF parse below.
   const { category, date: suppliedDate } = validatedQuery(event, zPhotoUploadQuery)
 
-  const contentType = getHeader(event, 'content-type') ?? 'application/octet-stream'
+  // Only a known image type is stored as the object's content type: the proxy serves it back
+  // verbatim to the friend role, so a client's arbitrary header must never become the served
+  // type. Anything else is stored as plain bytes (an <img> decodes by content, not by header).
+  const declared = getHeader(event, 'content-type') ?? ''
+  const contentType = EXT_BY_MIME[declared] ? declared : 'application/octet-stream'
   const data = await readRawBody(event, false)
   if (!data?.length) {
     throw createError({ statusCode: 400, message: 'No file uploaded' })

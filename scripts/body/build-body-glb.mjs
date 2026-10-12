@@ -21,6 +21,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Document, NodeIO } from '@gltf-transform/core'
 import { quantize } from '@gltf-transform/functions'
+import { scanTag } from '../../shared/utils/scanTag.ts'
 
 const REGION = { head: 0, arms: 1, legs: 2, trunk: 3 }
 const BAND = { none: 0, android: 1, gynoid: 2 }
@@ -321,15 +322,17 @@ async function main() {
     .setAttribute('NORMAL', acc('normal', 'VEC3', normal))
     .setAttribute('COLOR_0', acc('region', 'VEC4', color, true))
     .setIndices(acc('indices', 'SCALAR', n < 65535 ? Uint16Array.from(tris) : Uint32Array.from(tris)))
+  // The scans are named by tag, not by date (shared/utils/scanTag.ts): the GLB is a public asset,
+  // and the viewer only needs to match the tags of the scans it shows against these.
   if (alt) {
-    prim.addTarget(doc.createPrimitiveTarget(altDate)
+    prim.addTarget(doc.createPrimitiveTarget(scanTag(altDate))
       .setAttribute('POSITION', acc('alt-position', 'VEC3', dPosition))
       .setAttribute('NORMAL', acc('alt-normal', 'VEC3', dNormal)))
   }
   const round = v => +v.toFixed(4)
   const mesh = doc.createMesh('body').addPrimitive(prim).setExtras({
-    base: baseDate,
-    alt: altDate ?? null,
+    base: scanTag(baseDate),
+    alt: altDate ? scanTag(altDate) : null,
     height: round(lm.height),
     landmarks: Object.fromEntries(['crotch', 'armpit', 'torsoHalfWidth', 'neck', 'chin', 'waist', 'pelvisCut'].map(k => [k, round(lm[k])])),
     bands: { android: lm.android.map(round), gynoid: lm.gynoid.map(round) },

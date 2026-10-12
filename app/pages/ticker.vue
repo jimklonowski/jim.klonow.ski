@@ -304,6 +304,7 @@ import { localTimeNow } from '#shared/utils/time'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
+import { mergePatch } from '#shared/utils/mergePatch'
 import {
   LEAN_GAIN_LBS, MANE_TIERS, TIER_DAYS, ageDays as ageDaysOf, buildOf, firstLoggedDay,
   finasterideStreak as finasterideStreakOf, leanGain as leanGainOf, loggedDayCount, maneTier as maneTierOf,
@@ -364,9 +365,19 @@ const memory = reactive<Record<string, unknown>>({ ...(memoryData.value?.state ?
 const visits = computed(() => memoryData.value?.visits ?? null)
 const visitorLabel = computed(() => memoryData.value?.me.label ?? null)
 
+// Browser memory is read only once mounted. During hydration the setup-time reads returned the
+// stored values while the server had rendered the defaults, so the demo pet hydrated with a PETS
+// tile, a FEED count and a HI that didn't match its markup. Registered here, before the hooks
+// below that re-read each setup-time recall(), so it flips first.
+let hydrated = false
+onMounted(() => {
+  hydrated = true
+})
+
 /** What it remembers under a key: the server's copy, or the browser's for the demo pet. */
 function recall<T>(key: string): T | null {
   if (remote) return (memory[key] as T | undefined) ?? null
+  if (import.meta.server || !hydrated) return null
   try {
     const raw = localStorage.getItem(`ticker:${key}`)
     if (raw == null) return null
@@ -382,15 +393,21 @@ function recall<T>(key: string): T | null {
   }
 }
 
-/** Remember something: the server for the owner, the browser for the demo pet, nowhere for a guest. */
-function remember(key: string, value: unknown) {
-  memory[key] = value
+/**
+ * Remember something: the server for the owner, the browser for the demo pet, nowhere for a
+ * guest. `merge` folds an object into what is stored (json_patch on the server, the same rule on
+ * the mirror here) instead of replacing it, so a fed check made on the phone and one made on the
+ * desktop both survive — whole-object writes were last-writer-wins across devices.
+ */
+function remember(key: string, value: unknown, merge = false) {
+  const next = merge ? mergePatch(remote ? memory[key] : recall(key), value) : value
+  memory[key] = next
   if (remote) {
-    if (role.value === 'owner') $fetch('/api/ticker/state', { method: 'POST', body: { key, value } }).catch(() => { /* it'll remember next time */ })
+    if (role.value === 'owner') $fetch('/api/ticker/state', { method: 'POST', body: { key, value, merge } }).catch(() => { /* it'll remember next time */ })
   }
   else {
     try {
-      localStorage.setItem(`ticker:${key}`, JSON.stringify(value))
+      localStorage.setItem(`ticker:${key}`, JSON.stringify(next))
     }
     catch { /* a private window — the demo pet forgets on close, which is fine */ }
   }
@@ -1045,9 +1062,12 @@ const doseKeys = computed(() => {
     return `${base}#${nth}`
   })
 })
+/** The stored checks: `keys` is a map so two devices' checks merge; rows from before hold an array. */
+type FedMemory = { date: string, keys: string[] | Record<string, unknown> }
 function fedFromMemory(): Set<string> {
-  const saved = recall<{ date: string, keys: string[] }>(FED_KEY)
-  return new Set(saved?.date === mealDay.value && Array.isArray(saved.keys) ? saved.keys : [])
+  const saved = recall<FedMemory>(FED_KEY)
+  if (saved?.date !== mealDay.value || !saved.keys) return new Set()
+  return new Set(Array.isArray(saved.keys) ? saved.keys : Object.keys(saved.keys))
 }
 const fedKeys = ref(fedFromMemory())
 onMounted(() => {
@@ -1059,8 +1079,17 @@ watch(mealDay, () => {
 /** Plate indices fed today. */
 const fedThisVisit = computed(() => new Set(doseKeys.value.map((k, i) => fedKeys.value.has(k) ? i : -1).filter(i => i >= 0)))
 function markFed(i: number) {
-  fedKeys.value = new Set([...fedKeys.value, doseKeys.value[i]!])
-  remember(FED_KEY, { date: mealDay.value, keys: [...fedKeys.value] })
+  const key = doseKeys.value[i]!
+  fedKeys.value = new Set([...fedKeys.value, key])
+  // The same day merges one check in, so a check made on another device isn't erased; a new
+  // day (or a row from before the map) replaces the plate outright.
+  const stored = recall<FedMemory>(FED_KEY)
+  const merge = stored?.date === mealDay.value && !Array.isArray(stored.keys)
+  remember(
+    FED_KEY,
+    { date: mealDay.value, keys: Object.fromEntries((merge ? [key] : [...fedKeys.value]).map(k => [k, 1])) },
+    merge
+  )
 }
 
 /** A reconstitution: the vial and the bac water, swirled, never shaken. */
@@ -1341,6 +1370,8 @@ const playing = ref(false)
 const runnerHi = ref<TickerRecord | null>(recall<TickerRecord>('runner'))
 const visitorsBest = ref(visits.value?.best ?? null)
 let runSetRecord = false
+/** A guest's run that topped the house record — the figure their HUD shows, so the one its NEW BEST and the quit line agree on. */
+let runBeatHouse = false
 onMounted(() => {
   if (!remote) runnerHi.value = recall<TickerRecord>('runner')
 })
@@ -1356,11 +1387,14 @@ function play() {
   wake()
   busy.value = true
   runSetRecord = false
+  runBeatHouse = false
   playing.value = true
   line.value = 'space or tap to run. esc quits.'
 }
 
 function onRunOver(score: number) {
+  // Read before the server's answer moves the house record up to this very score.
+  runBeatHouse = !keeper && score > 0 && score > houseBest.value
   if (!remote) {
     if (score > (runnerHi.value?.score ?? 0)) {
       runnerHi.value = { score, date: today.value }
@@ -1388,10 +1422,16 @@ async function onRunQuit(score: number) {
   await nextTick()
   measureFloor()
   const bestRun = runnerHi.value
-  if (runSetRecord) {
-    line.value = keeper && bestRun ? `new best: ${bestRun.score} points. ♥` : `new best: ${score} points. ♥`
+  // The keeper's record, or a guest topping the house: the celebration the HUD's NEW BEST promised.
+  if (keeper ? runSetRecord : runBeatHouse) {
+    line.value = keeper ? `new best: ${bestRun?.score ?? score} points. ♥` : `new house record: ${score} points. ♥`
     pet.value?.trigger('celebrate')
     for (let i = 0; i < 5; i++) timers.push(setTimeout(() => spawnHeart(Math.random() * 120 - 60), i * 150))
+  }
+  else if (!keeper && runSetRecord) {
+    // Their own best (the server's word), short of the house: a nod, not a party.
+    line.value = `${score} points — your best yet. the house record is ${houseBest.value}.`
+    pet.value?.trigger('bigbeat')
   }
   else if (score > 0 && keeper && bestRun) {
     line.value = `${score} points. best ${bestRun.score} on ${formatDate(bestRun.date, 'monthDay')} — it's still catching its breath.`
@@ -1775,8 +1815,10 @@ const freshAchievements = computed(() => achievements.value.filter(a => a.progre
 function announceAchievements() {
   const fresh = freshAchievements.value
   if (!fresh.length) return
-  achievementDates.value = { ...achievementDates.value, ...Object.fromEntries(fresh.map(a => [a.id, today.value])) }
-  remember(ACHIEVEMENTS_KEY, achievementDates.value)
+  // Only the new dates go to memory, merged in: another device's earlier dates stay as they were.
+  const dated = Object.fromEntries(fresh.map(a => [a.id, today.value]))
+  achievementDates.value = { ...achievementDates.value, ...dated }
+  remember(ACHIEVEMENTS_KEY, dated, true)
   const rewards = fresh.filter(a => a.reward).map(a => WEARABLE_META[a.reward!]!.id)
   line.value = `achievement${fresh.length === 1 ? '' : 's'}: ${fresh.map(a => a.name).join(', ')}${rewards.length ? ` — it put on the ${rewards.join(' and the ')}` : ''}. ♥`
   pet.value?.trigger('celebrate')

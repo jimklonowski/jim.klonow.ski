@@ -45,11 +45,16 @@ test('vitals reject the shapes that used to reach a D1 bind', () => {
 })
 
 test('a ticker memory write needs a value: absence is refused, an explicit null forgets the key', () => {
-  assert.deepEqual(zTickerStateSave.parse({ key: 'runner', value: { score: 412, date: '2026-10-07' } }), { key: 'runner', value: { score: 412, date: '2026-10-07' } })
+  assert.deepEqual(zTickerStateSave.parse({ key: 'runner', value: { score: 412, date: '2026-10-07' } }), { key: 'runner', value: { score: 412, date: '2026-10-07' }, merge: false })
   assert.equal(zTickerStateSave.parse({ key: 'flinched', value: null }).value, null)
   assert.match(problem(zTickerStateSave, { key: 'runner' }), /value: Missing value/, 'a missing value used to store "null" and wipe the record')
   assert.match(problem(zTickerStateSave, { key: 'flinched', value: 'x'.repeat(8001) }), /value: Too large/)
   assert.match(problem(zTickerStateSave, { key: 'pets', value: 1 }), /key: Bad key/, 'the counter is not writable')
+  // A merge folds an object in (json_patch); anything else has nothing to merge into.
+  assert.equal(zTickerStateSave.parse({ key: 'fed', value: { keys: { 'HGH 2 iu#1': 1 } } }).merge, false)
+  assert.equal(zTickerStateSave.parse({ key: 'fed', value: { keys: { 'HGH 2 iu#1': 1 } }, merge: true }).merge, true)
+  assert.match(problem(zTickerStateSave, { key: 'fed', value: ['x'], merge: true }), /value: A merge needs an object value/)
+  assert.match(problem(zTickerStateSave, { key: 'flinched', value: null, merge: true }), /value: A merge needs an object value/)
 })
 
 test('a journal move needs two different real days, and replace is off unless the client says so', () => {

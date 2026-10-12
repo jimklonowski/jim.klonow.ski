@@ -220,8 +220,10 @@ function downloadExport() {
   window.location.assign('/api/export')
 }
 
+// Home timezone on both sides: the Worker renders in UTC otherwise, so every hard load painted
+// "7:03 PM" for a 2:03 PM save and re-patched it on hydration.
 function when(iso: string) {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: HOME_TZ })
 }
 
 function confirmText(e: AuditEntry): string {
