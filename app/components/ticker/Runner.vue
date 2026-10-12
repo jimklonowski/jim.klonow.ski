@@ -385,6 +385,10 @@ function quit() {
 }
 
 function onKey(e: KeyboardEvent) {
+  // Not when something else owns the keyboard: the ⌘K palette's input (a typed "w" used to jump
+  // the runner, and its Escape quit the game), any field, any dialog.
+  const target = e.target as HTMLElement | null
+  if (target?.closest?.('input, textarea, select, [contenteditable], [role="dialog"]')) return
   if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
     e.preventDefault()
     if (!e.repeat) press()

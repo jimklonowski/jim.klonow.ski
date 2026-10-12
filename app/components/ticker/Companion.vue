@@ -155,7 +155,13 @@ const activeEvent = ref<TickerEvent | null>(null)
 let eventTimer: ReturnType<typeof setTimeout> | undefined
 
 function trigger(event: TickerEvent) {
-  if (activeEvent.value) return
+  if (activeEvent.value) {
+    // The hover heartbeat is a flourish: a real event may cut it short. (Every click arrives
+    // right after a mouseenter — or a synthetic one, on touch — so the first pat's celebrate
+    // used to be refused while the 700 ms bigbeat ran.) Nothing cuts a real event short.
+    if (activeEvent.value !== 'bigbeat' || event === 'bigbeat') return
+    clearTimeout(eventTimer)
+  }
   activeEvent.value = event
   eventTimer = setTimeout(() => {
     activeEvent.value = null

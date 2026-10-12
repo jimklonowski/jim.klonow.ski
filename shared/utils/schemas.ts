@@ -293,7 +293,15 @@ export const zTickerStateSave = z.object({
   // still a value (forget the key); absence is not.
   value: z.unknown()
     .refine(v => v !== undefined, 'Missing value')
-    .refine(v => JSON.stringify(v ?? null).length <= 8000, 'Too large')
+    .refine(v => JSON.stringify(v ?? null).length <= 8000, 'Too large'),
+  /**
+   * Fold the value into what is stored (RFC 7396, SQLite json_patch) instead of replacing it: a
+   * fed check made on the phone and one made on the desktop both survive. Needs an object value.
+   */
+  merge: z.boolean().default(false)
+}).refine(v => !v.merge || (typeof v.value === 'object' && v.value !== null && !Array.isArray(v.value)), {
+  message: 'A merge needs an object value',
+  path: ['value']
 })
 
 export const zTickerRun = z.object({

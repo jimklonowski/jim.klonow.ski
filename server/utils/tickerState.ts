@@ -33,6 +33,21 @@ export async function writeTickerState(event: H3Event, key: string, value: unkno
   `).bind(key, JSON.stringify(value ?? null), new Date().toISOString()).run()
 }
 
+/**
+ * Folds a JSON object into a key (SQLite json_patch, RFC 7396) in one statement, or stores it
+ * when the key is new or holds a non-object. Whole-object writes were last-writer-wins across
+ * devices: a fed check from the phone erased one from the desktop. The client mirrors the same
+ * rule (shared/utils/mergePatch.ts).
+ */
+export async function mergeTickerState(event: H3Event, key: string, patch: Record<string, unknown>): Promise<void> {
+  await getDb(event).prepare(`
+    INSERT INTO ticker_state (key, value, updated_at) VALUES (?1, ?2, ?3)
+    ON CONFLICT(key) DO UPDATE SET
+      value = CASE WHEN json_valid(value) AND json_type(value) = 'object' THEN json_patch(value, excluded.value) ELSE excluded.value END,
+      updated_at = excluded.updated_at
+  `).bind(key, JSON.stringify(patch), new Date().toISOString()).run()
+}
+
 function parseVisit(r: Record<string, unknown>): TickerVisit {
   return {
     date: String(r.date),
