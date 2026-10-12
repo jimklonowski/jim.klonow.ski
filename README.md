@@ -43,7 +43,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 ## Stack
 
-- **Nuxt 4** + Vue 3 + TypeScript, on **Node ≥ 22.18** and **pnpm 11**
+- **Nuxt 4** + Vue 3 + TypeScript, on **Node 22.22+ / 24.15+** and **pnpm 11**
 - **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" dark-only TUI theme (JetBrains Mono / Departure Mono)
 - **Installable PWA** — standalone display, afib-heartbeat icon set (`public/`), iOS homescreen metas in `app/app.vue`
 - **Cloudflare Workers** (Paid plan) — deployed via Wrangler (nodejs_compat), with cron triggers for the scheduled tasks
@@ -216,7 +216,7 @@ Bindings (the D1 databases, R2 buckets, and KV namespace) are declared in `wrang
 
 ## Dev
 
-Requires Node 22.18 or newer (the tests and scripts rely on its built-in TypeScript type stripping) and pnpm 11.
+Requires Node 22.22.3+, 24.15+ or 26+ (Nuxt 4.6's floor; the tests and scripts also rely on Node's built-in TypeScript type stripping) and pnpm 11.
 
 ```bash
 pnpm install
