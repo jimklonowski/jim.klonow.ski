@@ -274,7 +274,11 @@ export default defineNuxtConfig({
         // also catches directives not spelled out here (media, frames, workers).
         'default-src': ['\'self\''],
         'connect-src': ['\'self\''],
-        'font-src': ['\'self\'']
+        'font-src': ['\'self\''],
+        // The default here was `'self' https: 'unsafe-inline'`: any https origin could serve a
+        // stylesheet to injected markup (CSS exfiltration tricks). 'unsafe-inline' stays for Vue's
+        // dynamic `style` attributes and the per-component styles; the origin list is just us.
+        'style-src': ['\'self\'', '\'unsafe-inline\'']
       }
     },
     rateLimiter: {

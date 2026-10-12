@@ -1305,7 +1305,8 @@ const quotes = computed(() => {
     keeper && v?.total
       ? `visitors: ${v.total} footprint${v.total === 1 ? '' : 's'}${v.recent[0] ? ` — last ${v.recent[0].label ?? `a ${v.recent[0].role}`} on ${formatDate(v.recent[0].date, 'monthDay')}` : ''}.`
       : null,
-    v?.best ? `visitors' best run: ${v.best.label ?? 'a friend'}, ${v.best.score} points.` : null,
+    // A guest is handed the holder's name only when it is their own; anyone else is "a friend".
+    v?.best ? `visitors' best run: ${!keeper && v.best.label ? 'you' : v.best.label ?? 'a friend'}, ${v.best.score} points.` : null,
     !keeper ? `you're on file as ${visitorLabel.value ?? 'a friend'}. it's keeping a footprint.` : null,
     ...records.value.map(r => `for the record — ${r}`)
   ]

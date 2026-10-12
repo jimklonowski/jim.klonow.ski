@@ -408,11 +408,15 @@ const summary = ref('')
 const summaryError = ref('')
 
 // A parsed extraction is a paid Opus call: leaving the page before SAVE used to discard it
-// without a word. Dirty while a result exists and hasn't been saved; save and reset clear it
-// by construction, so no markClean bookkeeping. Must come after saveResult: useDirtyGuard
-// snapshots the source synchronously, and a `const` read before its line is a TDZ throw that
-// kills setup (the page mounted blank with only the 403 from validate-upload to show for it).
-useDirtyGuard(() => (saveResult.value?.ok ? null : result.value))
+// without a word, and so did the page's own RESET / TRY AGAIN / UPLOAD ANOTHER buttons (the
+// last of them two buttons from SAVE TO SITE). Dirty while a result exists and hasn't been
+// saved; save and reset clear it by construction, so no markClean bookkeeping. Must come after
+// saveResult: useDirtyGuard snapshots the source synchronously, and a `const` read before its
+// line is a TDZ throw that kills setup (the page mounted blank with only the 403 from
+// validate-upload to show for it).
+const parsedGuard = useDirtyGuard(() => (saveResult.value?.ok ? null : result.value), {
+  prompt: 'This extraction hasn\'t been saved. Discard it? Parsing the PDF again is another paid call.'
+})
 
 interface PreviewEntry {
   key: string
@@ -586,7 +590,9 @@ async function upload(file: File) {
   }
 }
 
+/** Clears the page for another PDF — after asking, when the result on screen was never saved. */
 function reset() {
+  if (!parsedGuard.confirmDiscard()) return
   result.value = null
   error.value = ''
   filename.value = ''

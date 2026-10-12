@@ -291,6 +291,7 @@
 
 <script setup lang="ts">
 import { diffDays } from '#shared/utils/dates'
+import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
@@ -331,9 +332,10 @@ const digests = computed(() => digestData.value ?? [])
 const latestWorkouts = computed(() => {
   const last = allWorkouts.value.at(-1)
   if (!last) return []
+  // Sorted on the parsed instant: Whoop's ISO and Apple's local strings don't compare as text.
   return allWorkouts.value
     .filter(w => w.date === last.date)
-    .sort((a, b) => (b.start_time ?? '').localeCompare(a.start_time ?? ''))
+    .sort((a, b) => (workoutStartMs(b.start_time) ?? 0) - (workoutStartMs(a.start_time) ?? 0))
 })
 
 function doseLabel(dose: PeptideEntry) {
@@ -353,11 +355,11 @@ const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today.
 const now = useNow({ interval: 60_000 })
 
 function workoutAge(w: typeof allWorkouts.value[number]): string | null {
-  // start_time is "2026-08-24 17:37:44 -0500" — not ISO, so it's rebuilt before parsing;
-  // the recorded offset makes it an exact instant regardless of the viewer's zone.
-  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?) ([+-]\d{2}):?(\d{2})$/.exec(w.start_time ?? '')
-  const instant = m ? Date.parse(`${m[1]}T${m[2]}${m[3]}:${m[4]}`) : NaN
-  if (!Number.isNaN(instant)) {
+  // Either stored format (shared/utils/time.ts) resolves to an exact instant regardless of the
+  // viewer's zone. A format-specific regex used to live here, so a merged record that carried
+  // Whoop's ISO start fell through to the whole-days fallback: "1d ago" for last night's ride.
+  const instant = workoutStartMs(w.start_time)
+  if (instant != null) {
     const mins = Math.max(0, Math.floor((now.value.getTime() - instant) / 60000))
     if (mins < 1) return 'just now'
     // Dated yesterday but under an hour old happens right after midnight.

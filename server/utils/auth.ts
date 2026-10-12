@@ -91,6 +91,24 @@ export function clearAuthCookies(event: H3Event) {
   deleteCookie(event, UPLOAD_COOKIE, { path: '/' })
 }
 
+/**
+ * Refuses a request a browser sent from another site. SameSite=Lax stops a cross-site form from
+ * SENDING the session cookie, but a Set-Cookie on the response still lands — so a page anywhere
+ * could auto-submit a form to /api/auth/logout and sign the owner out. Fetch metadata decides
+ * where the browser sends it (every current browser does); otherwise the Origin header against
+ * this request's origin. A request with neither (curl, a Shortcut) is not a browser and passes.
+ */
+export function requireSameOrigin(event: H3Event) {
+  const refuse = () => createError({ statusCode: 403, message: 'Cross-site request refused' })
+  const site = getHeader(event, 'sec-fetch-site')
+  if (site) {
+    if (site !== 'same-origin' && site !== 'none') throw refuse()
+    return
+  }
+  const origin = getHeader(event, 'origin')
+  if (origin && origin !== getRequestURL(event).origin) throw refuse()
+}
+
 // --- Endpoint guards (read event.context.auth, set once per request by the middleware) ---
 
 export function getAuth(event: H3Event): AuthContext | null {

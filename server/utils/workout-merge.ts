@@ -5,6 +5,8 @@
 // time: workouts that start near-simultaneously or substantially overlap in time are treated as
 // one session, keeping the richest record and filling its gaps from the others.
 
+import { workoutStartMs } from '#shared/utils/time'
+
 // Cross-source copies usually start within a couple of minutes of each other, but Whoop's
 // auto-detection can lead/lag the Peloton class by 10+ minutes (observed: 11.7 min). The start
 // window catches the common case; the overlap rule (below) catches the stragglers without
@@ -33,12 +35,10 @@ export function workoutSource(externalId: string | null): string {
 }
 
 // Whoop start times are ISO UTC ("2026-07-19T10:10:00.000Z"); Health Auto Export uses local time
-// with offset ("2026-07-19 06:10:00 -0500"). Both parse via Date to the same epoch; anything
-// else opts out of clustering.
+// with offset ("2026-07-19 06:10:00 -0500"). Both resolve to the same epoch; anything else opts
+// out of clustering.
 function startMs(w: MergeableWorkout): number | null {
-  if (!w.start_time) return null
-  const t = new Date(w.start_time).getTime()
-  return Number.isNaN(t) ? null : t
+  return workoutStartMs(w.start_time)
 }
 
 function richness(w: MergeableWorkout): number {
@@ -64,7 +64,14 @@ function mergeCluster<T extends MergeableWorkout>(cluster: T[]): MergedWorkout<T
   merged.workout_type = apple?.workout_type
     ?? ranked.find(w => w.workout_type != null)?.workout_type
     ?? null
-  if (apple) merged.date = apple.date
+  if (apple) {
+    merged.date = apple.date
+    // The start comes with the date so the merged record is self-consistent: Apple's is the class
+    // start, where Whoop's auto-detected one can lag it, and it's in the local-with-offset form.
+    // Whoop syncs on a cron before the phone fires its webhook, so its row has the lower id and
+    // used to win every richness tie as the base — leaking its UTC start_time to the client.
+    if (apple.start_time) merged.start_time = apple.start_time
+  }
   merged.sources = [...new Set(ranked.map(w => workoutSource(w.external_id)))]
   return merged
 }

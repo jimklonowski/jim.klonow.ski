@@ -2,6 +2,7 @@
 // mutually-incompatible variants (T00 vs T12 anchors, month lengths). Everything anchors to
 // noon now — a midnight anchor renders as the previous day in timezones west of UTC.
 
+import { localClockOf, workoutStartMs } from '#shared/utils/time'
 import { formatSite } from '~/data/journal'
 
 const DATE_STYLES = {
@@ -21,11 +22,13 @@ export function formatDateTerse(d: string): string {
   return formatDate(d, 'short').replace(',', '').toUpperCase()
 }
 
-// Workout start_time arrives as "2026-08-24 17:37:44 -0500" — already local to where the
-// session happened, so the first HH:MM is the clock time. Parsing it into a Date would
-// re-shift it into the viewer's zone; the regex keeps what the tracker recorded.
+// Workout start_time comes in two shapes (Whoop ISO UTC, Health Auto Export local + offset);
+// both resolve to an instant, rendered on the home-timezone clock like every other time in the
+// app — never the viewer's zone. The first-HH:MM regex this replaced read whatever digits the
+// string led with, which for a Whoop-based record was its UTC clock: "00:36" for a 7:36 pm ride.
 export function workoutTime(startTime: string | null): string | null {
-  return startTime?.match(/\d{2}:\d{2}/)?.[0] ?? null
+  const ms = workoutStartMs(startTime)
+  return ms == null ? null : localClockOf(ms)
 }
 
 // Injection sites in the dense terminal rows: "Right Glute" → "R glute", "Oral" → "oral".
