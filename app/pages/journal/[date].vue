@@ -493,141 +493,150 @@
           >{{ dayPhotos.length }} on file</span>
         </TuiHeader>
 
-        <!-- Same category strip as the photos page, so a photo is filed the same way from either. -->
-        <TuiTabs
-          v-if="isOwner"
-          v-model="uploadCategory"
-          :items="PHOTO_CATEGORIES"
-          cols="grid-cols-3 md:grid-cols-6"
-          class="mt-2.5"
-        />
-
-        <UFileUpload
-          v-if="isOwner"
-          v-model="pendingFile"
-          accept="image/*"
-          layout="list"
-          position="inside"
-          icon="i-lucide-camera"
-          :label="`Drop a ${photoCategoryLabel(uploadCategory)} photo here`"
-          description="or click to browse — date is detected automatically from EXIF"
-          class="w-full mt-2.5"
-          :ui="{
-            base: 'bg-raised border border-dashed border-line-input',
-            label: 'text-[12.5px] text-body',
-            description: 'text-[11px] text-muted'
-          }"
-        >
-          <template #file="{ removeFile }">
-            <!-- .stop: this slot renders inside the dropzone, whose own click handler opens
-                 the file picker — without it, UPLOAD/CANCEL/date clicks re-open the picker. -->
-            <div
-              class="flex items-center gap-4 w-full"
-              @click.stop
-            >
-              <!-- Decorative: the date field beside it is the content. -->
-              <img
-                v-if="pendingPreviewUrl"
-                :src="pendingPreviewUrl"
-                alt=""
-                class="w-24 h-24 object-cover border border-line"
-              >
-              <div class="flex-1 space-y-2">
-                <UFormField
-                  label="Date"
-                  description="Detected from the photo's EXIF data — edit if it's wrong"
-                  :ui="FIELD_UI"
-                >
-                  <UInput
-                    v-model="pendingDate"
-                    type="date"
-                    class="w-full"
-                  />
-                </UFormField>
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    class="tui-btn tui-btn-accent"
-                    :disabled="photoUploading"
-                    @click="confirmUploadPhoto"
-                  >
-                    {{ photoUploading ? 'UPLOADING…' : '↑ UPLOAD' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="tui-btn"
-                    @click="removeFile()"
-                  >
-                    CANCEL
-                  </button>
-                </div>
-              </div>
-            </div>
-          </template>
-        </UFileUpload>
-
-        <p
-          v-if="photoError"
-          class="mt-2 text-[12px] text-danger"
-        >
-          {{ photoError }}
-        </p>
-
-        <template
-          v-for="c in PHOTO_CATEGORIES"
-          :key="c.value"
+        <!-- Desktop: uploader in a fixed left column, the day's photos beside it, so the
+             dropzone doesn't stretch across the whole page. Stacks below lg. -->
+        <div
+          class="mt-2.5 grid gap-4"
+          :class="{ 'lg:grid-cols-[24rem_minmax(0,1fr)]': isOwner }"
         >
           <div
-            v-if="photosFor(c.value).length"
-            class="mt-3"
+            v-if="isOwner"
+            class="min-w-0"
           >
-            <p class="text-[10.5px] text-muted uppercase tracking-[0.12em] mb-1.5">
-              {{ c.label }}
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <div
-                v-for="photo in photosFor(c.value)"
-                :key="photo.id"
-                class="relative group"
-              >
-                <!-- A button, not a click handler on the image: opening the lightbox has to be
-                     reachable by keyboard and announced as an action. -->
-                <button
-                  type="button"
-                  class="block"
-                  :aria-label="`Enlarge the ${photoCategoryLabel(photo.category)} photo`"
-                  @click="lightboxPhoto = photo"
-                >
-                  <img
-                    :src="photo.thumbUrl ?? photo.url"
-                    alt=""
-                    loading="lazy"
-                    class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
-                    :class="{ '-scale-x-100': photo.frameFlip }"
-                  >
-                </button>
-                <button
-                  v-if="isOwner"
-                  type="button"
-                  class="absolute top-0 right-0 px-1 text-[11px] bg-bg text-faint hover:text-danger tui-row-action cursor-pointer"
-                  aria-label="Delete photo"
-                  @click="deletePhoto(photo.id)"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          </div>
-        </template>
+            <!-- Same category strip as the photos page, so a photo is filed the same way from either. -->
+            <TuiTabs
+              v-model="uploadCategory"
+              :items="PHOTO_CATEGORIES"
+              cols="grid-cols-3 md:grid-cols-6 lg:grid-cols-3"
+            />
 
-        <UEmpty
-          v-if="!dayPhotos.length"
-          icon="i-lucide-image-off"
-          title="No progress photos"
-          description="No progress photos for this day yet."
-          class="mt-2"
-          :ui="{ title: 'text-[12.5px] text-body', description: 'text-[11px] text-muted' }"
-        />
+            <UFileUpload
+              v-model="pendingFile"
+              accept="image/*"
+              layout="list"
+              position="inside"
+              icon="i-lucide-camera"
+              :label="`Drop a ${photoCategoryLabel(uploadCategory)} photo here`"
+              description="or click to browse — date is detected automatically from EXIF"
+              class="w-full mt-2.5"
+              :ui="{
+                base: 'bg-raised border border-dashed border-line-input',
+                label: 'text-[12.5px] text-body',
+                description: 'text-[11px] text-muted'
+              }"
+            >
+              <template #file="{ removeFile }">
+                <!-- .stop: this slot renders inside the dropzone, whose own click handler opens
+                     the file picker — without it, UPLOAD/CANCEL/date clicks re-open the picker. -->
+                <div
+                  class="flex items-center gap-4 w-full"
+                  @click.stop
+                >
+                  <!-- Decorative: the date field beside it is the content. -->
+                  <img
+                    v-if="pendingPreviewUrl"
+                    :src="pendingPreviewUrl"
+                    alt=""
+                    class="w-24 h-24 object-cover border border-line"
+                  >
+                  <div class="flex-1 space-y-2">
+                    <UFormField
+                      label="Date"
+                      description="Detected from the photo's EXIF data — edit if it's wrong"
+                      :ui="FIELD_UI"
+                    >
+                      <UInput
+                        v-model="pendingDate"
+                        type="date"
+                        class="w-full"
+                      />
+                    </UFormField>
+                    <div class="flex gap-2">
+                      <button
+                        type="button"
+                        class="tui-btn tui-btn-accent"
+                        :disabled="photoUploading"
+                        @click="confirmUploadPhoto"
+                      >
+                        {{ photoUploading ? 'UPLOADING…' : '↑ UPLOAD' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="tui-btn"
+                        @click="removeFile()"
+                      >
+                        CANCEL
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </UFileUpload>
+
+            <p
+              v-if="photoError"
+              class="mt-2 text-[12px] text-danger"
+            >
+              {{ photoError }}
+            </p>
+          </div>
+
+          <div class="min-w-0 space-y-3">
+            <template
+              v-for="c in PHOTO_CATEGORIES"
+              :key="c.value"
+            >
+              <div v-if="photosFor(c.value).length">
+                <p class="text-[10.5px] text-muted uppercase tracking-[0.12em] mb-1.5">
+                  {{ c.label }}
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <div
+                    v-for="photo in photosFor(c.value)"
+                    :key="photo.id"
+                    class="relative group"
+                  >
+                    <!-- A button, not a click handler on the image: opening the lightbox has to be
+                         reachable by keyboard and announced as an action. -->
+                    <button
+                      type="button"
+                      class="block"
+                      :aria-label="`Enlarge the ${photoCategoryLabel(photo.category)} photo`"
+                      @click="lightboxPhoto = photo"
+                    >
+                      <img
+                        :src="photo.thumbUrl ?? photo.url"
+                        alt=""
+                        loading="lazy"
+                        class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
+                        :class="{ '-scale-x-100': photo.frameFlip }"
+                      >
+                    </button>
+                    <button
+                      v-if="isOwner"
+                      type="button"
+                      class="absolute top-0 right-0 px-1 text-[11px] bg-bg text-faint hover:text-danger tui-row-action cursor-pointer"
+                      aria-label="Delete photo"
+                      @click="deletePhoto(photo.id)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- h-full: fills the row beside the uploader instead of a short box floating at the top. -->
+            <UEmpty
+              v-if="!dayPhotos.length"
+              icon="i-lucide-image-off"
+              title="No progress photos"
+              description="No progress photos for this day yet."
+              class="h-full"
+              :ui="{ title: 'text-[12.5px] text-body', description: 'text-[11px] text-muted' }"
+            />
+          </div>
+        </div>
       </section>
 
       <!-- Synced workouts -->
