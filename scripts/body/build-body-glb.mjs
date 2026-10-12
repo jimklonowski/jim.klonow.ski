@@ -9,7 +9,11 @@
 // 1 android, 2 gynoid), found from the mesh itself the way the scanner draws its ROI lines:
 // the arm cut at the shoulder joint, the leg cut running from the crotch out to the hips, the
 // android region 20 % of pelvis-to-chin above the pelvis, the gynoid 1.5 android-heights below
-// it and twice as tall. The landmark heights land in the mesh extras for the viewer's band lines.
+// it and twice as tall. The landmark heights land in the mesh extras, and the viewer
+// (app/components/labs/BodyMesh.vue) re-applies the same cuts per fragment from them, so region
+// edges follow the planes rather than the triangles; of the vertex labels it reads only arm vs
+// not-arm below the armpit, the one split that is topological rather than planar. Keep the two
+// in step when changing a cut here.
 //
 // Landmarks come from slicing the TRIANGLES with horizontal planes, not from clustering vertices:
 // MakeHuman's torso is sparsely meshed and its hands and head densely, so vertex gaps say nothing

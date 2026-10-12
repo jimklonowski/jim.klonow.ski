@@ -97,7 +97,7 @@
       <!-- Body map beside the regional table; hovering either lights the other -->
       <section class="px-4 sm:px-6 py-4">
         <TuiHeader label="BODY MAP · FAT % BY REGION">
-          <span class="hidden sm:inline text-[10.5px] text-muted">hover a region or a row</span>
+          <span class="hidden sm:inline text-[10.5px] text-muted">hover a region or a row · click to lock</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,460px)_1fr] gap-x-8 gap-y-5 mt-3 items-start">
@@ -112,8 +112,10 @@
             />
             <ClientOnly v-if="webgl">
               <LabsBodyMesh
+                ref="bodyMesh"
                 :key="bodyView"
                 v-model:highlight="highlightRegion"
+                v-model:pinned="pinnedRegion"
                 :mode="bodyView === '3d' ? 'turn' : 'flat'"
                 :regions="latest.regions"
                 :previous-regions="previous?.regions ?? null"
@@ -128,9 +130,10 @@
             </ClientOnly>
             <LabsBodyMap
               v-else
-              v-model:highlight="highlightRegion"
+              :highlight="litRegion"
               :regions="latest.regions"
               :symmetry="latest.symmetry"
+              @update:highlight="highlightRegion = $event"
             />
           </div>
 
@@ -144,21 +147,31 @@
                 <span class="tui-label">lean lbs</span>
                 <span class="tui-label">Δ fat %</span>
               </div>
+              <!-- A row lights its region on hover; a click locks it and turns the body to show it -->
               <div
                 v-for="(row, i) in regionRows"
                 :key="row.key"
-                class="grid grid-cols-[1fr_repeat(4,auto)] gap-x-4 px-2.5 py-1.5 text-right tabular-nums cursor-default transition-colors"
+                role="button"
+                tabindex="0"
+                :aria-pressed="pinnedRegion === row.key"
+                class="grid grid-cols-[1fr_repeat(4,auto)] gap-x-4 px-2.5 py-1.5 text-right tabular-nums cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-accent"
                 :class="[
-                  highlightRegion === row.key ? 'bg-nav-active' : i % 2 ? 'bg-inset' : '',
+                  litRegion === row.key ? 'bg-nav-active' : i % 2 ? 'bg-inset' : '',
                   row.spaced ? 'border-t border-line-soft' : ''
                 ]"
                 @mouseenter="highlightRegion = row.key"
                 @mouseleave="highlightRegion = null"
+                @click="toggleRegion(row.key)"
+                @keydown.enter.prevent="toggleRegion(row.key)"
+                @keydown.space.prevent="toggleRegion(row.key)"
               >
                 <span
                   class="text-left tracking-[0.04em]"
-                  :class="highlightRegion === row.key ? 'text-hi' : 'text-dim'"
-                >{{ row.label }}</span>
+                  :class="litRegion === row.key ? 'text-hi' : 'text-dim'"
+                >{{ row.label }}<span
+                  v-if="pinnedRegion === row.key"
+                  class="ml-2 text-[9px] tracking-[0.12em] text-accent"
+                >LOCKED</span></span>
                 <span class="text-hi">{{ row.pct }}</span>
                 <span class="text-body">{{ row.fat }}</span>
                 <span class="text-body">{{ row.lean }}</span>
@@ -467,7 +480,17 @@ const statCells = computed(() =>
 )
 
 // --- body map + regional table ----------------------------------------------------------------
+/** The hovered region, from the figure or a row. */
 const highlightRegion = ref<string | null>(null)
+/** The locked region: a click on the figure or a row, kept until clicked again, cleared or Escaped. */
+const pinnedRegion = ref<string | null>(null)
+const litRegion = computed(() => pinnedRegion.value ?? highlightRegion.value)
+const bodyMesh = ref<{ focusRegion: (key: string) => void } | null>(null)
+// A row click locks its region and turns the body to show it; clicking the locked row releases it.
+function toggleRegion(key: string) {
+  pinnedRegion.value = pinnedRegion.value === key ? null : key
+  if (pinnedRegion.value) bodyMesh.value?.focusRegion(key)
+}
 
 // The body mesh carries both views — turning in 3D, or locked to a straight-on front as the
 // flat map — and three.js loads lazily, only here. The hand-drawn SVG map remains for the one
