@@ -24,13 +24,13 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.133.0
-        version: 0.133.0(zod@4.6.5)
+        version: 0.133.0(zod@4.6.6)
       '@nuxt/ui':
         specifier: ^4.11.3
-        version: 4.11.3(17298efbcb7ba6d5743df7c43cb03234)
+        version: 4.11.3(8381521ebbfe3c0801f218531f414d3b)
       '@nuxtjs/seo':
         specifier: 5.3.16
-        version: 5.3.16(853ca35715fff26ee7e8ed117c69de4d)
+        version: 5.3.16(9ee571107fc676b43d6b18d36142e43d)
       '@unhead/vue':
         specifier: ^3.4.2
         version: 3.4.2(@oxc-project/types@0.153.0)(@vitejs/devtools-kit@0.4.8(cac@7.0.0)(srvx@1.0.5)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(esbuild@0.28.2)(lightningcss@1.33.0)(oxc-parser@0.143.0)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))(vue@3.5.43(typescript@6.0.3))
@@ -53,8 +53,8 @@ importers:
         specifier: ^0.1.3
         version: 0.1.3
       zod:
-        specifier: ^4.6.5
-        version: 4.6.5
+        specifier: ^4.6.6
+        version: 4.6.6
     devDependencies:
       '@comark/nuxt':
         specifier: 0.7.0
@@ -7274,6 +7274,9 @@ packages:
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
+
   zrender@6.1.0:
     resolution: {integrity: sha512-oEGMDB6pOP2S6OwRR4PdVv610zrjnA3Bh+JnSG12fYJlBKjtNAoEb5fSUoCOOINlH96I2fU38/A2UpRKs67xYQ==}
 
@@ -7294,12 +7297,12 @@ snapshots:
       package-manager-detector: 1.9.0
       tinyexec: 1.3.1
 
-  '@anthropic-ai/sdk@0.133.0(zod@4.6.5)':
+  '@anthropic-ai/sdk@0.133.0(zod@4.6.6)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:
-      zod: 4.6.5
+      zod: 4.6.6
 
   '@apidevtools/json-schema-ref-parser@14.2.1(@types/json-schema@7.0.15)':
     dependencies:
@@ -8833,7 +8836,7 @@ snapshots:
       rc9: 3.1.0
       std-env: 4.3.0
 
-  '@nuxt/ui@4.11.3(17298efbcb7ba6d5743df7c43cb03234)':
+  '@nuxt/ui@4.11.3(8381521ebbfe3c0801f218531f414d3b)':
     dependencies:
       '@floating-ui/dom': 1.8.0
       '@iconify/vue': 5.0.3(vue@3.5.43(typescript@6.0.3))
@@ -8905,7 +8908,7 @@ snapshots:
       '@nuxt/content': 3.15.0(@nuxt/schema@4.6.1)(@valibot/to-json-schema@1.8.0(valibot@1.4.2(typescript@6.0.3)))(better-sqlite3@12.11.1)(confbox@0.3.1)(dotenv@17.4.2)(esbuild@0.28.2)(giget@3.3.1)(magic-string@1.4.3)(magicast@0.5.4)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(rollup@4.62.2)(valibot@1.4.2(typescript@6.0.3))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))
       valibot: 1.4.2(typescript@6.0.3)
       vue-router: 5.4.0(@vue/compiler-sfc@3.5.43)(esbuild@0.28.2)(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.43(typescript@6.0.3)))(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))(vue@3.5.43(typescript@6.0.3))
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -9134,20 +9137,20 @@ snapshots:
       - unplugin
     optional: true
 
-  '@nuxtjs/robots@6.1.5(4b040f286b2fab81ee83019e3ec5bab3)':
+  '@nuxtjs/robots@6.1.5(a48dbfc6b6a265fc25990ef7e7b74554)':
     dependencies:
       '@fingerprintjs/botd': 2.0.0
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
       consola: 3.4.2
       defu: 6.1.7
       h3: 1.15.11
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       pathe: 2.0.3
       pkg-types: 2.3.3
       ufo: 1.6.4
     optionalDependencies:
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - '@nuxt/schema'
       - confbox
@@ -9163,18 +9166,18 @@ snapshots:
       - vite
       - vue
 
-  '@nuxtjs/seo@5.3.16(853ca35715fff26ee7e8ed117c69de4d)':
+  '@nuxtjs/seo@5.3.16(9ee571107fc676b43d6b18d36142e43d)':
     dependencies:
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
-      '@nuxtjs/robots': 6.1.5(4b040f286b2fab81ee83019e3ec5bab3)
-      '@nuxtjs/sitemap': 8.3.4(4b040f286b2fab81ee83019e3ec5bab3)
+      '@nuxtjs/robots': 6.1.5(a48dbfc6b6a265fc25990ef7e7b74554)
+      '@nuxtjs/sitemap': 8.3.4(a48dbfc6b6a265fc25990ef7e7b74554)
       nuxt: 4.6.1(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.0))(@oxc-project/types@0.153.0)(@parcel/watcher@2.5.6)(@types/node@26.6.5)(@vitejs/devtools-kit@0.4.8(cac@7.0.0)(srvx@1.0.5)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(@vue/compiler-sfc@3.5.43)(acorn@8.18.0)(better-sqlite3@12.11.1)(confbox@0.3.1)(db0@0.3.4(better-sqlite3@12.11.1))(dotenv@17.4.2)(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0))(giget@3.3.1)(ioredis@5.10.1)(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxc-parser@0.143.0)(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.43(typescript@6.0.3)))(rolldown@1.2.13)(rollup-plugin-visualizer@7.0.1(rolldown@1.2.13)(rollup@4.62.2))(rollup@4.62.2)(srvx@1.0.5)(terser@5.47.1)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.0)
-      nuxt-link-checker: 5.2.0(96641063f3d126e3f4182b1225929500)
-      nuxt-og-image: 6.7.8(58ddf5ca3c9cadb0be2c7d5464d2463e)
-      nuxt-schema-org: 6.2.9(aea8c7ec02dc4bd628bb5425dd292150)
-      nuxt-seo-utils: 8.4.2(210380ad883b6a174f8590b61220ef25)
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-link-checker: 5.2.0(e1d38645d1d52f9c78effbf6b6c16f20)
+      nuxt-og-image: 6.7.8(75d5b95bb5bd28017a102c9728d559b6)
+      nuxt-schema-org: 6.2.9(17a302b528d920dcc504d93562ddf1c9)
+      nuxt-seo-utils: 8.4.2(8bdebf3b3597e8a8ddf3322f63eef7d2)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -9237,13 +9240,13 @@ snapshots:
       - webpack
       - zod
 
-  '@nuxtjs/sitemap@8.3.4(4b040f286b2fab81ee83019e3ec5bab3)':
+  '@nuxtjs/sitemap@8.3.4(a48dbfc6b6a265fc25990ef7e7b74554)':
     dependencies:
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
       consola: 3.4.2
       defu: 6.1.7
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       ofetch: 1.5.1
       pathe: 2.0.3
       pkg-types: 2.3.3
@@ -9252,7 +9255,7 @@ snapshots:
       ufo: 1.6.4
       ultrahtml: 1.7.0
     optionalDependencies:
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - '@nuxt/schema'
       - confbox
@@ -13495,7 +13498,7 @@ snapshots:
       - rolldown
       - unplugin
 
-  nuxt-link-checker@5.2.0(96641063f3d126e3f4182b1225929500):
+  nuxt-link-checker@5.2.0(e1d38645d1d52f9c78effbf6b6c16f20):
     dependencies:
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
       '@vueuse/core': 14.4.0(vue@3.5.43(typescript@6.0.3))
@@ -13506,8 +13509,8 @@ snapshots:
       h3: 1.15.11
       magic-string: 1.4.3
       nuxt: 4.6.1(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.0))(@oxc-project/types@0.153.0)(@parcel/watcher@2.5.6)(@types/node@26.6.5)(@vitejs/devtools-kit@0.4.8(cac@7.0.0)(srvx@1.0.5)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(@vue/compiler-sfc@3.5.43)(acorn@8.18.0)(better-sqlite3@12.11.1)(confbox@0.3.1)(db0@0.3.4(better-sqlite3@12.11.1))(dotenv@17.4.2)(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0))(giget@3.3.1)(ioredis@5.10.1)(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxc-parser@0.143.0)(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.43(typescript@6.0.3)))(rolldown@1.2.13)(rollup-plugin-visualizer@7.0.1(rolldown@1.2.13)(rollup@4.62.2))(rollup@4.62.2)(srvx@1.0.5)(terser@5.47.1)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.0)
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       ofetch: 1.5.1
       pathe: 2.0.3
       pkg-types: 2.3.3
@@ -13549,7 +13552,7 @@ snapshots:
       - vue
       - zod
 
-  nuxt-og-image@6.7.8(58ddf5ca3c9cadb0be2c7d5464d2463e):
+  nuxt-og-image@6.7.8(75d5b95bb5bd28017a102c9728d559b6):
     dependencies:
       '@clack/prompts': 1.8.1
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
@@ -13565,8 +13568,8 @@ snapshots:
       magic-string: 1.4.3
       magicast: 0.5.4
       mocked-exports: 0.1.1
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       nypm: 0.6.10
       object-identity: 0.2.3
       ofetch: 1.5.1
@@ -13593,7 +13596,7 @@ snapshots:
       sharp: 0.34.5
       tailwindcss: 4.3.3
       unifont: 0.7.4
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - '@farmfe/core'
       - '@nuxt/schema'
@@ -13616,18 +13619,18 @@ snapshots:
       - vue
       - webpack
 
-  nuxt-schema-org@6.2.9(aea8c7ec02dc4bd628bb5425dd292150):
+  nuxt-schema-org@6.2.9(17a302b528d920dcc504d93562ddf1c9):
     dependencies:
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
       defu: 6.1.7
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       pkg-types: 2.3.3
       ufo: 1.6.4
     optionalDependencies:
       '@unhead/vue': 3.4.2(@oxc-project/types@0.153.0)(@vitejs/devtools-kit@0.4.8(cac@7.0.0)(srvx@1.0.5)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(esbuild@0.28.2)(lightningcss@1.33.0)(oxc-parser@0.143.0)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))(vue@3.5.43(typescript@6.0.3))
       unhead: 3.4.2(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - '@nuxt/schema'
       - confbox
@@ -13666,7 +13669,7 @@ snapshots:
       - supports-color
       - unplugin
 
-  nuxt-seo-utils@8.4.2(210380ad883b6a174f8590b61220ef25):
+  nuxt-seo-utils@8.4.2(8bdebf3b3597e8a8ddf3322f63eef7d2):
     dependencies:
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
       citty: 0.2.2
@@ -13675,8 +13678,8 @@ snapshots:
       escape-string-regexp: 5.0.0
       exsolve: 1.1.3
       nuxt: 4.6.1(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.0))(@oxc-project/types@0.153.0)(@parcel/watcher@2.5.6)(@types/node@26.6.5)(@vitejs/devtools-kit@0.4.8(cac@7.0.0)(srvx@1.0.5)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(@vue/compiler-sfc@3.5.43)(acorn@8.18.0)(better-sqlite3@12.11.1)(confbox@0.3.1)(db0@0.3.4(better-sqlite3@12.11.1))(dotenv@17.4.2)(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0))(giget@3.3.1)(ioredis@5.10.1)(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxc-parser@0.143.0)(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.43(typescript@6.0.3)))(rolldown@1.2.13)(rollup-plugin-visualizer@7.0.1(rolldown@1.2.13)(rollup@4.62.2))(rollup@4.62.2)(srvx@1.0.5)(terser@5.47.1)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.0)
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       pathe: 2.0.3
       pkg-types: 2.3.3
       scule: 1.3.0
@@ -13723,7 +13726,7 @@ snapshots:
       - unplugin
       - vue
 
-  nuxt-site-config@4.2.3(4b040f286b2fab81ee83019e3ec5bab3):
+  nuxt-site-config@4.2.3(a48dbfc6b6a265fc25990ef7e7b74554):
     dependencies:
       '@nuxt/devalue': 2.0.2
       '@nuxt/kit': 4.6.1(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))
@@ -13731,7 +13734,7 @@ snapshots:
       defu: 6.1.7
       h3: 1.15.11
       nuxt-site-config-kit: 4.2.3(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(vue@3.5.43(typescript@6.0.3))
-      nuxtseo-shared: 5.3.16(0ab6c038ee17bd49010a95b9d76d4aea)
+      nuxtseo-shared: 5.3.16(0438c097632994d12b16184aee508bbc)
       pathe: 2.0.3
       pkg-types: 2.3.3
       site-config-stack: 4.2.3(vue@3.5.43(typescript@6.0.3))
@@ -13906,7 +13909,7 @@ snapshots:
       - xml2js
       - yaml
 
-  nuxtseo-shared@5.3.16(0ab6c038ee17bd49010a95b9d76d4aea):
+  nuxtseo-shared@5.3.16(0438c097632994d12b16184aee508bbc):
     dependencies:
       '@clack/prompts': 1.8.1
       '@nuxt/devtools-kit': 4.0.0-alpha.7(@nuxt/schema@4.6.1)(confbox@0.3.1)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(oxc-parser@0.143.0)(rolldown@1.2.13)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.13)(rollup@4.62.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0)))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.47.1)(yaml@2.9.0))
@@ -13926,8 +13929,8 @@ snapshots:
       ufo: 1.6.4
       vue: 3.5.43(typescript@6.0.3)
     optionalDependencies:
-      nuxt-site-config: 4.2.3(4b040f286b2fab81ee83019e3ec5bab3)
-      zod: 4.6.5
+      nuxt-site-config: 4.2.3(a48dbfc6b6a265fc25990ef7e7b74554)
+      zod: 4.6.6
     transitivePeerDependencies:
       - confbox
       - dotenv
@@ -16071,7 +16074,10 @@ snapshots:
   zod@3.25.76:
     optional: true
 
-  zod@4.6.5: {}
+  zod@4.6.5:
+    optional: true
+
+  zod@4.6.6: {}
 
   zrender@6.1.0:
     dependencies:
