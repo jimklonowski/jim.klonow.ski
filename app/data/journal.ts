@@ -27,7 +27,7 @@ export function blankVial(compound = ''): Vial {
 }
 
 export const SODA_DRINKS = [
-  'Dr Pepper', 'Coke', 'Cherry Coke', 'Diet Coke', 'Coke Zero', 'Sprite', 'Mountain Dew', 'Root Beer', 'Mr Pibb',
+  'Dr Pepper', 'Coke', 'Cherry Coke', 'Diet Coke', 'Coke Zero', 'Wild Cherry Pepsi', 'Sprite', 'Mountain Dew', 'Root Beer', 'Mr Pibb',
   'Orange Fanta', 'Orange Crush', 'Canada Dry', 'Ginger Ale'
 ]
 

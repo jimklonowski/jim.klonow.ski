@@ -115,12 +115,20 @@ export function isOpen(state: PlannedDrawState): boolean {
 }
 
 /**
- * The one plan the home strip and the labs header talk about: the soonest open one. An overdue
- * plan sorts before an upcoming one by construction (its date is earlier), which is right — it
- * is the one that needs attention.
+ * The open plan to talk about, from states in date order: a plan booked for TODAY first — on
+ * draw day the home strip, the labs header and the pet have to say so, and the day's prep
+ * ("orals after the draw") hangs off it — otherwise the soonest open one, where an overdue plan
+ * sorts before an upcoming one by construction (its date is earlier), which is right: it is the
+ * one that needs attention. A missed appointment rebooked as a second plan used to shadow the
+ * new one on its own day.
  */
+export function nextOpen(states: PlannedDrawState[]): PlannedDrawState | null {
+  return states.find(s => s.status === 'today') ?? states.find(isOpen) ?? null
+}
+
+/** The one plan the home strip and the labs header talk about (see nextOpen). */
 export function nextPlannedDraw(plans: PlannedDraw[], drawDates: string[], today: string): PlannedDrawState | null {
-  return plannedDrawStates(plans, drawDates, today).find(isOpen) ?? null
+  return nextOpen(plannedDrawStates(plans, drawDates, today))
 }
 
 /** The plan booked for a cycle's checkpoint, if one is. */

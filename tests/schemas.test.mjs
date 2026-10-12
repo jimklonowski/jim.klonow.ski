@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import {
   zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalMove, zJournalSave, zLabsSave,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
-  zSodaRemove, zSupplementSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
+  zSodaRemove, zSupplementSave, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
 
 /** The first failure message, or null when the value parsed. */
@@ -42,6 +42,14 @@ test('vitals reject the shapes that used to reach a D1 bind', () => {
   assert.ok(problem(zJournalSave, { ...day, hrv: Number.POSITIVE_INFINITY }))
   // Explicit null stays null — that is how the form clears a reading.
   assert.equal(zJournalSave.parse({ ...day, weight_lbs: null }).weight_lbs, null)
+})
+
+test('a ticker memory write needs a value: absence is refused, an explicit null forgets the key', () => {
+  assert.deepEqual(zTickerStateSave.parse({ key: 'runner', value: { score: 412, date: '2026-10-07' } }), { key: 'runner', value: { score: 412, date: '2026-10-07' } })
+  assert.equal(zTickerStateSave.parse({ key: 'flinched', value: null }).value, null)
+  assert.match(problem(zTickerStateSave, { key: 'runner' }), /value: Missing value/, 'a missing value used to store "null" and wipe the record')
+  assert.match(problem(zTickerStateSave, { key: 'flinched', value: 'x'.repeat(8001) }), /value: Too large/)
+  assert.match(problem(zTickerStateSave, { key: 'pets', value: 1 }), /key: Bad key/, 'the counter is not writable')
 })
 
 test('a journal move needs two different real days, and replace is off unless the client says so', () => {
