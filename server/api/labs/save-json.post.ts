@@ -4,7 +4,10 @@ import { zLabsSave } from '#shared/utils/schemas'
 import { shiftDays } from '#shared/utils/dates'
 import { MATCH_WINDOW_DAYS, canFulfil } from '#shared/utils/plannedDraws'
 
-// Writes an extraction (or a hand-edited copy of one) into labs_entries / dexa_entries.
+// Writes an extraction (or a hand-edited copy of one) into labs_entries / dexa_entries. A re-save
+// of a date clears that row's AI summary and provenance: the prose narrated the old figures, and
+// the upload page regenerates right after a save anyway — a failed regen now leaves "no summary
+// yet" rather than a summary of numbers that are no longer there.
 //
 // Everything here originates in a PDF that Claude read, so it is treated as untrusted: marker
 // keys are whitelisted against the catalogue the UI can display, values must be finite numbers,
@@ -45,7 +48,8 @@ export default defineEventHandler(async (event) => {
         vat = excluded.vat,
         ag_ratio = excluded.ag_ratio,
         bone_density = excluded.bone_density,
-        symmetry = excluded.symmetry
+        symmetry = excluded.symmetry,
+        ai_summary = NULL, ai_summary_model = NULL, ai_summary_prompt_hash = NULL, ai_summary_at = NULL
     `).bind(
       date,
       weight,
@@ -98,7 +102,8 @@ export default defineEventHandler(async (event) => {
       fasting = excluded.fasting,
       sources = excluded.sources,
       markers = excluded.markers,
-      qualitative = excluded.qualitative
+      qualitative = excluded.qualitative,
+      ai_summary = NULL, ai_summary_model = NULL, ai_summary_prompt_hash = NULL, ai_summary_at = NULL
   `).bind(
     date,
     fasting,

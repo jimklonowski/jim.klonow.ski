@@ -337,11 +337,10 @@ const entryMap = computed(() => {
   return map
 })
 
-const webhookUrl = computed(() =>
-  typeof window !== 'undefined'
-    ? `${window.location.origin}/api/journal/health-webhook`
-    : '/api/journal/health-webhook'
-)
+// The request's own origin, so the server and the browser print the same URL (a `window` check
+// rendered a bare path on the server and the full URL on the client — a hydration mismatch).
+const requestUrl = useRequestURL()
+const webhookUrl = `${requestUrl.origin}/api/journal/health-webhook`
 
 // --- File handling ---
 // UFileUpload owns the picker + drag/drop; `selectedFile` is its v-model.

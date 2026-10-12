@@ -42,8 +42,13 @@ export async function plannedDrawContext(db: D1Database, asOf: string, preloaded
   }
   if (!plans.length) return ''
 
+  // A stored link outranks the window (matchDraw), so one made after asOf has to be set aside
+  // here too — a digest regenerated for the draw's eve must still read the plan as upcoming,
+  // prep in force and all, not as done.
+  const asOfPlans = plans.map(p => (p.labs_date && p.labs_date > asOf ? { ...p, labs_date: null } : p))
+
   const paragraphs: string[] = []
-  for (const state of plannedDrawStates(plans, drawDates, asOf)) {
+  for (const state of plannedDrawStates(asOfPlans, drawDates, asOf)) {
     const { plan, status, inDays } = state
     const what = drawLabel(plan)
     const questions = purposeLines(plan)

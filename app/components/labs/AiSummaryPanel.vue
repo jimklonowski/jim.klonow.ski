@@ -108,7 +108,7 @@ async function onPinUnlocked() {
       class="mt-2 text-[10.5px] text-ghost tracking-[0.06em]"
       :title="summary.promptHash ? `prompt ${summary.promptHash}` : undefined"
     >
-      written by {{ summary.model }}{{ summary.at ? ` · ${formatDate(summary.at.slice(0, 10), 'monthDay').toLowerCase()}` : '' }}
+      written by {{ summary.model }}{{ summary.at ? ` · ${formatDate(localDayOf(summary.at), 'monthDay').toLowerCase()}` : '' }}
     </p>
     <p
       v-else-if="!regenerating && !summary"

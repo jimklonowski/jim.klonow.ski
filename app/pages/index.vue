@@ -353,8 +353,13 @@ const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today.
 // for a minute-grained label. VueUse stays on the 14.x line Nuxt UI depends on; 15 replaces
 // `interval` with `scheduler: cb => useIntervalFn(cb, 60_000)` when that day comes.
 const now = useNow({ interval: 60_000 })
+// Ages are client-only: the server's `now` and the browser's differ by the request's latency,
+// and a minute boundary between the two rendered "4m ago" against "5m ago" — a hydration
+// mismatch on every load that straddled one. The labels appear right after mount instead.
+const mounted = useMounted()
 
 function workoutAge(w: typeof allWorkouts.value[number]): string | null {
+  if (!mounted.value) return null
   // Either stored format (shared/utils/time.ts) resolves to an exact instant regardless of the
   // viewer's zone. A format-specific regex used to live here, so a merged record that carried
   // Whoop's ISO start fell through to the whole-days fallback: "1d ago" for last night's ride.
