@@ -3,33 +3,38 @@ import { zTickerRun } from '#shared/utils/schemas'
 import type { TickerRecord, TickerRunResponse } from '#shared/types/ticker'
 import { visitsForGuest } from '#shared/utils/tickerVisits'
 
-// A finished run of the runner. The owner's score goes to the house record when it beats it; a
-// guest's goes to their footprint for the day, which is the visitors' leaderboard.
+// A finished game — the runner or the can crusher. The owner's score goes to that game's house
+// record when it beats it; a guest's goes to their footprint for the day, which is that game's
+// visitors' leaderboard. The crusher's record also remembers whether a wall was ever cleared.
 export default defineEventHandler(async (event): Promise<TickerRunResponse> => {
   const auth = requireRole(event, 'owner', 'friend', 'doctor')
-  const { score } = await readValidatedJson(event, zTickerRun)
+  const { score, game, cleared } = await readValidatedJson(event, zTickerRun)
   const today = localToday()
   const db = getDb(event)
 
-  let record = ((await readTickerState(event)).runner as TickerRecord | undefined) ?? null
+  let record = ((await readTickerState(event))[game] as TickerRecord | undefined) ?? null
   let isRecord = false
 
   if (auth.role === 'owner') {
-    if (score > 0 && score > (record?.score ?? 0)) {
-      record = { score, date: today }
-      await writeTickerState(event, 'runner', record)
-      isRecord = true
+    const better = score > 0 && score > (record?.score ?? 0)
+    const nowCleared = game === 'crusher' && cleared && !record?.cleared
+    if (better || nowCleared) {
+      record = {
+        score: better ? score : record?.score ?? 0,
+        date: better ? today : record?.date ?? today,
+        ...(game === 'crusher' ? { cleared: !!record?.cleared || cleared } : {})
+      }
+      await writeTickerState(event, game, record)
+      isRecord = better
     }
   }
   else if (await touchVisit(event, auth)) {
-    const mine = await db.prepare('SELECT MAX(best_run) AS best FROM ticker_visits WHERE invite_id = ?1')
-      .bind(auth.inviteId).first<{ best: number | null }>()
-    isRecord = score > 0 && score > (mine?.best ?? 0)
-    await db.prepare('UPDATE ticker_visits SET best_run = MAX(COALESCE(best_run, 0), ?3), updated_at = ?4 WHERE invite_id = ?1 AND date = ?2')
-      .bind(auth.inviteId, today, score, new Date().toISOString()).run()
+    isRecord = score > 0 && score > await guestBest(db, game, auth.inviteId!)
+    await guestScoreStatement(db, game, auth.inviteId!, today, score, new Date().toISOString()).run()
   }
 
   // The leaderboard's holder is named to the owner and to themself only.
   const visits = await readVisits(event)
-  return { record, visitorsBest: auth.role === 'owner' ? visits.best : visitsForGuest(visits, auth.inviteId).best, isRecord }
+  const bests = auth.role === 'owner' ? visits.bests : visitsForGuest(visits, auth.inviteId).bests
+  return { game, record, visitorsBest: bests[game] ?? null, isRecord }
 })

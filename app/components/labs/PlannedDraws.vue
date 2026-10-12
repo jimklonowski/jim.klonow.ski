@@ -150,7 +150,7 @@
           :key="s.plan.id"
           class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-1.5 border-b border-line-row last:border-0 text-[12px] group"
         >
-          <span class="text-muted tabular-nums w-[92px] shrink-0">{{ formatDate(s.plan.date) }}</span>
+          <span class="text-muted tabular-nums w-23 shrink-0">{{ formatDate(s.plan.date) }}</span>
           <span class="text-hi">{{ s.plan.lab || 'draw' }}</span>
           <span
             v-if="s.plan.panel"
