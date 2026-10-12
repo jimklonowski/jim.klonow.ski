@@ -14,6 +14,7 @@
       ref="stage"
       class="stage relative mt-3 h-68 bg-raised border border-line-soft overflow-hidden"
       :class="{ night }"
+      :style="playing === 'crusher' && crusherHeight ? { height: `${crusherHeight}px` } : undefined"
       @mousemove="glance"
       @mouseleave="unglance"
     >
@@ -32,8 +33,11 @@
         <path d="M0 0L27 6M0 0L20 20M0 0L6 27M10 0A10 10 0 0 1 0 10M18 0A18 18 0 0 1 0 18M26 0A26 26 0 0 1 0 26" />
       </svg>
 
-      <!-- the window: the sky by the hour (sun, golden hour, moon and stars), a clock under it -->
+      <!-- the window: the sky by the hour (sun, golden hour, moon and stars), a clock under it.
+           Not during the crusher: its wall takes the width, and on a phone the widest row ran
+           behind them. -->
       <div
+        v-if="playing !== 'crusher'"
         class="window"
         :class="`sky-${sky}`"
         aria-hidden="true"
@@ -48,6 +52,7 @@
         </template>
       </div>
       <p
+        v-if="playing !== 'crusher'"
         class="clock"
         aria-hidden="true"
       >
@@ -97,6 +102,7 @@
         :lives="crusherLives"
         :title="crusherWall.title"
         :practice="crusherWall.practice"
+        @fit="h => crusherHeight = h"
         @over="(score, cleared) => onGameOver('crusher', score, cleared)"
         @quit="onGameQuit"
       />
@@ -1467,6 +1473,8 @@ const paddleScale = computed(() => (recovery.value == null ? 1 : Math.max(0.7, M
 const crusherLives = computed(() => 3 + (minutesOn(today.value) > 0 ? 1 : 0))
 /** Everyone plays the same board on a day. */
 const daySeed = computed(() => Number(today.value.replace(/-/g, '')))
+/** The stage height the crusher asks for (its `fit`): a month of cans needs about twice the runner's 17rem. */
+const crusherHeight = ref<number | null>(null)
 
 const playItems = computed<DropdownMenuItem[][]>(() => [[
   {
