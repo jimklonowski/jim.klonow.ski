@@ -288,7 +288,12 @@ export const TICKER_STATE_KEYS = ['runner', 'unlocks', 'achievements', 'flinched
 
 export const zTickerStateSave = z.object({
   key: z.enum(TICKER_STATE_KEYS, 'Bad key'),
-  value: z.unknown().refine(v => JSON.stringify(v ?? null).length <= 8000, 'Too large')
+  // `z.unknown()` lets a MISSING key through (undefined satisfies unknown), and the write stored
+  // it as "null" — a stale request without a value wiped the runner record. An explicit null is
+  // still a value (forget the key); absence is not.
+  value: z.unknown()
+    .refine(v => v !== undefined, 'Missing value')
+    .refine(v => JSON.stringify(v ?? null).length <= 8000, 'Too large')
 })
 
 export const zTickerRun = z.object({
