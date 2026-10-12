@@ -84,7 +84,9 @@ export function useListResource<T, Raw = T>(key: string, url: string, options: L
     async () => {
       if (import.meta.client) lastFetchStarted.set(key, Date.now())
       try {
-        const raw = await requestFetch<Raw>(url)
+        // Nuxt 4.6's route-typed fetch can't prove its result assignable to an unconstrained
+        // generic, so the cast goes on the result rather than the call.
+        const raw = await requestFetch(url) as Raw
         return transform ? transform(raw) : (raw as unknown as T)
       }
       catch (err) {

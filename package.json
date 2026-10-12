@@ -1,11 +1,11 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.09",
+  "version": "2026.10.12",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
     "build": "nuxt build",
@@ -32,7 +32,7 @@
     "demo:seed:remote": "node scripts/demo/seed-demo.mjs --remote"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.132.1",
+    "@anthropic-ai/sdk": "^0.133.0",
     "@nuxt/ui": "^4.11.3",
     "@nuxtjs/seo": "5.3.16",
     "@unhead/vue": "^3.4.2",
@@ -48,22 +48,22 @@
     "@comark/nuxt": "0.7.0",
     "@gltf-transform/core": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
-    "@iconify-json/lucide": "^1.2.141",
+    "@iconify-json/lucide": "^1.2.142",
     "@iconify-json/simple-icons": "^1.2.99",
     "@nuxt/eslint": "^1.17.0",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
     "echarts": "^6.1.0",
     "eslint": "^10.12.0",
     "nitro-cloudflare-dev": "^0.2.2",
-    "nuxt": "4.5.2",
+    "nuxt": "4.6.1",
     "nuxt-echarts": "^1.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vue": "catalog:",
-    "vue-echarts": "^8.3.1",
-    "vue-tsc": "^3.3.12",
-    "wrangler": "^4.148.0"
+    "vue-echarts": "^8.3.2",
+    "vue-tsc": "^3.3.13",
+    "wrangler": "^4.149.0"
   },
   "packageManager": "pnpm@11.7.0"
 }

@@ -19,6 +19,14 @@ catalog:
   vue: &vue 3.5.43
 
 overrides:
+  # Nuxt UI declares its ~20 @tiptap/* peers as required, so pnpm auto-installs them (this app
+  # never renders an editor). They were pinned at 3.26.1 when first added, but extension-list is
+  # a plain dependency of starter-kit and floated to 3.31, and tiptap's peers are exact pins.
+  # Nuxt 4.5 never pre-bundled tiptap; Nuxt 4.6's eager Vite optimizer does, and the mismatch
+  # ("getPreviousBlockSibling is not exported by @tiptap/core") crashes the optimizer so that
+  # `nuxt dev` server-renders but never hydrates. Holding extension-list at the rest of the
+  # tree's version is the one-line fix; dedupe/update can't reach auto-installed peers.
+  '@tiptap/extension-list': 3.26.1
   tslib: 2.8.1
   vue: *vue
   '@vue/shared': *vue
