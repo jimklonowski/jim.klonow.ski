@@ -2,7 +2,28 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isIsoDate, localDayOf, localDaysAgo, localTimeNow, localToday } from '../shared/utils/time.ts'
+import { isIsoDate, localClockOf, localDayOf, localDaysAgo, localTimeNow, localToday, workoutStartMs } from '../shared/utils/time.ts'
+
+test('workoutStartMs reads both stored start_time formats to the same instant', () => {
+  // The Oct 11 2026 ride as Health Auto Export (local + offset) and Whoop (ISO UTC) stored it.
+  const apple = workoutStartMs('2026-10-11 19:36:13 -0500')
+  const whoop = workoutStartMs('2026-10-12T00:36:13.000Z')
+  assert.equal(apple, Date.UTC(2026, 9, 12, 0, 36, 13))
+  assert.equal(whoop, apple)
+  assert.equal(workoutStartMs('2026-10-11 19:36 -05:00'), Date.UTC(2026, 9, 12, 0, 36), 'seconds optional, colon offset')
+  assert.equal(workoutStartMs(null), null)
+  assert.equal(workoutStartMs(undefined), null)
+  assert.equal(workoutStartMs(''), null)
+  assert.equal(workoutStartMs('last night'), null)
+})
+
+test('localClockOf renders the HOME_TZ wall clock whichever format the start came in', () => {
+  assert.equal(localClockOf(workoutStartMs('2026-10-12T00:36:13.000Z')), '19:36')
+  assert.equal(localClockOf(workoutStartMs('2026-10-11 19:36:13 -0500')), '19:36')
+  // Winter (CST, UTC-6).
+  assert.equal(localClockOf('2026-01-15T01:08:00.000Z'), '19:08')
+  assert.equal(localClockOf('2026-01-15T06:05:00.000Z'), '00:05', 'h23: midnight is 00, never 24')
+})
 
 test('localDayOf: the HOME_TZ calendar day of a timestamp, not the UTC one', () => {
   // 03:30 UTC is 22:30 the previous evening in Chicago (CDT).

@@ -35,6 +35,26 @@ export function localTimeNow(): string {
   return clockFmt.format(new Date())
 }
 
+/** The home-timezone wall clock (HH:MM) of an instant — epoch ms or a parseable timestamp. */
+export function localClockOf(instant: number | string): string {
+  return clockFmt.format(new Date(instant))
+}
+
+/**
+ * Epoch ms for a workout's stored start_time, or null when it can't be read. Two formats reach
+ * the workouts table: Whoop writes ISO UTC ("2026-10-12T00:36:13.000Z") and Health Auto Export
+ * writes local time with a numeric offset ("2026-10-11 19:36:13 -0500"). The second isn't ISO —
+ * V8 parses it, WebKit doesn't — so it's rebuilt into ISO first. Both name the same instant, and
+ * everything that ages, sorts, or shows a workout's clock goes through here so neither format
+ * leaks (the home strip once showed a 7:36 pm ride as "1d ago · 00:36" off the Whoop copy).
+ */
+export function workoutStartMs(startTime: string | null | undefined): number | null {
+  if (!startTime) return null
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?) ([+-]\d{2}):?(\d{2})$/.exec(startTime)
+  const ms = Date.parse(m ? `${m[1]}T${m[2]}${m[3]}:${m[4]}` : startTime)
+  return Number.isNaN(ms) ? null : ms
+}
+
 /**
  * The home-timezone calendar date (YYYY-MM-DD) a timestamp falls on. For "yesterday / N days
  * ago" labels: elapsed-milliseconds ÷ 86 400 000 counts hours, not calendar days, so 11:50 pm
