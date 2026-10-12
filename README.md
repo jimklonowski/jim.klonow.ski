@@ -43,7 +43,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 
 ## Stack
 
-- **Nuxt 4** + Vue 3 + TypeScript, on **Node ≥ 22.18** and **pnpm 11**
+- **Nuxt 4** + Vue 3 + TypeScript, on **Node 22.22+ / 24.15+** and **pnpm 11**
 - **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" dark-only TUI theme (JetBrains Mono / Departure Mono)
 - **Installable PWA** — standalone display, afib-heartbeat icon set (`public/`), iOS homescreen metas in `app/app.vue`
 - **Cloudflare Workers** (Paid plan) — deployed via Wrangler (nodejs_compat), with cron triggers for the scheduled tasks
@@ -122,13 +122,13 @@ The persona is generated deterministically by `scripts/demo/generate-demo-data.m
 
 Hardening beyond auth is handled by [nuxt-security](https://nuxt-security.vercel.app/), configured in `nuxt.config.ts`:
 
-- **Security headers** on every SSR response: a nonce-based CSP (`script-src 'strict-dynamic'`; `img-src` also allows `blob:` for photo-upload previews), HSTS, `frame-ancestors 'self'`, `X-Content-Type-Options: nosniff`, COOP/CORP, and a Permissions-Policy that disables camera/mic/geolocation. `Referrer-Policy: no-referrer` keeps share-link tokens out of outbound referrers. Everything on the site is self-hosted (fonts, scripts, images), so the CSP needs no third-party allowances.
+- **Security headers** on every SSR response: a nonce-based CSP (`script-src 'strict-dynamic'`; `img-src` also allows `blob:` for photo-upload previews), HSTS, `frame-ancestors 'self'`, `X-Content-Type-Options: nosniff`, COOP/CORP, and a Permissions-Policy that disables camera/mic/geolocation. `Referrer-Policy: no-referrer` keeps share-link tokens out of outbound referrers. Everything on the site is self-hosted (fonts, scripts, images), so every source list is `'self'` only: `style-src` keeps `'unsafe-inline'` for Vue's dynamic style attributes, and scripts run on a nonce with `'strict-dynamic'`.
 - **Subresource integrity** hashes on build assets; `console.log`/`console.debug` and `debugger` statements are stripped from production app builds (server/api logging is untouched, so `wrangler tail` keeps working).
 - **Request size limits**: 2 MB standard bodies / 8 MB multipart globally, raised per-route for the raw-binary photo upload (25 MB) and multipart lab-PDF upload (20 MB).
 - **Rate limiting** (KV-backed, per-IP via `cf-connecting-ip`) on the credential endpoints (`/api/labs/auth`, `/api/labs/upload-auth`), share-link redemption, demo entry (`/demo`), `/api/ai/ask`, and the public `/ticker/og.png`; disabled everywhere else so ordinary requests never touch KV.
 - **The `/ticker` Open Graph card** (`/ticker/og.png`) is the one public route under a gated section, since link unfurls fetch it with no session. It draws the pet's public outfit only — the earned wearables and the tier, which are counts of logging and exercise, never the finasteride mane or the DEXA build (`publicWardrobeOf` in `shared/utils/tickerWardrobe.ts`) — plus its age and logged streak, and is served from the edge cache for an hour so unfurls don't reach D1.
 
-Deliberately not enabled — with reasoning in the config comments: `xssValidator` (false-positives on freeform journal text; Vue escaping + CSP cover XSS), `corsHandler` (same-origin API), `allowedMethodsRestricter` (nitro's file-based method routing already 405s), CSRF tokens (cookies are `httpOnly`/`secure`/`sameSite: lax`).
+Deliberately not enabled — with reasoning in the config comments: `xssValidator` (false-positives on freeform journal text; Vue escaping + CSP cover XSS), `corsHandler` (same-origin API), `allowedMethodsRestricter` (nitro's file-based method routing already 405s), CSRF tokens (cookies are `httpOnly`/`secure`/`sameSite: lax`; the one endpoint that writes a cookie without a session, `/api/auth/logout`, checks the request's fetch metadata or Origin instead, since Lax stops a cross-site form from sending cookies but not from receiving a `Set-Cookie`).
 
 The lab-PDF proxy only serves flat lab-PDF names (`isLabPdfKey`). The labs bucket also holds the demo seed and the database backups, and the proxy would otherwise have served those to any signed-in guest who guessed a key.
 
@@ -216,7 +216,7 @@ Bindings (the D1 databases, R2 buckets, and KV namespace) are declared in `wrang
 
 ## Dev
 
-Requires Node 22.18 or newer (the tests and scripts rely on its built-in TypeScript type stripping) and pnpm 11.
+Requires Node 22.22.3+, 24.15+ or 26+ (Nuxt 4.6's floor; the tests and scripts also rely on Node's built-in TypeScript type stripping) and pnpm 11.
 
 ```bash
 pnpm install

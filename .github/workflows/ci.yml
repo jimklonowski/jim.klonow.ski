@@ -22,8 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         # The unit tests load shared/utils/*.ts through Node's native type stripping (22.18+),
-        # so both maintained lines run: 22 is the CI floor from package.json engines, 24 is
-        # what the dev machine runs.
+        # so both maintained lines run: 22 is the CI floor from package.json engines (Nuxt 4.6
+        # needs 22.22.3+ there; setup-node resolves the latest 22.x), 24 is what the dev
+        # machine runs.
         node: [22, 24]
 
     steps:

@@ -169,11 +169,15 @@ Be factual, specific and concise, and keep the whole thing to roughly 350 words 
   }
 
   const provenance = { model: AI_MODELS.summary, promptHash: promptHash(prompt), at: new Date().toISOString() }
+  // Audited like every other owner write on the row: a regeneration replaces the prose and its
+  // provenance, and a worse rewrite (or a prompt change that regressed) is otherwise gone for good.
+  const before = await auditBefore(event, 'dexa_entries', date)
   await db.prepare(`
     UPDATE dexa_entries
     SET ai_summary = ?2, ai_summary_model = ?3, ai_summary_prompt_hash = ?4, ai_summary_at = ?5
     WHERE date = ?1
   `).bind(date, summary, provenance.model, provenance.promptHash, provenance.at).run()
+  await recordAudit(event, { table: 'dexa_entries', key: date, before, summary: `AI summary for the ${date} scan` })
 
   return { ok: true, date, summary, ...provenance }
 })

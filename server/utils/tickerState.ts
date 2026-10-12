@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import { localToday } from '#shared/utils/time'
-import type { TickerVisit, TickerVisitsSummary } from '#shared/types/ticker'
+import type { TickerVisit, TickerVisitsRead } from '#shared/types/ticker'
 
 // The /ticker pet's memory (migration 0009): a key/value JSON table read whole and written a key
 // at a time, plus the visitors' footprints. Reads tolerate an environment that has not had the
@@ -43,22 +43,32 @@ function parseVisit(r: Record<string, unknown>): TickerVisit {
   }
 }
 
-export async function readVisits(event: H3Event): Promise<TickerVisitsSummary> {
+/**
+ * Every footprint, summarized. The holder of the leaderboard comes back as `bestInviteId` so the
+ * endpoints can name them to the owner and to themself only (shared/utils/tickerVisits.ts) — the
+ * response types never carry it.
+ */
+export async function readVisits(event: H3Event): Promise<TickerVisitsRead> {
   const visits = await listRows(
     event,
-    'SELECT date, role, label, pets, best_run FROM ticker_visits ORDER BY date DESC, id DESC',
-    parseVisit,
+    'SELECT date, invite_id, role, label, pets, best_run FROM ticker_visits ORDER BY date DESC, id DESC',
+    r => ({ ...parseVisit(r), invite_id: String(r.invite_id) }),
     { missingTableOk: true }
   )
-  let best: TickerVisitsSummary['best'] = null
+  let best: TickerVisitsRead['best'] = null
+  let bestInviteId: string | null = null
   for (const v of visits) {
-    if (v.best_run != null && (!best || v.best_run > best.score)) best = { label: v.label, score: v.best_run, date: v.date }
+    if (v.best_run != null && (!best || v.best_run > best.score)) {
+      best = { label: v.label, score: v.best_run, date: v.date }
+      bestInviteId = v.invite_id
+    }
   }
   return {
     total: visits.length,
     pets: visits.reduce((s, v) => s + v.pets, 0),
-    recent: visits.slice(0, 5),
-    best
+    recent: visits.slice(0, 5).map(({ invite_id: _omit, ...v }) => v),
+    best,
+    bestInviteId
   }
 }
 

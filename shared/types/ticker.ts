@@ -31,8 +31,13 @@ export interface TickerVisitsSummary {
   pets: number
   /** Newest first; empty for a guest. */
   recent: TickerVisit[]
-  /** The visitors' leaderboard's top entry. */
+  /** The visitors' leaderboard's top entry. `label` is the invite label the owner gave that guest — shown to the owner and to that guest alone (shared/utils/tickerVisits.ts). */
   best: { label: string | null, score: number, date: string } | null
+}
+
+/** readVisits' full read: the summary plus who holds the leaderboard, which never leaves the server. */
+export interface TickerVisitsRead extends TickerVisitsSummary {
+  bestInviteId: string | null
 }
 
 export interface TickerStateResponse {

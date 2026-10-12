@@ -133,6 +133,7 @@
 
 <script setup lang="ts">
 import { diffDays, weekStartOf } from '#shared/utils/dates'
+import { workoutStartMs } from '#shared/utils/time'
 import type { WorkoutEntry } from '#shared/types/journal'
 import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 
@@ -142,11 +143,12 @@ const { data, refresh, error } = await useWorkoutsEntries()
 
 // Newest first — the log reads backwards from today. Sorting on date alone left a day's
 // sessions in whatever order the API returned, so a morning lift could sit above an evening
-// stretch; start_time breaks the tie (nulls last, since '' loses every descending compare).
+// stretch; the parsed start breaks the tie (nulls last). Parsed, not compared as text: Whoop's
+// ISO and Apple's local-with-offset strings interleave wrongly as strings.
 const workouts = computed(() =>
   [...(data.value ?? [])].sort((a, b) =>
     b.date.localeCompare(a.date)
-    || (b.start_time ?? '').localeCompare(a.start_time ?? '')
+    || (workoutStartMs(b.start_time) ?? 0) - (workoutStartMs(a.start_time) ?? 0)
   )
 )
 

@@ -1,6 +1,7 @@
 import { localToday } from '#shared/utils/time'
 import { zTickerRun } from '#shared/utils/schemas'
 import type { TickerRecord, TickerRunResponse } from '#shared/types/ticker'
+import { visitsForGuest } from '#shared/utils/tickerVisits'
 
 // A finished run of the runner. The owner's score goes to the house record when it beats it; a
 // guest's goes to their footprint for the day, which is the visitors' leaderboard.
@@ -28,6 +29,7 @@ export default defineEventHandler(async (event): Promise<TickerRunResponse> => {
       .bind(auth.inviteId, today, score, new Date().toISOString()).run()
   }
 
+  // The leaderboard's holder is named to the owner and to themself only.
   const visits = await readVisits(event)
-  return { record, visitorsBest: visits.best, isRecord }
+  return { record, visitorsBest: auth.role === 'owner' ? visits.best : visitsForGuest(visits, auth.inviteId).best, isRecord }
 })
