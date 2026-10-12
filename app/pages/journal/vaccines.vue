@@ -121,7 +121,7 @@
             :key="v.id"
             class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
           >
-            <span class="text-[12px] text-muted tabular-nums w-[92px] shrink-0">{{ formatDate(v.date) }}</span>
+            <span class="text-[12px] text-muted tabular-nums w-23 shrink-0">{{ formatDate(v.date) }}</span>
             <span class="text-[13px] text-hi">{{ v.vaccine }}</span>
             <span
               v-if="v.product"
