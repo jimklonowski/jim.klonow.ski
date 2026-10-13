@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.13",
+  "version": "2026.10.13b",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -42,14 +42,14 @@
     "nuxt-security": "^2.6.0",
     "three": "^0.186.1",
     "uqr": "^0.1.3",
-    "zod": "^4.6.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@comark/nuxt": "0.7.0",
     "@gltf-transform/core": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
-    "@iconify-json/lucide": "^1.2.142",
-    "@iconify-json/simple-icons": "^1.2.99",
+    "@iconify-json/lucide": "^1.2.143",
+    "@iconify-json/simple-icons": "^1.2.100",
     "@nuxt/eslint": "^1.17.0",
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",

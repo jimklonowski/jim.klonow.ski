@@ -242,10 +242,16 @@ export default defineNuxtConfig({
   // disallowNonIndexableRoutes: that option emits '/labs/*', which doesn't cover the bare '/labs'.
   // The robots: false route rules above add the noindex header and keep these pages out of the
   // sitemap; this list is only the robots.txt half.
-  // The '*' group carries the AI-usage preferences (the top-level disallow merges into it). They
-  // state what Cloudflare's "Block AI bots" rule already enforces at the edge: search indexing
-  // yes, training and live AI-answer fetching no. Advisory only — the edge rule is the teeth.
+  // /labs/login is allowed back in (Allow is emitted before Disallow, and it's the longer match,
+  // so both rule conventions agree): a signed-out /ticker redirects there carrying the pet's
+  // Open Graph card, and Slack's unfurler honours robots.txt on every hop of a redirect — with
+  // /labs blanket-disallowed it never read the card and a pasted link showed nothing. The page
+  // is still noindex (header + meta), which a crawler can only obey on a page it may fetch.
+  // The '*' group carries the AI-usage preferences (the top-level allow/disallow merge into it).
+  // They state what Cloudflare's "Block AI bots" rule already enforces at the edge: search
+  // indexing yes, training and live AI-answer fetching no. Advisory only — the edge rule is the teeth.
   robots: {
+    allow: ['/labs/login'],
     disallow: ['/labs', '/journal', '/tools', '/ask', '/share', '/demo'],
     groups: [
       {
@@ -259,7 +265,9 @@ export default defineNuxtConfig({
   // Deliberately OFF: xssValidator (regex input filter would false-positive on freeform journal
   // text; Vue escaping + CSP cover XSS), corsHandler (same-origin API — sending no CORS headers
   // is already the most restrictive state, and the Bearer-token Shortcuts flow is non-browser),
-  // allowedMethodsRestricter (nitro's .get.ts/.post.ts file routing already 405s wrong methods).
+  // allowedMethodsRestricter (nitro's .get.ts/.post.ts file routing already refuses wrong methods —
+  // h3 1.x matches the method literally, so a POST or HEAD at a .get.ts route falls through to the
+  // page renderer's 404; routes that must answer HEAD get a .head.ts twin, see ticker/og.png).
   // The KV storage driver must be declared on the global rateLimiter object — it's the only place
   // the module reads it from — which is why global limiting is disabled via the '/**' route rule
   // above rather than here.
