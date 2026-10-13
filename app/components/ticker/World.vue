@@ -72,7 +72,7 @@ import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
 import {
   DAY_TILES, GROUND, PLATFORM, PLAYER_ART_DX, PLAYER_H, ROWS, START_TILES, TILE,
-  autoRun, createWorld, dayAt, levelWidth, start, stepWorld, tileAt, worldPose
+  autoRun, createWorld, dayAt, levelWidth, startWorld, stepWorld, tileAt, worldPose
 } from '#shared/utils/tickerWorld'
 import type { DayInput, WorldInput, WorldState } from '#shared/utils/tickerWorld'
 import { FLAG, renderCells } from '~/utils/tickerArt'
@@ -462,7 +462,7 @@ function press() {
     jumpPressed = true
     return
   }
-  const started = start(s)
+  const started = startWorld(s)
   if (ended) {
     reportedEnd = false
     endedAt = -1
