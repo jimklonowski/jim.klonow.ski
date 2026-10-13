@@ -19,10 +19,6 @@ export default defineNuxtConfig({
     }
   },
 
-  aiReady: false,
-
-  skewProtection: false,
-
   devtools: { enabled: true },
 
   css: ['~/assets/css/main.css'],
@@ -175,6 +171,8 @@ export default defineNuxtConfig({
     }
   },
 
+  aiReady: false,
+
   echarts: {
     renderer: 'svg',
     charts: ['LineChart', 'BarChart'],
@@ -314,5 +312,7 @@ export default defineNuxtConfig({
     // survive, so `wrangler tail` stays useful.
     removeLoggers: false,
     hidePoweredBy: true
-  }
+  },
+
+  skewProtection: false
 })
