@@ -19,6 +19,10 @@ export default defineNuxtConfig({
     }
   },
 
+  aiReady: false,
+
+  skewProtection: false,
+
   devtools: { enabled: true },
 
   css: ['~/assets/css/main.css'],
@@ -161,7 +165,6 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: {
       include: [
-        '@unhead/schema-org/vue',
         'exifr',
         'three',
         'three/examples/jsm/loaders/GLTFLoader.js'
