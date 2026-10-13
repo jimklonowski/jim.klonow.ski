@@ -20,6 +20,7 @@ import { encodePng } from '#shared/utils/pixelCanvas'
 // so an unfurl used to reach D1 every time. The key is the bare path (a query string can't bust
 // it), and a per-isolate memo sits in front for `nuxt dev` (no Cache API in Node) and for the
 // moments before the edge write lands. A rateLimiter rule in nuxt.config caps one IP on top.
+// og.png.head.ts re-exports this handler, since h3 1.x doesn't answer HEAD from a GET route.
 
 const MAX_AGE_SECONDS = 3600
 const CACHE_CONTROL = `public, max-age=${MAX_AGE_SECONDS}`
@@ -62,6 +63,7 @@ export default defineEventHandler(async (event) => {
 /** `X-Card-Source` says which path answered — the way to see the caching work from `curl -I`. */
 function send(event: H3Event, png: Uint8Array, source: 'memo' | 'edge' | 'render') {
   setHeader(event, 'Content-Type', 'image/png')
+  setHeader(event, 'Content-Length', png.byteLength) // Node leaves it off a HEAD unless told
   setHeader(event, 'Cache-Control', CACHE_CONTROL)
   setHeader(event, 'X-Card-Source', source)
   return Buffer.from(png)
