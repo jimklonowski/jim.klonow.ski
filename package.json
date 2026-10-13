@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.13b",
+  "version": "2026.10.13c",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -34,7 +34,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
     "@nuxt/ui": "^4.11.3",
-    "@nuxtjs/seo": "5.3.16",
+    "@nuxtjs/seo": "6.0.1",
     "@unhead/vue": "^3.4.2",
     "@vueuse/core": "^14.4.0",
     "@vueuse/nuxt": "^14.4.0",
