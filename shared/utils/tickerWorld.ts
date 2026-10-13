@@ -14,6 +14,11 @@
 //
 // Units: canvas pixels and seconds. x grows right, y grows DOWN from the top of the playfield.
 // The figure is drawn at 3px cells (84×48); tiles are 24px.
+//
+// Every export here is auto-imported alongside the runner's and the crusher's (Nuxt scans
+// shared/utils), so the names that both games have — gravity, jump, stride — carry a WORLD_
+// prefix, and what is the same is imported from the runner rather than declared twice.
+import { MAX_DT, makeRng } from './tickerRunner.ts'
 
 export const TILE = 24
 export const ROWS = 16
@@ -27,21 +32,19 @@ export const MAX_PIT = 3
 export const START_TILES = 4
 export const END_TILES = 10
 
-export const GRAVITY = 1800
+export const WORLD_GRAVITY = 1800
 /** Holding jump while rising weakens gravity: a tap clears a step, a hold reaches a platform three rows up. */
 export const HOLD_GRAVITY = 990
-export const JUMP_V = 470
+export const WORLD_JUMP_V = 470
 export const RUN_SPEED = 200
 export const ACCEL = 1400
 export const FRICTION = 1800
-/** A frame longer than this is a tab that was hidden, not a slow device: don't tunnel. */
-export const MAX_DT = 0.05
 /** The player's box: the heart's trunk, not the arms. */
 export const PLAYER_W = 44
 export const PLAYER_H = 44
 /** How far the figure's canvas (84 wide) is offset from the box. */
 export const PLAYER_ART_DX = -20
-export const STRIDE_PX = 26
+export const WORLD_STRIDE_PX = 26
 /** Fallen this far below the last row: a life. */
 export const FALL_LIMIT = ROWS * TILE + 60
 
@@ -113,18 +116,6 @@ export interface WorldState {
 }
 
 export const NO_INPUT: WorldInput = { left: false, right: false, jump: false, jumpHeld: false }
-
-/** mulberry32, seedable — shared with the other games' tests. */
-export function makeRng(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6D2B79F5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
 
 // --- the generator ------------------------------------------------------------------------------
 
@@ -297,7 +288,7 @@ function placeOnGround(s: WorldState, x: number) {
 }
 
 /** The one-shot button: ready → running; over or cleared → a fresh world on the same month. */
-export function start(s: WorldState): WorldState {
+export function startWorld(s: WorldState): WorldState {
   if (s.status === 'over' || s.status === 'cleared') {
     Object.assign(s, createWorld({ width: s.width, height: s.height, days: s.source.days, lives: s.source.lives, seed: s.source.seed }))
   }
@@ -354,10 +345,10 @@ function advance(s: WorldState, t: number, input: WorldInput) {
 
   // Jump: on the ground only; a hold softens gravity on the way up.
   if (input.jump && p.onGround) {
-    p.vy = -JUMP_V
+    p.vy = -WORLD_JUMP_V
     p.onGround = false
   }
-  const g = p.vy < 0 && input.jumpHeld ? HOLD_GRAVITY : GRAVITY
+  const g = p.vy < 0 && input.jumpHeld ? HOLD_GRAVITY : WORLD_GRAVITY
   p.vy = Math.min(900, p.vy + g * t)
 
   // Horizontal move and walls, with a one-tile step-up: a stair is walked, not jumped.
@@ -479,7 +470,7 @@ export function worldPose(s: WorldState): 'idle' | 'walk1' | 'walk2' | 'happy' |
   if (s.status === 'cleared') return 'petted'
   if (s.deathAt >= 0 && s.elapsed - s.deathAt < 0.4) return 'flatline'
   if (!s.player.onGround) return 'happy'
-  if (Math.abs(s.player.vx) > 20) return Math.floor(s.player.walked / STRIDE_PX) % 2 === 0 ? 'walk1' : 'walk2'
+  if (Math.abs(s.player.vx) > 20) return Math.floor(s.player.walked / WORLD_STRIDE_PX) % 2 === 0 ? 'walk1' : 'walk2'
   return 'idle'
 }
 
@@ -490,7 +481,7 @@ export function worldPose(s: WorldState): 'idle' | 'walk1' | 'walk2' | 'happy' |
  */
 export function autoRun(s: WorldState): WorldInput {
   if (s.status === 'ready') {
-    start(s)
+    startWorld(s)
     return { left: false, right: true, jump: false, jumpHeld: false }
   }
   if (s.status !== 'running') return NO_INPUT

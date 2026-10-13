@@ -6,9 +6,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  BASE_ROW, DAY_TILES, GROUND, JUMP_V, GRAVITY, HOLD_GRAVITY, MAX_PIT, PLATFORM, PLAYER_H, PLAYER_W, ROWS, START_TILES, TILE,
-  autoRun, buildLevel, createWorld, dayAt, groundRowAt, groundRowFor, levelWidth, makeRng, platformLength, start, stepWorld, tileAt, worldPose
+  BASE_ROW, DAY_TILES, GROUND, WORLD_JUMP_V as JUMP_V, WORLD_GRAVITY as GRAVITY, HOLD_GRAVITY, MAX_PIT, PLATFORM, PLAYER_H, PLAYER_W, ROWS, START_TILES, TILE,
+  autoRun, buildLevel, createWorld, dayAt, groundRowAt, groundRowFor, levelWidth, platformLength, startWorld as start, stepWorld, tileAt, worldPose
 } from '../shared/utils/tickerWorld.ts'
+import { makeRng } from '../shared/utils/tickerRunner.ts'
 
 const DT = 1 / 60
 const day = (over = {}) => ({ date: '2026-10-01', logged: true, doses: 2, sodas: [], workoutMin: 0, recovery: 70, draw: false, ...over })
