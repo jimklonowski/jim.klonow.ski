@@ -17,12 +17,14 @@ export default defineEventHandler(async (event): Promise<TickerRunResponse> => {
 
   if (auth.role === 'owner') {
     const better = score > 0 && score > (record?.score ?? 0)
-    const nowCleared = game === 'crusher' && cleared && !record?.cleared
+    // The runner has no end to reach; every other game remembers that it was finished once.
+    const finishes = game !== 'runner'
+    const nowCleared = finishes && cleared && !record?.cleared
     if (better || nowCleared) {
       record = {
         score: better ? score : record?.score ?? 0,
         date: better ? today : record?.date ?? today,
-        ...(game === 'crusher' ? { cleared: !!record?.cleared || cleared } : {})
+        ...(finishes ? { cleared: !!record?.cleared || cleared } : {})
       }
       await writeTickerState(event, game, record)
       isRecord = better
