@@ -14,7 +14,7 @@
       ref="stage"
       class="stage relative mt-3 h-68 bg-raised border border-line-soft overflow-hidden"
       :class="{ night }"
-      :style="playing === 'crusher' && crusherHeight ? { height: `${crusherHeight}px` } : undefined"
+      :style="playing && playing !== 'runner' && gameHeight ? { height: `${gameHeight}px` } : undefined"
       @mousemove="glance"
       @mouseleave="unglance"
     >
@@ -37,7 +37,7 @@
            Not during the crusher: its wall takes the width, and on a phone the widest row ran
            behind them. -->
       <div
-        v-if="playing !== 'crusher'"
+        v-if="!playing || playing === 'runner'"
         class="window"
         :class="`sky-${sky}`"
         aria-hidden="true"
@@ -52,7 +52,7 @@
         </template>
       </div>
       <p
-        v-if="playing !== 'crusher'"
+        v-if="!playing || playing === 'runner'"
         class="clock"
         aria-hidden="true"
       >
@@ -102,8 +102,22 @@
         :lives="crusherLives"
         :title="crusherWall.title"
         :practice="crusherWall.practice"
-        @fit="h => crusherHeight = h"
+        @fit="h => gameHeight = h"
         @over="(score, cleared) => onGameOver('crusher', score, cleared)"
+        @quit="onGameQuit"
+      />
+      <TickerWorld
+        v-else-if="playing === 'world'"
+        ref="runner"
+        :build="build"
+        :accessories="worn"
+        :night="night"
+        :hi="houseBestOf('world')"
+        :days="worldDays"
+        :seed="daySeed"
+        :lives="crusherLives"
+        @fit="h => gameHeight = h"
+        @over="(score, cleared) => onGameOver('world', score, cleared)"
         @quit="onGameQuit"
       />
 
@@ -345,6 +359,7 @@ import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycle
 import { mergePatch } from '#shared/utils/mergePatch'
 import { sodaOunces } from '#shared/utils/soda'
 import type { CanInput } from '#shared/utils/tickerBreakout'
+import type { DayInput } from '#shared/utils/tickerWorld'
 import {
   LEAN_GAIN_LBS, MANE_TIERS, TIER_DAYS, ageDays as ageDaysOf, buildOf, firstLoggedDay,
   finasterideStreak as finasterideStreakOf, leanGain as leanGainOf, loggedDayCount, maneTier as maneTierOf,
@@ -675,6 +690,7 @@ const records = computed(() => {
   if (calm) lines.push(`lowest resting HR: ${calm.value} bpm on ${when(calm.item.date)}.`)
   if (runnerHi.value) lines.push(`best run: ${runnerHi.value.score} points on ${when(runnerHi.value.date)}.`)
   if (crusherHi.value) lines.push(`best crush: ${crusherHi.value.score} points on ${when(crusherHi.value.date)}${crusherHi.value.cleared ? ' — and a whole wall cleared, once.' : '.'}`)
+  if (worldHi.value) lines.push(`best month: ${worldHi.value.score} points on ${when(worldHi.value.date)}${worldHi.value.cleared ? ' — and made it all the way home, once.' : '.'}`)
   return lines
 })
 
@@ -1378,9 +1394,10 @@ const quotes = computed(() => {
       ? `visitors: ${v.total} footprint${v.total === 1 ? '' : 's'}${v.recent[0] ? ` — last ${v.recent[0].label ?? `a ${v.recent[0].role}`} on ${formatDate(v.recent[0].date, 'monthDay')}` : ''}.`
       : null,
     // A guest is handed a holder's name only when it is their own; anyone else is "a friend".
-    ...(['runner', 'crusher'] as TickerGame[]).map((g) => {
+    ...(['runner', 'crusher', 'world'] as TickerGame[]).map((g) => {
       const b = visitorsBests.value[g]
-      return b ? `visitors' best ${g === 'runner' ? 'run' : 'crush'}: ${!keeper && b.label ? 'you' : b.label ?? 'a friend'}, ${b.score} points.` : null
+      const noun = g === 'runner' ? 'run' : g === 'crusher' ? 'crush' : 'month'
+      return b ? `visitors' best ${noun}: ${!keeper && b.label ? 'you' : b.label ?? 'a friend'}, ${b.score} points.` : null
     }),
     !keeper ? `you're on file as ${visitorLabel.value ?? 'a friend'}. it's keeping a footprint.` : null,
     ...records.value.map(r => `for the record — ${r}`)
@@ -1416,9 +1433,15 @@ const runner = useTemplateRef('runner')
 /** The game on the stage, or none. */
 const playing = ref<TickerGame | null>(null)
 /** The house records, one per game, under memory keys of the same names. */
-const hiScores = ref<Record<TickerGame, TickerRecord | null>>({ runner: recall<TickerRecord>('runner'), crusher: recall<TickerRecord>('crusher') })
+const readHiScores = (): Record<TickerGame, TickerRecord | null> => ({
+  runner: recall<TickerRecord>('runner'),
+  crusher: recall<TickerRecord>('crusher'),
+  world: recall<TickerRecord>('world')
+})
+const hiScores = ref<Record<TickerGame, TickerRecord | null>>(readHiScores())
 const runnerHi = computed(() => hiScores.value.runner)
 const crusherHi = computed(() => hiScores.value.crusher)
+const worldHi = computed(() => hiScores.value.world)
 const visitorsBests = ref<Partial<Record<TickerGame, TickerBest | null>>>(visits.value?.bests ?? { runner: visits.value?.best ?? null })
 let runSetRecord = false
 /** A guest's game that topped the house record — the figure their HUD shows, so the one its NEW BEST and the quit line agree on. */
@@ -1426,7 +1449,7 @@ let runBeatHouse = false
 /** The crusher's wall went, this game. */
 let lastCleared = false
 onMounted(() => {
-  if (!remote) hiScores.value = { runner: recall<TickerRecord>('runner'), crusher: recall<TickerRecord>('crusher') }
+  if (!remote) hiScores.value = readHiScores()
 })
 
 /** The HI on a game's HUD: the owner's record, or for a guest the house record whoever holds it. */
@@ -1473,8 +1496,31 @@ const paddleScale = computed(() => (recovery.value == null ? 1 : Math.max(0.7, M
 const crusherLives = computed(() => 3 + (minutesOn(today.value) > 0 ? 1 : 0))
 /** Everyone plays the same board on a day. */
 const daySeed = computed(() => Number(today.value.replace(/-/g, '')))
-/** The stage height the crusher asks for (its `fit`): a month of cans needs about twice the runner's 17rem. */
-const crusherHeight = ref<number | null>(null)
+/** The stage height a game asks for (its `fit`): the crusher's wall and the world's playfield need about twice the runner's 17rem. */
+const gameHeight = ref<number | null>(null)
+
+// --- ticker world's month ---------------------------------------------------------------------
+// The trailing thirty days as the level's days (shared/utils/tickerWorld.ts): logged or not, the
+// doses and the sodas, the workout minutes, the recovery, a draw on file. The castle is today.
+const WORLD_DAYS = 30
+const worldDays = computed<DayInput[]>(() => {
+  const byDate = new Map(entries.value.map(e => [e.date, e]))
+  const recoveryOn = new Map((healthData.value ?? []).map(h => [h.date, h.recovery_score ?? null]))
+  const draws = new Set(drawDates.value)
+  return Array.from({ length: WORLD_DAYS }, (_, i) => {
+    const date = shiftDays(today.value, -(WORLD_DAYS - 1 - i))
+    const e = byDate.get(date)
+    return {
+      date,
+      logged: !!e && isLoggedDay(e),
+      doses: e?.peptides?.length ?? 0,
+      sodas: (e?.sodas ?? []).map(s => ({ oz: sodaOunces(s.size) })),
+      workoutMin: minutesOn(date),
+      recovery: recoveryOn.get(date) ?? null,
+      draw: draws.has(date)
+    }
+  })
+})
 
 const playItems = computed<DropdownMenuItem[][]>(() => [[
   {
@@ -1486,6 +1532,11 @@ const playItems = computed<DropdownMenuItem[][]>(() => [[
     label: `can crusher${houseBestOf('crusher') ? ` · HI ${houseBestOf('crusher')}` : ''} · ${crusherWall.value.count} can${crusherWall.value.count === 1 ? '' : 's'}${crusherWall.value.practice ? ' (last month)' : ''}`,
     icon: 'i-lucide-cup-soda',
     onSelect: () => play('crusher')
+  },
+  {
+    label: `ticker world${houseBestOf('world') ? ` · HI ${houseBestOf('world')}` : ''} · the month`,
+    icon: 'i-lucide-castle',
+    onSelect: () => play('world')
   }
 ]])
 
@@ -1499,9 +1550,11 @@ function play(game: TickerGame) {
   playing.value = game
   line.value = game === 'runner'
     ? 'space or tap to run. esc quits.'
-    : crusherWall.value.count
-      ? `${crusherWall.value.count} cans on the wall${crusherWall.value.practice ? ' (last month\'s — this one is clean)' : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
-      : 'nothing to shoot. good. (esc quits)'
+    : game === 'world'
+      ? 'the month, left to right — home is today. ← → run, space jumps (hold for height). esc quits.'
+      : crusherWall.value.count
+        ? `${crusherWall.value.count} cans on the wall${crusherWall.value.practice ? ' (last month\'s — this one is clean)' : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
+        : 'nothing to shoot. good. (esc quits)'
 }
 
 function onGameOver(game: TickerGame, score: number, cleared: boolean) {
@@ -1510,13 +1563,15 @@ function onGameOver(game: TickerGame, score: number, cleared: boolean) {
   if (cleared) lastCleared = true
   const current = hiScores.value[game]
   const better = score > (current?.score ?? 0)
-  const nowCleared = game === 'crusher' && cleared && !current?.cleared
+  // The runner has no end to reach; every other game remembers that it was finished once.
+  const finishes = game !== 'runner'
+  const nowCleared = finishes && cleared && !current?.cleared
   if (!remote) {
     if (better || nowCleared) {
       const next: TickerRecord = {
         score: better ? score : current?.score ?? 0,
         date: better ? today.value : current?.date ?? today.value,
-        ...(game === 'crusher' ? { cleared: !!current?.cleared || cleared } : {})
+        ...(finishes ? { cleared: !!current?.cleared || cleared } : {})
       }
       hiScores.value = { ...hiScores.value, [game]: next }
       remember(game, next)
@@ -1545,7 +1600,7 @@ async function onGameQuit(score: number) {
   measureFloor()
   const best = hiScores.value[game]
   const house = houseBestOf(game)
-  const swept = game === 'crusher' && lastCleared ? 'wall cleared. ' : ''
+  const swept = lastCleared ? (game === 'crusher' ? 'wall cleared. ' : game === 'world' ? 'made it home. ' : '') : ''
   // The keeper's record, or a guest topping the house: the celebration the HUD's NEW BEST promised.
   if (keeper ? runSetRecord : runBeatHouse) {
     line.value = keeper ? `${swept}new best: ${best?.score ?? score} points. ♥` : `${swept}new house record: ${score} points. ♥`

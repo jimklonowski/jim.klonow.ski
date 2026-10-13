@@ -35,15 +35,19 @@ export const FLAG: Cells = [
 /** `n` cans in a row, a cell apart. */
 export const cansRow = (n: number): Cells => Array.from({ length: n }, (_, i) => CAN.map(([r, c, ink]) => [r, c + i * 5, ink] as [number, number, TickerInk])).flat()
 
-/** A cell list to a 1× canvas; the game's context scales it with smoothing off, so pixels stay pixels. */
-export function renderCells(cells: Cells, cols: number, rows: number, inks: Record<TickerInk, string>): HTMLCanvasElement {
+/**
+ * A cell list to a 1× canvas; the game's context scales it with smoothing off, so pixels stay
+ * pixels. The runner and the crusher draw at the companion's md pitch (4px cells with a 1px gap);
+ * the world draws its figure smaller, at 3px cells with no gap.
+ */
+export function renderCells(cells: Cells, cols: number, rows: number, inks: Record<TickerInk, string>, px = CELL, gap = 1): HTMLCanvasElement {
   const c = document.createElement('canvas')
-  c.width = cols * CELL
-  c.height = rows * CELL
+  c.width = cols * px
+  c.height = rows * px
   const g = c.getContext('2d')!
   for (const [r, col, ink] of cells) {
     g.fillStyle = inks[ink]
-    g.fillRect(col * CELL, r * CELL, CELL - 1, CELL - 1)
+    g.fillRect(col * px, r * px, px - gap, px - gap)
   }
   return c
 }
