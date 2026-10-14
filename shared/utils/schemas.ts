@@ -309,7 +309,9 @@ export const zTickerRun = z.object({
   /** Which mini-game (the PLAY menu); the runner for older clients. */
   game: z.enum(['runner', 'crusher', 'world'], 'Bad game').default('runner'),
   /** The crusher: this game cleared the whole wall; the world: it reached the castle. */
-  cleared: z.boolean().default(false)
+  cleared: z.boolean().default(false),
+  /** The world: the feats this finished month earned (shared/utils/tickerWorld.ts WORLD_FEATS). */
+  feats: z.array(z.enum(['clean-month', 'no-hit-week', 'chain-3'])).max(8).default([])
 })
 
 export const zPlannedDrawSave = z.object({

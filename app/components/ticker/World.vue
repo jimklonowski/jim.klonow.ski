@@ -44,16 +44,26 @@
           ▶
         </button>
       </div>
-      <button
-        type="button"
-        class="pad pointer-events-auto"
-        @pointerdown.prevent="hold('jump', true)"
-        @pointerup="hold('jump', false)"
-        @pointercancel="hold('jump', false)"
-        @pointerleave="hold('jump', false)"
-      >
-        ▲
-      </button>
+      <div class="flex gap-2 pointer-events-auto">
+        <button
+          v-if="hasShaker"
+          type="button"
+          class="pad"
+          @pointerdown.prevent="fire()"
+        >
+          ●
+        </button>
+        <button
+          type="button"
+          class="pad"
+          @pointerdown.prevent="hold('jump', true)"
+          @pointerup="hold('jump', false)"
+          @pointercancel="hold('jump', false)"
+          @pointerleave="hold('jump', false)"
+        >
+          ▲
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -66,16 +76,28 @@
 // the theme's colours; each day is labelled at the top of the playfield, so the level reads as
 // the calendar it is.
 //
-// Session one: ground, hills, pits, platforms, capsules, week flags, the castle. The soda cans,
-// the shrink on a hit and the draw blocks' reveals come next.
+// Session one: ground, hills, pits, platforms, capsules, week flags, the castle. Session two:
+// the soda cans and the germs on patrol (the can art is the crusher's; a germ is a hopping blob
+// in the accent ink), the hatchling the figure shrinks to on a hit (the same sprite at 2px
+// cells, flickering while it's untouchable), the dented can sliding as a shell, and the scores
+// that float up where they were earned. Session three: walls of cans (the same art, stacked
+// in their tiles), needles as little syringes flying left, sliding platforms, "zz" on a short
+// night's day tick, and the question mark that rises out of a pit. Session four: what the
+// blocks let out (the plate, the shaker, the star, the tiny heart — the face sprite at 1px),
+// the scoops the shaker throws (X, F or Shift; a fourth pad on touch while it's held), the
+// figure cycling its hues under a star, hidden blocks that aren't drawn until found, and the
+// block's line in the HUD. Session five, the feel: a squash on every stomp, a flash and a
+// small shake on a hit (the big one stays for a lost life), a title card as each week begins,
+// far hills at a third of the camera, a tick on a day whose capsules are all taken, and the
+// month's feats and figures handed to the page with the score.
 import { tickerSprite } from '#shared/utils/tickerSprite'
-import type { TickerBuild, TickerInk, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
+import type { TickerBuild, TickerInk, TickerProp } from '#shared/utils/tickerSprite'
 import {
-  DAY_TILES, GROUND, PLATFORM, PLAYER_ART_DX, PLAYER_H, ROWS, START_TILES, TILE,
-  autoRun, createWorld, dayAt, levelWidth, startWorld, stepWorld, tileAt, worldPose
+  BASE_ROW, DAY_TILES, GROUND, PLATFORM, REVEAL_SECONDS, ROWS, STACK, START_TILES, TILE,
+  autoRun, createWorld, dayAt, isShortSleep, isStarred, levelWidth, popperBox, startWorld, stepWorld, tileAt, worldFeats, worldPose, worldSummary
 } from '#shared/utils/tickerWorld'
-import type { DayInput, WorldInput, WorldState } from '#shared/utils/tickerWorld'
-import { FLAG, renderCells } from '~/utils/tickerArt'
+import type { DayInput, Enemy, Item, PlayerSize, WorldFeat, WorldInput, WorldState, WorldSummary } from '#shared/utils/tickerWorld'
+import { CAN, CAN_CRUMPLED, CAN_DENTED, FLAG, renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
 
 const props = defineProps<{
@@ -92,8 +114,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** The game ended with this score; `cleared` when the castle was reached. */
-  over: [score: number, cleared: boolean]
+  /** The game ended with this score; `cleared` when the castle was reached; the feats it earned and its figures. */
+  over: [score: number, cleared: boolean, feats: WorldFeat[], summary: WorldSummary]
   /** The player left (Escape or the page's QUIT); the score is the last game's. */
   quit: [score: number]
   /** The stage height the playfield needs, in px. */
@@ -104,13 +126,23 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 const announce = ref('press space or tap to start; arrows run, space jumps; escape quits')
 /** Coarse pointer: show the on-stage buttons. */
 const touch = ref(false)
+/** Holding the shaker: the throw pad is up. */
+const hasShaker = ref(false)
 
 /** The figure's cell size here: smaller than the companion's md, so it fits a two-tile gap. */
 const PX = 3
+/** The hatchling's: the same sprite, two thirds the size. */
+const PX_SMALL = 2
+const POSES = ['idle', 'walk1', 'walk2', 'happy', 'petted', 'flatline', 'worried'] as const
+const POP_SECONDS = 0.9
 /** Space above the playfield for the HUD. */
 const HUD_H = 36
 const RESTART_LOCKOUT = 0.6
 const SHAKE_SECONDS = 0.3
+const HURT_SHAKE_SECONDS = 0.15
+const SQUASH_SECONDS = 0.12
+const FLASH_SECONDS = 0.1
+const CARD_SECONDS = 1.8
 const PAD = (n: number) => String(Math.min(99999, n)).padStart(5, '0')
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -133,15 +165,30 @@ let reportedEnd = false
 let endedAt = -1
 let lostAt = -1
 let livesSeen = 0
+let sizeSeen: PlayerSize = 'grown'
 let bestAt = -1
 let bestShown = false
 let inks: Record<TickerInk, string>
 let font = 'monospace'
 let colors = { ground: '#333', fill: '#111', text: '#888', faint: '#666', star: '#444', accent: '#4c6', life: '#c33', platform: '#6f8aa0', raised: '#101410', warn: '#e8b34b' }
-const sprites = new Map<TickerPose, { image: HTMLCanvasElement, rows: number }>()
+/** `${size}:${pose}` → the baked sprite and where its feet are (the hatchling has no legs, so its bottom inked row sits above the canvas edge). */
+const sprites = new Map<string, { image: HTMLCanvasElement, bottom: number }>()
 let flagArt: HTMLCanvasElement | null = null
+let heartArt: HTMLCanvasElement | null = null
+type CanArt = { walk: HTMLCanvasElement, shell: HTMLCanvasElement, crushed: HTMLCanvasElement }
+let canArt: Record<'can' | 'tall', CanArt> | null = null
 const held = { left: false, right: false, jump: false }
 let jumpPressed = false
+let firePressed = false
+let powerSeen: WorldState['power'] = 'none'
+let starSeen = false
+let comboSeen = 0
+let stompAt = -1
+let hurtSeen = -1
+let hurtShakeAt = -1
+let weekSeen = -1
+let cardAt = -1
+let cardText = ''
 let ro: ResizeObserver | undefined
 
 function prepare() {
@@ -160,16 +207,39 @@ function prepare() {
   }
   font = canvas.value ? getComputedStyle(canvas.value).fontFamily : font
   sprites.clear()
-  for (const pose of ['idle', 'walk1', 'walk2', 'happy', 'petted', 'flatline'] as const) {
-    const worn = pose === 'flatline' ? props.accessories.filter(a => a !== 'shades') : props.accessories
-    const s = tickerSprite(pose, 'full', worn, props.build)
-    const cells: Cells = []
-    s.cells.forEach((cell, i) => {
-      if (cell.ink) cells.push([Math.floor(i / s.cols), i % s.cols, cell.ink])
-    })
-    sprites.set(pose, { image: renderCells(cells, s.cols, s.rows, inks, PX, 0), rows: s.rows })
+  for (const size of ['grown', 'hatchling'] as const) {
+    const px = size === 'grown' ? PX : PX_SMALL
+    const build: TickerBuild = size === 'grown' ? props.build : { ...props.build, tier: 'hatchling' }
+    for (const pose of POSES) {
+      const worn = pose === 'flatline' ? props.accessories.filter(a => a !== 'shades') : props.accessories
+      const s = tickerSprite(pose, 'full', worn, build)
+      const cells: Cells = []
+      let bottom = 0
+      s.cells.forEach((cell, i) => {
+        if (!cell.ink) return
+        const r = Math.floor(i / s.cols)
+        cells.push([r, i % s.cols, cell.ink])
+        bottom = Math.max(bottom, r + 1)
+      })
+      sprites.set(`${size}:${pose}`, { image: renderCells(cells, s.cols, s.rows, inks, px, 0), bottom: bottom * px })
+    }
   }
   flagArt = renderCells(FLAG, 5, 5, inks, 4, 1)
+  {
+    // The extra life: the heart's face at 1px cells, 17×15.
+    const face = tickerSprite('idle', 'face')
+    const cells: Cells = []
+    face.cells.forEach((cell, i) => {
+      if (cell.ink) cells.push([Math.floor(i / face.cols), i % face.cols, cell.ink])
+    })
+    heartArt = renderCells(cells, face.cols, face.rows, inks, 1, 0)
+  }
+  const can = (px: number): CanArt => ({
+    walk: renderCells(CAN, 4, 7, inks, px, 0),
+    shell: renderCells(CAN_DENTED, 4, 7, inks, px, 0),
+    crushed: renderCells(CAN_CRUMPLED, 4, 7, inks, px, 0)
+  })
+  canArt = { can: can(3), tall: can(4) }
 }
 
 function fresh(): WorldState {
@@ -207,15 +277,36 @@ function draw() {
   g.setTransform(g.getTransform().a, 0, 0, g.getTransform().d, 0, 0)
   g.clearRect(0, 0, W, H)
 
-  const shaking = lostAt >= 0 && now - lostAt < SHAKE_SECONDS && !reducedMotion
-  if (shaking) {
-    const k = 5 * (1 - (now - lostAt) / SHAKE_SECONDS)
-    g.translate(Math.round((Math.random() - 0.5) * 2 * k), Math.round((Math.random() - 0.5) * 2 * k))
+  // A lost life shakes hard; a hit, a little.
+  if (!reducedMotion) {
+    const k = lostAt >= 0 && now - lostAt < SHAKE_SECONDS
+      ? 5 * (1 - (now - lostAt) / SHAKE_SECONDS)
+      : hurtShakeAt >= 0 && now - hurtShakeAt < HURT_SHAKE_SECONDS ? 3 * (1 - (now - hurtShakeAt) / HURT_SHAKE_SECONDS) : 0
+    if (k > 0) g.translate(Math.round((Math.random() - 0.5) * 2 * k), Math.round((Math.random() - 0.5) * 2 * k))
   }
 
   const top = H - ROWS * TILE
   const cam = Math.round(s.camera)
   const level = s.level
+
+  // Far hills at a third of the camera: each hump's size comes from its number, so the range
+  // never changes shape as it drifts.
+  {
+    const base = top + BASE_ROW * TILE
+    const step = 180
+    const off = cam * 0.3
+    g.fillStyle = colors.fill
+    g.globalAlpha = 0.8
+    for (let i = Math.floor(off / step) - 1; i <= Math.floor((off + W) / step) + 1; i++) {
+      const w = 140 + ((((i * 104729) % 4) + 4) % 4) * 20
+      const h = 22 + ((((i * 7919) % 5) + 5) % 5) * 9
+      const x = i * step - off
+      g.beginPath()
+      g.ellipse(x + w / 2, base, w / 2, h, 0, Math.PI, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 1
+  }
 
   // Stars drift at a tenth of the camera: the far distance.
   if (props.night) {
@@ -241,10 +332,16 @@ function draw() {
     g.globalAlpha = 0.5
     g.fillRect(x, top, 1, 8)
     g.globalAlpha = 1
-    g.fillText(`${dayLabel(level.days[i]!.date)} · ${weekdayOf(level.days[i]!.date)}`, x + 4, top + 2)
+    const d = level.days[i]!
+    // A day whose capsules are all taken gets its tick.
+    const caps = level.capsules.filter(c => c.day === i)
+    const done = caps.length > 0 && caps.every(c => c.taken)
+    if (done) g.fillStyle = colors.accent
+    g.fillText(`${dayLabel(d.date)} · ${weekdayOf(d.date)}${isShortSleep(d) ? ' · zz' : ''}${done ? ' ✓' : ''}`, x + 4, top + 2)
   }
 
-  // Tiles: ground as filled blocks with a bright top edge, platforms as thin bars.
+  // Tiles: ground as filled blocks with a bright top edge, platforms as thin bars, a wall of
+  // cans as the can in each of its tiles.
   for (let c = firstCol; c <= lastCol; c++) {
     for (let r = 0; r < ROWS; r++) {
       const t = tileAt(level, c, r)
@@ -263,7 +360,40 @@ function draw() {
         g.fillStyle = colors.platform
         g.fillRect(c * TILE - cam, top + r * TILE + 2, TILE, 5)
       }
+      else if (t === STACK && canArt) {
+        g.drawImage(canArt.can.walk, c * TILE - cam + 6, top + r * TILE + 3)
+      }
     }
+  }
+
+  // Sliding platforms.
+  for (const m of level.movers) {
+    const x = Math.round(m.x - cam)
+    if (x + m.w < -20 || x > W + 20) continue
+    g.fillStyle = colors.platform
+    g.fillRect(x, top + m.y + 2, m.w, 5)
+  }
+
+  // Poppers: the question mark out of a pit, on its stalk.
+  for (const pp of level.poppers) {
+    const box = popperBox(pp, s.elapsed)
+    if (!box) continue
+    const x = Math.round(pp.x - cam)
+    if (x < -30 || x > W + 30) continue
+    g.fillStyle = colors.faint
+    g.fillRect(x - 2, top + box.y + 10, 4, box.h - 10)
+    g.fillStyle = colors.raised
+    g.fillRect(x - 9, top + box.y, 18, 16)
+    g.strokeStyle = colors.warn
+    g.lineWidth = 1
+    g.strokeRect(x - 8.5, top + box.y + 0.5, 17, 15)
+    g.fillStyle = colors.warn
+    g.font = `bold 12px ${font}`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('?', x, top + box.y + 9)
+    g.textBaseline = 'top'
+    g.textAlign = 'left'
   }
 
   // Capsules: a two-tone pill, bobbing a little.
@@ -295,8 +425,9 @@ function draw() {
     g.fillText(`1-${f.week + 1}`, x + 1, top + ground - 78)
   }
 
-  // Draw blocks: a question tile, lit until it's hit (its reveal comes in session two).
+  // Question blocks: lit until they're hit; a hidden one isn't there until a head finds it.
   for (const b of level.blocks) {
+    if (b.hidden && !b.hit) continue
     const x = Math.round(b.x - cam)
     if (x < -30 || x > W + 30) continue
     const y = top + b.y
@@ -343,12 +474,85 @@ function draw() {
     }
   }
 
-  // The figure.
-  const sprite = sprites.get(worldPose(s))
+  // What the blocks let out, and the scoops.
+  for (const it of level.items) {
+    if (it.taken || it.gone) continue
+    const x = Math.round(it.x - cam)
+    if (x < -30 || x > W + 30) continue
+    drawItem(g, it, x, top + Math.round(it.y))
+  }
+  for (const sc of level.scoops) {
+    if (!sc.alive) continue
+    const x = Math.round(sc.x - cam)
+    if (x < -10 || x > W + 10) continue
+    g.fillStyle = inks.glove
+    g.fillRect(x, top + Math.round(sc.y), 6, 6)
+    g.fillStyle = inks.spec
+    g.fillRect(x + 1, top + Math.round(sc.y) + 1, 2, 2)
+  }
+
+  // The enemies: cans in the crusher's art (dented as a shell, crumpled and flattened once
+  // crushed, spinning while a shell slides), germs as hopping blobs.
+  for (const e of level.enemies) {
+    if (e.mode === 'gone') continue
+    const x = Math.round(e.x - cam)
+    if (x < -40 || x > W + 40) continue
+    const y = top + Math.round(e.y)
+    if (e.kind === 'germ') {
+      drawGerm(g, e, x, y)
+      continue
+    }
+    if (e.kind === 'needle') {
+      drawNeedle(g, e, x, y)
+      continue
+    }
+    const art = canArt?.[e.kind]
+    if (!art) continue
+    if (e.mode === 'crushed') {
+      const h = Math.round(art.crushed.height * 0.45)
+      g.drawImage(art.crushed, x, y + e.h - h, art.crushed.width, h)
+    }
+    else {
+      const img = e.mode === 'shell' ? art.shell : art.walk
+      const spin = e.mode === 'shell' && e.vx !== 0 && !reducedMotion && Math.floor(now * 12) % 2 === 1
+      if (spin) {
+        g.save()
+        g.translate(x + img.width, y)
+        g.scale(-1, 1)
+        g.drawImage(img, 0, 0)
+        g.restore()
+      }
+      else {
+        g.drawImage(img, x, y)
+      }
+    }
+  }
+
+  // The figure: grown at 3px cells, the hatchling at 2px, flickering while it's untouchable.
+  const sprite = sprites.get(`${s.size}:${worldPose(s)}`)
   if (sprite) {
     const p = s.player
-    const x = Math.round(p.x - cam + PLAYER_ART_DX)
-    const y = top + Math.round(p.y + PLAYER_H - sprite.rows * PX)
+    const x = Math.round(p.x - cam + (p.w - sprite.image.width) / 2)
+    const y = top + Math.round(p.y + p.h - sprite.bottom)
+    const hurt = s.status === 'running' && s.elapsed < s.hurtUntil
+    const starred = s.status === 'running' && isStarred(s)
+    if (hurt) g.globalAlpha = reducedMotion ? 0.55 : Math.floor(now * 14) % 2 ? 0.3 : 1
+    // Under a star the inks cycle round the wheel (still motion gets one fixed turn); a hit
+    // flashes white for a frame or two.
+    const filters: string[] = []
+    if (starred) filters.push(`hue-rotate(${reducedMotion ? 120 : Math.round((now * 540) % 360)}deg)`)
+    if (s.hurtAt >= 0 && s.elapsed - s.hurtAt < FLASH_SECONDS) filters.push('brightness(2.5)')
+    if (filters.length) g.filter = filters.join(' ')
+    // A stomp squashes the figure for a moment, around its feet.
+    const squash = !reducedMotion && stompAt >= 0 && now - stompAt < SQUASH_SECONDS
+    if (squash) {
+      const cx = x + sprite.image.width / 2
+      const feet = y + sprite.bottom
+      g.save()
+      g.translate(cx, feet)
+      g.scale(1.2, 0.78)
+      g.translate(-cx, -feet)
+    }
     if (p.facing < 0) {
       g.save()
       g.translate(x + sprite.image.width, y)
@@ -359,7 +563,26 @@ function draw() {
     else {
       g.drawImage(sprite.image, x, y)
     }
+    if (squash) g.restore()
+    g.filter = 'none'
+    g.globalAlpha = 1
   }
+
+  // Scores float up from where they were earned.
+  g.font = `bold 10px ${font}`
+  g.textAlign = 'center'
+  g.textBaseline = 'bottom'
+  for (const pp of s.pops) {
+    const age = s.elapsed - pp.at
+    if (age < 0 || age > POP_SECONDS) continue
+    const x = Math.round(pp.x - cam)
+    if (x < -30 || x > W + 30) continue
+    g.globalAlpha = Math.max(0, 1 - age / POP_SECONDS)
+    g.fillStyle = pp.text === '1UP' ? colors.warn : colors.accent
+    g.fillText(pp.text, x, top + Math.round(pp.y - 4 - (reducedMotion ? 0 : age * 28)))
+  }
+  g.globalAlpha = 1
+  g.textBaseline = 'top'
 
   // HUD: the day on the left, the scores and lives on the right.
   g.font = `11px ${font}`
@@ -369,8 +592,19 @@ function draw() {
   const d = dayAt(s)
   const dayText = d >= 0 ? `1-${Math.floor(d / 7) + 1}  ${dayLabel(level.days[d]!.date)} · ${weekdayOf(level.days[d]!.date)}` : d < 0 && s.player.x >= level.castleX - TILE * 2 ? 'HOME' : `1-1  ${dayLabel(level.days[0]!.date)}`
   g.fillText(dayText, 12, 10)
-  g.fillStyle = colors.accent
-  g.fillText(`${s.collected}/${level.capsules.length} capsules`, 12, 24)
+  // The second line: the tally — or, for a few seconds after a block is bumped, what it said.
+  const reveal = s.reveal && s.status === 'running' && s.elapsed - s.reveal.at < REVEAL_SECONDS ? s.reveal : null
+  if (reveal) {
+    const age = s.elapsed - reveal.at
+    g.globalAlpha = age > REVEAL_SECONDS - 0.6 ? Math.max(0.2, (REVEAL_SECONDS - age) / 0.6) : 1
+    g.fillStyle = colors.warn
+    g.fillText(`? ${reveal.text}`, 12, 24)
+    g.globalAlpha = 1
+  }
+  else {
+    g.fillStyle = colors.accent
+    g.fillText(`${s.collected}/${level.capsules.length} capsules${s.crushed ? ` · ${s.crushed} crushed` : ''}${s.power === 'shaker' ? (touch.value ? ' · shaker' : ' · shaker (x throws)') : ''}`, 12, 24)
+  }
   g.textAlign = 'right'
   g.fillStyle = colors.faint
   g.fillText(`HI ${PAD(props.hi)}  ${PAD(s.score)}`, W - 12, 10)
@@ -378,9 +612,31 @@ function draw() {
     g.fillStyle = colors.life
     g.fillRect(W - 18 - i * 10, 27, 6, 6)
   }
+  // The shaker in hand: a little bottle beside the lives.
+  if (s.power === 'shaker') {
+    const x = W - 22 - s.lives * 10 - 8
+    g.fillStyle = inks.bowl
+    g.fillRect(x, 26, 5, 8)
+    g.fillStyle = inks.line
+    g.fillRect(x + 1, 23, 3, 3)
+  }
   if (bestAt >= 0 && now - bestAt < 1.6 && s.status === 'running') {
     g.fillStyle = colors.accent
     g.fillText('NEW BEST', W - 12, 40)
+  }
+
+  // The week's title card, as it begins.
+  if (cardAt >= 0 && now - cardAt < CARD_SECONDS && s.status === 'running') {
+    const age = now - cardAt
+    g.globalAlpha = reducedMotion ? 1 : age < 0.2 ? age / 0.2 : age > CARD_SECONDS - 0.4 ? Math.max(0, (CARD_SECONDS - age) / 0.4) : 1
+    g.fillStyle = colors.text
+    g.font = `bold 15px ${font}`
+    g.textAlign = 'center'
+    g.textBaseline = 'top'
+    g.fillText(cardText, W / 2, top + 60)
+    g.fillStyle = colors.faint
+    g.fillRect(W / 2 - 56, top + 82, 112, 1)
+    g.globalAlpha = 1
   }
 
   // Prompts, centred on the stage.
@@ -390,14 +646,16 @@ function draw() {
   const first = level.days[0]?.date
   const lastDay = level.days.at(-1)?.date
   if (s.status === 'ready') {
+    const cans = level.enemies.filter(e => e.kind !== 'germ').length
     g.fillStyle = colors.faint
-    g.fillText(`${first ? dayLabel(first) : ''} – ${lastDay ? dayLabel(lastDay) : ''} · ${level.days.length} DAYS · ${level.capsules.length} CAPSULES`, W / 2, promptY - 18)
+    g.fillText(`${first ? dayLabel(first) : ''} – ${lastDay ? dayLabel(lastDay) : ''} · ${level.days.length} DAYS · ${level.capsules.length} CAPSULES${cans ? ` · ${cans} CAN${cans === 1 ? '' : 'S'}` : ''}`, W / 2, promptY - 18)
     g.globalAlpha = pulse
     g.fillStyle = colors.text
     g.fillText('space · tap to start', W / 2, promptY + 4)
     g.globalAlpha = 1
     g.fillStyle = colors.faint
     g.fillText(touch.value ? '◀ ▶ run · ▲ jump (hold for height) · esc quits' : '← → run · space jumps (hold for height) · esc quits', W / 2, promptY + 20)
+    g.fillText(W < 520 ? 'stomp the cans · a side touch shrinks you' : 'land on a can to crush it · a touch from the side shrinks you', W / 2, promptY + 34)
   }
   else if (s.status === 'over' || s.status === 'cleared') {
     g.fillStyle = s.status === 'cleared' ? colors.accent : colors.text
@@ -408,6 +666,88 @@ function draw() {
       g.fillText('space · tap for another go   esc quits', W / 2, promptY + 16)
     }
   }
+}
+
+/** A germ: a stepped blob in the accent ink, stretched mid-hop, flattened when crushed, with two eyes looking where it walks. */
+function drawGerm(g: CanvasRenderingContext2D, e: Enemy, x: number, y: number) {
+  const crushed = e.mode === 'crushed'
+  const h = crushed ? e.h * 0.3 : e.onGround ? e.h : e.h * 1.15
+  const w = crushed ? e.w * 1.3 : e.onGround ? e.w : e.w * 0.9
+  const cx = x + e.w / 2
+  const bottom = y + e.h
+  const widths = [0.5, 0.8, 1, 1, 0.8, 0.55]
+  const rowH = h / widths.length
+  g.fillStyle = colors.accent
+  g.globalAlpha = crushed ? 0.5 : 0.85
+  widths.forEach((k, i) => {
+    const rw = Math.round(w * k)
+    g.fillRect(Math.round(cx - rw / 2), Math.round(bottom - h + i * rowH), rw, Math.ceil(rowH))
+  })
+  g.globalAlpha = 1
+  if (crushed) return
+  g.fillStyle = colors.fill
+  const look = e.dir > 0 ? 2 : -2
+  g.fillRect(Math.round(cx - 5 + look), Math.round(bottom - h * 0.62), 2, 3)
+  g.fillRect(Math.round(cx + 3 + look), Math.round(bottom - h * 0.62), 2, 3)
+}
+
+/** What a block let out: a plate with something on it, the shaker bottle, a star, the tiny heart. */
+function drawItem(g: CanvasRenderingContext2D, it: Item, x: number, y: number) {
+  if (it.kind === 'plate') {
+    g.fillStyle = inks.glove
+    g.fillRect(x, y + it.h - 4, it.w, 3)
+    g.fillRect(x + 2, y + it.h - 1, it.w - 4, 1)
+    g.fillStyle = inks.red
+    g.fillRect(x + 4, y + 2, 5, 4)
+    g.fillStyle = colors.accent
+    g.fillRect(x + 11, y + 1, 5, 5)
+    return
+  }
+  if (it.kind === 'shaker') {
+    g.fillStyle = inks.bowl
+    g.fillRect(x + 1, y + 6, it.w - 2, it.h - 6)
+    g.fillStyle = inks.glove
+    g.fillRect(x + 3, y + 10, it.w - 6, it.h - 12)
+    g.fillStyle = inks.line
+    g.fillRect(x + 3, y, it.w - 6, 6)
+    g.fillRect(x + 5, y - 2, it.w - 10, 2)
+    return
+  }
+  if (it.kind === 'star') {
+    const pulse = reducedMotion ? 1 : 0.8 + 0.2 * Math.sin(now * 10)
+    const cx = x + it.w / 2
+    const cy = y + it.h / 2
+    g.fillStyle = colors.accent
+    g.beginPath()
+    for (let i = 0; i < 10; i++) {
+      const r = (i % 2 ? 4 : 9) * pulse
+      const a = -Math.PI / 2 + (i * Math.PI) / 5
+      g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+    }
+    g.closePath()
+    g.fill()
+    return
+  }
+  if (heartArt) g.drawImage(heartArt, x, y)
+}
+
+/** A needle: a little syringe flying left — barrel, plunger at the back, the needle in front; bent flat once stomped. */
+function drawNeedle(g: CanvasRenderingContext2D, e: Enemy, x: number, y: number) {
+  const mid = y + e.h / 2
+  if (e.mode === 'crushed') {
+    g.fillStyle = colors.faint
+    g.fillRect(x + 4, y + e.h - 3, e.w - 8, 2)
+    return
+  }
+  g.fillStyle = colors.text
+  g.fillRect(x + 8, y + 1, 14, e.h - 2) // barrel
+  g.fillStyle = colors.faint
+  g.fillRect(x + 22, mid - 2, 5, 4) // plunger
+  g.fillRect(x + 25, y, 3, e.h)
+  g.fillStyle = inks.line
+  g.fillRect(x, mid - 1, 8, 2) // the needle
+  g.fillStyle = inks.red
+  g.fillRect(x + 10, y + 3, 4, e.h - 6) // what's in it
 }
 
 /** The ground's y (playfield px) under a level x, for standing things on it. */
@@ -425,14 +765,51 @@ function frame(ts: number) {
   now = ts / 1000
   const s = state
   if (s && !paused) {
-    const input: WorldInput = { left: held.left, right: held.right, jump: jumpPressed, jumpHeld: held.jump }
+    const input: WorldInput = { left: held.left, right: held.right, jump: jumpPressed, jumpHeld: held.jump, fire: firePressed }
     jumpPressed = false
+    firePressed = false
     const wasLive = s.status === 'running'
     stepWorld(s, dt, input)
+    hasShaker.value = s.power === 'shaker'
+    if (s.power !== powerSeen) {
+      powerSeen = s.power
+      if (s.status === 'running') announce.value = s.power === 'shaker' ? 'got the shaker. x throws' : 'lost the shaker'
+    }
+    const starred = isStarred(s)
+    if (starred !== starSeen) {
+      starSeen = starred
+      if (starred && s.status === 'running') announce.value = 'a star. untouchable for a bit'
+    }
+    // The feel: a stomp (the combo climbs), a hit (hurtAt moves), a new week (its card).
+    if (s.combo > comboSeen) stompAt = now
+    comboSeen = s.combo
+    if (s.hurtAt !== hurtSeen) {
+      hurtSeen = s.hurtAt
+      if (s.hurtAt >= 0) hurtShakeAt = now
+    }
+    const today = dayAt(s)
+    // The runway counts as the first week, so the card opens the game.
+    const week = today >= 0 ? Math.floor(today / 7) : s.status === 'running' ? 0 : -1
+    if (s.status === 'running' && week >= 0 && week !== weekSeen) {
+      weekSeen = week
+      cardAt = now
+      const first = s.level.days[week * 7]!
+      const last = s.level.days[Math.min(week * 7 + 6, s.level.days.length - 1)]!
+      cardText = `WEEK ${week + 1} · ${dayLabel(first.date)} – ${dayLabel(last.date)}`
+      if (week > 0) announce.value = `week ${week + 1}`
+    }
     if (s.lives < livesSeen) {
       livesSeen = s.lives
       lostAt = now
-      if (s.status === 'running') announce.value = `fell. ${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left`
+      if (s.status === 'running') announce.value = `lost a life. ${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left`
+    }
+    else if (s.lives > livesSeen) {
+      livesSeen = s.lives
+      announce.value = `extra life. ${s.lives} lives`
+    }
+    if (s.size !== sizeSeen) {
+      sizeSeen = s.size
+      if (s.status === 'running') announce.value = s.size === 'hatchling' ? 'hit. small now' : 'grown again'
     }
     if (!bestShown && props.hi > 0 && s.score > props.hi && s.status === 'running') {
       bestShown = true
@@ -445,7 +822,7 @@ function frame(ts: number) {
     announce.value = s.status === 'cleared'
       ? `made it home at ${s.score}. space or tap for another go; escape quits`
       : `game over at ${s.score}. space or tap for another go; escape quits`
-    emit('over', s.score, s.status === 'cleared')
+    emit('over', s.score, s.status === 'cleared', worldFeats(s), worldSummary(s))
   }
   draw()
   raf = requestAnimationFrame(frame)
@@ -468,6 +845,15 @@ function press() {
     endedAt = -1
     lostAt = -1
     livesSeen = started.lives
+    sizeSeen = started.size
+    powerSeen = started.power
+    starSeen = false
+    comboSeen = 0
+    stompAt = -1
+    hurtSeen = -1
+    hurtShakeAt = -1
+    weekSeen = -1
+    cardAt = -1
     bestAt = -1
     bestShown = false
   }
@@ -481,6 +867,11 @@ function onTap() {
 function hold(key: 'left' | 'right' | 'jump', down: boolean) {
   if (key === 'jump' && down && !held.jump) press()
   held[key] = down
+}
+
+/** A throw, with the shaker (the engine ignores it otherwise). */
+function fire() {
+  if (state?.status === 'running') firePressed = true
 }
 
 function quit() {
@@ -502,6 +893,10 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault()
     if (!e.repeat) press()
     held.jump = true
+  }
+  else if (e.code === 'KeyX' || e.code === 'KeyF' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+    e.preventDefault()
+    if (!e.repeat) fire()
   }
   else if (e.code === 'Escape') {
     e.preventDefault()
@@ -543,6 +938,11 @@ onMounted(() => {
       state: () => state,
       status: () => state?.status ?? null,
       score: () => state?.score ?? 0,
+      lives: () => state?.lives ?? 0,
+      size: () => state?.size ?? null,
+      power: () => state?.power ?? null,
+      crushed: () => state?.crushed ?? 0,
+      fire,
       day: () => (state ? dayAt(state) : -1),
       x: () => state?.player.x ?? 0,
       width: () => (state ? levelWidth(state.level) : 0),
@@ -552,14 +952,15 @@ onMounted(() => {
         held.jump = input.jumpHeld
         if (input.jump) press()
       },
-      /** One frame of the engine's scripted runner, through the same input path a thumb uses. */
+      /** One frame of the engine's scripted runner, through the same input path a thumb uses; returns its decision. */
       auto: () => {
-        if (!state) return
+        if (!state) return null
         const i = autoRun(state)
         held.left = i.left
         held.right = i.right
         held.jump = i.jumpHeld
         if (i.jump) press()
+        return i
       }
     }
   }
