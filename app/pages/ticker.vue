@@ -117,7 +117,7 @@
         :seed="daySeed"
         :lives="crusherLives"
         @fit="h => gameHeight = h"
-        @over="(score, cleared) => onGameOver('world', score, cleared)"
+        @over="(score, cleared, feats, summary) => onGameOver('world', score, cleared, feats, summary)"
         @quit="onGameQuit"
       />
 
@@ -359,7 +359,7 @@ import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycle
 import { mergePatch } from '#shared/utils/mergePatch'
 import { sodaOunces } from '#shared/utils/soda'
 import type { CanInput } from '#shared/utils/tickerBreakout'
-import type { DayInput } from '#shared/utils/tickerWorld'
+import type { DayInput, HitBy, WorldFeat, WorldSummary } from '#shared/utils/tickerWorld'
 import {
   LEAN_GAIN_LBS, MANE_TIERS, TIER_DAYS, ageDays as ageDaysOf, buildOf, firstLoggedDay,
   finasterideStreak as finasterideStreakOf, leanGain as leanGainOf, loggedDayCount, maneTier as maneTierOf,
@@ -750,6 +750,10 @@ const achievements = computed<Achievement[]>(() => [
   { id: 'runner-1000', name: 'Marathon', desc: 'a thousand points on the runner', icon: 'i-lucide-trophy', goal: 1000, progress: runnerHi.value?.score ?? 0, unit: 'points' },
   { id: 'crusher-300', name: 'Can Crusher', desc: 'three hundred points on the can crusher', icon: 'i-lucide-cup-soda', goal: 300, progress: crusherHi.value?.score ?? 0, unit: 'points' },
   { id: 'clean-sweep', name: 'Clean Sweep', desc: 'every can on the wall, cleared', icon: 'i-lucide-check-check', goal: 1, progress: crusherHi.value?.cleared ? 1 : 0, unit: 'wall' },
+  { id: 'made-it-home', name: 'Made It Home', desc: 'the whole month, left to right, to the castle', icon: 'i-lucide-castle', goal: 1, progress: worldHi.value?.cleared ? 1 : 0, unit: 'month' },
+  { id: 'clean-month', name: 'Clean Month', desc: 'every soda can in the month, crushed', icon: 'i-lucide-cup-soda', goal: 1, progress: worldFeat('clean-month'), unit: 'month' },
+  { id: 'no-hit-week', name: 'No-Hit Week', desc: 'a whole week of the month without a scratch', icon: 'i-lucide-shield', goal: 1, progress: worldFeat('no-hit-week'), unit: 'week' },
+  { id: 'chain-3', name: 'Chain of Three', desc: 'a kicked can that crushed three in a row', icon: 'i-lucide-link', goal: 1, progress: worldFeat('chain-3'), unit: 'chain' },
   { id: 'petted', name: 'Well Petted', desc: 'a hundred pats, all time', icon: 'i-lucide-hand-heart', goal: 100, progress: pets.value.total, unit: 'pets' },
   { id: 'open-house', name: 'Open House', desc: 'five visits from friends', icon: 'i-lucide-door-open', goal: 5, progress: visits.value?.total ?? 0, unit: 'visits' },
   { id: 'pincushion', name: 'Pincushion', desc: 'ten blood draws on file', icon: 'i-lucide-test-tube', goal: 10, progress: drawDates.value.length, unit: 'draws' },
@@ -783,18 +787,22 @@ const nextAchievement = computed(() => achievementCards.value
 // The trailing seven days scored against the same merged rules as the hunger meter; today only
 // counts once logged (tallySchedule's rule), so a morning never reads as a miss.
 
-const weekTally = computed(() => {
-  if (!rulesApply) return null
-  const doseDates = new Map<string, Set<string>>()
+/** Which dates each compound was dosed on — what the schedule is scored against. */
+const doseDates = computed(() => {
+  const out = new Map<string, Set<string>>()
   for (const e of entries.value) {
     for (const p of e.peptides ?? []) {
       if (!p.compound) continue
-      let set = doseDates.get(p.compound)
-      if (!set) doseDates.set(p.compound, set = new Set())
+      let set = out.get(p.compound)
+      if (!set) out.set(p.compound, set = new Set())
       set.add(e.date)
     }
   }
-  const tallies = tallySchedule(rules.value, shiftDays(today.value, -6), today.value, doseDates, today.value)
+  return out
+})
+const weekTally = computed(() => {
+  if (!rulesApply) return null
+  const tallies = tallySchedule(rules.value, shiftDays(today.value, -6), today.value, doseDates.value, today.value)
   const hit = tallies.reduce((s, t) => s + t.hit.length, 0)
   const missed = tallies.flatMap(t => t.missed.map(date => ({ compound: t.rule.compound, date })))
   return { hit, missed }
@@ -1442,6 +1450,10 @@ const hiScores = ref<Record<TickerGame, TickerRecord | null>>(readHiScores())
 const runnerHi = computed(() => hiScores.value.runner)
 const crusherHi = computed(() => hiScores.value.crusher)
 const worldHi = computed(() => hiScores.value.world)
+/** 1 once a finished month ever earned the feat (sticky on the record), for the achievements. */
+const worldFeat = (feat: WorldFeat) => (worldHi.value?.feats?.includes(feat) ? 1 : 0)
+/** The last world game's figures, for the remark that names the day that got you. */
+let lastSummary: WorldSummary | null = null
 const visitorsBests = ref<Partial<Record<TickerGame, TickerBest | null>>>(visits.value?.bests ?? { runner: visits.value?.best ?? null })
 let runSetRecord = false
 /** A guest's game that topped the house record — the figure their HUD shows, so the one its NEW BEST and the quit line agree on. */
@@ -1503,21 +1515,35 @@ const gameHeight = ref<number | null>(null)
 // The trailing thirty days as the level's days (shared/utils/tickerWorld.ts): logged or not, the
 // doses and the sodas, the workout minutes, the recovery, a draw on file. The castle is today.
 const WORLD_DAYS = 30
+/** The running kinds (the cap family plus the bike): their platform slides. */
+const CARDIO = /walk|run|jog|hik|elliptical|stair|tread|row|cycling|spin|bike|swim/i
 const worldDays = computed<DayInput[]>(() => {
   const byDate = new Map(entries.value.map(e => [e.date, e]))
   const recoveryOn = new Map((healthData.value ?? []).map(h => [h.date, h.recovery_score ?? null]))
-  const draws = new Set(drawDates.value)
+  const sleepOn = new Map((healthData.value ?? []).map(h => [h.date, h.sleep_total_min ?? null]))
+  const first = shiftDays(today.value, -(WORLD_DAYS - 1))
+  // A draw's block says its lab and how many markers it read.
+  const drawLabels = new Map((labsData.value ?? []).map(d => [d.date, `${d.sources.length ? d.sources.join(' · ') : 'draw'} · ${Object.keys(d.markers).length} markers`]))
+  // A gold-star day: every dose the schedule called for, logged, and none missed.
+  const tallies = rulesApply ? tallySchedule(rules.value, first, today.value, doseDates.value, today.value) : []
+  const hitDates = new Set(tallies.flatMap(t => t.hit))
+  const missedDates = new Set(tallies.flatMap(t => t.missed))
   return Array.from({ length: WORLD_DAYS }, (_, i) => {
     const date = shiftDays(today.value, -(WORLD_DAYS - 1 - i))
     const e = byDate.get(date)
+    const workoutMin = minutesOn(date)
     return {
       date,
       logged: !!e && isLoggedDay(e),
       doses: e?.peptides?.length ?? 0,
       sodas: (e?.sodas ?? []).map(s => ({ oz: sodaOunces(s.size) })),
-      workoutMin: minutesOn(date),
+      workoutMin,
+      cardio: workoutsOn(date).some(w => CARDIO.test(w.workout_type ?? '')),
       recovery: recoveryOn.get(date) ?? null,
-      draw: draws.has(date)
+      sleepMin: sleepOn.get(date) ?? null,
+      draw: drawLabels.has(date),
+      drawLabel: drawLabels.get(date) ?? null,
+      goldStar: hitDates.has(date) && !missedDates.has(date) && workoutMin > 0
     }
   })
 })
@@ -1557,21 +1583,24 @@ function play(game: TickerGame) {
         : 'nothing to shoot. good. (esc quits)'
 }
 
-function onGameOver(game: TickerGame, score: number, cleared: boolean) {
+function onGameOver(game: TickerGame, score: number, cleared: boolean, feats: WorldFeat[] = [], summary: WorldSummary | null = null) {
   // Read before the server's answer moves the house record up to this very score.
   runBeatHouse = !keeper && score > 0 && score > houseBestOf(game)
   if (cleared) lastCleared = true
+  if (game === 'world') lastSummary = summary
   const current = hiScores.value[game]
   const better = score > (current?.score ?? 0)
   // The runner has no end to reach; every other game remembers that it was finished once.
   const finishes = game !== 'runner'
   const nowCleared = finishes && cleared && !current?.cleared
+  const earned = game === 'world' && cleared ? feats.filter(f => !current?.feats?.includes(f)) : []
   if (!remote) {
-    if (better || nowCleared) {
+    if (better || nowCleared || earned.length) {
       const next: TickerRecord = {
         score: better ? score : current?.score ?? 0,
         date: better ? today.value : current?.date ?? today.value,
-        ...(finishes ? { cleared: !!current?.cleared || cleared } : {})
+        ...(finishes ? { cleared: !!current?.cleared || cleared } : {}),
+        ...(game === 'world' && (current?.feats?.length || earned.length) ? { feats: [...(current?.feats ?? []), ...earned] } : {})
       }
       hiScores.value = { ...hiScores.value, [game]: next }
       remember(game, next)
@@ -1583,7 +1612,7 @@ function onGameOver(game: TickerGame, score: number, cleared: boolean) {
     hiScores.value = { ...hiScores.value, [game]: { ...current, score, date: today.value } } // the server confirms below
     runSetRecord = true
   }
-  $fetch<TickerRunResponse>('/api/ticker/run', { method: 'POST', body: { score, game, cleared } })
+  $fetch<TickerRunResponse>('/api/ticker/run', { method: 'POST', body: { score, game, cleared, ...(feats.length ? { feats } : {}) } })
     .then((r) => {
       hiScores.value = { ...hiScores.value, [game]: r.record }
       visitorsBests.value = { ...visitorsBests.value, [game]: r.visitorsBest }
@@ -1625,6 +1654,27 @@ async function onGameQuit(score: number) {
   else {
     line.value = game === 'crusher' && !crusherWall.value.count ? 'nothing to shoot. good.' : 'next time.'
   }
+  // The world names the day that got you — or admits it never did.
+  if (game === 'world' && lastSummary) {
+    const got = gotLine(lastSummary)
+    if (got) line.value = `${line.value} ${got}`
+  }
+}
+
+/** "sep 14 got me — two cans and the pit." from a world game's figures; "not a scratch." for a clean run home. */
+function gotLine(summary: WorldSummary): string {
+  const worst = summary.worstDay
+  if (!worst) return summary.cleared ? 'not a scratch.' : ''
+  const word = (by: HitBy, n: number) => {
+    const noun = by === 'can' || by === 'tall' ? 'can' : by === 'germ' ? 'germ' : by === 'needle' ? 'needle' : by === 'popper' ? 'question mark' : 'pit'
+    const count = n === 1 ? (by === 'needle' || by === 'popper' || by === 'pit' ? 'the' : 'a') : n === 2 ? 'two' : n === 3 ? 'three' : `${n}`
+    return `${count} ${noun}${n > 1 ? 's' : ''}`
+  }
+  const counts = new Map<HitBy, number>()
+  for (const h of summary.hits) if (h.day === worst.day) counts.set(h.by, (counts.get(h.by) ?? 0) + 1)
+  const parts = worst.by.map(by => word(by, counts.get(by) ?? 1))
+  const causes = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]
+  return `${formatDate(worst.date, 'monthDay').toLowerCase()} got me — ${causes}.`
 }
 
 // --- fidgets: what it does when nobody is doing anything --------------------------------------

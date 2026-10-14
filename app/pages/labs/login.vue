@@ -102,9 +102,9 @@ definePageMeta({ layout: false })
 //
 // A signed-out /ticker redirects here with `for=ticker` (server/middleware/auth.ts): the pet
 // page is gated, so this is where a pasted link's preview card has to live. The card itself is
-// drawn live by /ticker/og.png. robots.txt allows this one path under /labs so an unfurler may
-// follow that redirect (nuxt.config `robots.allow`); the noindex above is what keeps it out of
-// search.
+// drawn live by /ticker/og.png. robots.txt allows this one path under /labs so a previewer that
+// honours robots.txt may follow that redirect (nuxt.config `robots.allow`); the noindex above is
+// what keeps it out of search.
 const route = useRoute()
 const forTicker = route.query.for === 'ticker'
 useSeoMeta({

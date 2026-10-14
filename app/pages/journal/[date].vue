@@ -581,54 +581,89 @@
             </p>
           </div>
 
-          <div class="min-w-0 space-y-3">
-            <template
-              v-for="c in PHOTO_CATEGORIES"
-              :key="c.value"
+          <!-- Contact sheet: one square tile per photo in category order, captioned underneath.
+               For the owner an empty category keeps its slot as a dashed tile that points the
+               uploader at it, so the sheet doubles as "what's still missing today". -->
+          <div class="min-w-0">
+            <div
+              v-if="isOwner || dayPhotos.length"
+              class="grid grid-cols-3 sm:grid-cols-6 gap-2.5"
             >
-              <div v-if="photosFor(c.value).length">
-                <p class="text-[10.5px] text-muted uppercase tracking-[0.12em] mb-1.5">
-                  {{ c.label }}
-                </p>
-                <div class="flex flex-wrap gap-2">
-                  <div
-                    v-for="photo in photosFor(c.value)"
-                    :key="photo.id"
-                    class="relative group"
+              <template
+                v-for="c in PHOTO_CATEGORIES"
+                :key="c.value"
+              >
+                <figure
+                  v-for="photo in photosFor(c.value)"
+                  :key="photo.id"
+                  class="relative group min-w-0"
+                >
+                  <!-- A button, not a click handler on the image: opening the lightbox has to be
+                       reachable by keyboard and announced as an action. -->
+                  <button
+                    type="button"
+                    class="block w-full aspect-square overflow-hidden border border-line-soft hover:border-line-accent transition-colors cursor-zoom-in"
+                    :aria-label="`Enlarge the ${c.label} photo`"
+                    @click="lightboxPhoto = photo"
                   >
-                    <!-- A button, not a click handler on the image: opening the lightbox has to be
-                         reachable by keyboard and announced as an action. -->
-                    <button
-                      type="button"
-                      class="block"
-                      :aria-label="`Enlarge the ${photoCategoryLabel(photo.category)} photo`"
-                      @click="lightboxPhoto = photo"
+                    <img
+                      :src="photo.thumbUrl ?? photo.url"
+                      alt=""
+                      loading="lazy"
+                      class="w-full h-full object-cover"
+                      :class="{ '-scale-x-100': photo.frameFlip }"
                     >
-                      <img
-                        :src="photo.thumbUrl ?? photo.url"
-                        alt=""
-                        loading="lazy"
-                        class="w-20 h-20 object-cover border border-line cursor-pointer hover:border-line-accent transition-colors"
-                        :class="{ '-scale-x-100': photo.frameFlip }"
-                      >
-                    </button>
-                    <button
-                      v-if="isOwner"
-                      type="button"
-                      class="absolute top-0 right-0 px-1 text-[11px] bg-bg text-faint hover:text-danger tui-row-action cursor-pointer"
-                      aria-label="Delete photo"
-                      @click="deletePhoto(photo.id)"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </template>
+                  </button>
+                  <button
+                    v-if="isOwner"
+                    type="button"
+                    class="absolute top-1 right-1 px-1 text-[11px] bg-bg/80 text-faint hover:text-danger tui-row-action cursor-pointer"
+                    aria-label="Delete photo"
+                    @click="deletePhoto(photo.id)"
+                  >
+                    ✕
+                  </button>
+                  <figcaption
+                    class="mt-1 text-[10.5px] uppercase tracking-[0.12em] truncate"
+                    :class="isOwner && uploadCategory === c.value ? 'text-accent' : 'text-muted'"
+                  >
+                    {{ c.label }}
+                  </figcaption>
+                </figure>
+
+                <figure
+                  v-if="isOwner && !photosFor(c.value).length"
+                  class="min-w-0"
+                >
+                  <button
+                    type="button"
+                    class="w-full aspect-square flex flex-col items-center justify-center gap-1 border border-dashed text-[11px] transition-colors cursor-pointer"
+                    :class="uploadCategory === c.value
+                      ? 'border-line-accent text-accent bg-raised'
+                      : 'border-line-input text-faint hover:text-muted hover:border-line-accent'"
+                    :aria-label="`Upload a ${c.label} photo`"
+                    :aria-pressed="uploadCategory === c.value"
+                    @click="uploadCategory = c.value"
+                  >
+                    <UIcon
+                      name="i-lucide-plus"
+                      class="w-4 h-4"
+                    />
+                    <span>add</span>
+                  </button>
+                  <figcaption
+                    class="mt-1 text-[10.5px] uppercase tracking-[0.12em] truncate"
+                    :class="uploadCategory === c.value ? 'text-accent' : 'text-faint'"
+                  >
+                    {{ c.label }}
+                  </figcaption>
+                </figure>
+              </template>
+            </div>
 
             <!-- h-full: fills the row beside the uploader instead of a short box floating at the top. -->
             <UEmpty
-              v-if="!dayPhotos.length"
+              v-if="!isOwner && !dayPhotos.length"
               icon="i-lucide-image-off"
               title="No progress photos"
               description="No progress photos for this day yet."

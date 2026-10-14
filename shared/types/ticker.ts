@@ -20,6 +20,8 @@ export interface TickerRecord {
   date: string
   /** The crusher: whether a whole wall has ever been cleared; the world: whether the month was ever finished (sticky, for the achievements). */
   cleared?: boolean
+  /** The world: the feats ever earned on a finished month (sticky, for the achievements). */
+  feats?: string[]
 }
 
 /** A leaderboard's top entry. `label` is the invite label the owner gave that guest — shown to the owner and to that guest alone (shared/utils/tickerVisits.ts). */

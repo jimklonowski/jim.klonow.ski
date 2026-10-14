@@ -45,8 +45,10 @@ test('vitals reject the shapes that used to reach a D1 bind', () => {
 })
 
 test('a finished game names its game (the runner for older clients) and whether the wall went', () => {
-  assert.deepEqual(zTickerRun.parse({ score: 412 }), { score: 412, game: 'runner', cleared: false })
-  assert.deepEqual(zTickerRun.parse({ score: 300, game: 'crusher', cleared: true }), { score: 300, game: 'crusher', cleared: true })
+  assert.deepEqual(zTickerRun.parse({ score: 412 }), { score: 412, game: 'runner', cleared: false, feats: [] })
+  assert.deepEqual(zTickerRun.parse({ score: 300, game: 'crusher', cleared: true }), { score: 300, game: 'crusher', cleared: true, feats: [] })
+  assert.deepEqual(zTickerRun.parse({ score: 2100, game: 'world', cleared: true, feats: ['clean-month', 'chain-3'] }).feats, ['clean-month', 'chain-3'])
+  assert.ok(problem(zTickerRun, { score: 1, game: 'world', feats: ['speedrun'] }), 'only the known feats')
   assert.match(problem(zTickerRun, { score: 1, game: 'pong' }), /game: Bad game/)
   assert.ok(problem(zTickerRun, { score: -1 }))
   assert.ok(problem(zTickerRun, { score: 100000 }))

@@ -245,9 +245,11 @@ export default defineNuxtConfig({
   // sitemap; this list is only the robots.txt half.
   // /labs/login is allowed back in (Allow is emitted before Disallow, and it's the longer match,
   // so both rule conventions agree): a signed-out /ticker redirects there carrying the pet's
-  // Open Graph card, and Slack's unfurler honours robots.txt on every hop of a redirect — with
-  // /labs blanket-disallowed it never read the card and a pasted link showed nothing. The page
-  // is still noindex (header + meta), which a crawler can only obey on a page it may fetch.
+  // Open Graph card, and the previewers that do honour robots.txt (X's Twitterbot, LinkedIn)
+  // would otherwise refuse to read it. Slack's doesn't read robots.txt at all
+  // (api.slack.com/robots) — its blank unfurls were Cloudflare Bot Fight Mode challenging
+  // Slackbot's AWS IPs, which is why that setting is off for the zone. The page is still noindex
+  // (header + meta), which a crawler can only obey on a page it may fetch.
   // The '*' group carries the AI-usage preferences (the top-level allow/disallow merge into it).
   // They state what Cloudflare's "Block AI bots" rule already enforces at the edge: search
   // indexing yes, training and live AI-answer fetching no. Advisory only — the edge rule is the teeth.
