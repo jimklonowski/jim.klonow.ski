@@ -13,10 +13,11 @@
     <div
       ref="stage"
       class="stage relative mt-3 h-68 bg-raised border border-line-soft overflow-hidden"
-      :class="{ night }"
+      :class="{ night, 'in-game': playing }"
       :style="playing && playing !== 'runner' && gameHeight ? { height: `${gameHeight}px` } : undefined"
       @mousemove="glance"
       @mouseleave="unglance"
+      @contextmenu="e => playing && e.preventDefault()"
     >
       <!-- unlogged days this week gather cobwebs: one for a day or two, three for most of the week -->
       <svg
@@ -2103,6 +2104,18 @@ onMounted(() => {
 }
 .stage.night {
   background: var(--color-bg);
+}
+/* While a game has the stage, nothing on it is text to a thumb: a long press on a pad (or the
+   paddle, or the runner's tap) used to fall through to the remark line and pop iOS's
+   selection handles and Copy / Look Up menu. All three games inherit this. */
+.stage.in-game {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.stage.in-game > p {
+  pointer-events: none;
 }
 
 /* The window: a four-pane frame on the left wall whose glass follows the hour. */

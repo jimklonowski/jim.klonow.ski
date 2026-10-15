@@ -14,55 +14,65 @@
     >
       {{ announce }}
     </p>
-    <!-- On-stage buttons for touch: run left, run right, jump. Held, not tapped. -->
-    <!-- They sit above the page's remark line (the bottom ~44px of the stage) and over the
-         figure's start, where thumbs rest; translucent so the ground still reads through. -->
+    <!-- On-stage pads for touch: a d-pad (◀ ▶) on the left, jump (and the throw, with the
+         shaker) on the right. Held, not tapped. They sit above the page's remark line and over
+         the figure's start, where thumbs rest; translucent so the ground still reads through.
+         Each finger is tracked from touch-down to lift and mapped to whichever pad it's over
+         now, so a thumb rocks ◀ to ▶ without lifting and a drift off the edge doesn't drop
+         the run. Plain divs, not buttons, and touchstart is cancelled: iOS otherwise reads a
+         long press as one on the text underneath and selects it. -->
     <div
       v-if="touch"
-      class="absolute inset-x-0 bottom-11 flex items-end justify-between px-3 pointer-events-none"
+      class="pads absolute inset-x-0 bottom-11 flex items-end justify-between px-3 pointer-events-none"
       aria-hidden="true"
     >
-      <div class="flex gap-2 pointer-events-auto">
-        <button
-          type="button"
+      <div
+        ref="dpad"
+        class="flex gap-2 pointer-events-auto"
+        @touchstart.prevent
+        @pointerdown="padDown"
+        @pointermove="padMove"
+        @pointerup="padUp"
+        @pointercancel="padUp"
+        @lostpointercapture="padUp"
+      >
+        <div
           class="pad"
-          @pointerdown.prevent="hold('left', true)"
-          @pointerup="hold('left', false)"
-          @pointercancel="hold('left', false)"
-          @pointerleave="hold('left', false)"
+          :class="{ on: padsOn.left }"
         >
           ◀
-        </button>
-        <button
-          type="button"
+        </div>
+        <div
           class="pad"
-          @pointerdown.prevent="hold('right', true)"
-          @pointerup="hold('right', false)"
-          @pointercancel="hold('right', false)"
-          @pointerleave="hold('right', false)"
+          :class="{ on: padsOn.right }"
         >
           ▶
-        </button>
+        </div>
       </div>
-      <div class="flex gap-2 pointer-events-auto">
-        <button
+      <div
+        class="flex gap-2 pointer-events-auto"
+        @touchstart.prevent
+        @pointerdown="padDown"
+        @pointermove="padMove"
+        @pointerup="padUp"
+        @pointercancel="padUp"
+        @lostpointercapture="padUp"
+      >
+        <div
           v-if="hasShaker"
-          type="button"
+          data-zone="fire"
           class="pad"
-          @pointerdown.prevent="fire()"
+          :class="{ on: padsOn.fire }"
         >
           ●
-        </button>
-        <button
-          type="button"
+        </div>
+        <div
+          data-zone="jump"
           class="pad"
-          @pointerdown.prevent="hold('jump', true)"
-          @pointerup="hold('jump', false)"
-          @pointercancel="hold('jump', false)"
-          @pointerleave="hold('jump', false)"
+          :class="{ on: padsOn.jump }"
         >
           ▲
-        </button>
+        </div>
       </div>
     </div>
   </div>
@@ -128,6 +138,10 @@ const announce = ref('press space or tap to start; arrows run, space jumps; esca
 const touch = ref(false)
 /** Holding the shaker: the throw pad is up. */
 const hasShaker = ref(false)
+/** The left cluster, whose halves are ◀ and ▶. */
+const dpad = ref<HTMLElement | null>(null)
+/** Which pads a finger is on right now, for their lit state. */
+const padsOn = reactive({ left: false, right: false, jump: false, fire: false })
 
 /** The figure's cell size here: smaller than the companion's md, so it fits a two-tile gap. */
 const PX = 3
@@ -864,14 +878,63 @@ function onTap() {
   press()
 }
 
-function hold(key: 'left' | 'right' | 'jump', down: boolean) {
-  if (key === 'jump' && down && !held.jump) press()
-  held[key] = down
-}
-
 /** A throw, with the shaker (the engine ignores it otherwise). */
 function fire() {
   if (state?.status === 'running') firePressed = true
+}
+
+// --- the touch pads: every finger tracked from down to up -------------------------------------
+
+type PadZone = 'left' | 'right' | 'jump' | 'fire'
+const fingers = new Map<number, PadZone | null>()
+/** How far past the d-pad's edge a thumb can wander and still steer. */
+const DPAD_SLOP = 28
+
+/** The pad under a point: the d-pad split down its middle (with slop around it), else the pad element there. */
+function zoneAt(x: number, y: number): PadZone | null {
+  const r = dpad.value?.getBoundingClientRect()
+  if (r && x >= r.left - DPAD_SLOP && x <= r.right + DPAD_SLOP && y >= r.top - DPAD_SLOP && y <= r.bottom + DPAD_SLOP) {
+    return x < r.left + r.width / 2 ? 'left' : 'right'
+  }
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-zone]')
+  return (el?.dataset.zone as PadZone | undefined) ?? null
+}
+
+/** Folds every finger into the held state: a new finger on ▲ is a press, a new one on ● a throw. */
+function syncPads() {
+  const on = { left: false, right: false, jump: false, fire: false }
+  for (const z of fingers.values()) if (z) on[z] = true
+  if (on.jump && !held.jump) press()
+  if (on.fire && !padsOn.fire) fire()
+  held.left = on.left
+  held.right = on.right
+  held.jump = on.jump
+  Object.assign(padsOn, on)
+}
+
+function padDown(e: PointerEvent) {
+  e.preventDefault()
+  ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+  fingers.set(e.pointerId, zoneAt(e.clientX, e.clientY))
+  syncPads()
+}
+
+function padMove(e: PointerEvent) {
+  if (!fingers.has(e.pointerId)) return
+  const z = zoneAt(e.clientX, e.clientY)
+  if (z === fingers.get(e.pointerId)) return
+  fingers.set(e.pointerId, z)
+  syncPads()
+}
+
+function padUp(e: PointerEvent) {
+  if (!fingers.delete(e.pointerId)) return
+  syncPads()
+}
+
+function releasePads() {
+  fingers.clear()
+  syncPads()
 }
 
 function quit() {
@@ -914,6 +977,7 @@ function onVisibility() {
   paused = document.hidden
   if (!paused) last = performance.now()
   if (paused) {
+    releasePads()
     held.left = false
     held.right = false
     held.jump = false
@@ -983,20 +1047,30 @@ defineExpose({ quit })
 </script>
 
 <style scoped>
-/* The touch pads: big, translucent, and they must not scroll or zoom the page under a thumb. */
+/* The touch pads: big, translucent, and they must not scroll, zoom, select or call out a menu
+   under a thumb. Lit by the finger tracking (`.on`), not :active, which a captured pointer
+   that has slid onto the next pad would leave on the wrong one. */
+.pads > div {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .pad {
-  width: 48px;
-  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
   border: 1px solid var(--color-line-input);
   background: color-mix(in srgb, var(--color-raised) 55%, transparent);
   color: var(--color-dim);
   font-size: 18px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
-.pad:active {
+.pad.on {
   color: var(--color-accent);
   border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 </style>
