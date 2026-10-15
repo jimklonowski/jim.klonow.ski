@@ -16,7 +16,7 @@ allowBuilds:
 # whole tree. These used to be literal versions and drifted (vue 3.5.43 over @vue/* 3.5.41,
 # plus a stray vue 3.5.42 copy).
 catalog:
-  vue: &vue 3.5.43
+  vue: &vue 3.5.44
 
 overrides:
   # Nuxt UI declares its ~20 @tiptap/* peers as required, so pnpm auto-installs them (this app
