@@ -1,10 +1,17 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+/* The other display presets: one `html[data-theme]` block each, redefining the tokens below.
+   Generated from shared/utils/themePresets.ts (`pnpm theme:css`), never edited by hand. */
+@import "./themes.css";
 
 /* ── Phosphor Terminal design tokens ─────────────────────────────────────────
-   Dark-only terminal system: near-black green-tinted surfaces, phosphor-green
+   Dark terminal system: near-black green-tinted surfaces, phosphor-green
    accent, monospace everywhere, no rounded corners. See
-   design_handoff_phosphor_terminal/README.md "Design Tokens". */
+   design_handoff_phosphor_terminal/README.md "Design Tokens".
+
+   These are the DEFAULT preset. shared/utils/themePresets.ts holds a copy as data (tests pin the
+   two equal) and derives the other presets from it; useTheme() puts the pick on <html data-theme>.
+   Keep every color a token — a literal anywhere else is a color the themes can't reach. */
 @theme static {
   /* JetBrains Mono is the base face; Departure Mono is display/numbers only. */
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
@@ -35,6 +42,9 @@
   /* Status colors */
   --color-accent: #2ce8a4;
   --color-accent-hover: #7df0c9;
+  /* Accent-tinted fills: the .tui-btn-accent face and its hover. */
+  --color-accent-bg: #0f2418;
+  --color-accent-bg-hover: #173125;
   --color-warn: #e8b34b;
   --color-danger: #e86a5e;
   /* Between warn and danger: the workout HR over 150 bpm, the sleep chart's awake time. */
@@ -57,6 +67,9 @@
   --color-hi: #e6f2ec;
   --color-body: #c7d4cd;
   --color-dim: #a7bcb0;
+  /* Between dim and faint: Nuxt UI's `text-muted`, the label/secondary colour on its form
+     controls. Raised from #5d7a6d (4.2:1) since it reads at 10.5–12px, under the AA floor. */
+  --color-muted: #7a9688;
   --color-faint: #62806f;
   --color-ghost: #4a6357;
   /* Idle nav links: between faint and dim, so the active link's accent carries the row. */
@@ -97,8 +110,8 @@
   --container-12xl: 120rem;
 }
 
-/* Nuxt UI semantic tokens → phosphor palette. The design is dark-only, so the
-   same values apply in both modes (color-mode preference defaults to dark). */
+/* Nuxt UI semantic tokens → the palette tokens. Every preset is dark, so the same map applies in
+   both modes (color-mode preference defaults to dark) and a preset swap flows through the vars. */
 :root, .dark {
   --ui-container: var(--container-12xl);
   --ui-radius: 0px;
@@ -110,9 +123,7 @@
   --ui-bg-inverted: var(--color-hi);
 
   --ui-text-dimmed: var(--color-faint);
-  /* Raised from #5d7a6d (4.2:1) — this is the label/secondary colour on Nuxt UI form controls
-     and reads at 10.5-12px, where 4.2 was under the AA floor. */
-  --ui-text-muted: #7a9688;
+  --ui-text-muted: var(--color-muted);
   --ui-text-toned: var(--color-dim);
   --ui-text: var(--color-body);
   --ui-text-highlighted: var(--color-hi);
@@ -218,10 +229,10 @@
   .tui-btn-accent {
     border-color: var(--color-line-accent);
     color: var(--color-accent);
-    background: #0f2418;
+    background: var(--color-accent-bg);
   }
   .tui-btn-accent:hover {
-    background: #173125;
+    background: var(--color-accent-bg-hover);
   }
 
   /* Live/status dot with phosphor glow */

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DexaEntry } from '~/composables/useDexaEntries'
+import { hexChannels } from '#shared/utils/oklch'
 import { scanTag } from '#shared/utils/scanTag'
 import { DEXA_NOISE, deltaInfo, type Delta } from '~/utils/dexaDeltas'
 
@@ -197,6 +198,10 @@ const FRAGMENT = /* glsl */ `
   uniform float uBeam;
   uniform float uDpr;
   uniform float uOrtho;
+  // The raster's colors as the page's theme tokens (inset, warn, accent) — see applyPalette().
+  uniform vec3 uSurface;
+  uniform vec3 uWarn;
+  uniform vec3 uAccent;
   varying vec3 vPosLocal;
   varying vec3 vNormalV;
   varying vec3 vViewDir;
@@ -258,9 +263,10 @@ const FRAGMENT = /* glsl */ `
     // keeps the silhouette solid.
     float period = 3.0 * uDpr;
     float line = step(mod(gl_FragCoord.y, period), 1.4 * uDpr);
-    vec3 surface = vec3(0.039, 0.059, 0.047);
-    vec3 amber = vec3(0.910, 0.702, 0.294);
-    vec3 green = vec3(0.173, 0.910, 0.643);
+    // The theme's inset, warn and accent tokens (applyPalette), not literals.
+    vec3 surface = uSurface;
+    vec3 amber = uWarn;
+    vec3 green = uAccent;
     float w = (region < 0.5 || fat < 0.0) ? 0.10 : wash(fat);
     float shade = 0.55 + 0.45 * lambert;
     vec3 col = surface + amber * (w * shade) * (0.14 + 0.86 * line);
@@ -453,11 +459,31 @@ onMounted(async () => {
       uTime: { value: 0 },
       uBeam: { value: reducedMotion.value ? 0 : 1 },
       uDpr: { value: renderer.getPixelRatio() },
-      uOrtho: { value: flat.value ? 1 : 0 }
+      uOrtho: { value: flat.value ? 1 : 0 },
+      uSurface: { value: new THREE.Vector3() },
+      uWarn: { value: new THREE.Vector3() },
+      uAccent: { value: new THREE.Vector3() }
     }
+    // The shader has no CSS to resolve a token, so its three colors are read off <html>'s computed
+    // style — as raw sRGB channels, which is what the literals they replace were, not through
+    // THREE.Color's color management — and read again whenever the display preset changes
+    // `data-theme` (app.vue), so a theme switch reaches the mesh along with everything else.
+    const token = (name: string) => {
+      const [r, g, b] = hexChannels(getComputedStyle(document.documentElement).getPropertyValue(`--color-${name}`).trim())
+      return new THREE.Vector3(r / 255, g / 255, b / 255)
+    }
+    const applyPalette = () => {
+      uniforms.uSurface.value = token('inset')
+      uniforms.uWarn.value = token('warn')
+      uniforms.uAccent.value = token('accent')
+    }
+    applyPalette()
+    const themeObserver = new MutationObserver(applyPalette)
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
     const material = new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms, vertexColors: true })
     const mesh = new THREE.Mesh(geometry, material)
     cleanups.push(() => {
+      themeObserver.disconnect()
       material.dispose()
       geometry.dispose()
     })
@@ -779,7 +805,7 @@ function onStageKey(e: KeyboardEvent) {
 
 // Text over the body gets a surface-colour halo so it clears contrast on any shade, and the
 // on-body labels sit on a backplate so the raster doesn't run through the digits.
-const HALO = 'paint-order: stroke; stroke: #070a09; stroke-width: 4px; stroke-linejoin: round;'
+const HALO = 'paint-order: stroke; stroke: var(--color-bg); stroke-width: 4px; stroke-linejoin: round;'
 const plateWidth = (c: Placed) => Math.max(c.name.length * 7.2, c.pct.length * 12.5, (c.delta?.text.length ?? 0) * 6.5) + 18
 /** The plate grows a line for the delta while the slider is off NOW. */
 const plateHeight = (c: Placed) => (c.delta ? 52 : 40)
@@ -841,9 +867,8 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
                 :y="c.ay - 17"
                 :width="plateWidth(c)"
                 height="40"
-                fill="#070a09"
+                class="fill-bg stroke-accent"
                 fill-opacity="0.82"
-                stroke="#2ce8a4"
                 stroke-width="1"
               />
               <text
@@ -924,9 +949,9 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
               :y="c.y - 17"
               :width="plateWidth(c)"
               :height="plateHeight(c)"
-              fill="#070a09"
+              class="fill-bg"
+              :class="lit === c.key ? 'stroke-accent' : 'stroke-line-accent'"
               fill-opacity="0.82"
-              :stroke="lit === c.key ? '#2ce8a4' : '#24382f'"
               stroke-width="1"
             />
             <text

@@ -212,7 +212,7 @@ const annotationKey = computed(() => {
   return placeAnnotations(annotations.value, days).map(a => ({
     ...a,
     glyph: a.kind === 'dose' ? '│' : '▒',
-    color: a.kind === 'dose' ? ANNOTATION_STYLE.dose : a.kind === 'cycle' ? ANNOTATION_STYLE.cycleText : ANNOTATION_STYLE.eventText,
+    color: ANNOTATION_STYLE[a.kind].color,
     when: a.to && a.to !== a.from
       ? `${md(a.from)}–${a.from.slice(0, 7) === a.to.slice(0, 7) ? a.to.slice(8).replace(/^0/, '') : md(a.to)}`
       : md(a.from)
