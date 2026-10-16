@@ -14,22 +14,32 @@ interface DisplayPrefs {
 const YEAR = 60 * 60 * 24 * 365
 
 /**
- * The active display preset. `theme` is always a valid id (an unknown or absent cookie value is
- * the default), so callers can index PRESETS with it. app.vue puts it on `<html>`; the CSS does
- * the rest — every color on the site is a `--color-*` token, and app/assets/css/themes.css
- * redefines them per `[data-theme]`.
+ * The display preset. `theme` is the kept choice (always a valid id — an unknown or absent cookie
+ * value is the default), `preview` a transient one the picker sets while a row is hovered, and
+ * `active` whichever applies: app.vue puts it on `<html>` and the CSS does the rest, since every
+ * color on the site is a `--color-*` token and app/assets/css/themes.css redefines them per
+ * `[data-theme]`. State lives in useState so the header's picker and app.vue see one value;
+ * the cookie is only read to seed it and written when a choice is kept.
  */
 export function useTheme() {
-  const prefs = useCookie<DisplayPrefs>('display', { default: () => ({}), maxAge: YEAR, sameSite: 'lax' })
-  const theme = computed<ThemeId>(() => {
-    const t = prefs.value?.theme
+  const cookie = useCookie<DisplayPrefs>('display', { default: () => ({}), maxAge: YEAR, sameSite: 'lax' })
+  const theme = useState<ThemeId>('display-theme', () => {
+    const t = cookie.value?.theme
     return isThemeId(t) ? t : DEFAULT_THEME
   })
-  const preset = computed(() => PRESETS[theme.value])
+  const preview = useState<ThemeId | null>('display-preview', () => null)
+  const active = computed<ThemeId>(() => preview.value ?? theme.value)
+  const preset = computed(() => PRESETS[active.value])
 
   function setTheme(id: ThemeId) {
-    prefs.value = { ...prefs.value, theme: id }
+    theme.value = id
+    cookie.value = { ...cookie.value, theme: id }
   }
 
-  return { theme, preset, presets: THEME_LIST, setTheme }
+  /** Show a preset without keeping it; `null` goes back to the kept one. */
+  function previewTheme(id: ThemeId | null) {
+    preview.value = id
+  }
+
+  return { theme, preview, active, preset, presets: THEME_LIST, setTheme, previewTheme }
 }

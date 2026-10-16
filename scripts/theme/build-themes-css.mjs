@@ -16,7 +16,9 @@ catch {
   // first run
 }
 
-if (current === next) {
+// Compared with line endings normalised: git's autocrlf gives a Windows checkout CRLF, and that
+// must not read as a stale file (or rewrite it to LF on every run).
+if (current.replace(/\r\n/g, '\n') === next) {
   console.log('app/assets/css/themes.css is up to date')
 }
 else {

@@ -49,7 +49,8 @@ test('every preset sets every token and scale step as #rrggbb', () => {
 })
 
 test('app/assets/css/themes.css is what the presets generate (run `pnpm theme:css`)', () => {
-  const onDisk = readFileSync(new URL('app/assets/css/themes.css', root), 'utf8')
+  // Line endings are git's business (autocrlf hands a Windows checkout CRLF), not the generator's.
+  const onDisk = readFileSync(new URL('app/assets/css/themes.css', root), 'utf8').replace(/\r\n/g, '\n')
   assert.equal(onDisk, themesCss())
   for (const p of THEME_LIST) {
     const present = onDisk.includes(`html[data-theme="${p.id}"]`)
