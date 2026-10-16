@@ -15,12 +15,19 @@
 <script setup>
 import { CHART_ACCENT } from '~/utils/chartTheme'
 
+// The display preset, from the `display` cookie (so it is in the SSR HTML and never flashes), or
+// the one the header's picker is previewing. Going on <html> as data-theme is all it takes:
+// app/assets/css/themes.css redefines every --color-* token under that attribute, and nothing
+// on the site paints with anything else.
+const { active: theme, preset } = useTheme()
+
 useHead({
   meta: [
     // viewport-fit=cover lets the standalone PWA paint behind the iPhone notch/home bar
     // instead of showing white bands there.
     { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-    { name: 'theme-color', content: '#070a09' },
+    // The browser chrome matches the page surface of whichever preset is on.
+    { name: 'theme-color', content: () => preset.value.tokens.bg },
     // Add-to-homescreen: open as a standalone dark app rather than a Safari tab.
     { name: 'mobile-web-app-capable', content: 'yes' },
     { name: 'apple-mobile-web-app-capable', content: 'yes' },
@@ -36,7 +43,8 @@ useHead({
     { rel: 'manifest', href: '/site.webmanifest' }
   ],
   htmlAttrs: {
-    lang: 'en'
+    'lang': 'en',
+    'data-theme': theme
   }
 })
 

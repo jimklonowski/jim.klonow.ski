@@ -50,7 +50,7 @@
               :x2="W"
               :y1="t.guideY"
               :y2="t.guideY"
-              stroke="#5d7a6d"
+              class="stroke-mark"
               stroke-width="1"
               stroke-dasharray="3 3"
               vector-effect="non-scaling-stroke"

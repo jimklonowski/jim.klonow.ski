@@ -1,22 +1,27 @@
 import type { TickerInk } from './tickerSprite.ts'
+import { PRESETS } from './themePresets.ts'
 
 // TICKER's inks as plain hex, for drawing the sprite where there is no CSS to resolve a theme
-// token: the Open Graph card the Worker renders (server/routes/ticker/og.png.get.ts). The
-// token-backed inks carry the values from app/assets/css/main.css — tests/tickerCard.test.mjs
-// reads that file and fails if the two drift. The sprite-only shades mirror
-// app/components/ticker/Companion.vue; app/utils/tickerPalette.ts is the browser's live copy.
+// token: the Open Graph card the Worker renders (server/routes/ticker/og.png.get.ts). The card is
+// public, so it is always the default preset — no viewer's display cookie reaches a share unfurl.
+// The token-backed inks read that preset (shared/utils/themePresets.ts, held equal to main.css by
+// tests/theme.test.mjs; tests/tickerCard.test.mjs checks these against main.css as well). The
+// sprite-only shades mirror app/components/ticker/Companion.vue; app/utils/tickerPalette.ts is
+// the browser's live copy.
+const DEFAULT = PRESETS.phosphor.tokens
+
 export const TOKEN_HEX = {
-  bg: '#070a09',
-  raised: '#0d1310',
-  lineAccent: '#24382f',
-  accent: '#2ce8a4',
-  warn: '#e8b34b',
-  danger: '#e86a5e',
-  ember: '#e8834b',
-  hi: '#e6f2ec',
-  dim: '#a7bcb0',
-  faint: '#62806f',
-  ghost: '#4a6357'
+  bg: DEFAULT.bg,
+  raised: DEFAULT.raised,
+  lineAccent: DEFAULT['line-accent'],
+  accent: DEFAULT.accent,
+  warn: DEFAULT.warn,
+  danger: DEFAULT.danger,
+  ember: DEFAULT.ember,
+  hi: DEFAULT.hi,
+  dim: DEFAULT.dim,
+  faint: DEFAULT.faint,
+  ghost: DEFAULT.ghost
 } as const
 
 /** The main.css custom property each token is, for the drift test. */

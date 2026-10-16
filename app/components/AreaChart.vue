@@ -117,11 +117,11 @@ const option = computed<ECOption>(() => {
   const drawLines = props.markLines.filter(v => labels.includes(v)).map(xAxis => ({ xAxis }))
   const doseLines = onChart.filter(a => a.end == null).map(a => ({
     xAxis: a.at,
-    lineStyle: { color: ANNOTATION_STYLE.doseLine, type: 'solid' as const, width: 1 }
+    lineStyle: { ...ANNOTATION_STYLE.dose, type: 'solid' as const, width: 1 }
   }))
   // echarts types a band as a [start, end] pair, so build it as a tuple.
-  const bands = onChart.filter(a => a.end != null).map((a): [{ xAxis: string, itemStyle: { color: string } }, { xAxis: string }] => [
-    { xAxis: a.at, itemStyle: { color: a.kind === 'cycle' ? ANNOTATION_STYLE.cycle : ANNOTATION_STYLE.event } },
+  const bands = onChart.filter(a => a.end != null).map((a): [{ xAxis: string, itemStyle: { color: string, opacity: number } }, { xAxis: string }] => [
+    { xAxis: a.at, itemStyle: { ...(a.kind === 'cycle' ? ANNOTATION_STYLE.cycle : ANNOTATION_STYLE.event) } },
     { xAxis: a.end! }
   ])
 
@@ -172,6 +172,9 @@ const option = computed<ECOption>(() => {
       ...(flagRows || hasMarkers ? { showAllSymbol: true } : {}),
       lineStyle: { width: 1.5, color: meta.color },
       itemStyle: { color: meta.color },
+      // Colors are var() strings echarts can't lift for a hover state (chartTheme.ts); the
+      // tooltip carries the hover.
+      emphasis: { disabled: true },
       ...(props.area
         ? { areaStyle: { color: meta.color, opacity: 0.08 } }
         : {}),
@@ -208,7 +211,7 @@ function tooltipWith(placed: PlacedAnnotation[], order: string[], display?: (d: 
       .filter(p => p.value != null && p.value !== '')
       .map(p => `${p.marker ?? ''}${escapeHtml(p.seriesName ?? '')} <b>${escapeHtml(String(p.value))}</b>`)
     const notes = annotationsAt(placed, category, order).map((a) => {
-      const color = a.kind === 'dose' ? ANNOTATION_STYLE.dose : a.kind === 'cycle' ? ANNOTATION_STYLE.cycleText : ANNOTATION_STYLE.eventText
+      const { color } = ANNOTATION_STYLE[a.kind]
       return `<span style="color:${color}">${a.kind === 'dose' ? '│' : '▒'} ${escapeHtml(a.text)}</span>`
     })
     return [escapeHtml(display ? display(category) : category), ...rows, ...notes].join('<br/>')

@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { CHART_TOOLTIP_Z, chartFrame } from '~/utils/chartTheme'
+import { CHART_ACCENT, CHART_TOOLTIP_Z, chartFrame } from '~/utils/chartTheme'
 
 export interface BarTooltipPoint {
   seriesName?: string
@@ -102,7 +102,7 @@ const option = computed<ECOption>(() => ({
   }),
   tooltip: {
     trigger: 'axis',
-    axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(44,232,164,0.06)' } },
+    axisPointer: { type: 'shadow', shadowStyle: { color: CHART_ACCENT, opacity: 0.06 } },
     padding: 0,
     borderWidth: 0,
     backgroundColor: 'transparent',
@@ -113,7 +113,10 @@ const option = computed<ECOption>(() => ({
     name: props.categories[key]?.name ?? key,
     stack: props.stacked ? 'total' : undefined,
     data: props.data.map(d => d[key] as number),
-    itemStyle: { color: props.categories[key]?.color, borderRadius: 0 }
+    itemStyle: { color: props.categories[key]?.color, borderRadius: 0 },
+    // Colors are var() strings echarts can't lift for a hover state (chartTheme.ts); the
+    // tooltip carries the hover.
+    emphasis: { disabled: true }
   }))
 }))
 </script>

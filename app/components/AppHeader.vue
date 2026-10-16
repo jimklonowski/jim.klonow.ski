@@ -44,6 +44,10 @@
         ⌘K
       </button>
 
+      <!-- Display preset. Sits beside ⌘K on the logo row on mobile; from md up `order` moves it
+           past the nav, next to the session dot. -->
+      <DisplayPicker class="md:order-1" />
+
       <!-- Nav: own row under the logo on mobile (`order-last` keeps the session dot up on
            the logo row), inline in the bar from md up. -->
       <nav
@@ -63,7 +67,7 @@
 
       <!-- Session dot -->
       <span
-        class="w-1.75 h-1.75 rounded-full shrink-0"
+        class="w-1.75 h-1.75 rounded-full shrink-0 md:order-2"
         :class="role ? 'bg-accent glow-dot' : 'bg-line-accent'"
         :title="role ? `${role} session` : 'no session'"
       />
