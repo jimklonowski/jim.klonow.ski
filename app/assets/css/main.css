@@ -110,6 +110,12 @@
   /* Idle nav links: between faint and dim, so the active link's accent carries the row. */
   --color-nav-idle: #6b8578;
 
+  /* The sprite's darkest and lightest inks (TICKER's pupils and glints, the canvas games via
+     app/utils/tickerPalette.ts). The page and the text colour here; the other way round on PAPER
+     (themePresets.ts derive()) — spelled as `bg`/`hi` the pupils vanished on a light page. */
+  --color-pupil: #070a09;
+  --color-glint: #e6f2ec;
+
   /* Misc series colors from the handoff */
   --color-indigo-dot: #8593ea;
   --color-soda: #7a2e35;
@@ -155,6 +161,10 @@
      figures follow at half the rate (XL = 1.25 body → 1.125 figures). */
   --type-scale: 1;
   --type-scale-display: calc(1 + (var(--type-scale) - 1) * 0.5);
+
+  /* Floating panels (chart tooltips): a glow on the dark presets; PAPER redefines it as a drop
+     shadow in themes.css. Used as `shadow-(--panel-shadow)`. */
+  --panel-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
 
   --ui-bg: var(--color-bg);
   --ui-bg-muted: var(--color-inset);
