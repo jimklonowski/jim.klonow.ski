@@ -9,7 +9,6 @@ export default defineNuxtConfig({
     '@nuxtjs/seo',
     '@vueuse/nuxt',
     'nitro-cloudflare-dev',
-    'nuxt-echarts',
     'nuxt-security'
   ],
 
@@ -173,17 +172,8 @@ export default defineNuxtConfig({
 
   aiReady: false,
 
-  echarts: {
-    renderer: 'svg',
-    charts: ['LineChart', 'BarChart'],
-    // LabelLayout was registered here without any option ever setting `labelLayout`; dropped so
-    // the bundle carries only what the charts actually use.
-    // Every component an option touches has to be listed: echarts drops the rest without a
-    // word (a series' markLine is not a top-level key, so it never gets the "used but not
-    // imported" dev warning). The lab-draw guides were invisible until MarkLine joined;
-    // MarkArea draws the event and cycle bands (shared/utils/chartAnnotations.ts).
-    components: ['GridComponent', 'TooltipComponent', 'LegendComponent', 'MarkLineComponent', 'MarkAreaComponent']
-  },
+  // Charts are Nuxt UI's Chart (TanStack Charts) behind app/components/AreaChart.vue and
+  // BarChart.vue since 2026-10-19; echarts and nuxt-echarts left with that change.
 
   eslint: {
     config: {

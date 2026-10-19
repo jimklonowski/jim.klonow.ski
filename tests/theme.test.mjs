@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import * as fsSync from 'node:fs'
-import { ANNOTATION_STYLE, BAND_COLORS, CHART_AXIS, CHART_TOOLTIP, STATUS_COLORS, THEME } from '../app/utils/chartTheme.ts'
+import { ANNOTATION_STYLE, BAND_COLORS, CHART_AXIS, STATUS_COLORS, THEME } from '../app/utils/chartTheme.ts'
 import {
   DEFAULT_THEME, PRESETS, SCALE_STEPS, THEME_IDS, THEME_LIST, TOKEN_KEYS, accentScale, isThemeId
 } from '../shared/utils/themePresets.ts'
@@ -237,7 +237,6 @@ test('chart colors are var() references to tokens main.css declares', () => {
   collect('BAND_COLORS', BAND_COLORS)
   collect('CHART_AXIS', CHART_AXIS)
   collect('ANNOTATION_STYLE', ANNOTATION_STYLE)
-  collect('CHART_TOOLTIP', CHART_TOOLTIP)
   assert.ok(refs.length >= 20, `found ${refs.length} var() colors`)
   for (const [where, v] of refs) {
     const m = /^var\(--(color|font)-([\w-]+)\)$/.exec(v)
