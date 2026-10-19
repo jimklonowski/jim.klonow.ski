@@ -44,14 +44,14 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 ## Stack
 
 - **Nuxt 4** + Vue 3 + TypeScript, on **Node 22.22+ / 24.15+** and **pnpm 11**
-- **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" dark-only TUI theme (JetBrains Mono / Departure Mono)
+- **Nuxt UI v4** + Tailwind CSS v4 — "Phosphor Terminal" TUI theme (JetBrains Mono / Departure Mono), with a DISPLAY picker in the header: seven color presets (six dark, one paper-light), six monospace faces, four text sizes — all CSS tokens, saved per device in a cookie
 - **Installable PWA** — standalone display, afib-heartbeat icon set (`public/`), iOS homescreen metas in `app/app.vue`
 - **Cloudflare Workers** (Paid plan) — deployed via Wrangler (nodejs_compat), with cron triggers for the scheduled tasks
 - **Cloudflare D1** — two databases: the real one (`DB`) and the demo sandbox (`DEMO_DB`), built and changed by numbered migrations
 - **Cloudflare R2** — lab PDFs, progress photos, the demo seed, and the weekly database backups
 - **Cloudflare KV** — rate limiting, and the "sign out other devices" cutoff
 - **zod** — every request body and query string is validated against a schema in `shared/utils/schemas.ts`
-- **nuxt-echarts** — trend charts
+- **Nuxt UI Chart** (TanStack Charts) — trend and bar charts, behind two local wrappers that take the theme's tokens
 - **Anthropic SDK** — lab PDF parsing, protocol-aware lab summaries, daily/weekly health digests, freeform stock-dump parsing into inventory rows (structured output), and the `/ask` chat (models under **AI** below)
 - **Whoop API** — OAuth sync for recovery, sleep, and workout data
 - **@nuxtjs/seo** — per-page titles via a `%s | jim.klonow.ski` template (each page sets just its leaf name with `useSeoMeta`), inferred OG/Twitter cards over a shared `public/og.png`, and the robots rules under **Search engines and AI crawlers**
