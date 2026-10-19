@@ -18,7 +18,7 @@
     :ui="{ root: bare ? 'overflow-visible' : undefined }"
   >
     <template #tooltip="{ points }">
-      <div class="px-2.5 py-1.5 text-meta min-w-32 bg-raised border border-line-accent text-body shadow-[0_0_12px_rgba(0,0,0,.5)]">
+      <div class="px-2.5 py-1.5 text-meta min-w-32 bg-raised border border-line-accent text-body shadow-(--panel-shadow)">
         <p class="text-muted mb-1">
           {{ tipTitle(points) }}
         </p>

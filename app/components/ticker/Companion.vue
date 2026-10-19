@@ -234,7 +234,7 @@ const ekgPoints = computed(() => {
 .ticker {
   --heart: var(--color-danger);      /* #e86a5e */
   --heart-hi: #ff8a7d;               /* top-left lobe highlight — sprite-only shade */
-  --ticker-eye: var(--color-bg);     /* eyes are punched out to the panel background */
+  --ticker-eye: var(--color-pupil);  /* the darkest ink on the page — the panel background on a dark preset */
   width: max-content;
   text-align: center;
 }
@@ -271,12 +271,12 @@ const ekgPoints = computed(() => {
 .ink-hi { background: var(--heart-hi); }
 .ink-spec { background: #ffd5cc; }
 .ink-eye { background: var(--ticker-eye); }
-.ink-glint { background: var(--color-hi); }
+.ink-glint { background: var(--color-glint); }
 .ink-blush { background: #f5a0a6; }
 .ink-tongue { background: #ff9aa5; }
 .ink-drop { background: #8fd3ff; }
 .ink-limb { background: var(--color-dim); }
-.ink-glove { background: var(--color-hi); }
+.ink-glove { background: var(--color-glint); }
 .ink-shoe { background: var(--color-accent); }
 .ink-clip { background: var(--color-warn); }
 .ink-line { background: var(--color-faint); }

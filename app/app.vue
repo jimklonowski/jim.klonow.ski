@@ -22,6 +22,21 @@ import { CHART_ACCENT } from '~/utils/chartTheme'
 // paints or sets type with anything else.
 const { active: theme, activeFont: font, activeScale: scale, preset } = useTheme()
 
+// Nuxt UI's own internals — `scheme-dark` on <body>, native form controls, scrollbars — follow the
+// color-mode module's class rather than our tokens, so it is kept in step with the preset: PAPER
+// is the one light page. (Our --ui-* map in main.css already applies to both classes.) The
+// module's client plugin runs its preference watcher immediately and registers its value watcher
+// after it, so a preference changed during SSR arrives in the payload, flips the value before
+// anything listens, and the <html> class never follows. Hence client-only, after mount: the
+// change then goes through both watchers. (The module stores the result in its own cookie, so
+// the next server render starts out right.)
+const colorMode = useColorMode()
+const applyScheme = () => {
+  if (import.meta.client) colorMode.preference = preset.value.light ? 'light' : 'dark'
+}
+watch(() => preset.value.light, applyScheme)
+useNuxtApp().hook('app:mounted', applyScheme)
+
 useHead({
   meta: [
     // viewport-fit=cover lets the standalone PWA paint behind the iPhone notch/home bar

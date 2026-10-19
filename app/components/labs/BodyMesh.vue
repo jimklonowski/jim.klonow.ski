@@ -269,13 +269,16 @@ const FRAGMENT = /* glsl */ `
     vec3 green = uAccent;
     float w = (region < 0.5 || fat < 0.0) ? 0.10 : wash(fat);
     float shade = 0.55 + 0.45 * lambert;
-    vec3 col = surface + amber * (w * shade) * (0.14 + 0.86 * line);
+    // Mixed toward the token rather than added to the surface: adding light to a near-black
+    // surface and mixing toward it look the same, but on PAPER's near-white surface an addition
+    // would only wash out — the mix still reads.
+    vec3 col = mix(surface, amber, (w * shade) * (0.14 + 0.86 * line));
 
     bool lit = (uHighlight > 0.5 && uHighlight < 3.5 && abs(region - uHighlight) < 0.5)
       || (uHighlight > 3.5 && abs(band - (uHighlight - 3.0)) < 0.5);
     float hl = lit ? 1.0 : 0.0;
-    col += green * 0.16 * hl;
-    col += green * fresnel * (0.32 + 0.4 * hl);
+    col = mix(col, green, 0.16 * hl);
+    col = mix(col, green, fresnel * (0.32 + 0.4 * hl));
 
     // The ROI lines, as the report draws them on its own figure: the band edges across the
     // trunk and legs, the three cuts — each where it actually separates two regions — and the
@@ -304,7 +307,7 @@ const FRAGMENT = /* glsl */ `
 
     float beamY = mod(uTime * 0.32, 1.0) * 2.1 - 0.1;
     float beam = smoothstep(0.035, 0.0, abs(vPosLocal.y - beamY)) * uBeam;
-    col += green * beam * 0.35;
+    col = mix(col, green, beam * 0.35);
 
     gl_FragColor = vec4(col, 1.0);
   }

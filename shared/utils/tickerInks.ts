@@ -21,7 +21,9 @@ export const TOKEN_HEX = {
   hi: DEFAULT.hi,
   dim: DEFAULT.dim,
   faint: DEFAULT.faint,
-  ghost: DEFAULT.ghost
+  ghost: DEFAULT.ghost,
+  pupil: DEFAULT.pupil,
+  glint: DEFAULT.glint
 } as const
 
 /** The main.css custom property each token is, for the drift test. */
@@ -36,7 +38,9 @@ export const TOKEN_PROPERTY: Record<keyof typeof TOKEN_HEX, string> = {
   hi: '--color-hi',
   dim: '--color-dim',
   faint: '--color-faint',
-  ghost: '--color-ghost'
+  ghost: '--color-ghost',
+  pupil: '--color-pupil',
+  glint: '--color-glint'
 }
 
 export const INK_HEX: Record<TickerInk, string> = {
@@ -45,13 +49,13 @@ export const INK_HEX: Record<TickerInk, string> = {
   shade: '#c2493f',
   hi: '#ff8a7d',
   spec: '#ffd5cc',
-  eye: TOKEN_HEX.bg,
-  glint: TOKEN_HEX.hi,
+  eye: TOKEN_HEX.pupil,
+  glint: TOKEN_HEX.glint,
   blush: '#f5a0a6',
   tongue: '#ff9aa5',
   drop: '#8fd3ff',
   limb: TOKEN_HEX.dim,
-  glove: TOKEN_HEX.hi,
+  glove: TOKEN_HEX.glint,
   shoe: TOKEN_HEX.accent,
   clip: TOKEN_HEX.warn,
   line: TOKEN_HEX.faint,

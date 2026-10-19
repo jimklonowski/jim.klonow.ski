@@ -128,7 +128,7 @@
               :height="120"
             >
               <template #tooltip="{ params }">
-                <div class="px-2.5 py-2 text-meta min-w-44 bg-raised border border-line-accent shadow-[0_0_12px_rgba(0,0,0,0.5)]">
+                <div class="px-2.5 py-2 text-meta min-w-44 bg-raised border border-line-accent shadow-(--panel-shadow)">
                   <p class="text-muted mb-1.5">
                     {{ params[0]?.axisValue }}
                   </p>

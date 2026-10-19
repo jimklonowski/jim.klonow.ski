@@ -27,10 +27,13 @@ export default defineNuxtConfig({
     url: 'https://jim.klonow.ski'
   },
 
-  // Phosphor Terminal is a dark-only design — default (and fall back) to dark.
+  // Every display preset but PAPER is dark — default (and fall back) to dark. app.vue sets the
+  // preference from the active preset; stored in a cookie (not localStorage) so the server
+  // renders the right class for a returning PAPER visitor instead of flashing dark controls.
   colorMode: {
     preference: 'dark',
-    fallback: 'dark'
+    fallback: 'dark',
+    storage: 'cookie'
   },
 
   ui: {

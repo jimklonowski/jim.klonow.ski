@@ -9,7 +9,7 @@
 import { contrast, hexToOklch, oklchToHex } from './oklch.ts'
 import type { Oklch } from './oklch.ts'
 
-export const THEME_IDS = ['phosphor', 'amber', 'ice', 'white', 'emkay', 'emkay-inverted'] as const
+export const THEME_IDS = ['phosphor', 'amber', 'ice', 'white', 'emkay', 'emkay-inverted', 'paper'] as const
 export type ThemeId = (typeof THEME_IDS)[number]
 export const DEFAULT_THEME: ThemeId = 'phosphor'
 
@@ -32,7 +32,10 @@ export const TOKEN_KEYS = [
   // Range bands
   'band', 'band-outer',
   // Text ramp
-  'hi', 'body', 'dim', 'muted', 'faint', 'ghost', 'nav-idle'
+  'hi', 'body', 'dim', 'muted', 'faint', 'ghost', 'nav-idle',
+  // The sprite's darkest and lightest inks (TICKER's pupils and glints): the page and the text
+  // colour on a dark preset, the other way round on a light one — see derive().
+  'pupil', 'glint'
 ] as const
 export type TokenKey = (typeof TOKEN_KEYS)[number]
 export type Tokens = Record<TokenKey, string>
@@ -48,8 +51,12 @@ export interface ThemePreset {
   label: string
   /** One line under the label. */
   blurb: string
+  /** A light page. app.vue flips the color-mode module to match, for Nuxt UI's own internals. */
+  light: boolean
   tokens: Tokens
   scale: Scale
+  /** The floating panels' box-shadow (`--panel-shadow`): a glow on a dark page, a drop on paper. */
+  shadow: string
 }
 
 /** The default. These are copies of main.css; tests/theme.test.mjs holds them equal. */
@@ -57,6 +64,8 @@ const PHOSPHOR: ThemePreset = {
   id: 'phosphor',
   label: 'PHOSPHOR',
   blurb: 'green on near-black',
+  light: false,
+  shadow: '0 0 12px rgba(0, 0, 0, 0.5)',
   tokens: {
     'bg': '#070a09',
     'raised': '#0d1310',
@@ -90,7 +99,10 @@ const PHOSPHOR: ThemePreset = {
     'muted': '#7a9688',
     'faint': '#62806f',
     'ghost': '#4a6357',
-    'nav-idle': '#6b8578'
+    'nav-idle': '#6b8578',
+
+    'pupil': '#070a09',
+    'glint': '#e6f2ec'
   },
   scale: {
     50: '#eafff7',
@@ -147,9 +159,13 @@ const STATUS: readonly TokenKey[] = ['warn', 'danger', 'ember']
  * (inside the range is what the accent stands for). They take the accent's hue. */
 const ACCENT_TINTED: readonly TokenKey[] = ['accent-hover', 'accent-bg', 'accent-bg-hover', 'band', 'band-outer']
 
+/** The sprite inks are not derived by hue: they are whichever of the page and text colours is
+ * darkest and lightest, assigned at the end of derive(). */
+const SPRITE: readonly TokenKey[] = ['pupil', 'glint']
+
 /** Everything else — surfaces, lines, the text ramp, mark — takes the surface hue: the accent's,
  * or a second brand hue when the preset names one. */
-const SURFACE_TINTED = TOKEN_KEYS.filter(k => k !== 'accent' && !STATUS.includes(k) && !ACCENT_TINTED.includes(k))
+const SURFACE_TINTED = TOKEN_KEYS.filter(k => k !== 'accent' && !STATUS.includes(k) && !ACCENT_TINTED.includes(k) && !SPRITE.includes(k))
 
 interface PresetSpec {
   id: ThemeId
@@ -159,10 +175,15 @@ interface PresetSpec {
   /** A second hue for the surfaces, lines and text — a brand pair like EMKAY's purple under its
    * orange. The accent's own when omitted. */
   tint?: string
+  /** A light page: phosphor's lightness mirrored, so the near-black page becomes near-white and
+   * the text ramp inverts. The accent must then be a DARK color (it is link and label text). */
+  light?: boolean
   /** Tokens set by hand instead of derived — the status trio, when the accent lands on one. */
   tokens?: Partial<Tokens>
   /** A hand-picked scale; generated from the accent when omitted. */
   scale?: Scale
+  /** The panels' box-shadow; the default's glow when omitted. */
+  shadow?: string
 }
 
 /** The two surfaces the text ramp was tuned against; derived first so the rest can be held to them. */
@@ -175,14 +196,17 @@ const SURFACES: readonly TokenKey[] = ['bg', 'raised']
  * ones. Lightness alone does not carry WCAG contrast across hues exactly (a warm grey is a shade
  * dimmer than a cool one at the same OKLCH L), so each token is then lifted until it clears, on
  * both surfaces, the ratio its phosphor original had — the contrast the ramp was tuned for is the
- * invariant, not the number. Phase B tunes by eye through `tokens`.
+ * invariant, not the number. A light preset mirrors the lightness first (1.12 − L puts the page
+ * at 0.98 and `hi` at 0.17) and lifts the other way, darker. Phase B tunes by eye through `tokens`.
  */
 function derive(spec: PresetSpec): ThemePreset {
+  const light = !!spec.light
   const base = hexToOklch(PHOSPHOR.tokens.accent)
   const hue = { accent: hexToOklch(spec.accent), surface: hexToOklch(spec.tint ?? spec.accent) }
+  const mirror = (L: number) => (light ? Math.min(0.985, Math.max(0.1, 1.12 - L)) : L)
   const shift = (key: TokenKey, to: Oklch, lift = 0) => {
     const o = hexToOklch(PHOSPHOR.tokens[key])
-    return oklchToHex({ L: o.L + lift, C: o.C * Math.min(1.3, to.C / base.C), h: to.h })
+    return oklchToHex({ L: mirror(o.L) + (light ? -lift : lift), C: o.C * Math.min(1.3, to.C / base.C), h: to.h })
   }
   const tokens = { ...PHOSPHOR.tokens }
   for (const key of SURFACES) tokens[key] = shift(key, hue.surface)
@@ -196,8 +220,27 @@ function derive(spec: PresetSpec): ThemePreset {
   for (const key of SURFACE_TINTED) if (!SURFACES.includes(key)) tokens[key] = held(key, hue.surface)
   for (const key of ACCENT_TINTED) tokens[key] = held(key, hue.accent)
   tokens.accent = spec.accent
+  if (light) {
+    // The status trio at a lightness that reads as text on paper, keeping each one's hue and
+    // chroma (the phosphor values are tuned for black and sit under 2:1 on white).
+    for (const key of STATUS) {
+      const o = hexToOklch(PHOSPHOR.tokens[key])
+      tokens[key] = oklchToHex({ L: 0.56, C: o.C, h: o.h })
+    }
+  }
+  // A pupil is the darkest thing on the page and a glint the lightest, whichever way up it is.
+  tokens.pupil = light ? tokens.hi : tokens.bg
+  tokens.glint = light ? tokens.bg : tokens.hi
   Object.assign(tokens, spec.tokens)
-  return { id: spec.id, label: spec.label, blurb: spec.blurb, tokens, scale: spec.scale ?? accentScale(spec.accent) }
+  return {
+    id: spec.id,
+    label: spec.label,
+    blurb: spec.blurb,
+    light,
+    tokens,
+    scale: spec.scale ?? accentScale(spec.accent),
+    shadow: spec.shadow ?? PHOSPHOR.shadow
+  }
 }
 
 // The presets below are DRAFTS: derived, gated by tests/theme.test.mjs, not yet tuned by eye.
@@ -257,14 +300,27 @@ const EMKAY_INVERTED = derive({
   tint: '#f68820'
 })
 
-export const THEME_LIST: readonly ThemePreset[] = [PHOSPHOR, AMBER, ICE, WHITE, EMKAY, EMKAY_INVERTED]
+/** The light one: phosphor on paper. The accent is the dark end of the phosphor scale (its 700
+ * step, 4.9:1 on the page), since on paper the accent is text; the panels cast a drop shadow
+ * instead of glowing. */
+const PAPER = derive({
+  id: 'paper',
+  label: 'PAPER',
+  blurb: 'phosphor on paper — light',
+  light: true,
+  accent: '#147f5b',
+  shadow: '0 2px 10px rgba(0, 0, 0, 0.12)'
+})
+
+export const THEME_LIST: readonly ThemePreset[] = [PHOSPHOR, AMBER, ICE, WHITE, EMKAY, EMKAY_INVERTED, PAPER]
 export const PRESETS = Object.fromEntries(THEME_LIST.map(p => [p.id, p])) as Record<ThemeId, ThemePreset>
 
 /** The `html[data-theme]` block for one preset. */
 export function themeCss(p: ThemePreset): string {
   const vars = [
     ...TOKEN_KEYS.map(k => `  --color-${k}: ${p.tokens[k]};`),
-    ...SCALE_STEPS.map(s => `  --color-phosphor-${s}: ${p.scale[s]};`)
+    ...SCALE_STEPS.map(s => `  --color-phosphor-${s}: ${p.scale[s]};`),
+    `  --panel-shadow: ${p.shadow};`
   ]
   return `html[data-theme="${p.id}"] {\n${vars.join('\n')}\n}\n`
 }

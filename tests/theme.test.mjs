@@ -14,7 +14,7 @@ import {
 import { DEFAULT_FONT, FONTS, FONT_IDS, FONT_LIST, isFontId } from '../shared/utils/displayFonts.ts'
 import { DEFAULT_SCALE, SCALES, SCALE_IDS, SCALE_LIST, isScaleId } from '../shared/utils/displayScale.ts'
 import { displayCss } from '../shared/utils/displayCss.ts'
-import { contrast, hexToOklch, hueDistance, oklchToHex } from '../shared/utils/oklch.ts'
+import { contrast, hexToOklch, hueDistance, luminance, oklchToHex } from '../shared/utils/oklch.ts'
 
 const root = new URL('../', import.meta.url)
 const css = readFileSync(new URL('app/assets/css/main.css', root), 'utf8')
@@ -50,7 +50,7 @@ test('every preset sets every token and scale step as #rrggbb', () => {
     for (const step of SCALE_STEPS) assert.match(p.scale[step] ?? '', HEX, `${p.id} scale ${step}`)
     assert.equal(p.scale[400], p.tokens.accent, `${p.id}: scale step 400 is the accent`)
   }
-  assert.ok(isThemeId('amber') && !isThemeId('paper') && !isThemeId(undefined))
+  assert.ok(isThemeId('amber') && isThemeId('paper') && !isThemeId('sepia') && !isThemeId(undefined))
 })
 
 test('app/assets/css/themes.css is what the presets generate (run `pnpm theme:css`)', () => {
@@ -188,6 +188,26 @@ test('every preset keeps the default\'s contrast', () => {
       }
     }
   }
+})
+
+test('PAPER is the one light preset, held to the same floors, and the panel shadow is a token', () => {
+  const paper = PRESETS.paper
+  assert.ok(paper.light, 'paper is light')
+  assert.ok(luminance(paper.tokens.bg) > 0.85 && luminance(paper.tokens.raised) > 0.75, `page ${paper.tokens.bg} / raised ${paper.tokens.raised}`)
+  assert.ok(luminance(paper.tokens.hi) < 0.1 && luminance(paper.tokens.body) < 0.2, 'the text ramp inverted')
+  assert.ok(contrast(paper.tokens.accent, paper.tokens.bg) >= 4.5, `accent is text on paper: ${contrast(paper.tokens.accent, paper.tokens.bg).toFixed(2)}`)
+  for (const p of THEME_LIST) {
+    assert.equal(p.light, p.id === 'paper', `${p.id}.light`)
+    if (!p.light) assert.ok(luminance(p.tokens.bg) < 0.05, `${p.id} is a dark page`)
+    assert.match(p.shadow, /^\d.*rgba\(/, `${p.id} has a panel shadow`)
+    // The sprite's pupil is always the darkest ink and its glint the lightest, whichever way up.
+    assert.ok(luminance(p.tokens.pupil) < luminance(p.tokens.glint), `${p.id}: pupil darker than glint`)
+    assert.ok(contrast(p.tokens.pupil, p.tokens.glint) >= 12, `${p.id}: pupil/glint ${contrast(p.tokens.pupil, p.tokens.glint).toFixed(1)}:1`)
+    assert.equal(p.tokens.pupil, p.light ? p.tokens.hi : p.tokens.bg, `${p.id}: pupil is the page's darkest`)
+  }
+  assert.match(css, /--panel-shadow:\s*0 0 12px rgba\(0, 0, 0, 0\.5\);/, 'main.css declares the default glow')
+  assert.equal(phosphor.shadow, '0 0 12px rgba(0, 0, 0, 0.5)', 'the default preset carries the same value')
+  assert.ok(displayCss().includes(`--panel-shadow: ${paper.shadow};`), 'themes.css redefines it for paper')
 })
 
 test('every preset keeps the accent and the status trio apart', () => {
