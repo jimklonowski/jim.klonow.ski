@@ -179,6 +179,17 @@
   --ui-success: var(--color-accent);
   --ui-warning: var(--color-warn);
   --ui-error: var(--color-danger);
+
+  /* Nuxt UI's Chart paints unnamed series from these, in order — the site's series palette
+     (accent first, then the indigo and cyan that keep a second and third line apart). */
+  --ui-chart-1: var(--color-accent);
+  --ui-chart-2: var(--color-indigo-dot);
+  --ui-chart-3: var(--color-warn);
+  --ui-chart-4: var(--color-danger);
+  --ui-chart-5: var(--color-ember);
+  --ui-chart-6: #38b6d9;
+  /* The focused column behind a bar group (was echarts' axis-pointer shadow at the same alpha). */
+  --ts-chart-focus-fill: color-mix(in srgb, var(--color-accent) 6%, transparent);
 }
 
 @layer base {
@@ -275,6 +286,23 @@
   }
   .tui-btn-accent:hover {
     background: var(--color-accent-bg-hover);
+  }
+
+  /* Nuxt UI's Chart (TanStack Charts). Its SVG sets sizes and opacities as presentation
+     attributes, which these rules outrank: labels at the micro size (so they follow the SIZE
+     setting) in the root's full mark colour, grid and axis lines in the tokens the echarts
+     charts used. Series colours come from the --ts-chart-* variables each chart sets. */
+  .ts-chart text {
+    font-size: calc(10px * var(--type-scale));
+    fill-opacity: 1;
+  }
+  .ts-chart__grid line {
+    stroke: var(--color-line-soft);
+    stroke-opacity: 1;
+  }
+  .ts-chart__axes line {
+    stroke: var(--color-line);
+    stroke-opacity: 1;
   }
 
   /* Live/status dot with phosphor glow */

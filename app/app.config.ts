@@ -14,8 +14,15 @@ const PANEL = 'bg-raised border border-line-accent ring-0'
 // `text-default` won and every label rendered in body color instead of faint.
 const TUI_LABEL = 'text-label font-medium tracking-[0.14em] uppercase text-faint'
 
+// The chart's tooltip container is transparent and unpadded: the call sites' `#tooltip` slots
+// (and BarChart's default) paint their own raised panel, the way the echarts tooltips did.
+const CHART_TOOLTIP = 'flex-col items-stretch gap-0 h-auto min-w-0 p-0 bg-transparent border-0 ring-0 shadow-none pointer-events-none'
+
 export default defineAppConfig({
   ui: {
+    // Axis labels and ticks take the root's text color and font: the mark colour at the micro
+    // size (so a face or size switch reaches them), in the active preset's tokens.
+    chart: { slots: { root: 'relative w-full text-micro text-mark', tooltip: CHART_TOOLTIP } },
     colors: {
       primary: 'phosphor',
       secondary: 'indigo',

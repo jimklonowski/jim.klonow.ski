@@ -1,8 +1,8 @@
 import { DEFAULT_THEME, PRESETS, THEME_LIST, isThemeId } from '#shared/utils/themePresets'
 import type { ThemeId } from '#shared/utils/themePresets'
-import { DEFAULT_FONT, FONTS, FONT_LIST, isFontId } from '#shared/utils/displayFonts'
+import { DEFAULT_FONT, FONT_LIST, isFontId } from '#shared/utils/displayFonts'
 import type { FontId } from '#shared/utils/displayFonts'
-import { DEFAULT_SCALE, SCALES, SCALE_LIST, isScaleId } from '#shared/utils/displayScale'
+import { DEFAULT_SCALE, SCALE_LIST, isScaleId } from '#shared/utils/displayScale'
 import type { ScaleId } from '#shared/utils/displayScale'
 
 /**
@@ -45,9 +45,6 @@ export function useTheme() {
   })
   const fontPreview = useState<FontId | null>('display-font-preview', () => null)
   const activeFont = computed<FontId>(() => fontPreview.value ?? font.value)
-  /** The active face's `font-family` value, for script that needs the font as a string: echarts
-   * measures its labels with canvas measureText, which cannot resolve a var(). */
-  const fontStack = computed(() => FONTS[activeFont.value].stack)
 
   const scale = useState<ScaleId>('display-scale', () => {
     const s = cookie.value?.scale
@@ -55,8 +52,6 @@ export function useTheme() {
   })
   const scalePreview = useState<ScaleId | null>('display-scale-preview', () => null)
   const activeScale = computed<ScaleId>(() => scalePreview.value ?? scale.value)
-  /** The active step's factor, for script that sizes text in numbers (echarts labels). */
-  const typeScale = computed(() => SCALES[activeScale.value].factor)
 
   function setTheme(id: ThemeId) {
     theme.value = id
@@ -88,7 +83,7 @@ export function useTheme() {
 
   return {
     theme, preview, active, preset, presets: THEME_LIST, setTheme, previewTheme,
-    font, fontPreview, activeFont, fontStack, fonts: FONT_LIST, setFont, previewFont,
-    scale, scalePreview, activeScale, typeScale, scales: SCALE_LIST, setScale, previewScale
+    font, fontPreview, activeFont, fonts: FONT_LIST, setFont, previewFont,
+    scale, scalePreview, activeScale, scales: SCALE_LIST, setScale, previewScale
   }
 }
