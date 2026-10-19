@@ -56,7 +56,7 @@ export interface ThemePreset {
 const PHOSPHOR: ThemePreset = {
   id: 'phosphor',
   label: 'PHOSPHOR',
-  blurb: 'green phosphor on near-black — the original',
+  blurb: 'green on near-black',
   tokens: {
     'bg': '#070a09',
     'raised': '#0d1310',
@@ -206,7 +206,7 @@ function derive(spec: PresetSpec): ThemePreset {
 const AMBER = derive({
   id: 'amber',
   label: 'AMBER',
-  blurb: 'amber phosphor on warm black',
+  blurb: 'amber on warm black',
   accent: '#ffb000',
   tokens: {
     // The accent sits on warn's own hue, so warn moves up to a lemon the eye can tell from it;
@@ -219,7 +219,7 @@ const AMBER = derive({
 const ICE = derive({
   id: 'ice',
   label: 'ICE',
-  blurb: 'ice-blue phosphor on cool black',
+  blurb: 'ice blue on cool black',
   accent: '#6ec8ff'
 })
 
@@ -228,7 +228,7 @@ const ICE = derive({
 const WHITE = derive({
   id: 'white',
   label: 'WHITE',
-  blurb: 'white phosphor on neutral black',
+  blurb: 'white on neutral black',
   accent: '#e8edf0'
 })
 
@@ -236,7 +236,7 @@ const WHITE = derive({
 const EMKAY = derive({
   id: 'emkay',
   label: 'EMKAY',
-  blurb: 'corporate orange on purple-black',
+  blurb: 'orange on purple-black',
   accent: '#f68820',
   tint: '#4f286c',
   tokens: {
@@ -252,7 +252,7 @@ const EMKAY = derive({
 const EMKAY_INVERTED = derive({
   id: 'emkay-inverted',
   label: 'EMKAY INVERTED',
-  blurb: 'corporate purple on orange-black',
+  blurb: 'purple on orange-black',
   accent: '#b27cdf',
   tint: '#f68820'
 })
