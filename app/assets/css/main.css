@@ -13,7 +13,9 @@
    two equal) and derives the other presets from it; useTheme() puts the pick on <html data-theme>.
    Keep every color a token — a literal anywhere else is a color the themes can't reach. */
 @theme static {
-  /* JetBrains Mono is the base face; Departure Mono is display/numbers only. */
+  /* JetBrains Mono is the base face; Departure Mono is display/numbers only. The FONT presets
+     (shared/utils/displayFonts.ts, via themes.css) override the first three per html[data-font];
+     --font-display is never overridden. */
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
   --font-sans: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
   --font-serif: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;

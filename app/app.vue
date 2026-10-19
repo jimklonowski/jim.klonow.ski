@@ -15,11 +15,11 @@
 <script setup>
 import { CHART_ACCENT } from '~/utils/chartTheme'
 
-// The display preset, from the `display` cookie (so it is in the SSR HTML and never flashes), or
-// the one the header's picker is previewing. Going on <html> as data-theme is all it takes:
-// app/assets/css/themes.css redefines every --color-* token under that attribute, and nothing
-// on the site paints with anything else.
-const { active: theme, preset } = useTheme()
+// The display preset and face, from the `display` cookie (so they are in the SSR HTML and never
+// flash), or the ones the header's picker is previewing. Going on <html> as data-theme/data-font
+// is all it takes: app/assets/css/themes.css redefines every --color-* and --font-* token under
+// those attributes, and nothing on the site paints or sets type with anything else.
+const { active: theme, activeFont: font, preset } = useTheme()
 
 useHead({
   meta: [
@@ -44,7 +44,8 @@ useHead({
   ],
   htmlAttrs: {
     'lang': 'en',
-    'data-theme': theme
+    'data-theme': theme,
+    'data-font': font
   }
 })
 

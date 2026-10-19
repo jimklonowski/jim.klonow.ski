@@ -8,8 +8,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { ANNOTATION_STYLE, BAND_COLORS, CHART_AXIS, CHART_TOOLTIP, STATUS_COLORS, THEME } from '../app/utils/chartTheme.ts'
 import {
-  DEFAULT_THEME, PRESETS, SCALE_STEPS, THEME_IDS, THEME_LIST, TOKEN_KEYS, accentScale, isThemeId, themesCss
+  DEFAULT_THEME, PRESETS, SCALE_STEPS, THEME_IDS, THEME_LIST, TOKEN_KEYS, accentScale, isThemeId
 } from '../shared/utils/themePresets.ts'
+import { DEFAULT_FONT, FONTS, FONT_IDS, FONT_LIST, isFontId } from '../shared/utils/displayFonts.ts'
+import { displayCss } from '../shared/utils/displayCss.ts'
 import { contrast, hexToOklch, hueDistance, oklchToHex } from '../shared/utils/oklch.ts'
 
 const root = new URL('../', import.meta.url)
@@ -51,12 +53,52 @@ test('every preset sets every token and scale step as #rrggbb', () => {
 test('app/assets/css/themes.css is what the presets generate (run `pnpm theme:css`)', () => {
   // Line endings are git's business (autocrlf hands a Windows checkout CRLF), not the generator's.
   const onDisk = readFileSync(new URL('app/assets/css/themes.css', root), 'utf8').replace(/\r\n/g, '\n')
-  assert.equal(onDisk, themesCss())
+  assert.equal(onDisk, displayCss())
   for (const p of THEME_LIST) {
     const present = onDisk.includes(`html[data-theme="${p.id}"]`)
     assert.equal(present, p.id !== DEFAULT_THEME, `${p.id} block ${present ? 'present' : 'absent'}`)
   }
+  for (const f of FONT_LIST) {
+    const present = onDisk.includes(`html[data-font="${f.id}"]`)
+    assert.equal(present, f.id !== DEFAULT_FONT, `${f.id} font block ${present ? 'present' : 'absent'}`)
+  }
   assert.ok(css.includes('@import "./themes.css"'), 'main.css imports the generated file')
+})
+
+// --- faces ------------------------------------------------------------------------------------
+const faceTokens = Object.fromEntries(
+  [...themeBlock.matchAll(/--font-(mono|sans|serif|display):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()])
+)
+
+test('the default face is main.css, and main.css sets the three body tokens to it', () => {
+  assert.equal(DEFAULT_FONT, 'jetbrains')
+  for (const token of ['mono', 'sans', 'serif']) {
+    assert.equal(faceTokens[token], FONTS[DEFAULT_FONT].stack, `--font-${token} drifted from the default face`)
+  }
+  assert.ok(faceTokens.display?.startsWith('\'Departure Mono\''), 'the display face is Departure Mono')
+  assert.ok(!displayCss().includes('--font-display'), 'no font preset touches the display face')
+})
+
+test('every face is complete, and every web face is self-hosted without preloading', () => {
+  assert.deepEqual(FONT_LIST.map(f => f.id), [...FONT_IDS])
+  const config = readFileSync(new URL('nuxt.config.ts', root), 'utf8')
+  for (const f of FONT_LIST) {
+    assert.equal(FONTS[f.id], f)
+    assert.ok(f.label && f.blurb && f.stack, `${f.id} needs a label, blurb and stack`)
+    assert.ok(f.stack.endsWith('monospace'), `${f.id} falls back to generic monospace`)
+    if (f.family == null) continue
+    assert.ok(f.stack.startsWith(`'${f.family}'`), `${f.id}: the stack leads with its family`)
+    const listed = config.includes(`'${f.family}'`)
+    assert.ok(listed, `${f.family} is missing from fonts.families in nuxt.config.ts`)
+  }
+  // The alternates must not be preloaded: @nuxt/fonts would otherwise put every face in the entry
+  // CSS on each page's <head>, and a visitor uses one. The default keeps its preload (first paint).
+  const alternates = FONT_LIST.filter(f => f.family && f.id !== DEFAULT_FONT).map(f => f.family)
+  const block = config.slice(config.indexOf('fonts: {'), config.indexOf('icon: {'))
+  const preloadOff = /preload:\s*false/.test(block)
+  assert.ok(preloadOff, 'the alternate families set preload: false')
+  for (const family of alternates) assert.ok(block.includes(`'${family}'`), `${family} is in the fonts block`)
+  assert.ok(isFontId('system') && !isFontId('comic') && !isFontId(undefined))
 })
 
 // The text ramp was tuned for contrast against the near-black surfaces (main.css notes the 4.5:1
@@ -132,9 +174,10 @@ test('chart colors are var() references to tokens main.css declares', () => {
   collect('CHART_TOOLTIP', CHART_TOOLTIP)
   assert.ok(refs.length >= 20, `found ${refs.length} var() colors`)
   for (const [where, v] of refs) {
-    const m = /^var\(--color-([\w-]+)\)$/.exec(v)
-    assert.ok(m, `${where} = ${v} is not a plain var(--color-*)`)
-    assert.ok(m[1] in tokens, `${where} names --color-${m[1]}, which main.css does not declare`)
+    const m = /^var\(--(color|font)-([\w-]+)\)$/.exec(v)
+    assert.ok(m, `${where} = ${v} is not a plain var(--color-*) or var(--font-*)`)
+    const declared = m[1] === 'color' ? tokens : faceTokens
+    assert.ok(m[2] in declared, `${where} names --${m[1]}-${m[2]}, which main.css does not declare`)
   }
   for (const [k, v] of Object.entries(ANNOTATION_STYLE)) {
     assert.ok(v.opacity > 0 && v.opacity < 0.5, `ANNOTATION_STYLE.${k} is a faint tint`)

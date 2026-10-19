@@ -58,6 +58,9 @@ defineSlots<{
   tooltip?(props: { params: BarTooltipPoint[] }): unknown
 }>()
 
+// The chosen face, as a string: the SVG's labels are measured with it (see CHART_TEXT).
+const { fontStack } = useTheme()
+
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
   categories: Record<string, { name: string, color: string }>
@@ -93,6 +96,7 @@ const describedChart = computed(() => {
 const option = computed<ECOption>(() => ({
   ...chartFrame({
     labels: props.data.map(d => d[props.xAxisKey] as string),
+    fontFamily: fontStack.value,
     showLegend: props.showLegend,
     legendItem: { width: 10, height: 10 },
     grid: props.hideXAxis && props.hideYAxis ? 'bare' : 'normal',

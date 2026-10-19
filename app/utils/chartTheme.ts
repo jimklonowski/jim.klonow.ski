@@ -81,8 +81,9 @@ export const ANNOTATION_STYLE = {
 } as const
 
 export const CHART_TEXT = {
-  // A literal rather than var(--font-mono): zrender measures labels with canvas measureText,
-  // which can't resolve a var() and would size every gutter for the fallback face.
+  // The default face as a literal rather than var(--font-mono): zrender measures labels with
+  // canvas measureText, which can't resolve a var() and would size every gutter for the fallback
+  // face. A chosen face reaches the SVG through chartFrame's `fontFamily` (useTheme().fontStack).
   fontFamily: '\'JetBrains Mono\', ui-monospace, monospace',
   fontSize: 10
 } as const
@@ -124,7 +125,8 @@ export const CHART_TOOLTIP = {
   borderColor: THEME['line-accent'],
   borderWidth: 1,
   padding: [6, 10] as [number, number],
-  textStyle: { ...CHART_TEXT, color: THEME.body, fontSize: 11 },
+  // The tooltip is HTML, so here the face CAN be the token and follows a font switch by itself.
+  textStyle: { ...CHART_TEXT, fontFamily: 'var(--font-mono)', color: THEME.body, fontSize: 11 },
   extraCssText: `${CHART_TOOLTIP_Z}border-radius:0;box-shadow:0 0 12px rgba(0,0,0,.5);`
 }
 
@@ -149,6 +151,8 @@ interface ChartFrameOptions {
   xAxis?: Record<string, unknown>
   /** Merged over the shared value y-axis (visibility, scale, splitLine.show). */
   yAxis?: Record<string, unknown> & { splitLine?: Record<string, unknown> }
+  /** The active face's font-family (useTheme().fontStack); CHART_TEXT's default when omitted. */
+  fontFamily?: string
 }
 
 /**
@@ -162,9 +166,11 @@ export function chartFrame(o: ChartFrameOptions) {
     ? { top: o.bareTop ?? 4, left: 2, right: 2, bottom: 2, containLabel: false }
     : { ...(o.grid === 'fixed' ? CHART_GRID_FIXED : CHART_GRID), top: o.showLegend ? 26 : 8 }
   const { splitLine, ...yAxis } = o.yAxis ?? {}
+  const text = o.fontFamily ? { ...CHART_TEXT, fontFamily: o.fontFamily } : CHART_TEXT
   return {
     backgroundColor: 'transparent',
-    textStyle: CHART_TEXT,
+    // The global default for every label on the chart, axes included.
+    textStyle: text,
     grid,
     legend: {
       show: !!o.showLegend,
@@ -172,7 +178,7 @@ export function chartFrame(o: ChartFrameOptions) {
       itemWidth: o.legendItem?.width ?? 14,
       itemHeight: o.legendItem?.height ?? 2,
       icon: 'rect',
-      textStyle: { ...CHART_TEXT, color: CHART_AXIS.label }
+      textStyle: { ...text, color: CHART_AXIS.label }
     },
     xAxis: {
       type: 'category' as const,

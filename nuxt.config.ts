@@ -211,7 +211,19 @@ export default defineNuxtConfig({
         weights: [400, 500, 700],
         styles: ['normal'],
         subsets: ['latin']
-      }
+      },
+      // The DISPLAY picker's alternate faces (shared/utils/displayFonts.ts), self-hosted like
+      // JetBrains Mono. `preload: false` matters: @nuxt/fonts preloads every face it finds in the
+      // entry CSS on every page's <head> by default, and a visitor only ever uses one of these.
+      // (The default keeps its preload for the first paint; tests/theme.test.mjs checks the flag.)
+      ...['IBM Plex Mono', 'Fira Code', 'Source Code Pro', 'Geist Mono'].map(name => ({
+        name,
+        provider: 'fontsource' as const,
+        weights: [400, 500, 700],
+        styles: ['normal' as const],
+        subsets: ['latin'],
+        preload: false
+      }))
     ]
   },
 

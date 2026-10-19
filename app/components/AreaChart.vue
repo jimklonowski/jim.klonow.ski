@@ -29,6 +29,9 @@ interface AxisTooltipParam {
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 
+// The chosen face, as a string: the SVG's labels are measured with it (see CHART_TEXT).
+const { fontStack } = useTheme()
+
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
   categories: Record<string, { name: string, color: string }>
@@ -127,6 +130,7 @@ const option = computed<ECOption>(() => {
 
   const frame = chartFrame({
     labels,
+    fontFamily: fontStack.value,
     showLegend: props.showLegend,
     grid: props.bare ? 'bare' : props.fixedGutter ? 'fixed' : 'normal',
     xAxis: { boundaryGap: false, show: !props.bare },
