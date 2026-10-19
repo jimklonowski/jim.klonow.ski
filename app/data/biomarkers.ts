@@ -40,6 +40,8 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   estradiol: { label: 'Estradiol', unit: 'pg/mL', category: 'hormones', refMax: 39, description: 'The primary estrogen. Important in men for bone density, cardiovascular health, libido, and mood. Elevated levels can cause water retention and reduced libido.' },
   fsh: { label: 'FSH', unit: 'mIU/mL', category: 'hormones', refMin: 1.4, refMax: 12.8, description: 'Follicle Stimulating Hormone — stimulates sperm production in the testes. Elevated FSH can indicate testicular dysfunction or primary hypogonadism.' },
   lh: { label: 'LH', unit: 'mIU/mL', category: 'hormones', refMin: 1.5, refMax: 9.3, description: 'Luteinizing Hormone — signals the testes to produce testosterone. Works with FSH to regulate reproductive and hormonal function.' },
+  // Quest male reference range; a one-off add-on, not on the standing panels.
+  prolactin: { label: 'Prolactin', unit: 'ng/mL', category: 'hormones', refMin: 2.0, refMax: 18.0, description: 'Pituitary hormone that in men acts as a brake on the HPG axis. Elevated prolactin suppresses LH and testosterone, flattens libido, and drives the progestogenic gyno seen with 19-nors (nandrolone, trenbolone) that tamoxifen alone won\'t fix. Stress, poor sleep, a hard workout and a draw soon after waking all nudge it up, so a single mildly high reading is normally repeated before acting on it.' },
   psa: { label: 'PSA', unit: 'ng/mL', category: 'hormones', refMax: 4.0, description: 'Prostate-Specific Antigen — the prostate screening marker, run on the annual CHW panel. Testosterone therapy can nudge it up; a rise of more than ~1.4 ng/mL within a year, or a level above 4.0, is the conventional trigger for urology follow-up.' },
 
   // Metabolic

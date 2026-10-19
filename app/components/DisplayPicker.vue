@@ -22,7 +22,7 @@
 
       <template #content>
         <div
-          class="w-88 max-w-[calc(100vw-1.5rem)] px-3.5 py-3"
+          class="w-92 max-w-[calc(100vw-1.5rem)] px-3.5 py-3"
           @mouseleave="previewTheme(null)"
         >
           <TuiHeader
@@ -44,10 +44,13 @@
             class="mt-2"
             :ui="{
               legend: 'sr-only',
-              fieldset: 'gap-y-0 -mx-2',
+              // min-w-0: a <fieldset> refuses to shrink below its widest nowrap child by default,
+              // which would let the rows run past the panel instead of the blurbs truncating.
+              fieldset: 'gap-y-0 -mx-2 min-w-0',
               item: 'w-full has-data-[state=checked]:bg-nav-active hover:bg-row-hover transition-colors',
               // The radio itself is sr-only (indicator hidden); the label block is the whole row.
-              wrapper: 'block w-full min-w-0',
+              // text-left undoes the centring the hidden-indicator variant applies.
+              wrapper: 'block w-full min-w-0 text-left',
               label: 'block w-full cursor-pointer',
               description: 'hidden'
             }"
@@ -72,9 +75,10 @@
                     :style="{ background: item.tokens[k] }"
                   />
                 </span>
-                <!-- A fixed name column so the blurbs line up as a column too. -->
+                <!-- A fixed name column (EMKAY INVERTED at 11px tracked = 105px) so the blurbs
+                     line up as a column too. -->
                 <span
-                  class="w-29 shrink-0 text-[11px] font-medium tracking-[0.08em] uppercase"
+                  class="w-27 shrink-0 text-[11px] font-medium tracking-[0.08em] uppercase"
                   :class="modelValue === item.value ? 'text-accent' : 'text-body'"
                 >{{ item.label }}</span>
                 <span class="text-[10px] text-muted truncate min-w-0">{{ item.description }}</span>

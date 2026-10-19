@@ -69,6 +69,7 @@ SEX HORMONE BINDING GLOBULIN → shbg
 ESTRADIOL → estradiol
 FSH → fsh
 LH → lh
+PROLACTIN → prolactin
 DHEA SULFATE → dhea_sulfate
 CORTISOL, TOTAL → cortisol
 TSH → tsh
