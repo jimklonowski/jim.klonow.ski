@@ -3,10 +3,10 @@
     v-if="!hasSession"
     class="px-6 py-20 text-center"
   >
-    <p class="num-display text-hi text-[22px]">
+    <p class="num-display text-hi text-figure">
       jim.klonow.ski
     </p>
-    <p class="mt-2 text-[12.5px] text-muted">
+    <p class="mt-2 text-row text-muted">
       personal health terminal · bloodwork, body composition, protocol log
     </p>
     <div class="mt-6 flex items-center justify-center gap-2.5">
@@ -26,14 +26,14 @@
         view demo
       </a>
     </div>
-    <p class="mt-3 text-[11px] text-faint">
+    <p class="mt-3 text-meta text-faint">
       demo mode — a fictional persona with synthetic data · no sign-up
     </p>
     <a
       :href="REPO_URL"
       target="_blank"
       rel="noopener"
-      class="mt-5 inline-flex items-center gap-1.5 text-[11px] text-muted hover:text-accent"
+      class="mt-5 inline-flex items-center gap-1.5 text-meta text-muted hover:text-accent"
     >
       <UIcon
         name="simple-icons:github"
@@ -88,7 +88,7 @@
         />
         <div
           v-if="dosesToday.length"
-          class="flex flex-col gap-1.5 mt-2.5 text-[12px]"
+          class="flex flex-col gap-1.5 mt-2.5 text-small"
         >
           <div
             v-for="(dose, i) in dosesToday"
@@ -105,7 +105,7 @@
         </div>
         <p
           v-else
-          class="mt-2.5 text-[12px] text-muted"
+          class="mt-2.5 text-small text-muted"
         >
           No doses logged today.
         </p>
@@ -115,7 +115,7 @@
            from the most recent workout day — a three-workout day used to show only its last. -->
         <div
           v-if="latestWorkouts.length"
-          class="mt-3.5 text-[12px] text-muted space-y-2"
+          class="mt-3.5 text-small text-muted space-y-2"
         >
           <div
             v-for="(w, i) in latestWorkouts"
@@ -193,12 +193,12 @@
 
       <div
         v-if="contextNote"
-        class="mt-3.5 px-3 py-2.5 bg-inset border border-dashed border-line-input text-[11.5px] text-muted"
+        class="mt-3.5 px-3 py-2.5 bg-inset border border-dashed border-line-input text-small text-muted"
       >
         ℹ {{ contextNote }}
       </div>
 
-      <div class="flex flex-wrap items-baseline gap-3.5 mt-3.5 text-[11.5px]">
+      <div class="flex flex-wrap items-baseline gap-3.5 mt-3.5 text-small">
         <span class="text-faint">quick:</span>
         <NuxtLink
           to="/labs"
@@ -239,7 +239,7 @@
           :aria-label="`${t.label} — open 90-day trends`"
           class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-row-hover hover:border-line-input transition-colors"
         >
-          <div class="flex justify-between text-[10.5px] text-muted">
+          <div class="flex justify-between text-label text-muted">
             <span>{{ t.label }}</span>
             <span class="text-body">{{ t.latest }}</span>
           </div>

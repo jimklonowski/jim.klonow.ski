@@ -12,7 +12,7 @@ const PANEL = 'bg-raised border border-line-accent ring-0'
 // The .tui-label look (main.css) spelled out as utilities for component themes. The class itself
 // sits in the components layer, so the theme's own utilities outrank it: on form labels Nuxt UI's
 // `text-default` won and every label rendered in body color instead of faint.
-const TUI_LABEL = 'text-[10.5px] font-medium tracking-[0.14em] uppercase text-faint'
+const TUI_LABEL = 'text-label font-medium tracking-[0.14em] uppercase text-faint'
 
 export default defineAppConfig({
   ui: {
@@ -26,7 +26,7 @@ export default defineAppConfig({
     },
     contextMenu: { slots: { content: PANEL } },
     // Menus read at 12px across the site; the md size's text-sm lives in the size variant.
-    dropdownMenu: { slots: { content: PANEL }, variants: { size: { md: { item: 'text-[12px]' } } } },
+    dropdownMenu: { slots: { content: PANEL }, variants: { size: { md: { item: 'text-small' } } } },
     // Every form label is the uppercase TUI label.
     formField: { slots: { label: TUI_LABEL } },
     input: { variants: { variant: { outline: FIELD_OUTLINE } } },
@@ -42,7 +42,7 @@ export default defineAppConfig({
     table: {
       slots: {
         th: `px-2.5 py-1.5 text-start ${TUI_LABEL} [&:has([role=checkbox])]:pe-0`,
-        td: 'px-2.5 py-1.5 text-[12.5px] text-body whitespace-nowrap [&:has([role=checkbox])]:pe-0',
+        td: 'px-2.5 py-1.5 text-row text-body whitespace-nowrap [&:has([role=checkbox])]:pe-0',
         tbody: 'divide-y divide-line-soft [&>tr:nth-child(even)]:bg-inset',
         separator: 'bg-line'
       },

@@ -16,12 +16,12 @@
     </button>
 
     <template #content>
-      <div class="w-80 max-w-[calc(100vw-2rem)] px-3 py-2.5 text-[11.5px]">
+      <div class="w-80 max-w-[calc(100vw-2rem)] px-3 py-2.5 text-small">
         <div class="flex items-baseline justify-between gap-3">
           <span class="tui-label">SITE HEALTH</span>
           <button
             type="button"
-            class="text-[10.5px] text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
+            class="text-label text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
             :disabled="loading"
             @click="load"
           >

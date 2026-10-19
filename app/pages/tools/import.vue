@@ -5,7 +5,7 @@
       meta="apple health → journal vitals"
     >
       <template #actions>
-        <span class="text-[11px] text-muted hidden md:inline">parsed in your browser · nothing leaves the page until you import</span>
+        <span class="text-meta text-muted hidden md:inline">parsed in your browser · nothing leaves the page until you import</span>
       </template>
     </ToolsHeader>
     <ToolsNav />
@@ -17,10 +17,10 @@
           label="ONE-TIME XML IMPORT"
           :dashes="8"
         >
-          <span class="text-[10.5px] text-muted normal-case">{{ fileMeta }}</span>
+          <span class="text-label text-muted normal-case">{{ fileMeta }}</span>
         </TuiHeader>
 
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           On your iPhone: <span class="text-hi">Health</span> → tap your profile photo → <span class="text-hi">Export All Health Data</span>
           → share the ZIP to your Mac → unzip → drop <code class="text-accent">export.xml</code> below.
         </p>
@@ -35,9 +35,9 @@
           :ui="{
             base: 'bg-inset border-line-input hover:border-line-accent p-5',
             icon: 'text-faint',
-            label: 'text-[12.5px] text-dim mt-2',
-            description: 'text-[11px] text-muted mt-1',
-            file: 'border-line-input bg-inset text-[11.5px]',
+            label: 'text-row text-dim mt-2',
+            description: 'text-meta text-muted mt-1',
+            file: 'border-line-input bg-inset text-small',
             fileName: 'text-body',
             fileSize: 'text-muted'
           }"
@@ -46,7 +46,7 @@
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-3">
           <p
             v-if="!entriesReady"
-            class="text-[11.5px] text-danger"
+            class="text-small text-danger"
           >
             Couldn't load the current journal, so importing is disabled — merging needs it to
             tell new days from existing ones. Reload the page to retry.
@@ -62,7 +62,7 @@
           </button>
           <span
             v-if="parsing"
-            class="flex flex-wrap items-baseline gap-x-1.5 text-[12px] text-muted"
+            class="flex flex-wrap items-baseline gap-x-1.5 text-small text-muted"
           >
             <span>parsing…</span>
             <span class="num-display text-hi">{{ parseProgress }}%</span>
@@ -82,7 +82,7 @@
           v-if="rows.length"
           class="mt-3.5"
         >
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-meta">
             <span class="flex items-center gap-1.5 text-body">
               <span class="w-1.5 h-1.5 rounded-full bg-accent glow-dot shrink-0" />
               <span class="num-display text-hi">{{ newCount }}</span> new entries
@@ -105,7 +105,7 @@
             sticky
             :virtualize="rows.length > 200 ? { estimateSize: 31 } : false"
             class="mt-2.5 border border-line-soft max-h-104"
-            :ui="{ td: 'text-[12px]', tbody: '[&>tr:nth-child(even)]:bg-transparent' }"
+            :ui="{ td: 'text-small', tbody: '[&>tr:nth-child(even)]:bg-transparent' }"
           >
             <template #select-header>
               <UCheckbox
@@ -139,7 +139,7 @@
             </template>
             <template #status-cell="{ row }">
               <span
-                class="text-[10.5px] tracking-widest uppercase border px-1.5 py-0.5"
+                class="text-label tracking-widest uppercase border px-1.5 py-0.5"
                 :class="row.original.action === 'create'
                   ? 'text-accent border-line-accent'
                   : 'text-dim border-line-input'"
@@ -161,7 +161,7 @@
             </button>
             <span
               v-if="importing || importDone"
-              class="flex flex-wrap items-center gap-x-2 text-[11px] text-muted"
+              class="flex flex-wrap items-center gap-x-2 text-meta text-muted"
             >
               <span><span class="num-display text-hi">{{ done }}</span> / {{ selectedCount }} saved</span>
               <span
@@ -178,7 +178,7 @@
 
         <p
           v-else-if="parsed"
-          class="mt-3 text-[12px] text-muted"
+          class="mt-3 text-small text-muted"
         >
           No new vitals found — every date in this export already has complete data in your journal.
         </p>
@@ -190,10 +190,10 @@
           label="AUTO-SYNC · HEALTH AUTO EXPORT"
           :dashes="4"
         >
-          <span class="text-[10.5px] text-muted normal-case">daily push, no manual export</span>
+          <span class="text-label text-muted normal-case">daily push, no manual export</span>
         </TuiHeader>
 
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           <a
             href="https://www.healthexportapp.com"
             target="_blank"
@@ -203,9 +203,9 @@
           RHR, HRV, and BP populate without touching the form.
         </p>
 
-        <ol class="mt-3 space-y-3 text-[12px]">
+        <ol class="mt-3 space-y-3 text-small">
           <li class="flex gap-2.5">
-            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">1</span>
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-label flex items-center justify-center">1</span>
             <div class="min-w-0">
               <p class="text-hi">
                 Install the app
@@ -216,7 +216,7 @@
             </div>
           </li>
           <li class="flex gap-2.5">
-            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">2</span>
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-label flex items-center justify-center">2</span>
             <div class="min-w-0">
               <p class="text-hi">
                 Create a new REST API export
@@ -227,29 +227,29 @@
             </div>
           </li>
           <li class="flex gap-2.5">
-            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">3</span>
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-label flex items-center justify-center">3</span>
             <div class="min-w-0 w-full">
               <p class="text-hi">
                 Configure the endpoint
               </p>
-              <div class="mt-1.5 border border-line-input bg-inset px-2.5 py-2 text-[11.5px] space-y-1">
+              <div class="mt-1.5 border border-line-input bg-inset px-2.5 py-2 text-small space-y-1">
                 <div class="flex gap-2.5">
-                  <span class="shrink-0 w-16 text-[10.5px] tracking-[0.12em] uppercase text-faint">url</span>
+                  <span class="shrink-0 w-16 text-label tracking-[0.12em] uppercase text-faint">url</span>
                   <span class="text-accent break-all">{{ webhookUrl }}</span>
                 </div>
                 <div class="flex gap-2.5">
-                  <span class="shrink-0 w-16 text-[10.5px] tracking-[0.12em] uppercase text-faint">method</span>
+                  <span class="shrink-0 w-16 text-label tracking-[0.12em] uppercase text-faint">method</span>
                   <span class="text-body">POST</span>
                 </div>
                 <div class="flex gap-2.5">
-                  <span class="shrink-0 w-16 text-[10.5px] tracking-[0.12em] uppercase text-faint">header</span>
+                  <span class="shrink-0 w-16 text-label tracking-[0.12em] uppercase text-faint">header</span>
                   <span class="text-body break-all">Authorization: Bearer <span class="text-muted">[your LABS_SECRET value]</span></span>
                 </div>
               </div>
             </div>
           </li>
           <li class="flex gap-2.5">
-            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">4</span>
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-label flex items-center justify-center">4</span>
             <div class="min-w-0">
               <p class="text-hi">
                 Select these metrics
@@ -258,7 +258,7 @@
                 <span
                   v-for="m in METRICS"
                   :key="m"
-                  class="px-2 py-0.5 border border-line-soft text-[11px] text-muted"
+                  class="px-2 py-0.5 border border-line-soft text-meta text-muted"
                 >
                   {{ m }}
                 </span>
@@ -266,7 +266,7 @@
             </div>
           </li>
           <li class="flex gap-2.5">
-            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-[10.5px] flex items-center justify-center">5</span>
+            <span class="shrink-0 w-5 h-5 border border-line-accent text-accent text-label flex items-center justify-center">5</span>
             <div class="min-w-0">
               <p class="text-hi">
                 Set schedule

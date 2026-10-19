@@ -28,12 +28,12 @@ const md = computed(() => props.size === 'md')
 <template>
   <div
     class="flex items-center"
-    :class="md ? 'gap-3' : 'gap-2.5 text-[10px]'"
+    :class="md ? 'gap-3' : 'gap-2.5 text-micro'"
   >
     <NuxtLink
       :to="`/journal/compound/${encodeURIComponent(name)}`"
       class="shrink-0 text-right truncate hover:opacity-70 transition-opacity"
-      :class="md ? 'w-30 sm:w-38 text-[11px]' : 'w-24 sm:w-30'"
+      :class="md ? 'w-30 sm:w-38 text-meta' : 'w-24 sm:w-30'"
       :style="{ color }"
     >{{ name }}</NuxtLink>
 
@@ -58,7 +58,7 @@ const md = computed(() => props.size === 'md')
 
     <span
       class="shrink-0 text-muted"
-      :class="trailingClass ?? (md ? 'w-9 text-[11px] text-right' : 'w-7')"
+      :class="trailingClass ?? (md ? 'w-9 text-meta text-right' : 'w-7')"
     >{{ trailing }}</span>
   </div>
 </template>

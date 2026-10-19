@@ -13,9 +13,9 @@
           label="EXPORT"
           :dashes="7"
         >
-          <span class="text-[10.5px] text-muted normal-case">everything, as one JSON file</span>
+          <span class="text-label text-muted normal-case">everything, as one JSON file</span>
         </TuiHeader>
-        <p class="mt-2 text-[12px] leading-[1.7] text-dim">
+        <p class="mt-2 text-small leading-[1.7] text-dim">
           Every table: journal days, labs, DEXA, vitals, workouts, photos (their metadata; the images
           stay in storage), supplements, vials, vaccines, cycles, digests and this change history.
           It's the same format as the weekly backup, so <code class="text-hi">scripts/restore-backup.mjs</code>
@@ -41,14 +41,14 @@
         :label="`CHANGE HISTORY · ${entries.length}`"
         :dashes="9"
       >
-        <span class="text-[10.5px] text-muted normal-case">your edits and deletes, newest first — any of them can be put back</span>
+        <span class="text-label text-muted normal-case">your edits and deletes, newest first — any of them can be put back</span>
       </TuiHeader>
 
       <!-- A failed load is an error, not an empty history — "no changes yet" on a 500 reads as
            data loss on exactly the page that exists to undo one. -->
       <p
         v-if="auditError"
-        class="mt-2.5 text-[12px] text-danger"
+        class="mt-2.5 text-small text-danger"
       >
         Couldn't load the change history.
         <button
@@ -75,7 +75,7 @@
         </template>
         <template #action-cell="{ row }">
           <span
-            class="text-[10.5px] tracking-widest uppercase border px-1.5 py-0.5"
+            class="text-label tracking-widest uppercase border px-1.5 py-0.5"
             :class="ACTION_CHIP[row.original.action]"
           >{{ row.original.action }}</span>
         </template>
@@ -86,7 +86,7 @@
         <template #restore-cell="{ row }">
           <span
             v-if="row.original.blocked"
-            class="text-[11px] text-faint"
+            class="text-meta text-faint"
           >{{ row.original.blocked }}</span>
           <button
             v-else
@@ -126,8 +126,8 @@
         :ui="{
           root: 'py-8 px-4 gap-2',
           avatar: 'bg-inset text-faint ring-0 mb-1',
-          title: 'text-[12.5px] font-normal',
-          description: 'text-[11.5px] text-muted'
+          title: 'text-row font-normal',
+          description: 'text-small text-muted'
         }"
       />
     </section>

@@ -4,7 +4,7 @@
       label="WATCH MARKERS · DRAW OVER DRAW"
       class="mt-5"
     >
-      <span class="text-[10.5px] text-muted">{{ draws.length }} draws</span>
+      <span class="text-label text-muted">{{ draws.length }} draws</span>
     </TuiHeader>
 
     <!-- Four across only in the xl three-column layout; the lg middle column can be ~640px. -->
@@ -17,14 +17,14 @@
         class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-row-hover hover:border-line-input transition-colors min-w-0"
       >
         <div class="flex items-baseline justify-between gap-2 min-w-0">
-          <span class="text-[10.5px] text-muted uppercase tracking-[0.12em] truncate">{{ t.label }}</span>
+          <span class="text-label text-muted uppercase tracking-[0.12em] truncate">{{ t.label }}</span>
           <span
-            class="num-display text-[17px] leading-none whitespace-nowrap"
+            class="num-display text-stat leading-none whitespace-nowrap"
             :style="{ color: t.color }"
           >{{ t.value }}<span
             v-if="t.censored"
-            class="text-warn text-[11px] ml-0.5"
-          >†</span><span class="text-[10px] text-muted ml-1 font-sans">{{ t.unit }}</span></span>
+            class="text-warn text-meta ml-0.5"
+          >†</span><span class="text-micro text-muted ml-1 font-sans">{{ t.unit }}</span></span>
         </div>
 
         <!-- The series over every draw that has the marker. The line is an SVG stretched to the
@@ -73,7 +73,7 @@
           />
         </div>
 
-        <div class="flex items-baseline justify-between gap-2 mt-1.5 text-[10px] text-muted min-w-0">
+        <div class="flex items-baseline justify-between gap-2 mt-1.5 text-micro text-muted min-w-0">
           <span class="truncate">{{ t.foot }}</span>
           <span class="whitespace-nowrap">{{ t.asOf }}</span>
         </div>

@@ -2,7 +2,7 @@
   <div class="bg-status border-b border-line">
     <!-- Wraps below sm rather than scrolling sideways: on a phone the tail of the bar
          (last draw, soda) was simply unreachable. -->
-    <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-[10.5px] tracking-[0.06em] uppercase whitespace-nowrap overflow-x-auto">
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 sm:gap-x-5 gap-y-0.5 px-3 sm:px-4 py-1 sm:py-0 min-h-7.5 sm:h-7.5 text-label tracking-[0.06em] uppercase whitespace-nowrap overflow-x-auto">
       <span class="text-muted shrink-0">
         {{ todayLabel }}
       </span>

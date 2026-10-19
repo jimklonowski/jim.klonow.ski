@@ -11,7 +11,7 @@
       >
         <!-- A tentative cycle covers its whole plan (nothing is behind a start that hasn't
              happened), so it says the period rather than a start date. -->
-        <span class="text-[10.5px] text-muted normal-case">
+        <span class="text-label text-muted normal-case">
           {{ tentativeStart
             ? `whole plan · ${tentativeStart}`
             : cycleStatus === 'upcoming' ? `starts ${formatDate(cycle.start_date, 'monthDay')}` : 'doses still ahead of today' }}
@@ -30,13 +30,13 @@
               class="w-1.5 h-1.5 rounded-full shrink-0 self-center"
               :style="{ background: getCompoundColor(row.compound) }"
             />
-            <span class="text-[12.5px] text-hi">{{ row.compound }}</span>
-            <span class="text-[11.5px] text-muted">
+            <span class="text-row text-hi">{{ row.compound }}</span>
+            <span class="text-small text-muted">
               <span class="num-display">{{ fmtAmount(row.onHand ?? 0) }}</span>
               / {{ fmtAmount(row.needed) }} {{ unitLabel(row.unit) }}
             </span>
             <span
-              class="ml-auto text-[11px] tracking-[0.08em] uppercase"
+              class="ml-auto text-meta tracking-[0.08em] uppercase"
               :class="verdictClass(row)"
             >{{ verdictText(row) }}</span>
           </div>
@@ -56,7 +56,7 @@
         label="STOCK RUNWAY"
         :dashes="8"
       >
-        <span class="text-[10.5px] text-muted normal-case">sealed + open stock ÷ current pace</span>
+        <span class="text-label text-muted normal-case">sealed + open stock ÷ current pace</span>
       </TuiHeader>
 
       <div class="mt-2.5 border border-line-soft">
@@ -70,12 +70,12 @@
             class="w-1.5 h-1.5 rounded-full shrink-0 self-center"
             :style="{ background: getCompoundColor(row.compound) }"
           />
-          <span class="text-[12.5px] text-hi">{{ row.compound }}</span>
-          <span class="text-[11.5px] text-muted">
+          <span class="text-row text-hi">{{ row.compound }}</span>
+          <span class="text-small text-muted">
             <span class="num-display">{{ fmtAmount(row.total) }}</span> {{ row.unit }} on hand
           </span>
           <span
-            class="ml-auto text-[11.5px]"
+            class="ml-auto text-small"
             :class="row.days < 30 ? 'text-warn' : 'text-accent'"
           >
             ~{{ Math.round(row.days) }}d{{ row.basis === 'typical' ? '*' : '' }}
@@ -85,7 +85,7 @@
       </div>
       <p
         v-if="runwayRows.some(r => r.basis === 'typical')"
-        class="mt-1.5 text-[10.5px] text-faint"
+        class="mt-1.5 text-label text-faint"
       >
         * pace estimated from typical dosing — not enough logged history yet
       </p>

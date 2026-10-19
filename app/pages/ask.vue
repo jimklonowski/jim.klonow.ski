@@ -12,7 +12,7 @@
           @open="nudge"
         />
         <p
-          class="ticker-bubble relative mt-4 w-full px-3 py-2.5 bg-raised border border-line-soft text-[12px] leading-[1.6] text-dim"
+          class="ticker-bubble relative mt-4 w-full px-3 py-2.5 bg-raised border border-line-soft text-small leading-[1.6] text-dim"
           aria-live="polite"
         >
           {{ bubble }}
@@ -21,7 +21,7 @@
       <!-- A failed list must not read as "no conversations saved yet". -->
       <p
         v-if="threadsError"
-        class="mt-6 text-[11.5px] text-danger"
+        class="mt-6 text-small text-danger"
       >
         Couldn't load saved conversations.
         <button
@@ -55,13 +55,13 @@
           aria-label="TICKER"
           @open="nudge"
         />
-        <h1 class="num-display text-hi text-[19px] leading-none">
+        <h1 class="num-display text-hi text-head leading-none">
           ASK
         </h1>
-        <p class="hidden sm:block text-[11px] text-muted tracking-[0.06em] uppercase">
+        <p class="hidden sm:block text-meta text-muted tracking-[0.06em] uppercase">
           ticker · labs + dexa + journal + whoop + protocol
         </p>
-        <div class="flex items-center gap-3 ml-auto text-[11px]">
+        <div class="flex items-center gap-3 ml-auto text-meta">
           <button
             type="button"
             class="lg:hidden text-accent hover:text-accent-hover cursor-pointer"
@@ -88,7 +88,7 @@
           class="space-y-3"
         >
           <!-- On a phone the rail (and its speech bubble) is hidden, so the greeting moves here. -->
-          <p class="text-[12.5px] text-muted leading-[1.7]">
+          <p class="text-row text-muted leading-[1.7]">
             <span class="lg:hidden">{{ GREETING }}</span>
             <span class="hidden lg:inline">Every draw, scan, dose, and Whoop night is in context.</span>
             {{ ' ' }}Answers cite the numbers they reason from; correlations are flagged as observations, not causes.
@@ -98,7 +98,7 @@
               v-for="q in SAMPLE_QUESTIONS"
               :key="q"
               type="button"
-              class="px-2.5 py-1.5 border border-line-input text-[11.5px] text-dim hover:text-accent hover:border-line-accent cursor-pointer text-left"
+              class="px-2.5 py-1.5 border border-line-input text-small text-dim hover:text-accent hover:border-line-accent cursor-pointer text-left"
               @click="send(q)"
             >
               ❯ {{ q }}
@@ -112,7 +112,7 @@
         >
           <p
             v-if="m.role === 'user'"
-            class="text-[12.5px] text-hi"
+            class="text-row text-hi"
           >
             <span class="text-accent">❯</span> {{ m.content }}
           </p>
@@ -120,10 +120,10 @@
             v-else
             class="pl-4 border-l border-line-soft"
           >
-            <p class="text-[10px] tracking-[0.14em] uppercase text-faint">
+            <p class="text-micro tracking-[0.14em] uppercase text-faint">
               <span class="text-danger">♥</span> ticker
             </p>
-            <div class="mt-1 text-[12.5px] leading-[1.75] text-dim digest-prose">
+            <div class="mt-1 text-row leading-[1.75] text-dim digest-prose">
               <p
                 v-if="streaming && i === messages.length - 1 && !m.content"
                 class="text-muted"
@@ -150,7 +150,7 @@
           class="flex items-end gap-2.5"
           @submit.prevent="send()"
         >
-          <span class="text-accent text-[13px] leading-[2.2]">❯</span>
+          <span class="text-accent text-prose leading-[2.2]">❯</span>
           <!-- Grows with the question up to ~7 lines, then scrolls; Enter sends, Shift+Enter breaks. -->
           <UTextarea
             v-model="draft"
@@ -159,7 +159,7 @@
             autoresize
             placeholder="ask ticker about our data…"
             class="flex-1"
-            :ui="{ base: 'resize-none text-[12.5px] placeholder:text-ghost' }"
+            :ui="{ base: 'resize-none text-row placeholder:text-ghost' }"
             :disabled="streaming"
             @keydown.enter.exact.prevent="send()"
           />
@@ -171,7 +171,7 @@
             {{ streaming ? '…' : 'ASK' }}
           </button>
         </form>
-        <p class="mt-1.5 text-[10.5px] text-ghost">
+        <p class="mt-1.5 text-label text-ghost">
           answers are generated from your logged data · observations, not medical advice<span class="hidden sm:inline"> · enter to send, shift+enter for a new line</span>
         </p>
       </div>
@@ -181,7 +181,7 @@
     <USlideover
       v-model:open="historyOpen"
       title="SAVED CONVERSATIONS"
-      :ui="{ content: 'max-w-xs bg-bg border-l border-line ring-0', header: 'border-b border-line', title: 'num-display text-hi text-[16px]' }"
+      :ui="{ content: 'max-w-xs bg-bg border-l border-line ring-0', header: 'border-b border-line', title: 'num-display text-hi text-stat' }"
     >
       <template #body>
         <AskThreadList

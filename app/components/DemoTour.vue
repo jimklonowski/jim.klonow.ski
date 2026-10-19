@@ -14,10 +14,10 @@
            (landscape phones) only the body scrolls — title and buttons stay reachable. -->
       <div class="w-76 max-w-[calc(100vw-1.5rem)] max-h-(--reka-popper-available-height) flex flex-col bg-raised border border-accent px-3.5 py-3">
         <div class="flex items-baseline justify-between gap-3 shrink-0">
-          <span class="text-[10.5px] tracking-widest uppercase text-accent font-medium">{{ current?.title }}</span>
-          <span class="text-[10px] text-faint shrink-0">{{ tour.index.value + 1 }} / {{ tour.total.value }}</span>
+          <span class="text-label tracking-widest uppercase text-accent font-medium">{{ current?.title }}</span>
+          <span class="text-micro text-faint shrink-0">{{ tour.index.value + 1 }} / {{ tour.total.value }}</span>
         </div>
-        <p class="mt-1.5 text-[12px] text-muted leading-[1.65] min-h-0 overflow-y-auto">
+        <p class="mt-1.5 text-small text-muted leading-[1.65] min-h-0 overflow-y-auto">
           {{ current?.body }}
         </p>
         <div class="mt-3 flex items-center gap-2 shrink-0">
@@ -48,7 +48,7 @@
           <button
             v-if="tour.hasNext.value"
             type="button"
-            class="ml-auto text-[10.5px] text-faint hover:text-accent"
+            class="ml-auto text-label text-faint hover:text-accent"
             @click="tour.finish()"
           >
             skip

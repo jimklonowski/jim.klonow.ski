@@ -7,7 +7,7 @@
     <ToolsNav />
 
     <!-- Access model note -->
-    <div class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-dashed border-line-input bg-inset text-[12px] leading-[1.7] text-dim">
+    <div class="mx-4 sm:mx-6 mt-4 px-3.5 py-3 border border-dashed border-line-input bg-inset text-small leading-[1.7] text-dim">
       Share links grant read-only access without handing out your password.
       <span class="text-hi">FRIEND</span> sees the whole site;
       <!-- Mirrors DOCTOR_PAGES in shared/utils/access.ts; keep the two in step. -->
@@ -24,7 +24,7 @@
           label="NEW SHARE LINK"
           :dashes="7"
         >
-          <span class="text-[10.5px] text-muted normal-case">shown once on create</span>
+          <span class="text-label text-muted normal-case">shown once on create</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-2.5">
@@ -41,7 +41,7 @@
           <UFormField
             label="Label"
             hint="who it's for"
-            :ui="{ hint: 'text-[10.5px] text-faint' }"
+            :ui="{ hint: 'text-label text-faint' }"
           >
             <UInput
               v-model="form.label"
@@ -52,7 +52,7 @@
           <UFormField
             label="Link valid for"
             hint="redemption window"
-            :ui="{ hint: 'text-[10.5px] text-faint' }"
+            :ui="{ hint: 'text-label text-faint' }"
           >
             <USelect
               v-model="form.expiresDays"
@@ -118,7 +118,7 @@
             </svg>
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <code class="flex-1 min-w-0 truncate text-[12px] text-hi">{{ createdLink }}</code>
+                <code class="flex-1 min-w-0 truncate text-small text-hi">{{ createdLink }}</code>
                 <button
                   type="button"
                   class="tui-btn shrink-0"
@@ -134,7 +134,7 @@
                   DONE
                 </button>
               </div>
-              <p class="mt-1.5 text-[11px] text-muted leading-[1.6]">
+              <p class="mt-1.5 text-meta text-muted leading-[1.6]">
                 Scan the code to open it on another phone. Lost it? Revoke the link below and
                 create a new one.
               </p>
@@ -150,13 +150,13 @@
         :label="`LINKS · ${invites.length}`"
         :dashes="9"
       >
-        <span class="text-[10.5px] text-muted normal-case">URLs aren't stored — revoke and reissue if one is lost</span>
+        <span class="text-label text-muted normal-case">URLs aren't stored — revoke and reissue if one is lost</span>
       </TuiHeader>
 
       <!-- A failed load must not read as "no links yet" — that's an invitation to mint a duplicate. -->
       <p
         v-if="invitesError"
-        class="mt-2.5 text-[12px] text-danger"
+        class="mt-2.5 text-small text-danger"
       >
         Couldn't load the share links.
         <button
@@ -179,25 +179,25 @@
           :class="[i % 2 ? 'bg-inset' : 'bg-raised', invite.revoked ? 'opacity-60' : '']"
         >
           <span
-            class="shrink-0 px-1.5 py-0.5 border text-[10.5px] tracking-widest uppercase"
+            class="shrink-0 px-1.5 py-0.5 border text-label tracking-widest uppercase"
             :class="roleChipClass(invite)"
           >{{ invite.role }}</span>
 
           <span
-            class="text-[13px] truncate"
+            class="text-prose truncate"
             :class="invite.revoked ? 'line-through text-muted' : 'text-hi'"
           >{{ invite.label || 'Unlabeled' }}</span>
 
           <span
             v-if="invite.revoked"
-            class="text-[10.5px] tracking-widest uppercase text-danger"
+            class="text-label tracking-widest uppercase text-danger"
           >✕ revoked</span>
 
-          <span class="text-[11px] text-muted">{{ inviteMeta(invite) }}</span>
+          <span class="text-meta text-muted">{{ inviteMeta(invite) }}</span>
 
           <span
             v-if="!invite.revoked"
-            class="ml-auto flex items-baseline gap-2.5 shrink-0 text-[11px]"
+            class="ml-auto flex items-baseline gap-2.5 shrink-0 text-meta"
           >
             <button
               type="button"
@@ -218,8 +218,8 @@
         :ui="{
           root: 'py-8 px-4 gap-2',
           avatar: 'bg-inset text-faint ring-0 mb-1',
-          title: 'text-[12.5px] font-normal',
-          description: 'text-[11.5px] text-muted'
+          title: 'text-row font-normal',
+          description: 'text-small text-muted'
         }"
       />
     </section>
@@ -231,9 +231,9 @@
           label="YOUR SESSIONS"
           :dashes="7"
         >
-          <span class="text-[10.5px] text-muted normal-case">a lost or shared device</span>
+          <span class="text-label text-muted normal-case">a lost or shared device</span>
         </TuiHeader>
-        <p class="mt-2 text-[12px] leading-[1.7] text-dim">
+        <p class="mt-2 text-small leading-[1.7] text-dim">
           Signs you out on every other device and browser, and locks lab uploads until the PIN is
           entered again. This device stays signed in. Share links aren't affected; revoke those above.
         </p>

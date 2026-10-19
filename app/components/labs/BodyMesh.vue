@@ -840,7 +840,7 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
       >{{ highlightText }}</span>
       <p
         v-if="status !== 'ready'"
-        class="absolute inset-0 flex items-center justify-center text-[10.5px] tracking-[0.12em] uppercase text-faint"
+        class="absolute inset-0 flex items-center justify-center text-label tracking-[0.12em] uppercase text-faint"
       >
         {{ status === 'loading' ? 'loading body mesh ⟳' : 'webgl unavailable' }}
       </p>
@@ -1024,7 +1024,7 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
       v-if="canMorph && meshDates && !compact"
       class="mt-3"
     >
-      <div class="flex items-baseline justify-between text-[9.5px] tracking-[0.12em] uppercase text-faint">
+      <div class="flex items-baseline justify-between text-nano tracking-[0.12em] uppercase text-faint">
         <span :class="morph >= 0.5 ? 'text-hi' : ''">then · {{ formatDateTerse(props.dates.previous!) }}</span>
         <span :class="morph < 0.5 ? 'text-hi' : ''">now · {{ formatDateTerse(props.dates.latest) }}</span>
       </div>
@@ -1040,7 +1040,7 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
 
     <figcaption
       v-if="!compact"
-      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-2.5 text-[9.5px] text-faint tracking-[0.06em] uppercase"
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-2.5 text-nano text-faint tracking-[0.06em] uppercase"
     >
       <span class="flex items-center gap-1.5">
         <span>fat %</span>

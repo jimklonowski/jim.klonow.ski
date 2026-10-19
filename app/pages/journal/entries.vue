@@ -42,7 +42,7 @@
           :title="cell.title"
         />
       </div>
-      <span class="shrink-0 text-[10px] text-muted">
+      <span class="shrink-0 text-micro text-muted">
         <span class="text-band">▪</span> logged · <span class="text-accent">▪</span> +photos/recon
       </span>
     </div>
@@ -50,7 +50,7 @@
     <!-- Ledger -->
     <div class="px-4 sm:px-6">
       <div
-        class="hidden lg:grid gap-2.5 py-1.5 text-[10px] text-faint uppercase tracking-[0.06em]"
+        class="hidden lg:grid gap-2.5 py-1.5 text-micro text-faint uppercase tracking-[0.06em]"
         :class="gridCols"
       >
         <span>Date</span>
@@ -65,7 +65,7 @@
         v-for="row in pageRows"
         :key="row.date"
         :to="canOpenDays ? `/journal/${row.date}` : ''"
-        class="grid gap-x-2.5 gap-y-1 items-baseline py-2 border-b border-line-row last:border-0 text-[11.5px]"
+        class="grid gap-x-2.5 gap-y-1 items-baseline py-2 border-b border-line-row last:border-0 text-small"
         :class="[gridCols, row.isToday ? 'bg-inset' : '', canOpenDays ? 'hover:bg-row-hover transition-colors' : 'pointer-events-none']"
       >
         <span class="text-hi uppercase">{{ formatDate(row.date, 'monthDay') }}</span>
@@ -85,17 +85,17 @@
             />
             <span
               v-if="row.photos"
-              class="text-[10px] text-faint"
+              class="text-micro text-faint"
               :title="`${row.photos} progress photo${row.photos > 1 ? 's' : ''}`"
             >📷</span>
             <span
               v-if="row.recon"
-              class="text-[10px] text-faint"
+              class="text-micro text-faint"
               :title="`${row.recon} reconstitution${row.recon > 1 ? 's' : ''}`"
             >⚗</span>
             <span
               v-if="row.isDraw"
-              class="text-[10px] text-accent whitespace-nowrap"
+              class="text-micro text-accent whitespace-nowrap"
             >▲ lab draw</span>
           </span>
 
@@ -123,7 +123,7 @@
       <!-- A failed load is the error state above, not an empty log. -->
       <p
         v-if="!error && !entries.length"
-        class="py-5 text-[12px] text-muted"
+        class="py-5 text-small text-muted"
       >
         No entries logged yet.
       </p>

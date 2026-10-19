@@ -8,14 +8,14 @@
         <span class="flex items-center gap-2.5">
           <button
             type="button"
-            class="text-[13px] text-faint hover:text-accent cursor-pointer"
+            class="text-prose text-faint hover:text-accent cursor-pointer"
             aria-label="Previous month"
             @click="prevMonth"
           >‹</button>
-          <span class="num-display text-hi text-[15px] w-38 text-center">{{ monthLabel }}</span>
+          <span class="num-display text-hi text-title w-38 text-center">{{ monthLabel }}</span>
           <button
             type="button"
-            class="text-[13px] text-faint hover:text-accent cursor-pointer"
+            class="text-prose text-faint hover:text-accent cursor-pointer"
             aria-label="Next month"
             @click="nextMonth"
           >›</button>
@@ -37,7 +37,7 @@
     />
 
     <!-- Compound colour legend for the dose dots in the grid below -->
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 sm:px-6 py-2 border-b border-line-soft text-[11px]">
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 sm:px-6 py-2 border-b border-line-soft text-meta">
       <span
         v-for="compound in legendCompounds"
         :key="compound"
@@ -64,7 +64,7 @@
       <div
         v-for="d in DAY_LABELS"
         :key="d"
-        class="bg-bg px-2 py-2 text-[10.5px] text-muted uppercase tracking-[0.12em]"
+        class="bg-bg px-2 py-2 text-label text-muted uppercase tracking-[0.12em]"
       >
         {{ d }}
       </div>
@@ -89,14 +89,14 @@
         <template v-if="cell.date">
           <div class="flex items-baseline gap-1.5">
             <span
-              class="text-[12px]"
+              class="text-small"
               :class="cell.isToday ? 'text-accent' : 'text-muted'"
             >{{ cell.day }}</span>
             <!-- "· TODAY" needs ~52px and a mobile cell is only ~47px wide, so it wraps out of
                  the box — dropped below md, where the accent outline and day number already mark it. -->
             <span
               v-if="cell.isToday"
-              class="hidden md:inline text-[10.5px] text-accent tracking-[0.12em]"
+              class="hidden md:inline text-label text-accent tracking-[0.12em]"
             >· TODAY</span>
           </div>
 
@@ -120,26 +120,26 @@
             />
             <span
               v-if="cell.marks"
-              class="text-[10.5px] text-muted"
+              class="text-label text-muted"
             >{{ cell.marks }}</span>
           </div>
 
           <div
             v-if="cell.isDraw"
-            class="mt-1 text-[10.5px] text-accent"
+            class="mt-1 text-label text-accent"
           >
             ▲ lab draw
           </div>
           <div
             v-if="cell.isPlannedDraw"
-            class="mt-1 text-[10.5px] text-muted"
+            class="mt-1 text-label text-muted"
           >
             △ planned draw
           </div>
 
           <div
             v-if="cell.weight"
-            class="mt-1 text-[12px] text-muted"
+            class="mt-1 text-small text-muted"
           >
             {{ cell.weight }}
           </div>

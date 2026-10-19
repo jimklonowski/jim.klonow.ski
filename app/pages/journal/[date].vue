@@ -8,13 +8,13 @@
         <NuxtLink
           v-if="prevEntry"
           :to="`/journal/${prevEntry.date}`"
-          class="text-[13px] text-faint hover:text-accent"
+          class="text-prose text-faint hover:text-accent"
           aria-label="Previous entry"
         >‹</NuxtLink>
         <NuxtLink
           v-if="nextEntry"
           :to="`/journal/${nextEntry.date}`"
-          class="text-[13px] text-faint hover:text-accent"
+          class="text-prose text-faint hover:text-accent"
           aria-label="Next entry"
         >›</NuxtLink>
         <NuxtLink
@@ -34,7 +34,7 @@
         </button>
         <span
           v-else
-          class="text-[10.5px] text-faint border border-line-input px-2 py-1.5 uppercase tracking-[0.08em]"
+          class="text-label text-faint border border-line-input px-2 py-1.5 uppercase tracking-[0.08em]"
         >read-only</span>
       </template>
     </JournalHeader>
@@ -139,7 +139,7 @@
             label="PROTOCOL · DOSES"
             :dashes="10"
           >
-            <span class="flex items-center gap-3 text-[11px]">
+            <span class="flex items-center gap-3 text-meta">
               <button
                 v-if="canEdit && prevEntry?.peptides?.length"
                 type="button"
@@ -236,7 +236,7 @@
                 <button
                   v-if="canEdit"
                   type="button"
-                  class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                  class="text-small text-faint hover:text-danger cursor-pointer"
                   :aria-label="`Remove dose ${i + 1}`"
                   @click="removePeptide(i)"
                 >
@@ -247,7 +247,7 @@
           </div>
           <p
             v-else
-            class="mt-2.5 text-[12px] text-muted"
+            class="mt-2.5 text-small text-muted"
           >
             No doses logged.<template v-if="canEdit">
               Use + add to record injections.
@@ -264,7 +264,7 @@
             <button
               v-if="canEdit"
               type="button"
-              class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+              class="text-meta text-accent hover:text-accent-hover cursor-pointer"
               @click="addReconstitution"
             >
               ⚗ add
@@ -349,7 +349,7 @@
                 <button
                   v-if="canEdit"
                   type="button"
-                  class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                  class="text-small text-faint hover:text-danger cursor-pointer"
                   :aria-label="`Remove reconstitution ${i + 1}`"
                   @click="removeReconstitution(i)"
                 >
@@ -360,7 +360,7 @@
           </div>
           <p
             v-else
-            class="mt-2.5 text-[12px] text-muted"
+            class="mt-2.5 text-small text-muted"
           >
             No reconstitutions today.
           </p>
@@ -401,7 +401,7 @@
               <button
                 v-if="canEdit"
                 type="button"
-                class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+                class="text-meta text-accent hover:text-accent-hover cursor-pointer"
                 @click="addSoda"
               >
                 + add
@@ -462,7 +462,7 @@
                   <button
                     v-if="canEdit"
                     type="button"
-                    class="text-[12px] text-faint hover:text-danger cursor-pointer"
+                    class="text-small text-faint hover:text-danger cursor-pointer"
                     :aria-label="`Remove soda ${i + 1}`"
                     @click="removeSoda(i)"
                   >
@@ -473,7 +473,7 @@
             </div>
             <p
               v-else
-              class="mt-2.5 text-[12px] text-muted"
+              class="mt-2.5 text-small text-muted"
             >
               No sodas logged.
             </p>
@@ -489,7 +489,7 @@
         >
           <span
             v-if="dayPhotos.length"
-            class="text-[10.5px] text-muted"
+            class="text-label text-muted"
           >{{ dayPhotos.length }} on file</span>
         </TuiHeader>
 
@@ -521,8 +521,8 @@
               class="w-full mt-2.5"
               :ui="{
                 base: 'bg-raised border border-dashed border-line-input',
-                label: 'text-[12.5px] text-body',
-                description: 'text-[11px] text-muted'
+                label: 'text-row text-body',
+                description: 'text-meta text-muted'
               }"
             >
               <template #file="{ removeFile }">
@@ -575,7 +575,7 @@
 
             <p
               v-if="photoError"
-              class="mt-2 text-[12px] text-danger"
+              class="mt-2 text-small text-danger"
             >
               {{ photoError }}
             </p>
@@ -617,14 +617,14 @@
                   <button
                     v-if="isOwner"
                     type="button"
-                    class="absolute top-1 right-1 px-1 text-[11px] bg-bg/80 text-faint hover:text-danger tui-row-action cursor-pointer"
+                    class="absolute top-1 right-1 px-1 text-meta bg-bg/80 text-faint hover:text-danger tui-row-action cursor-pointer"
                     aria-label="Delete photo"
                     @click="deletePhoto(photo.id)"
                   >
                     ✕
                   </button>
                   <figcaption
-                    class="mt-1 text-[10.5px] uppercase tracking-[0.12em] truncate"
+                    class="mt-1 text-label uppercase tracking-[0.12em] truncate"
                     :class="isOwner && uploadCategory === c.value ? 'text-accent' : 'text-muted'"
                   >
                     {{ c.label }}
@@ -637,7 +637,7 @@
                 >
                   <button
                     type="button"
-                    class="w-full aspect-square flex flex-col items-center justify-center gap-1 border border-dashed text-[11px] transition-colors cursor-pointer"
+                    class="w-full aspect-square flex flex-col items-center justify-center gap-1 border border-dashed text-meta transition-colors cursor-pointer"
                     :class="uploadCategory === c.value
                       ? 'border-line-accent text-accent bg-raised'
                       : 'border-line-input text-faint hover:text-muted hover:border-line-accent'"
@@ -652,7 +652,7 @@
                     <span>add</span>
                   </button>
                   <figcaption
-                    class="mt-1 text-[10.5px] uppercase tracking-[0.12em] truncate"
+                    class="mt-1 text-label uppercase tracking-[0.12em] truncate"
                     :class="uploadCategory === c.value ? 'text-accent' : 'text-faint'"
                   >
                     {{ c.label }}
@@ -668,7 +668,7 @@
               title="No progress photos"
               description="No progress photos for this day yet."
               class="h-full"
-              :ui="{ title: 'text-[12.5px] text-body', description: 'text-[11px] text-muted' }"
+              :ui="{ title: 'text-row text-body', description: 'text-meta text-muted' }"
             />
           </div>
         </div>
@@ -684,7 +684,7 @@
           <div
             v-for="(w, i) in dayWorkouts"
             :key="w.id"
-            class="flex items-baseline justify-between gap-3 px-2 py-1.5 text-[12.5px]"
+            class="flex items-baseline justify-between gap-3 px-2 py-1.5 text-row"
             :class="i % 2 ? 'bg-inset' : ''"
             :title="w.sources.length > 1 ? w.sources.join(' + ') : undefined"
           >
@@ -743,11 +743,11 @@ import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 
 // Shared :ui overrides so every field on this long form reads the same.
-const FIELD_UI = { hint: 'text-[10px] text-faint' }
+const FIELD_UI = { hint: 'text-micro text-faint' }
 // Shared by the USelects and the autocomplete UInputMenus (compound / food / soda) so every
 // popover on the form matches. Autocomplete mode keeps whatever is typed as the value and only
 // suggests from `items`, so off-list compounds and freeform meals still work.
-const SELECT_UI = { item: 'text-[12px]' }
+const SELECT_UI = { item: 'text-small' }
 
 /** Live "≈ 0.67 mg" hint beside the Dose label for IU compounds with a known mass factor. */
 function doseHelp(p: PeptideEntry): string | undefined {

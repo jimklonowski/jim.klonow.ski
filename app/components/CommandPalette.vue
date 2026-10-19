@@ -18,16 +18,16 @@
         :fuse="{ resultLimit: 100 }"
         :ui="{
           root: 'bg-raised divide-line-soft',
-          input: '[&>input]:text-[12.5px] [&>input]:h-11',
+          input: '[&>input]:text-row [&>input]:h-11',
           label: 'tui-label px-2 pt-3 pb-1',
-          item: 'text-[12px] py-1.5 data-highlighted:not-data-disabled:before:bg-nav-active',
+          item: 'text-small py-1.5 data-highlighted:not-data-disabled:before:bg-nav-active',
           itemLabelSuffix: 'text-faint',
           itemTrailingKbds: 'text-faint'
         }"
         @update:open="open = $event"
       >
         <template #empty>
-          <div class="py-6 text-center text-[12px] text-muted">
+          <div class="py-6 text-center text-small text-muted">
             no matches
           </div>
         </template>

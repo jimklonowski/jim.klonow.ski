@@ -8,18 +8,18 @@
         :key="row.label"
         class="flex items-baseline gap-2"
       >
-        <span class="w-18.5 shrink-0 text-[11px] text-muted">{{ row.label }}</span>
+        <span class="w-18.5 shrink-0 text-meta text-muted">{{ row.label }}</span>
         <span
-          class="num-display text-[21px] leading-none"
+          class="num-display text-figure leading-none"
           :class="row.accentValue ? 'text-accent' : 'text-hi'"
         >{{ row.value }}</span>
         <span
           v-if="row.unit"
-          class="text-[10.5px] text-muted"
+          class="text-label text-muted"
         >{{ row.unit }}</span>
         <span
           v-if="row.delta"
-          class="ml-auto text-[11px] shrink-0"
+          class="ml-auto text-meta shrink-0"
           :class="row.delta.class"
         >{{ row.delta.text }}</span>
       </div>
@@ -27,7 +27,7 @@
 
     <p
       v-if="!rows.length"
-      class="mt-3 text-[12px] text-muted"
+      class="mt-3 text-small text-muted"
     >
       No vitals logged yet.
     </p>

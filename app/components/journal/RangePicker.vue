@@ -1,5 +1,5 @@
 <template>
-  <span class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+  <span class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-meta">
     <button
       v-if="showNotes"
       type="button"

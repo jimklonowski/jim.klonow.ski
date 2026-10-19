@@ -2,18 +2,18 @@
   <div>
     <!-- Title row -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-3.5 border-b border-line">
-      <h1 class="num-display text-hi text-[24px] leading-none">
+      <h1 class="num-display text-hi text-hero leading-none">
         PRIVACY POLICY
       </h1>
-      <p class="text-[11px] text-muted tracking-[0.06em] uppercase">
+      <p class="text-meta text-muted tracking-[0.06em] uppercase">
         effective september 23, 2026
       </p>
-      <span class="ml-auto text-[11px] text-muted hidden sm:inline">personal dashboard · not open to public sign-up</span>
+      <span class="ml-auto text-meta text-muted hidden sm:inline">personal dashboard · not open to public sign-up</span>
     </div>
 
     <!-- Prose is the one place a comfortable line-height is correct -->
     <div class="px-4 sm:px-6 py-4 max-w-3xl">
-      <p class="text-[12.5px] leading-[1.7] text-dim">
+      <p class="text-row leading-[1.7] text-dim">
         jim.klonow.ski ("this site", "the app") is a personal health-tracking dashboard built and operated
         by Jim Klonowski ("the site owner"). It is not a commercial product and it is not open to public
         sign-up: the only person whose health data it holds is the site owner. This policy explains what
@@ -26,7 +26,7 @@
           label="WHAT DATA IS COLLECTED"
           :dashes="12"
         />
-        <ul class="mt-2.5 space-y-1.5 text-[12.5px] leading-[1.7] text-dim">
+        <ul class="mt-2.5 space-y-1.5 text-row leading-[1.7] text-dim">
           <li class="flex gap-2">
             <span class="text-faint shrink-0">·</span>
             <span>
@@ -73,7 +73,7 @@
           label="HOW DATA IS USED"
           :dashes="18"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           All data is used only to show the site owner's own health and fitness metrics back to them within
           this app. For example, the app correlates recovery and sleep trends with training load, lab markers,
           or medication protocols, and generates written summaries of those trends. Data is never sold, never
@@ -87,7 +87,7 @@
           label="WHO CAN SEE IT"
           :dashes="20"
         />
-        <ul class="mt-2.5 space-y-1.5 text-[12.5px] leading-[1.7] text-dim">
+        <ul class="mt-2.5 space-y-1.5 text-row leading-[1.7] text-dim">
           <li class="flex gap-2">
             <span class="text-faint shrink-0">·</span>
             <span>
@@ -127,10 +127,10 @@
           label="AI PROCESSING"
           :dashes="21"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           Some features send data to Anthropic's Claude API to generate a response:
         </p>
-        <ul class="mt-2 space-y-1.5 text-[12.5px] leading-[1.7] text-dim">
+        <ul class="mt-2 space-y-1.5 text-row leading-[1.7] text-dim">
           <li class="flex gap-2">
             <span class="text-faint shrink-0">·</span>
             <span>
@@ -154,7 +154,7 @@
             </span>
           </li>
         </ul>
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           Only the site owner can start these requests. This data is sent only to get a response for the site
           owner. This site never uses any data, including WHOOP data, to create, train, fine-tune, test, or
           improve any AI or machine learning model. By default, Anthropic does not train its models on data
@@ -175,11 +175,11 @@
           label="WHOOP DATA SPECIFICALLY"
           :dashes="11"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           When the WHOOP integration is connected, this app requests read-only access to recovery, cycle,
           sleep, workout, profile, and body measurement data via WHOOP's OAuth API. This data is:
         </p>
-        <ul class="mt-2 space-y-1.5 text-[12.5px] leading-[1.7] text-dim">
+        <ul class="mt-2 space-y-1.5 text-row leading-[1.7] text-dim">
           <li class="flex gap-2">
             <span class="text-faint shrink-0">·</span>
             <span>
@@ -223,7 +223,7 @@
           label="SERVICE PROVIDERS"
           :dashes="17"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           The site relies on a small number of providers, each used only to run this dashboard:
           <strong class="text-hi font-medium">Cloudflare</strong> (hosting, database, and file storage),
           <strong class="text-hi font-medium">Anthropic</strong> (the AI features described above),
@@ -238,7 +238,7 @@
           label="COOKIES AND LOGS"
           :dashes="18"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           The site sets a single signed, HTTP-only session cookie when someone signs in, plus a short-lived
           cookie that authorizes lab uploads. There are no analytics, advertising, or third-party tracking
           cookies. To block abuse, visitor IP addresses are counted on the sign-in, share-link, demo,
@@ -253,7 +253,7 @@
           label="DATA STORAGE AND SECURITY"
           :dashes="9"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           Data is stored in Cloudflare D1 databases and Cloudflare R2 file storage, which encrypt data at rest,
           and the site runs on Cloudflare Workers. All traffic is served over HTTPS. Private sections require a
           password or an authenticated session, and uploaded lab reports and photos can be opened only through
@@ -261,7 +261,7 @@
           and are never committed to source control. WHOOP access and refresh tokens are stored only on the
           server and are never sent to the browser.
         </p>
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           If a security incident exposes personal data, the site owner will notify anyone affected as the law
           requires. If WHOOP data is involved, the owner will notify WHOOP within 48 hours of discovering the
           incident.
@@ -273,7 +273,7 @@
           label="DATA RETENTION AND DELETION"
           :dashes="7"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           Health data is kept until the site owner deletes it, and the owner can delete any stored data at any
           time. Access for invited people ends when their link expires or is revoked. To ask a question about
           data this site holds, or to request its deletion, contact
@@ -289,7 +289,7 @@
           label="CHILDREN'S PRIVACY"
           :dashes="16"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           This site is not directed at children and is not intended for use by anyone under 18.
         </p>
       </section>
@@ -299,7 +299,7 @@
           label="CHANGES TO THIS POLICY"
           :dashes="12"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           This policy is updated whenever the app's data practices change. The effective date at the top of
           this page shows the most recent revision.
         </p>
@@ -310,7 +310,7 @@
           label="CONTACT"
           :dashes="27"
         />
-        <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+        <p class="mt-2.5 text-row leading-[1.7] text-dim">
           Questions about this policy or how data is handled can be sent to
           <a
             href="mailto:security@jim.klonow.ski"

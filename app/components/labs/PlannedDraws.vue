@@ -9,13 +9,13 @@
     >
       <span
         v-if="next"
-        class="text-[10.5px]"
+        class="text-label"
         :class="next.status === 'overdue' ? 'text-warn' : 'text-muted'"
       >{{ countdownLabel(next.inDays) }}</span>
       <button
         v-if="isOwner"
         type="button"
-        class="text-[10.5px] text-accent hover:text-accent-hover cursor-pointer ml-3"
+        class="text-label text-accent hover:text-accent-hover cursor-pointer ml-3"
         @click="modal?.open()"
       >
         + plan a draw
@@ -30,31 +30,31 @@
       <div class="min-w-0">
         <div class="flex items-baseline gap-2">
           <span
-            class="num-display text-[28px] leading-none"
+            class="num-display text-display leading-none"
             :class="bigClass"
           >{{ big.value }}</span>
           <span
             v-if="big.unit"
-            class="text-[10.5px] text-muted"
+            class="text-label text-muted"
           >{{ big.unit }}</span>
         </div>
-        <p class="text-[12.5px] text-hi mt-1.5">
+        <p class="text-row text-hi mt-1.5">
           {{ formatDate(next.plan.date, 'long') }}
         </p>
-        <p class="text-[11px] text-muted">
+        <p class="text-meta text-muted">
           {{ drawLabel(next.plan) }}
         </p>
         <p
           v-if="footLine"
-          class="text-[11px] text-faint mt-1.5"
+          class="text-meta text-faint mt-1.5"
         >
           {{ footLine }}
         </p>
       </div>
 
-      <div class="min-w-0 text-[12px] space-y-2.5">
+      <div class="min-w-0 text-small space-y-2.5">
         <div v-if="questions.length">
-          <p class="tui-label text-[10px]">
+          <p class="tui-label text-micro">
             answers
           </p>
           <div class="flex flex-col gap-0.5 mt-1">
@@ -70,7 +70,7 @@
         </div>
 
         <div v-if="next.status !== 'overdue'">
-          <p class="tui-label text-[10px]">
+          <p class="tui-label text-micro">
             prep
           </p>
           <div class="flex flex-col gap-0.5 mt-1">
@@ -81,7 +81,7 @@
             >
               <span class="text-ghost shrink-0">{{ i === prep.length - 1 ? '└' : '├' }}</span>
               <span
-                class="shrink-0 w-14 text-[11px]"
+                class="shrink-0 w-14 text-meta"
                 :class="r.state === 'ahead' ? 'text-faint' : 'text-accent'"
               >{{ prepWhen(r) }}</span>
               <span :class="r.state === 'ahead' ? 'text-muted' : 'text-body'">{{ r.text }}</span>
@@ -103,7 +103,7 @@
 
       <div
         v-if="isOwner"
-        class="sm:col-span-2 flex justify-end gap-3 text-[11px] -mt-1"
+        class="sm:col-span-2 flex justify-end gap-3 text-meta -mt-1"
       >
         <button
           type="button"
@@ -123,7 +123,7 @@
     </div>
     <p
       v-else
-      class="mt-2.5 text-[12px] text-muted"
+      class="mt-2.5 text-small text-muted"
     >
       No draw planned{{ isOwner ? ' — "+ plan a draw" books the next one: the date, the lab, the panel, and what it should answer.' : '.' }}
     </p>
@@ -135,7 +135,7 @@
     >
       <button
         type="button"
-        class="text-[10.5px] text-faint hover:text-accent cursor-pointer"
+        class="text-label text-faint hover:text-accent cursor-pointer"
         :aria-expanded="historyOpen"
         @click="historyOpen = !historyOpen"
       >
@@ -148,29 +148,29 @@
         <div
           v-for="s in others"
           :key="s.plan.id"
-          class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-1.5 border-b border-line-row last:border-0 text-[12px] group"
+          class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-1.5 border-b border-line-row last:border-0 text-small group"
         >
           <span class="text-muted tabular-nums w-23 shrink-0">{{ formatDate(s.plan.date) }}</span>
           <span class="text-hi">{{ s.plan.lab || 'draw' }}</span>
           <span
             v-if="s.plan.panel"
-            class="text-[11.5px] text-muted truncate min-w-0"
+            class="text-small text-muted truncate min-w-0"
           >{{ s.plan.panel }}</span>
           <span class="ml-auto flex items-baseline gap-2 shrink-0">
             <span
-              class="text-[11px]"
+              class="text-meta"
               :class="statusChip(s).class"
             >{{ statusChip(s).text }}</span>
             <template v-if="isOwner">
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                 :aria-label="`Edit the draw planned for ${s.plan.date}`"
                 @click="modal?.open(s.plan)"
               >edit</button>
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
+                class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
                 :aria-label="`Delete the draw planned for ${s.plan.date}`"
                 @click="confirmDelete(s.plan)"
               >✕</button>

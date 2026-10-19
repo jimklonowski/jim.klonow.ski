@@ -2,16 +2,16 @@
   <div>
     <!-- Breadcrumb title row -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-6 py-3.5 border-b border-line">
-      <span class="text-[11px] text-muted tracking-[0.06em] uppercase">
+      <span class="text-meta text-muted tracking-[0.06em] uppercase">
         <NuxtLink
           to="/labs"
           class="hover:text-accent"
         >labs</NuxtLink> /
       </span>
-      <h1 class="num-display text-hi text-[24px] leading-none">
+      <h1 class="num-display text-hi text-hero leading-none">
         UPLOAD
       </h1>
-      <p class="text-[11px] text-muted tracking-[0.06em] uppercase truncate">
+      <p class="text-meta text-muted tracking-[0.06em] uppercase truncate">
         {{ statusMeta }}
       </p>
 
@@ -43,7 +43,7 @@
           label="UPLOAD PIN REQUIRED"
           :dashes="4"
         />
-        <p class="mt-2.5 text-[12px] text-muted leading-[1.7]">
+        <p class="mt-2.5 text-small text-muted leading-[1.7]">
           Saving results is a write, so it needs your 9-digit upload PIN.
         </p>
         <LabsPinForm @unlocked="uploadAuthed = true" />
@@ -82,13 +82,13 @@
         }"
       >
         <template #leading>
-          <span class="num-display text-[28px] leading-none text-faint group-data-[dragging=true]:text-accent">↑</span>
+          <span class="num-display text-display leading-none text-faint group-data-[dragging=true]:text-accent">↑</span>
         </template>
         <template #label>
-          <span class="text-[12.5px] text-hi tracking-[0.06em] uppercase">drop your {{ dropZoneLabel }} pdf here</span>
+          <span class="text-row text-hi tracking-[0.06em] uppercase">drop your {{ dropZoneLabel }} pdf here</span>
         </template>
         <template #description>
-          <span class="text-[11px] text-muted">or click to browse · Claude reads the PDF, values land in D1</span>
+          <span class="text-meta text-muted">or click to browse · Claude reads the PDF, values land in D1</span>
         </template>
       </UFileUpload>
     </section>
@@ -103,14 +103,14 @@
           label="EXTRACTING"
           :dashes="8"
         >
-          <span class="text-[10.5px] text-accent">⟳ working</span>
+          <span class="text-label text-accent">⟳ working</span>
         </TuiHeader>
-        <p class="flex items-center gap-2 mt-2.5 text-[12.5px] text-dim">
+        <p class="flex items-center gap-2 mt-2.5 text-row text-dim">
           <span class="text-accent">❯</span>
           <span class="truncate">reading {{ filename }}</span>
           <span class="w-1.75 h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
         </p>
-        <p class="mt-1.5 text-[11px] text-muted">
+        <p class="mt-1.5 text-meta text-muted">
           Pulling biomarker values out of the report — this takes a few seconds.
         </p>
       </div>
@@ -126,9 +126,9 @@
           label="EXTRACTION FAILED"
           :dashes="4"
         >
-          <span class="text-[10.5px] text-danger">✕ error</span>
+          <span class="text-label text-danger">✕ error</span>
         </TuiHeader>
-        <p class="mt-2.5 text-[12.5px] text-danger leading-[1.7]">
+        <p class="mt-2.5 text-row text-danger leading-[1.7]">
           {{ error }}
         </p>
         <button
@@ -150,28 +150,28 @@
           :key="cell.label"
           class="bg-bg px-4 py-3.5"
         >
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
             {{ cell.label }}
           </p>
           <button
             v-if="cell.onClick"
             type="button"
-            class="num-display text-[24px] leading-none mt-1.5 whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
+            class="num-display text-hero leading-none mt-1.5 whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
             :title="cell.hint"
             @click="cell.onClick"
           >
-            {{ cell.value }} <span class="text-[13px] text-muted align-middle">{{ cell.glyph ?? '⇄' }}</span>
+            {{ cell.value }} <span class="text-prose text-muted align-middle">{{ cell.glyph ?? '⇄' }}</span>
           </button>
           <p
             v-else
-            class="num-display text-[24px] leading-none mt-1.5 whitespace-nowrap"
+            class="num-display text-hero leading-none mt-1.5 whitespace-nowrap"
             :class="cell.accent ? 'text-accent' : ''"
           >
             {{ cell.value }}
           </p>
           <p
             v-if="cell.hint"
-            class="mt-1.5 text-[10.5px] text-muted"
+            class="mt-1.5 text-label text-muted"
           >
             {{ cell.hint }}
           </p>
@@ -184,7 +184,7 @@
           :label="`${figureNoun.toUpperCase()} · ${previewEntries.length}`"
           :dashes="8"
         >
-          <span class="text-[10.5px] text-muted normal-case truncate">{{ filename }}</span>
+          <span class="text-label text-muted normal-case truncate">{{ filename }}</span>
         </TuiHeader>
 
         <div
@@ -197,16 +197,16 @@
             class="bg-raised px-3 py-2.5"
           >
             <p
-              class="text-[10.5px] text-muted uppercase tracking-[0.08em] leading-tight truncate"
+              class="text-label text-muted uppercase tracking-[0.08em] leading-tight truncate"
               :title="entry.label"
             >
               {{ entry.label }}
             </p>
-            <p class="num-display text-[22px] leading-none mt-1.5">
+            <p class="num-display text-figure leading-none mt-1.5">
               {{ entry.value }}
             </p>
             <p
-              class="mt-1.5 text-[10.5px]"
+              class="mt-1.5 text-label"
               :class="entry.known ? 'text-muted' : 'text-warn'"
             >
               {{ entry.unit }}
@@ -216,7 +216,7 @@
 
         <p
           v-else
-          class="mt-2.5 text-[12px] text-muted"
+          class="mt-2.5 text-small text-muted"
         >
           No numeric {{ figureNoun }} in this report.
         </p>
@@ -231,7 +231,7 @@
           label="GENETIC · QUALITATIVE"
           :dashes="4"
         />
-        <div class="mt-2.5 text-[12px]">
+        <div class="mt-2.5 text-small">
           <div
             v-for="(item, i) in result.qualitative"
             :key="item.name"
@@ -284,8 +284,8 @@
           :description="saveMessage"
           :ui="{
             root: 'ring-0 border border-line-input bg-inset p-3',
-            title: 'text-[12px]',
-            description: 'text-[11.5px] text-muted'
+            title: 'text-small',
+            description: 'text-small text-muted'
           }"
         />
       </div>
@@ -296,27 +296,27 @@
         class="mx-4 sm:mx-6 mb-4 px-3.5 py-3 border border-line-input bg-inset"
       >
         <div class="flex items-baseline gap-3">
-          <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ AI SUMMARY</span>
+          <span class="text-label tracking-[0.14em] uppercase text-accent">✦ AI SUMMARY</span>
           <span
             v-if="summarizing"
-            class="text-[10.5px] text-muted tracking-[0.06em] uppercase"
+            class="text-label text-muted tracking-[0.06em] uppercase"
           >working ⟳</span>
         </div>
         <p
           v-if="summarizing"
-          class="mt-2 text-[12.5px] text-muted"
+          class="mt-2 text-row text-muted"
         >
           Comparing this {{ reportType === 'dexa' ? 'scan' : 'draw' }} against your history…
         </p>
         <p
           v-else-if="summary"
-          class="mt-2 text-[12.5px] leading-[1.7] text-dim whitespace-pre-line"
+          class="mt-2 text-row leading-[1.7] text-dim whitespace-pre-line"
         >
           {{ summary }}
         </p>
         <p
           v-else
-          class="mt-2 text-[12.5px] text-muted"
+          class="mt-2 text-row text-muted"
         >
           {{ summaryError }}
         </p>

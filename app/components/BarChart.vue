@@ -12,7 +12,7 @@
         name="tooltip"
         :params="asPoints(raw)"
       >
-        <div class="px-2.5 py-1.5 text-[11px] min-w-32 bg-raised border border-line-accent text-body">
+        <div class="px-2.5 py-1.5 text-meta min-w-32 bg-raised border border-line-accent text-body">
           <p
             v-if="asPoints(raw)[0]"
             class="text-muted mb-1"
@@ -58,6 +58,9 @@ defineSlots<{
   tooltip?(props: { params: BarTooltipPoint[] }): unknown
 }>()
 
+// The chosen face and size, as values: the SVG's labels are measured with them (see CHART_TEXT).
+const { fontStack, typeScale } = useTheme()
+
 const props = withDefaults(defineProps<{
   data: Record<string, unknown>[]
   categories: Record<string, { name: string, color: string }>
@@ -93,6 +96,8 @@ const describedChart = computed(() => {
 const option = computed<ECOption>(() => ({
   ...chartFrame({
     labels: props.data.map(d => d[props.xAxisKey] as string),
+    fontFamily: fontStack.value,
+    scale: typeScale.value,
     showLegend: props.showLegend,
     legendItem: { width: 10, height: 10 },
     grid: props.hideXAxis && props.hideYAxis ? 'bare' : 'normal',

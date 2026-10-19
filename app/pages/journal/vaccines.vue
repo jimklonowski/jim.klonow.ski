@@ -5,7 +5,7 @@
       :meta="meta"
     >
       <template #actions>
-        <span class="text-[11px] text-muted hidden sm:inline">immunization record · recent shots feed AI context</span>
+        <span class="text-meta text-muted hidden sm:inline">immunization record · recent shots feed AI context</span>
         <button
           v-if="isOwner"
           type="button"
@@ -31,7 +31,7 @@
           label="CARD"
           :dashes="16"
         >
-          <span class="text-[10.5px] text-muted normal-case">standing facts</span>
+          <span class="text-label text-muted normal-case">standing facts</span>
         </TuiHeader>
         <div class="mt-1.5">
           <div
@@ -39,25 +39,25 @@
             :key="f.key"
             class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
           >
-            <span class="text-[13px] text-hi">{{ f.label }}</span>
+            <span class="text-prose text-hi">{{ f.label }}</span>
             <span
               v-if="f.hint"
-              class="text-[11px] text-faint hidden sm:inline"
+              class="text-meta text-faint hidden sm:inline"
             >{{ f.hint }}</span>
 
             <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
               <span
                 v-if="profile[f.key]"
-                class="num-display text-[15px] text-accent"
+                class="num-display text-title text-accent"
               >{{ profile[f.key] }}</span>
               <span
                 v-else
-                class="text-[12px] text-faint"
+                class="text-small text-faint"
               >not recorded</span>
               <button
                 v-if="isOwner"
                 type="button"
-                class="text-[11px] text-faint hover:text-accent cursor-pointer"
+                class="text-meta text-faint hover:text-accent cursor-pointer"
                 :aria-label="`${profile[f.key] ? 'Edit' : 'Set'} ${f.label}`"
                 @click="openProfileModal(f)"
               >{{ profile[f.key] ? 'edit' : 'set' }}</button>
@@ -68,7 +68,7 @@
 
       <p
         v-if="!vaccinations.length"
-        class="text-[12px] text-muted"
+        class="text-small text-muted"
       >
         No shots logged yet.{{ isOwner ? ' Use + LOG SHOT to record a vaccine — the coverage table then answers "when was my last tetanus shot?" for you.' : '' }}
       </p>
@@ -78,7 +78,7 @@
           label="COVERAGE"
           :dashes="12"
         >
-          <span class="text-[10.5px] text-muted normal-case">latest dose per vaccine · next booster</span>
+          <span class="text-label text-muted normal-case">latest dose per vaccine · next booster</span>
         </TuiHeader>
         <div class="mt-1.5">
           <div
@@ -86,21 +86,21 @@
             :key="c.family"
             class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
           >
-            <span class="text-[13px] text-hi">{{ c.label }}</span>
+            <span class="text-prose text-hi">{{ c.label }}</span>
             <span
               v-if="c.doses > 1"
-              class="text-[11px] text-faint"
+              class="text-meta text-faint"
             >×{{ c.doses }}</span>
             <span
               v-if="c.hint"
-              class="text-[11px] text-faint hidden sm:inline"
+              class="text-meta text-faint hidden sm:inline"
             >{{ c.hint }}</span>
 
             <span class="ml-auto flex items-baseline gap-2 shrink-0">
-              <span class="text-[12.5px] text-muted">last {{ formatDate(c.lastDate) }}</span>
+              <span class="text-row text-muted">last {{ formatDate(c.lastDate) }}</span>
               <span
                 v-if="dueChip(c)"
-                class="text-[11px] border px-1.5 py-0.5"
+                class="text-meta border px-1.5 py-0.5"
                 :class="dueChip(c)!.class"
               >{{ dueChip(c)!.text }}</span>
             </span>
@@ -113,7 +113,7 @@
           label="LOG"
           :dashes="17"
         >
-          <span class="text-[10.5px] text-muted normal-case">every dose, newest first</span>
+          <span class="text-label text-muted normal-case">every dose, newest first</span>
         </TuiHeader>
         <div class="mt-1.5">
           <div
@@ -121,15 +121,15 @@
             :key="v.id"
             class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
           >
-            <span class="text-[12px] text-muted tabular-nums w-23 shrink-0">{{ formatDate(v.date) }}</span>
-            <span class="text-[13px] text-hi">{{ v.vaccine }}</span>
+            <span class="text-small text-muted tabular-nums w-23 shrink-0">{{ formatDate(v.date) }}</span>
+            <span class="text-prose text-hi">{{ v.vaccine }}</span>
             <span
               v-if="v.product"
-              class="text-[11.5px] text-muted"
+              class="text-small text-muted"
             >{{ v.product }}</span>
             <span
               v-if="v.notes"
-              class="text-[11.5px] text-faint"
+              class="text-small text-faint"
             >{{ v.notes }}</span>
 
             <span
@@ -138,13 +138,13 @@
             >
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                 :aria-label="`Edit ${v.vaccine} on ${v.date}`"
                 @click="openEditModal(v)"
               >edit</button>
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
+                class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
                 :aria-label="`Delete ${v.vaccine} on ${v.date}`"
                 @click="confirmDelete(v)"
               >✕</button>
@@ -359,7 +359,7 @@ function dueChip(c: VaccineCoverage): { text: string, class: string } | null {
   return { text: `next ${when}`, class: 'text-accent border-line-accent' }
 }
 
-const SELECT_UI = { item: 'text-[12px]' }
+const SELECT_UI = { item: 'text-small' }
 
 const formModalRaw = ref(false)
 

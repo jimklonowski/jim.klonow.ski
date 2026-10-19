@@ -4,7 +4,7 @@
       v-for="tab in tabs"
       :key="tab.to"
       :to="tab.to"
-      class="py-2 text-[11px] tracking-[0.08em] uppercase whitespace-nowrap border-b-2 transition-colors"
+      class="py-2 text-meta tracking-[0.08em] uppercase whitespace-nowrap border-b-2 transition-colors"
       :class="isActive(tab)
         ? 'text-accent border-accent'
         : 'text-nav-idle border-transparent hover:text-accent'"

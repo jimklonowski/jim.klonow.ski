@@ -3,9 +3,9 @@
     <div class="w-full max-w-sm">
       <!-- Wordmark — this page runs without the app shell, so it carries its own header line -->
       <div class="flex items-center gap-2.5">
-        <span class="w-6 h-6 flex items-center justify-center bg-raised border border-accent text-accent text-[10px] leading-none">▲</span>
-        <span class="num-display text-[15px] tracking-tight">jim.klonow.ski</span>
-        <span class="ml-auto flex items-center gap-1.5 text-[10.5px] text-faint tracking-[0.12em] uppercase">
+        <span class="w-6 h-6 flex items-center justify-center bg-raised border border-accent text-accent text-micro leading-none">▲</span>
+        <span class="num-display text-title tracking-tight">jim.klonow.ski</span>
+        <span class="ml-auto flex items-center gap-1.5 text-label text-faint tracking-[0.12em] uppercase">
           <span class="w-1.75 h-1.75 rounded-full bg-line-accent" />
           no session
         </span>
@@ -17,7 +17,7 @@
           :dashes="4"
         />
 
-        <p class="mt-2.5 text-[12px] text-muted leading-[1.7]">
+        <p class="mt-2.5 text-small text-muted leading-[1.7]">
           Private dashboard. Enter the site password to continue.
         </p>
 
@@ -31,7 +31,7 @@
             label="Password"
           >
             <div class="flex items-center gap-2">
-              <span class="shrink-0 text-accent text-[13px] leading-none">❯</span>
+              <span class="shrink-0 text-accent text-prose leading-none">❯</span>
               <UInput
                 v-model="form.password"
                 type="password"
@@ -54,13 +54,13 @@
 
           <p
             v-if="error"
-            class="mt-2.5 text-[12px] text-danger"
+            class="mt-2.5 text-small text-danger"
           >
             ✕ {{ error }}
           </p>
         </UForm>
 
-        <p class="mt-3.5 pt-3 border-t border-line-soft text-[11.5px] text-muted">
+        <p class="mt-3.5 pt-3 border-t border-line-soft text-small text-muted">
           Just looking around?
           <!-- Plain <a>: /demo is a nitro server route (mints the demo cookie, redirects home). -->
           <a
@@ -73,14 +73,14 @@
       </div>
 
       <div class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <p class="text-[10.5px] text-ghost tracking-widest uppercase">
+        <p class="text-label text-ghost tracking-widest uppercase">
           session cookie · read-only share links issued on request
         </p>
         <a
           :href="REPO_URL"
           target="_blank"
           rel="noopener"
-          class="inline-flex items-center gap-1.5 text-[10.5px] tracking-widest uppercase text-faint hover:text-accent"
+          class="inline-flex items-center gap-1.5 text-label tracking-widest uppercase text-faint hover:text-accent"
         >
           <UIcon
             name="simple-icons:github"

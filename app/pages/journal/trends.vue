@@ -20,7 +20,7 @@
            under the cursor. Only what falls inside the selected range. -->
       <p
         v-if="annotationKey.length"
-        class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10.5px] leading-[1.6]"
+        class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-label leading-[1.6]"
         aria-label="Protocol notes on these charts"
       >
         <span class="text-faint uppercase tracking-widest">notes</span>
@@ -40,7 +40,7 @@
         >
           <span
             v-if="drawLabel"
-            class="text-[10px] text-muted normal-case"
+            class="text-micro text-muted normal-case"
           >▲ lab draws: {{ drawLabel }}</span>
         </TuiHeader>
 
@@ -71,7 +71,7 @@
           >
             <button
               type="button"
-              class="text-[10px] text-accent hover:text-accent-hover cursor-pointer normal-case"
+              class="text-micro text-accent hover:text-accent-hover cursor-pointer normal-case"
             >
               configure metrics ▾
             </button>
@@ -93,7 +93,7 @@
         </div>
         <p
           v-if="!healthTiles.length"
-          class="mt-2.5 text-[12px] text-muted"
+          class="mt-2.5 text-small text-muted"
         >
           No health metrics selected — use configure metrics to add some.
         </p>
@@ -104,7 +104,7 @@
         v-if="sleepRows.length"
         class="bg-raised border border-line-soft px-3 py-2.5"
       >
-        <div class="flex items-baseline gap-3 text-[10px] text-muted">
+        <div class="flex items-baseline gap-3 text-micro text-muted">
           <span class="uppercase tracking-widest">Sleep stages</span>
           <span class="text-faint">· min/night</span>
           <span class="ml-auto flex gap-2.5">
@@ -128,7 +128,7 @@
               :height="120"
             >
               <template #tooltip="{ params }">
-                <div class="px-2.5 py-2 text-[11px] min-w-44 bg-raised border border-line-accent shadow-[0_0_12px_rgba(0,0,0,0.5)]">
+                <div class="px-2.5 py-2 text-meta min-w-44 bg-raised border border-line-accent shadow-[0_0_12px_rgba(0,0,0,0.5)]">
                   <p class="text-muted mb-1.5">
                     {{ params[0]?.axisValue }}
                   </p>

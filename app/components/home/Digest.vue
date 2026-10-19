@@ -54,10 +54,10 @@
         v-if="weeklyParts.recommendations.length"
         class="mt-3.5 px-3.5 py-3 bg-raised border border-line-input"
       >
-        <div class="text-[10.5px] text-warn tracking-[0.12em] mb-2">
+        <div class="text-label text-warn tracking-[0.12em] mb-2">
           ▲ {{ weeklyParts.recommendations.length }} RECOMMENDATIONS
         </div>
-        <div class="text-[12px] leading-[1.7] text-dim">
+        <div class="text-small leading-[1.7] text-dim">
           <div
             v-for="(rec, i) in weeklyParts.recommendations"
             :key="i"
@@ -81,7 +81,7 @@
         :build="build"
         @open="digestOpen = true"
       />
-      <div class="flex-1 min-w-0 flex flex-col gap-1.5 text-[11.5px]">
+      <div class="flex-1 min-w-0 flex flex-col gap-1.5 text-small">
         <button
           type="button"
           class="self-start text-accent hover:text-accent-hover cursor-pointer"

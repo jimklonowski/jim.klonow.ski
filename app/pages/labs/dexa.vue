@@ -3,18 +3,18 @@
     <!-- Breadcrumb title row -->
     <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2 px-4 sm:px-6 pt-4 pb-3.5">
       <h1 class="flex items-baseline gap-2.5 min-w-0">
-        <span class="text-[11px] text-muted tracking-[0.06em] uppercase">
+        <span class="text-meta text-muted tracking-[0.06em] uppercase">
           <NuxtLink
             to="/labs"
             class="hover:text-accent"
           >labs</NuxtLink> /
         </span>
-        <span class="num-display text-hi text-[26px] leading-none">BODY COMPOSITION</span>
+        <span class="num-display text-hi text-tile leading-none">BODY COMPOSITION</span>
       </h1>
 
       <p
         v-if="latest"
-        class="text-[11px] text-muted tracking-[0.06em] uppercase"
+        class="text-meta text-muted tracking-[0.06em] uppercase"
       >
         {{ titleMeta }}
       </p>
@@ -65,28 +65,28 @@
           class="bg-bg px-4 py-3.5 text-left cursor-pointer transition-colors hover:bg-row-hover"
           @click="openModal(cell.key)"
         >
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
             {{ cell.label }}
           </p>
           <p
-            class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap"
+            class="num-display text-big leading-none mt-1.5 whitespace-nowrap"
             :class="cell.accent ? 'text-accent' : ''"
           >
             {{ cell.value }}<span
               v-if="cell.unit"
-              class="text-[10.5px] text-muted ml-1"
+              class="text-label text-muted ml-1"
             >{{ cell.unit }}</span>
           </p>
           <p
             v-if="cell.delta"
-            class="mt-1.5 text-[10.5px] tracking-[0.04em] tabular-nums"
+            class="mt-1.5 text-label tracking-[0.04em] tabular-nums"
             :class="cell.delta.class"
           >
             {{ cell.delta.text }}
           </p>
           <p
             v-if="cell.caption"
-            class="text-[10.5px] tracking-[0.08em] uppercase"
+            class="text-label tracking-[0.08em] uppercase"
             :class="[cell.captionClass, cell.delta ? 'mt-1' : 'mt-1.5']"
           >
             {{ cell.caption }}
@@ -97,7 +97,7 @@
       <!-- Body map beside the regional table; hovering either lights the other -->
       <section class="px-4 sm:px-6 py-4">
         <TuiHeader label="BODY MAP · FAT % BY REGION">
-          <span class="hidden sm:inline text-[10.5px] text-muted">hover a region or a row · click to lock</span>
+          <span class="hidden sm:inline text-label text-muted">hover a region or a row · click to lock</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,460px)_1fr] gap-x-8 gap-y-5 mt-3 items-start">
@@ -139,7 +139,7 @@
 
           <div class="min-w-0 space-y-5">
             <!-- Regional table -->
-            <div class="border border-line text-[12.5px]">
+            <div class="border border-line text-row">
               <div class="grid grid-cols-[1fr_repeat(4,auto)] gap-x-4 px-2.5 py-1.5 border-b border-line text-right">
                 <span class="tui-label text-left">region</span>
                 <span class="tui-label">fat %</span>
@@ -185,9 +185,9 @@
                 label="LEAN SYMMETRY · RIGHT vs LEFT"
                 :dashes="6"
               >
-                <span class="hidden sm:inline text-[10.5px] text-muted">typical gap ≤ {{ ARM_TYPICAL_GAP_LBS }} lbs arms · ≤ {{ LEG_TYPICAL_GAP_LBS }} lbs legs</span>
+                <span class="hidden sm:inline text-label text-muted">typical gap ≤ {{ ARM_TYPICAL_GAP_LBS }} lbs arms · ≤ {{ LEG_TYPICAL_GAP_LBS }} lbs legs</span>
               </TuiHeader>
-              <div class="mt-2.5 space-y-2.5 text-[12px]">
+              <div class="mt-2.5 space-y-2.5 text-small">
                 <div
                   v-for="row in symmetryRows"
                   :key="row.label"
@@ -212,12 +212,14 @@
                     </div>
                     <span class="w-14 text-hi whitespace-nowrap">L {{ row.left }}</span>
                   </div>
+                  <!-- Wraps rather than nowrap: at the larger SIZE steps the caption outgrows its
+                       column on a desktop and would run under the next one. -->
                   <span
-                    class="col-start-2 sm:col-start-3 text-[10.5px] tracking-[0.06em] uppercase sm:text-right whitespace-nowrap"
+                    class="col-start-2 sm:col-start-3 text-label tracking-[0.06em] uppercase sm:text-right"
                     :class="row.toneClass"
                   >{{ row.caption }}</span>
                 </div>
-                <p class="text-[10.5px] text-faint leading-[1.6]">
+                <p class="text-label text-faint leading-[1.6]">
                   Right on the left, as the report prints it. Each row's bars share one scale; a typical gap is ≤ {{ ARM_TYPICAL_GAP_LBS }} lbs for arms and ≤ {{ LEG_TYPICAL_GAP_LBS }} lbs for legs.
                 </p>
               </div>
@@ -231,20 +233,20 @@
                 class="bg-bg px-3.5 py-3"
               >
                 <div class="flex items-baseline justify-between gap-3">
-                  <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+                  <p class="text-label text-muted uppercase tracking-[0.12em]">
                     {{ m.label }}
                   </p>
                   <p
-                    class="text-[10.5px] tracking-[0.08em] uppercase"
+                    class="text-label tracking-[0.08em] uppercase"
                     :class="m.toneClass"
                   >
                     {{ m.caption }}
                   </p>
                 </div>
-                <p class="num-display text-[24px] leading-none mt-1.5 whitespace-nowrap">
+                <p class="num-display text-hero leading-none mt-1.5 whitespace-nowrap">
                   {{ m.value }}<span
                     v-if="m.unit"
-                    class="text-[10.5px] text-muted ml-1"
+                    class="text-label text-muted ml-1"
                   >{{ m.unit }}</span>
                 </p>
                 <LabsTierMeter
@@ -255,7 +257,7 @@
                   :bands="m.bands"
                   :ticks="m.ticks"
                 />
-                <p class="mt-1.5 text-[10.5px] text-muted leading-[1.6]">
+                <p class="mt-1.5 text-label text-muted leading-[1.6]">
                   {{ m.note }}
                 </p>
               </div>
@@ -269,7 +271,7 @@
         <TuiHeader label="SCAN OVER SCAN">
           <span
             v-if="previous"
-            class="text-[10.5px] text-muted"
+            class="text-label text-muted"
           >Δ = {{ scanHeader(latest.date) }} vs {{ scanHeader(previous.date) }}</span>
         </TuiHeader>
         <UTable
@@ -304,7 +306,7 @@
       </section>
       <p
         v-else-if="trendCards.length"
-        class="px-4 sm:px-6 pb-4 text-[10.5px] text-faint tracking-[0.04em]"
+        class="px-4 sm:px-6 pb-4 text-label text-faint tracking-[0.04em]"
       >
         Trend charts open at {{ MIN_SCANS_FOR_TRENDS }} scans — until then the table above is the trend.
       </p>
@@ -322,7 +324,7 @@
             label="ALL SCANS"
             :dashes="6"
           />
-          <div class="mt-2 text-[12px]">
+          <div class="mt-2 text-small">
             <div
               v-for="(row, i) in historyRows"
               :key="row.date"

@@ -5,7 +5,7 @@
       :meta="`${workouts.length.toLocaleString('en-US')} sessions`"
     >
       <template #actions>
-        <span class="text-[11px] text-muted">source: apple + whoop · auto-merged</span>
+        <span class="text-meta text-muted">source: apple + whoop · auto-merged</span>
       </template>
     </JournalHeader>
     <JournalNav />
@@ -25,14 +25,14 @@
         :key="cell.label"
         class="bg-bg px-4 py-2.5"
       >
-        <p class="text-[9.5px] text-faint uppercase tracking-widest">
+        <p class="text-nano text-faint uppercase tracking-widest">
           {{ cell.label }}
         </p>
-        <p class="num-display text-[21px] leading-none mt-1">
+        <p class="num-display text-figure leading-none mt-1">
           {{ cell.value }}
         </p>
         <p
-          class="text-[9.5px] mt-0.5"
+          class="text-nano mt-0.5"
           :class="cell.captionClass ?? 'text-muted'"
         >
           {{ cell.caption }}
@@ -40,13 +40,13 @@
       </div>
 
       <div class="bg-bg px-4 py-2.5 col-span-2 lg:col-span-1">
-        <p class="text-[9.5px] text-faint uppercase tracking-widest">
+        <p class="text-nano text-faint uppercase tracking-widest">
           Type mix · 90d
         </p>
         <div
           v-for="mix in typeMix"
           :key="mix.label"
-          class="flex items-center gap-2 mt-1.5 text-[10px]"
+          class="flex items-center gap-2 mt-1.5 text-micro"
         >
           <span class="w-22 shrink-0 text-dim uppercase">{{ mix.label }}</span>
           <span class="flex-1 h-1.75 bg-line-soft min-w-0">
@@ -59,7 +59,7 @@
         </div>
         <p
           v-if="!typeMix.length"
-          class="mt-1.5 text-[10px] text-muted"
+          class="mt-1.5 text-micro text-muted"
         >
           No sessions in the last 90 days.
         </p>
@@ -72,20 +72,20 @@
         v-for="group in weekGroups"
         :key="group.weekStart"
       >
-        <p class="pt-2.5 pb-1 text-[10px] text-faint uppercase tracking-[0.14em]">
+        <p class="pt-2.5 pb-1 text-micro text-faint uppercase tracking-[0.14em]">
           ── week of {{ group.label }} · {{ group.count }} sessions · {{ group.minutes }} min
         </p>
         <div
           v-for="w in group.rows"
           :key="w.id"
-          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_54px_90px_80px_88px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-line-row last:border-0 text-[11.5px]"
+          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_54px_90px_80px_88px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-line-row last:border-0 text-small"
         >
           <span class="text-muted uppercase">{{ formatDate(w.date, 'monthDay') }}</span>
           <span class="text-hi truncate">
             {{ w.workout_type ?? 'Workout' }}
             <span
               v-if="w.sources.length"
-              class="text-[10px] text-ghost"
+              class="text-micro text-ghost"
             >{{ w.sources.join('+') }}</span>
           </span>
           <!-- Below lg the five stats share one wrapped row spanning both columns. Dealt into
@@ -117,7 +117,7 @@
 
       <p
         v-if="!workouts.length"
-        class="py-5 text-[12px] text-muted"
+        class="py-5 text-small text-muted"
       >
         No workouts synced yet.
       </p>

@@ -6,13 +6,13 @@
     >
       <span
         v-if="meta"
-        class="text-[10.5px] text-muted"
+        class="text-label text-muted"
       >{{ meta }}</span>
     </TuiHeader>
 
     <div class="bubble relative mt-3 bg-raised border border-line-input px-3.25 pt-1 pb-2.75">
       <div
-        class="text-[12px] leading-[1.7] text-dim digest-prose"
+        class="text-small leading-[1.7] text-dim digest-prose"
         :class="{ wipe: wiping }"
       >
         <slot />

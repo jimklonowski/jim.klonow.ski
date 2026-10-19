@@ -14,7 +14,7 @@
       :dashes="4"
       class="mt-4"
     >
-      <span class="text-[10.5px] text-muted normal-case">{{ threads.length || '' }}</span>
+      <span class="text-label text-muted normal-case">{{ threads.length || '' }}</span>
     </TuiHeader>
 
     <ul
@@ -34,14 +34,14 @@
           @click="emit('open', t.id)"
         >
           <span
-            class="block text-[12px] leading-snug line-clamp-2"
+            class="block text-small leading-snug line-clamp-2"
             :class="t.id === activeId ? 'text-hi' : 'text-dim'"
           >{{ t.title }}</span>
-          <span class="block mt-0.5 text-[10.5px] text-faint">{{ when(t.updatedAt) }} · {{ t.exchanges }} {{ t.exchanges === 1 ? 'question' : 'questions' }}</span>
+          <span class="block mt-0.5 text-label text-faint">{{ when(t.updatedAt) }} · {{ t.exchanges }} {{ t.exchanges === 1 ? 'question' : 'questions' }}</span>
         </button>
         <button
           type="button"
-          class="tui-row-action shrink-0 text-[11px] text-faint hover:text-danger cursor-pointer disabled:cursor-default"
+          class="tui-row-action shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:cursor-default"
           :aria-label="`Delete conversation: ${t.title}`"
           :disabled="disabled"
           @click="emit('delete', t)"
@@ -52,7 +52,7 @@
     </ul>
     <p
       v-else
-      class="mt-2 text-[11.5px] text-muted leading-[1.6]"
+      class="mt-2 text-small text-muted leading-[1.6]"
     >
       Conversations are saved as you go, so you can come back to one.
     </p>

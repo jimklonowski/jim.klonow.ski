@@ -2,20 +2,20 @@
   <div class="flex flex-wrap items-center gap-x-3.5 gap-y-2 px-4 sm:px-6 py-3 border-b border-line">
     <NuxtLink
       to="/journal"
-      class="num-display text-hi text-[19px] leading-none hover:text-accent transition-colors"
+      class="num-display text-hi text-head leading-none hover:text-accent transition-colors"
     >
       JOURNAL
     </NuxtLink>
 
     <p
       v-if="meta"
-      class="text-[11px] text-muted tracking-[0.06em] uppercase"
+      class="text-meta text-muted tracking-[0.06em] uppercase"
     >
       <span v-if="section">/ {{ section }} · </span>{{ meta }}<slot name="meta" />
     </p>
     <p
       v-else-if="section"
-      class="text-[11px] text-muted tracking-[0.06em] uppercase"
+      class="text-meta text-muted tracking-[0.06em] uppercase"
     >
       / {{ section }}<slot name="meta" />
     </p>
