@@ -10,7 +10,7 @@
         v-if="!rows.length"
         class="space-y-4"
       >
-        <p class="text-[12.5px] leading-[1.7] text-dim">
+        <p class="text-row leading-[1.7] text-dim">
           Describe everything in the fridge in one go — vials, pens, pill bottles, powders.
           No format needed; it gets parsed into rows you can correct before saving.
         </p>
@@ -46,7 +46,7 @@
         v-else
         class="space-y-4"
       >
-        <p class="text-[12.5px] leading-[1.7] text-dim">
+        <p class="text-row leading-[1.7] text-dim">
           {{ rows.length }} product{{ rows.length === 1 ? '' : 's' }} found — fix anything that's off, then save.
           Everything lands as sealed stock.
         </p>
@@ -69,7 +69,7 @@
                   :items="KNOWN_COMPOUNDS"
                   open-on-click
                   class="w-full"
-                  :ui="{ item: 'text-[12px]' }"
+                  :ui="{ item: 'text-small' }"
                 />
               </UFormField>
               <UFormField
@@ -123,7 +123,7 @@
               </UFormField>
               <button
                 type="button"
-                class="col-span-1 pb-2 text-[13px] text-faint hover:text-danger cursor-pointer justify-self-end"
+                class="col-span-1 pb-2 text-prose text-faint hover:text-danger cursor-pointer justify-self-end"
                 :aria-label="`Remove ${row.compound || 'row'}`"
                 @click="rows.splice(i, 1)"
               >
@@ -155,13 +155,13 @@
             </div>
             <p
               v-if="isPillForm(row.form) && rowValid(row)"
-              class="text-[11px] text-muted"
+              class="text-meta text-muted"
             >
               = {{ pillTotal(row.amount, row.unit_count) }} {{ row.vial_unit }} per bottle
             </p>
             <p
               v-if="row.assumption"
-              class="text-[11px] text-warn leading-[1.6]"
+              class="text-meta text-warn leading-[1.6]"
             >
               ⚠ assumed: {{ row.assumption }}
             </p>
@@ -171,7 +171,7 @@
         <div class="flex items-center justify-between gap-2">
           <button
             type="button"
-            class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+            class="text-meta text-accent hover:text-accent-hover cursor-pointer"
             @click="backToText"
           >
             ‹ re-parse

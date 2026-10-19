@@ -7,7 +7,7 @@
       <template #actions>
         <span
           v-if="expiringCount"
-          class="text-[11px] text-warn tracking-[0.06em] uppercase"
+          class="text-meta text-warn tracking-[0.06em] uppercase"
         >▲ {{ expiringCount }} expiring</span>
         <button
           v-if="isOwner"
@@ -35,7 +35,7 @@
 
     <p
       v-if="!vials.length"
-      class="px-4 sm:px-6 py-5 text-[12px] text-muted"
+      class="px-4 sm:px-6 py-5 text-small text-muted"
     >
       Nothing tracked yet. Hit <span class="text-accent">✦ STOCK DUMP</span> and describe everything on hand — vials and
       pill bottles — in one sentence. It parses into rows, and the runway panel tells you whether the stockpile covers the next cycle.
@@ -83,7 +83,7 @@
           :label="`ACTIVE ${activeNoun.toUpperCase()} · ${activeVials.length}`"
           :dashes="7"
         >
-          <span class="text-[10.5px] text-muted normal-case">depletion projected from logged doses</span>
+          <span class="text-label text-muted normal-case">depletion projected from logged doses</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 mt-2.5">
@@ -100,10 +100,10 @@
                   :style="{ background: getCompoundColor(vial.compound) }"
                 />
                 <div class="min-w-0">
-                  <p class="text-[13px] text-hi truncate">
+                  <p class="text-prose text-hi truncate">
                     {{ vial.compound }}
                   </p>
-                  <p class="text-[11px] text-muted truncate">
+                  <p class="text-meta text-muted truncate">
                     {{ vialSpec(vial) }}
                   </p>
                 </div>
@@ -114,7 +114,7 @@
               >
                 <button
                   type="button"
-                  class="shrink-0 px-1 text-[14px] leading-none text-faint hover:text-accent cursor-pointer"
+                  class="shrink-0 px-1 text-title leading-none text-faint hover:text-accent cursor-pointer"
                   :aria-label="`${vial.compound} actions`"
                 >
                   ⋯
@@ -125,11 +125,11 @@
             <!-- depletion bar: a bottle counts down in tabs, a vial in its labeled unit -->
             <div class="mt-2.5">
               <div class="flex items-baseline justify-between gap-2">
-                <span class="text-[12px]">
-                  <span class="num-display text-[16px]">{{ remainingValue(vial, proj) }}</span>
+                <span class="text-small">
+                  <span class="num-display text-stat">{{ remainingValue(vial, proj) }}</span>
                   <span class="text-muted"> / {{ remainingOf(vial) }}</span>
                 </span>
-                <span class="text-[11px] text-muted">{{ Math.round(proj.pct * 100) }}%</span>
+                <span class="text-meta text-muted">{{ Math.round(proj.pct * 100) }}%</span>
               </div>
               <div class="h-1.5 bg-inset mt-1.5">
                 <div
@@ -140,7 +140,7 @@
             </div>
 
             <!-- projection -->
-            <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mt-2 text-[11.5px]">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mt-2 text-small">
               <span class="flex items-baseline gap-1.5">
                 <span :class="daysLeftClass(proj)">{{ daysLeftText(proj) }}</span>
                 <span
@@ -157,7 +157,7 @@
 
             <p
               v-if="openedText(vial, proj)"
-              class="mt-2 pt-2 border-t border-line-soft text-[11px] text-faint"
+              class="mt-2 pt-2 border-t border-line-soft text-meta text-faint"
             >
               {{ openedText(vial, proj) }}
             </p>
@@ -171,7 +171,7 @@
           :label="`SEALED STOCK · ${sealedCount}`"
           :dashes="3"
         >
-          <span class="text-[10.5px] text-muted normal-case">open one to start tracking it</span>
+          <span class="text-label text-muted normal-case">open one to start tracking it</span>
         </TuiHeader>
 
         <div class="mt-2.5 space-y-3">
@@ -184,8 +184,8 @@
                 class="w-1.5 h-1.5 rounded-full shrink-0"
                 :style="{ background: getCompoundColor(group.compound) }"
               />
-              <span class="text-[12.5px] text-hi">{{ group.compound }}</span>
-              <span class="text-[11px] text-muted">{{ group.total }} {{ group.noun }}</span>
+              <span class="text-row text-hi">{{ group.compound }}</span>
+              <span class="text-meta text-muted">{{ group.total }} {{ group.noun }}</span>
             </div>
 
             <div class="mt-1.5 border border-line-soft">
@@ -195,41 +195,41 @@
                 class="group flex flex-wrap items-baseline gap-x-3 gap-y-1 px-2.5 py-1.5 border-b border-line-soft last:border-0 hover:bg-row-hover transition-colors"
                 :class="i % 2 ? 'bg-inset' : ''"
               >
-                <span class="num-display text-[13px] shrink-0">{{ row.vial.quantity }}×</span>
-                <span class="text-[12px] text-body shrink-0">{{ describeContents(row.vial) }}</span>
+                <span class="num-display text-prose shrink-0">{{ row.vial.quantity }}×</span>
+                <span class="text-small text-body shrink-0">{{ describeContents(row.vial) }}</span>
                 <span
                   v-if="row.vial.supplier"
-                  class="text-[11.5px] text-muted truncate"
+                  class="text-small text-muted truncate"
                 >{{ row.vial.supplier }}</span>
                 <UBadge
                   v-if="row.expiryColor"
                   :color="row.expiryColor"
                   variant="subtle"
                   size="sm"
-                  class="text-[10.5px] tracking-widest uppercase"
+                  class="text-label tracking-widest uppercase"
                 >
                   {{ row.expiryText }}
                 </UBadge>
                 <span
                   v-else-if="row.expiryText"
-                  class="text-[11px] text-muted"
+                  class="text-meta text-muted"
                 >{{ row.expiryText }}</span>
 
                 <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
                   <button
                     type="button"
-                    class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+                    class="text-meta text-accent hover:text-accent-hover cursor-pointer"
                     @click="openReconstituteModal(row.vial)"
                   >{{ isPillForm(row.vial.form) ? '▸ open' : '⚗ open' }}</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                     :aria-label="`Edit ${row.vial.compound} ${containerNoun(row.vial.form)}`"
                     @click="openEditModal(row.vial)"
                   >edit</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
+                    class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
                     :aria-label="`Delete ${row.vial.compound} ${containerNoun(row.vial.form)}`"
                     @click="confirmDelete(row.vial)"
                   >✕</button>
@@ -248,7 +248,7 @@
         >
           <button
             type="button"
-            class="text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+            class="text-meta text-accent hover:text-accent-hover cursor-pointer"
             @click="showFinished = !showFinished"
           >
             {{ showFinished ? 'collapse ▴' : 'expand ▾' }}
@@ -269,19 +269,19 @@
               class="w-1.5 h-1.5 rounded-full shrink-0"
               :style="{ background: getCompoundColor(vial.compound) }"
             />
-            <span class="text-[12px] text-dim truncate">{{ vial.compound }}</span>
-            <span class="text-[11px] text-muted">{{ finishedMeta(vial) }}</span>
+            <span class="text-small text-dim truncate">{{ vial.compound }}</span>
+            <span class="text-meta text-muted">{{ finishedMeta(vial) }}</span>
 
             <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                 :aria-label="`Reactivate ${vial.compound} ${containerNoun(vial.form)}`"
                 @click="reactivate(vial)"
               >↻ reactivate</button>
               <button
                 type="button"
-                class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
+                class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
                 :aria-label="`Delete ${vial.compound} ${containerNoun(vial.form)}`"
                 @click="confirmDelete(vial)"
               >✕</button>
@@ -290,7 +290,7 @@
         </div>
       </section>
 
-      <p class="text-[11px] text-faint">
+      <p class="text-meta text-faint">
         {{ GENERAL_DISCLAIMER }}
       </p>
     </div>
@@ -318,7 +318,7 @@
               open-on-click
               placeholder="BPC-157"
               class="w-full"
-              :ui="{ item: 'text-[12px]' }"
+              :ui="{ item: 'text-small' }"
             />
           </UFormField>
 
@@ -419,7 +419,7 @@
                 />
               </UFormField>
             </div>
-            <p class="text-[11px] text-muted leading-[1.6]">
+            <p class="text-meta text-muted leading-[1.6]">
               {{ pillHint }}
             </p>
           </div>
@@ -528,13 +528,13 @@
           v-if="openTarget"
           class="space-y-4"
         >
-          <p class="text-[12.5px] leading-[1.7] text-dim">
+          <p class="text-row leading-[1.7] text-dim">
             {{ openLeadText }} <span class="text-hi">{{ openHighlight }}</span>
             {{ openTailText }}
           </p>
           <p
             v-if="reconstituteHint"
-            class="text-[11.5px] text-muted border border-line-input bg-inset px-2.5 py-2"
+            class="text-small text-muted border border-line-input bg-inset px-2.5 py-2"
           >
             ⚗ {{ reconstituteHint }}
           </p>
@@ -563,7 +563,7 @@
             </UFormField>
           </div>
 
-          <p class="text-[11.5px] text-muted leading-[1.7]">
+          <p class="text-small text-muted leading-[1.7]">
             {{ openOutcomeText }}
           </p>
 

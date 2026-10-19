@@ -66,12 +66,12 @@ async function onPinUnlocked() {
 <template>
   <div class="px-3.5 py-3 border border-line-input bg-inset">
     <div class="flex items-baseline gap-3">
-      <span class="text-[10.5px] tracking-[0.14em] uppercase text-accent">✦ LATEST {{ noun.toUpperCase() }} AI SUMMARY</span>
+      <span class="text-label tracking-[0.14em] uppercase text-accent">✦ LATEST {{ noun.toUpperCase() }} AI SUMMARY</span>
       <span
         v-if="summary"
-        class="text-[10.5px] text-muted tracking-[0.06em] uppercase"
+        class="text-label text-muted tracking-[0.06em] uppercase"
       >{{ formatDate(summary.date, 'monthDay').toUpperCase() }}</span>
-      <span class="ml-auto flex items-center gap-2.5 text-[11px]">
+      <span class="ml-auto flex items-center gap-2.5 text-meta">
         <button
           type="button"
           class="text-accent hover:text-accent-hover cursor-pointer"
@@ -91,13 +91,13 @@ async function onPinUnlocked() {
 
     <p
       v-if="regenerating"
-      class="mt-2 text-[12.5px] text-muted"
+      class="mt-2 text-row text-muted"
     >
       Comparing the {{ formatDate(latestDate) }} {{ noun }} against your history…
     </p>
     <p
       v-else-if="summary"
-      class="mt-2 text-[12.5px] leading-[1.7] text-dim whitespace-pre-line"
+      class="mt-2 text-row leading-[1.7] text-dim whitespace-pre-line"
       :class="open ? '' : 'line-clamp-1'"
     >
       {{ summary.text }}
@@ -105,14 +105,14 @@ async function onPinUnlocked() {
     <!-- Provenance: only summaries written since it was recorded carry it. -->
     <p
       v-if="!regenerating && open && summary?.model"
-      class="mt-2 text-[10.5px] text-ghost tracking-[0.06em]"
+      class="mt-2 text-label text-ghost tracking-[0.06em]"
       :title="summary.promptHash ? `prompt ${summary.promptHash}` : undefined"
     >
       written by {{ summary.model }}{{ summary.at ? ` · ${formatDate(localDayOf(summary.at), 'monthDay').toLowerCase()}` : '' }}
     </p>
     <p
       v-else-if="!regenerating && !summary"
-      class="mt-2 text-[12.5px] text-muted"
+      class="mt-2 text-row text-muted"
     >
       No AI summary for this {{ noun }} yet{{ canRegenerate ? ' — hit regen to generate one.' : '.' }}
     </p>

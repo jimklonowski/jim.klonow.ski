@@ -5,7 +5,7 @@
       :dashes="8"
     >
       <!-- The tagline is wider than a phone; the header keeps its title there and the hint under the buttons says the same. -->
-      <span class="hidden sm:inline text-[10.5px] text-muted normal-case">it lives off the data you already log — nothing here to maintain</span>
+      <span class="hidden sm:inline text-label text-muted normal-case">it lives off the data you already log — nothing here to maintain</span>
     </TuiHeader>
 
     <!-- Stage. Tall enough for the lg figure with a hat on (19 sprite rows), its EKG and captions,
@@ -155,7 +155,7 @@
 
       <!-- the pet's last remark -->
       <p
-        class="absolute left-3 bottom-2.5 text-[11.5px] text-muted truncate max-w-[calc(100%-1.5rem)]"
+        class="absolute left-3 bottom-2.5 text-small text-muted truncate max-w-[calc(100%-1.5rem)]"
         aria-live="polite"
       >
         {{ line }}
@@ -186,7 +186,7 @@
         :items="feedItems"
         :content="{ align: 'start' }"
         :disabled="busy || !dosesToday.length"
-        :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-[12px]' }"
+        :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-small' }"
       >
         <button
           type="button"
@@ -219,7 +219,7 @@
         :items="playItems"
         :content="{ align: 'start' }"
         :disabled="busy"
-        :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-[12px]' }"
+        :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-small' }"
       >
         <button
           type="button"
@@ -229,7 +229,7 @@
           ⊳ PLAY
         </button>
       </UDropdownMenu>
-      <span class="ml-auto text-[10.5px] text-faint">derived from the journal — talking quotes it, feed picks a dose (or the whole plate), walking replays what's logged; play is just play</span>
+      <span class="ml-auto text-label text-faint">derived from the journal — talking quotes it, feed picks a dose (or the whole plate), walking replays what's logged; play is just play</span>
     </div>
 
     <!-- Stats -->
@@ -243,19 +243,19 @@
         <p class="tui-label">
           {{ s.label }}
         </p>
-        <p class="mt-1 text-[13px] text-hi num-display">
+        <p class="mt-1 text-prose text-hi num-display">
           {{ s.value }}
         </p>
         <p
           v-if="s.hint"
-          class="mt-0.5 text-[10px] leading-tight text-faint"
+          class="mt-0.5 text-micro leading-tight text-faint"
         >
           {{ s.hint }}
         </p>
       </div>
     </div>
 
-    <p class="mt-2.5 text-[11.5px] leading-[1.7] text-muted">
+    <p class="mt-2.5 text-small leading-[1.7] text-muted">
       TICKER's day, read from the data: {{ todaySummary }}
     </p>
 
@@ -269,7 +269,7 @@
         label="TICKER · ACHIEVEMENTS"
         :dashes="4"
       >
-        <span class="text-[10.5px] text-faint">{{ earnedCount }} of {{ achievementCards.length }}</span>
+        <span class="text-label text-faint">{{ earnedCount }} of {{ achievementCards.length }}</span>
       </TuiHeader>
       <ul class="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-px bg-line-soft border border-line-soft">
         <li
@@ -285,19 +285,19 @@
             :class="a.earned ? 'text-accent' : 'text-faint'"
           />
           <div class="min-w-0 flex-1">
-            <p class="text-[12px] text-hi flex items-baseline gap-1.5 min-w-0">
+            <p class="text-small text-hi flex items-baseline gap-1.5 min-w-0">
               <span class="truncate">{{ a.name }}</span>
               <span
                 v-if="a.reward"
                 class="tui-label text-[8.5px] shrink-0"
               >wearable</span>
             </p>
-            <p class="text-[10.5px] leading-tight text-faint">
+            <p class="text-label leading-tight text-faint">
               {{ a.desc }}
             </p>
             <p
               v-if="a.earned"
-              class="mt-1 text-[10px] text-accent"
+              class="mt-1 text-micro text-accent"
             >
               earned{{ a.date ? ` ${formatDate(a.date, 'monthDay')}${a.date.slice(0, 4) !== today.slice(0, 4) ? ` ${a.date.slice(0, 4)}` : ''}` : '' }}
             </p>
@@ -308,7 +308,7 @@
                 size="2xs"
                 class="mt-1.5"
               />
-              <p class="mt-0.5 text-[10px] text-faint tabular-nums">
+              <p class="mt-0.5 text-micro text-faint tabular-nums">
                 {{ a.progress.toLocaleString('en-US') }} / {{ a.goal.toLocaleString('en-US') }} {{ a.unit }}
               </p>
             </template>
@@ -328,9 +328,9 @@
         label="TICKER · LOG"
         :dashes="4"
       >
-        <span class="text-[10.5px] text-faint">last {{ log.length }} of today</span>
+        <span class="text-label text-faint">last {{ log.length }} of today</span>
       </TuiHeader>
-      <ol class="mt-2 border-l border-line-soft pl-3 text-[11px] leading-[1.6]">
+      <ol class="mt-2 border-l border-line-soft pl-3 text-meta leading-[1.6]">
         <li
           v-for="(entry, i) in log"
           :key="entry.id"

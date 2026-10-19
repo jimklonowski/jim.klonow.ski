@@ -8,7 +8,7 @@
 
     <!-- ACTIVE: progress, dosing status, what's next -->
     <template v-if="state === 'active'">
-      <div class="flex items-baseline gap-2.5 mt-2.5 text-[12px]">
+      <div class="flex items-baseline gap-2.5 mt-2.5 text-small">
         <NuxtLink
           :to="dossier"
           class="text-hi hover:text-accent whitespace-nowrap"
@@ -22,12 +22,12 @@
         </span>
         <span
           v-if="pct != null"
-          class="text-[11px]"
+          class="text-meta"
           :class="pctClass"
         >{{ pct }}%</span>
       </div>
 
-      <div class="flex flex-col gap-1 mt-2 text-[12px]">
+      <div class="flex flex-col gap-1 mt-2 text-small">
         <div
           v-for="row in doseRows"
           :key="row.compound"
@@ -39,7 +39,7 @@
             class="text-body hover:text-accent truncate"
           >{{ row.compound }} {{ row.doseLabel }}</NuxtLink>
           <span
-            class="ml-auto shrink-0 text-[10.5px] tracking-[0.06em]"
+            class="ml-auto shrink-0 text-label tracking-[0.06em]"
             :class="STATUS_CLASSES[row.status.kind]"
           >{{ row.status.label }}</span>
         </div>
@@ -70,7 +70,7 @@
       </div>
       <div
         v-if="chips.length"
-        class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 pl-5 text-[11px]"
+        class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 pl-5 text-meta"
       >
         <span
           v-for="chip in chips"
@@ -84,7 +84,7 @@
          (month/quarter) swaps the countdown for the period it's pencilled in for; there's no
          day to count to. -->
     <template v-else-if="state === 'upcoming'">
-      <div class="flex flex-col gap-1 mt-2.5 text-[12px]">
+      <div class="flex flex-col gap-1 mt-2.5 text-small">
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">├</span>
           <NuxtLink
@@ -92,7 +92,7 @@
             class="text-hi hover:text-accent"
           >{{ tentativeStart ? `planned for ${tentativeStart}` : `starts in ${startsIn}d` }}</NuxtLink>
           <span
-            class="ml-auto shrink-0 text-[10.5px] tracking-[0.06em]"
+            class="ml-auto shrink-0 text-label tracking-[0.06em]"
             :class="tentativeStart ? 'text-dim' : 'text-muted'"
           >{{ tentativeStart ? 'NO DATE SET' : formatDate(cycle.start_date, 'monthDay') }}</span>
         </div>
@@ -111,7 +111,7 @@
       </div>
       <div
         v-if="chips.length"
-        class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 pl-5 text-[11px]"
+        class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 pl-5 text-meta"
       >
         <span
           v-for="chip in chips"
@@ -123,7 +123,7 @@
 
     <!-- DONE (recent): the recovery story -->
     <template v-else>
-      <div class="flex flex-col gap-1 mt-2.5 text-[12px]">
+      <div class="flex flex-col gap-1 mt-2.5 text-small">
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">├</span>
           <NuxtLink
@@ -139,7 +139,7 @@
       </div>
       <div
         v-if="chips.length"
-        class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 pl-5 text-[11px]"
+        class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 pl-5 text-meta"
       >
         <span
           v-for="chip in chips"

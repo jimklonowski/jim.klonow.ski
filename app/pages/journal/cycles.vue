@@ -5,7 +5,7 @@
       :meta="meta"
     >
       <template #actions>
-        <span class="text-[11px] text-muted hidden sm:inline">planned protocol phases · feeds adherence, calendar & AI</span>
+        <span class="text-meta text-muted hidden sm:inline">planned protocol phases · feeds adherence, calendar & AI</span>
         <button
           v-if="isOwner"
           type="button"
@@ -25,7 +25,7 @@
 
     <p
       v-if="!cycles.length"
-      class="px-4 sm:px-6 py-5 text-[12px] text-muted"
+      class="px-4 sm:px-6 py-5 text-small text-muted"
     >
       No cycles planned yet.{{ isOwner ? ' Use + PLAN CYCLE to lay out a run — planned compounds get calendar rings, adherence scoring, lab checkpoints, and AI context automatically.' : '' }}
     </p>
@@ -45,39 +45,39 @@
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <NuxtLink
                 :to="`/journal/cycle/${c.id}`"
-                class="text-[13px] text-hi hover:text-accent"
+                class="text-prose text-hi hover:text-accent"
               >{{ c.name }}</NuxtLink>
               <span
-                class="text-[10.5px] tracking-[0.06em] uppercase"
+                class="text-label tracking-[0.06em] uppercase"
                 :class="STATUS_CLASSES[statusKey(c)]"
               >{{ statusLabel(c) }}</span>
               <span
                 v-if="c.goal"
-                class="text-[11.5px] text-muted"
+                class="text-small text-muted"
               >{{ c.goal }}</span>
 
               <span class="ml-auto flex items-baseline gap-3 shrink-0">
                 <span
                   v-if="pctOf(c) != null"
-                  class="text-[11.5px]"
+                  class="text-small"
                   :class="pctClass(pctOf(c))"
                 >{{ pctOf(c) }}% adherence</span>
                 <template v-if="isOwner">
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                     :aria-label="`Edit ${c.name}`"
                     @click="cycleForm?.open(c)"
                   >edit</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                     :aria-label="`Duplicate ${c.name}`"
                     @click="cycleForm?.open(c, { duplicate: true })"
                   >duplicate</button>
                   <button
                     type="button"
-                    class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
+                    class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
                     :aria-label="`Delete ${c.name}`"
                     @click="confirmDelete(c)"
                   >✕</button>
@@ -87,7 +87,7 @@
 
             <!-- A tentative start has no end date to show — the span isn't known until a day
                  is picked, so it states the period and the length instead. -->
-            <div class="mt-1.5 text-[11.5px] text-muted">
+            <div class="mt-1.5 text-small text-muted">
               <template v-if="tentativeStartLabel(c)">
                 sometime in {{ tentativeStartLabel(c) }} · {{ durationLabel(c) }} planned · no date set
               </template>
@@ -101,7 +101,7 @@
               <div
                 v-for="(item, i) in c.compounds"
                 :key="i"
-                class="flex items-baseline gap-2 text-[11.5px]"
+                class="flex items-baseline gap-2 text-small"
               >
                 <span
                   class="w-1.5 h-1.5 rounded-full shrink-0 self-center"

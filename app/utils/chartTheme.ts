@@ -125,9 +125,11 @@ export const CHART_TOOLTIP = {
   borderColor: THEME['line-accent'],
   borderWidth: 1,
   padding: [6, 10] as [number, number],
-  // The tooltip is HTML, so here the face CAN be the token and follows a font switch by itself.
+  // The tooltip is HTML, so here the face CAN be the token and follows a font switch by itself —
+  // and the size setting too, through the font-size in extraCssText (it lands after echarts'
+  // own font-size in the same style attribute, so it wins).
   textStyle: { ...CHART_TEXT, fontFamily: 'var(--font-mono)', color: THEME.body, fontSize: 11 },
-  extraCssText: `${CHART_TOOLTIP_Z}border-radius:0;box-shadow:0 0 12px rgba(0,0,0,.5);`
+  extraCssText: `${CHART_TOOLTIP_Z}border-radius:0;box-shadow:0 0 12px rgba(0,0,0,.5);font-size:calc(11px * var(--type-scale));`
 }
 
 /** Point markers become noise past ~40 readings, so dense series render as a bare line. */
@@ -153,6 +155,8 @@ interface ChartFrameOptions {
   yAxis?: Record<string, unknown> & { splitLine?: Record<string, unknown> }
   /** The active face's font-family (useTheme().fontStack); CHART_TEXT's default when omitted. */
   fontFamily?: string
+  /** The SIZE setting's factor (useTheme().typeScale); the SVG's labels are sized by it. */
+  scale?: number
 }
 
 /**
@@ -166,7 +170,8 @@ export function chartFrame(o: ChartFrameOptions) {
     ? { top: o.bareTop ?? 4, left: 2, right: 2, bottom: 2, containLabel: false }
     : { ...(o.grid === 'fixed' ? CHART_GRID_FIXED : CHART_GRID), top: o.showLegend ? 26 : 8 }
   const { splitLine, ...yAxis } = o.yAxis ?? {}
-  const text = o.fontFamily ? { ...CHART_TEXT, fontFamily: o.fontFamily } : CHART_TEXT
+  const fontSize = Math.round(CHART_TEXT.fontSize * (o.scale ?? 1) * 10) / 10
+  const text = { ...CHART_TEXT, fontSize, ...(o.fontFamily ? { fontFamily: o.fontFamily } : {}) }
   return {
     backgroundColor: 'transparent',
     // The global default for every label on the chart, axes included.
@@ -183,14 +188,14 @@ export function chartFrame(o: ChartFrameOptions) {
     xAxis: {
       type: 'category' as const,
       data: o.labels,
-      axisLabel: { color: CHART_AXIS.label, fontSize: 10 },
+      axisLabel: { color: CHART_AXIS.label, fontSize },
       axisLine: { lineStyle: { color: CHART_AXIS.line } },
       axisTick: { show: false },
       ...o.xAxis
     },
     yAxis: {
       type: 'value' as const,
-      axisLabel: { color: CHART_AXIS.label, fontSize: 10 },
+      axisLabel: { color: CHART_AXIS.label, fontSize },
       axisLine: { show: false },
       ...yAxis,
       splitLine: { ...splitLine, lineStyle: { color: CHART_AXIS.split } }

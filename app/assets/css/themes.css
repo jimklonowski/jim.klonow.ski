@@ -247,3 +247,15 @@ html[data-font="system"] {
   --font-sans: ui-monospace, 'SF Mono', Menlo, Consolas, 'Cascadia Mono', 'Liberation Mono', monospace;
   --font-serif: ui-monospace, 'SF Mono', Menlo, Consolas, 'Cascadia Mono', 'Liberation Mono', monospace;
 }
+
+html[data-scale="s"] {
+  --type-scale: 0.92;
+}
+
+html[data-scale="l"] {
+  --type-scale: 1.12;
+}
+
+html[data-scale="xl"] {
+  --type-scale: 1.25;
+}

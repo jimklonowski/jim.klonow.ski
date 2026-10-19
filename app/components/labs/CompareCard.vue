@@ -53,7 +53,7 @@
     </div>
 
     <div class="px-2 py-2.5">
-      <p class="px-1.5 pb-1.5 text-[10.5px] text-muted">
+      <p class="px-1.5 pb-1.5 text-label text-muted">
         {{ metaLine }}
       </p>
       <ClientOnly>
@@ -70,7 +70,7 @@
         />
         <p
           v-else
-          class="h-50 flex items-center justify-center text-[12px] text-muted"
+          class="h-50 flex items-center justify-center text-small text-muted"
         >
           Pick two markers with at least two draws between them.
         </p>

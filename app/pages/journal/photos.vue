@@ -5,7 +5,7 @@
       :meta="headerMeta"
     >
       <template #actions>
-        <span class="text-[11px] text-muted hidden sm:inline">framing is non-destructive · originals untouched</span>
+        <span class="text-meta text-muted hidden sm:inline">framing is non-destructive · originals untouched</span>
       </template>
     </JournalHeader>
     <JournalNav />
@@ -30,8 +30,8 @@
         :ui="{
           root: 'bg-warn/10 border border-warn/25 ring-0 p-3 gap-2.5',
           icon: 'size-4 text-warn',
-          title: 'text-[12px] text-hi font-medium',
-          description: 'text-[11.5px] text-dim opacity-100 mt-1',
+          title: 'text-small text-hi font-medium',
+          description: 'text-small text-dim opacity-100 mt-1',
           actions: 'mt-2'
         }"
       />
@@ -46,7 +46,7 @@
         label="ADD PHOTOS"
         :dashes="11"
       >
-        <span class="text-[10.5px] text-muted normal-case">date auto-detected from EXIF</span>
+        <span class="text-label text-muted normal-case">date auto-detected from EXIF</span>
       </TuiHeader>
 
       <div class="mt-2 bg-raised border border-line-soft px-3.5 py-3">
@@ -62,8 +62,8 @@
           class="w-full"
           :ui="{
             base: 'bg-inset border-line-input',
-            label: 'text-[12px] text-dim mt-2 font-normal',
-            description: 'text-[11px] text-muted mt-1',
+            label: 'text-small text-dim mt-2 font-normal',
+            description: 'text-meta text-muted mt-1',
             icon: 'text-faint',
             file: 'border-b border-line-soft last:border-0 py-2'
           }"
@@ -111,7 +111,7 @@
                 <button
                   v-else
                   type="button"
-                  class="text-[11px] text-faint hover:text-danger cursor-pointer shrink-0 px-1"
+                  class="text-meta text-faint hover:text-danger cursor-pointer shrink-0 px-1"
                   aria-label="Remove file"
                   @click="removeFile(index)"
                 >
@@ -120,7 +120,7 @@
               </div>
               <p
                 v-if="metaFor(file).status === 'error'"
-                class="mt-1.5 w-full text-[11px] text-danger"
+                class="mt-1.5 w-full text-meta text-danger"
               >
                 {{ metaFor(file).error }}
               </p>
@@ -171,8 +171,8 @@
       :description="emptyDescription"
       :ui="{
         root: 'p-6',
-        title: 'text-[13px] text-hi font-medium',
-        description: 'text-[12px] text-muted'
+        title: 'text-prose text-hi font-medium',
+        description: 'text-small text-muted'
       }"
     />
 
@@ -183,7 +183,7 @@
           label="COMPARE"
           :dashes="13"
         >
-          <span class="text-[10.5px] text-muted normal-case">{{ compareMeta }}</span>
+          <span class="text-label text-muted normal-case">{{ compareMeta }}</span>
         </TuiHeader>
 
         <div class="mt-2 flex flex-wrap items-end gap-2.5">
@@ -237,7 +237,7 @@
           >
             <button
               type="button"
-              class="absolute top-2 left-2 px-1.5 py-0.5 text-[11px] bg-bg/80 border border-line-accent text-accent cursor-pointer"
+              class="absolute top-2 left-2 px-1.5 py-0.5 text-meta bg-bg/80 border border-line-accent text-accent cursor-pointer"
               aria-label="Expand before photo"
               @pointerdown.stop
               @click="lightboxPhoto = beforePhoto"
@@ -246,7 +246,7 @@
             </button>
             <button
               type="button"
-              class="absolute top-2 right-2 px-1.5 py-0.5 text-[11px] bg-bg/80 border border-line-accent text-accent cursor-pointer"
+              class="absolute top-2 right-2 px-1.5 py-0.5 text-meta bg-bg/80 border border-line-accent text-accent cursor-pointer"
               aria-label="Expand after photo"
               @pointerdown.stop
               @click="lightboxPhoto = afterPhoto"
@@ -279,11 +279,11 @@
               </button>
               <div
                 v-else
-                class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-[12px] text-muted"
+                class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-small text-muted"
               >
                 no photo
               </div>
-              <p class="mt-1.5 text-[11px] text-muted text-center">
+              <p class="mt-1.5 text-meta text-muted text-center">
                 {{ beforePhoto ? formatDate(beforePhoto.date) : '' }}
               </p>
             </div>
@@ -304,11 +304,11 @@
               </button>
               <div
                 v-else
-                class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-[12px] text-muted"
+                class="w-full aspect-square border border-dashed border-line-input flex items-center justify-center text-small text-muted"
               >
                 no photo
               </div>
-              <p class="mt-1.5 text-[11px] text-muted text-center">
+              <p class="mt-1.5 text-meta text-muted text-center">
                 {{ afterPhoto ? formatDate(afterPhoto.date) : '' }}
               </p>
             </div>
@@ -325,7 +325,7 @@
           label="TIMELAPSE"
           :dashes="11"
         >
-          <span class="text-[10.5px] text-muted normal-case">{{ timelapseMeta }}</span>
+          <span class="text-label text-muted normal-case">{{ timelapseMeta }}</span>
         </TuiHeader>
         <JournalPhotoTimelapse
           class="mt-2.5"
@@ -344,7 +344,7 @@
         >
           <!-- Doubles as the legend and the slot picker: whichever chip is armed is the slot
                the next thumbnail tap fills. -->
-          <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] normal-case">
+          <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-label normal-case">
             <button
               v-for="slot in (['before', 'after'] as const)"
               :key="slot"
@@ -401,7 +401,7 @@
           </UContextMenu>
         </div>
 
-        <p class="mt-2.5 text-[11px] text-muted">
+        <p class="mt-2.5 text-meta text-muted">
           Tap <span class="text-warn">before</span> or <span class="text-accent">after</span> above to pick the slot you're filling, then tap a thumbnail. Filling Before arms After for you.{{ isOwner ? ' Long-press a thumbnail for reframe / flip / edit / delete.' : '' }}
         </p>
       </section>
@@ -484,7 +484,7 @@
               <div class="absolute top-1/2 left-0 right-0 h-px bg-accent/40" />
             </div>
           </div>
-          <p class="text-[11px] text-muted text-center">
+          <p class="text-meta text-muted text-center">
             Drag the photo to reposition, use the slider to zoom.
           </p>
 

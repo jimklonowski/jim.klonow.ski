@@ -69,8 +69,8 @@ const detail = computed(() => {
 // Phosphor Terminal skin over UEmpty's slots.
 const tui = {
   root: 'py-8',
-  title: 'text-[13px] text-warn uppercase tracking-[0.12em] font-medium',
-  description: 'text-[12px] text-muted mt-1.5',
+  title: 'text-prose text-warn uppercase tracking-[0.12em] font-medium',
+  description: 'text-small text-muted mt-1.5',
   body: 'mt-3'
 }
 </script>

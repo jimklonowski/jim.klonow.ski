@@ -5,7 +5,7 @@
       :meta="`${activeCount} active`"
     >
       <template #actions>
-        <span class="text-[11px] text-muted hidden sm:inline">feeds AI digests as protocol context</span>
+        <span class="text-meta text-muted hidden sm:inline">feeds AI digests as protocol context</span>
         <button
           v-if="canEdit"
           type="button"
@@ -25,7 +25,7 @@
 
     <p
       v-if="!supplements.length"
-      class="px-4 sm:px-6 py-5 text-[12px] text-muted"
+      class="px-4 sm:px-6 py-5 text-small text-muted"
     >
       Nothing tracked yet.{{ canEdit ? ' Use + ADD to record your daily stack.' : '' }}
     </p>
@@ -39,14 +39,14 @@
           :label="`${group.title} · ${group.items.length}`"
           :dashes="group.dashes"
         >
-          <span class="text-[10.5px] text-muted normal-case">{{ group.hint }}</span>
+          <span class="text-label text-muted normal-case">{{ group.hint }}</span>
         </TuiHeader>
 
         <!-- Collapsed groups keep their rows behind a link, per the mockup's ON HAND section -->
         <button
           v-if="group.collapsible && !expanded[group.key]"
           type="button"
-          class="mt-1.5 text-[11px] text-accent hover:text-accent-hover cursor-pointer"
+          class="mt-1.5 text-meta text-accent hover:text-accent-hover cursor-pointer"
           @click="expanded[group.key] = true"
         >
           view →
@@ -62,36 +62,36 @@
             class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
           >
             <span
-              class="text-[13px]"
+              class="text-prose"
               :class="s.status === 'stopped' ? 'line-through text-muted' : 'text-hi'"
             >{{ s.name }}</span>
 
             <span
               v-if="annotation(s)"
-              class="text-[11.5px]"
+              class="text-small"
               :class="annotation(s)!.class"
             >{{ annotation(s)!.text }}</span>
 
             <span
               v-if="cadence(s)"
-              class="text-[11px] text-accent border border-line-accent px-1.5 py-0.5"
+              class="text-meta text-accent border border-line-accent px-1.5 py-0.5"
             >{{ cadence(s) }}</span>
 
             <span class="ml-auto flex items-baseline gap-2 shrink-0">
               <span
                 v-if="s.dose"
-                class="text-[12.5px] text-muted"
+                class="text-row text-muted"
               >{{ s.dose }}</span>
               <template v-if="canEdit">
                 <button
                   type="button"
-                  class="text-[11px] text-faint hover:text-accent cursor-pointer tui-row-action"
+                  class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
                   :aria-label="`Edit ${s.name}`"
                   @click="openEditModal(s)"
                 >edit</button>
                 <button
                   type="button"
-                  class="text-[11px] text-faint hover:text-danger cursor-pointer tui-row-action"
+                  class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
                   :aria-label="`Delete ${s.name}`"
                   @click="confirmDelete(s)"
                 >✕</button>

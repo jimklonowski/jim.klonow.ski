@@ -11,11 +11,11 @@
         />
         <span
           v-if="info"
-          class="text-[11px] text-accent border border-line-accent px-2 py-1 uppercase tracking-[0.08em]"
+          class="text-meta text-accent border border-line-accent px-2 py-1 uppercase tracking-[0.08em]"
         >{{ info.category }}</span>
         <span
           v-if="onDays.length"
-          class="text-[11px] text-muted tracking-[0.06em] uppercase"
+          class="text-meta text-muted tracking-[0.06em] uppercase"
         >{{ usageSummary }}</span>
       </template>
     </JournalHeader>
@@ -32,40 +32,40 @@
       class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-b border-line"
     >
       <div class="bg-bg px-4 sm:px-6 py-3.5">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           Total {{ isInjected ? 'injections' : 'doses' }}
         </p>
-        <p class="num-display text-[28px] leading-none mt-1.5">
+        <p class="num-display text-display leading-none mt-1.5">
           {{ totalDoses }}
         </p>
       </div>
       <div class="bg-bg px-4 sm:px-6 py-3.5">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           Avg dose
         </p>
-        <p class="num-display text-[28px] leading-none mt-1.5">
-          {{ avgDose }}<span class="text-[11px] text-muted"> {{ unit }}</span>
+        <p class="num-display text-display leading-none mt-1.5">
+          {{ avgDose }}<span class="text-meta text-muted"> {{ unit }}</span>
         </p>
         <p
           v-if="avgDoseEquiv"
-          class="text-[11px] text-muted mt-1"
+          class="text-meta text-muted mt-1"
         >
           {{ avgDoseEquiv }}
         </p>
       </div>
       <div class="bg-bg px-4 sm:px-6 py-3.5">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           First used
         </p>
-        <p class="num-display text-[28px] leading-none mt-1.5">
+        <p class="num-display text-display leading-none mt-1.5">
           {{ formatDate(onDays[0]!.date, 'monthDay').toUpperCase() }}
         </p>
       </div>
       <div class="bg-bg px-4 sm:px-6 py-3.5">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           {{ isInjected ? 'Sites' : 'Route' }}
         </p>
-        <p class="text-[13px] text-body mt-2.5">
+        <p class="text-prose text-body mt-2.5">
           {{ sitesLabel || '—' }}
         </p>
       </div>
@@ -73,7 +73,7 @@
 
     <p
       v-if="!onDays.length"
-      class="px-4 sm:px-6 py-4 text-[12px] text-muted"
+      class="px-4 sm:px-6 py-4 text-small text-muted"
     >
       No doses of {{ compoundName }} logged yet.
     </p>
@@ -108,7 +108,7 @@
               </span>
             </template>
             <template #label-cell="{ row }">
-              <span class="text-muted uppercase text-[11px] tracking-[0.08em]">{{ row.original.label }}</span>
+              <span class="text-muted uppercase text-meta tracking-[0.08em]">{{ row.original.label }}</span>
             </template>
             <template #on-cell="{ row }">
               <span class="text-hi">{{ row.original.on ?? '—' }}</span>
@@ -120,7 +120,7 @@
               <span :class="row.original.deltaClass">{{ row.original.deltaText }}</span>
             </template>
           </UTable>
-          <p class="mt-2 text-[11px] text-faint leading-[1.6]">
+          <p class="mt-2 text-meta text-faint leading-[1.6]">
             {{ onDaysWithVitals }} on-day vs {{ offDaysWithVitals.toLocaleString('en-US') }} off-day readings · correlation only — not causal
           </p>
         </div>
@@ -131,12 +131,12 @@
             label="DOSSIER"
             :dashes="20"
           />
-          <p class="mt-2.5 text-[12.5px] leading-[1.7] text-dim">
+          <p class="mt-2.5 text-row leading-[1.7] text-dim">
             {{ info.summary }}
           </p>
-          <dl class="mt-3 space-y-2 text-[12px]">
+          <dl class="mt-3 space-y-2 text-small">
             <div v-if="info.aka">
-              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+              <dt class="text-label text-muted uppercase tracking-[0.12em]">
                 Also known as
               </dt>
               <dd class="text-dim">
@@ -144,7 +144,7 @@
               </dd>
             </div>
             <div>
-              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+              <dt class="text-label text-muted uppercase tracking-[0.12em]">
                 Typical dosing
               </dt>
               <dd class="text-dim">
@@ -152,7 +152,7 @@
               </dd>
             </div>
             <div v-if="info.reconstitution">
-              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+              <dt class="text-label text-muted uppercase tracking-[0.12em]">
                 Reconstitution
               </dt>
               <dd class="text-dim">
@@ -166,7 +166,7 @@
               </dd>
             </div>
             <div v-if="info.cycling">
-              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+              <dt class="text-label text-muted uppercase tracking-[0.12em]">
                 Cycling
               </dt>
               <dd class="text-dim">
@@ -174,7 +174,7 @@
               </dd>
             </div>
             <div>
-              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+              <dt class="text-label text-muted uppercase tracking-[0.12em]">
                 Storage
               </dt>
               <dd class="text-dim">
@@ -182,7 +182,7 @@
               </dd>
             </div>
             <div v-if="info.halfLife">
-              <dt class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+              <dt class="text-label text-muted uppercase tracking-[0.12em]">
                 Half-life
               </dt>
               <dd class="text-dim">
@@ -192,7 +192,7 @@
           </dl>
           <p
             v-if="info.caution"
-            class="mt-3 text-[12px] text-warn leading-[1.6]"
+            class="mt-3 text-small text-warn leading-[1.6]"
           >
             ⚠ {{ info.caution }}
           </p>
@@ -204,7 +204,7 @@
              so the dates line up between the two. -->
         <div v-if="doseChart.length >= 2">
           <TuiHeader :label="`DAILY DOSE · ${unit.toUpperCase()}`">
-            <span class="text-[10.5px] text-muted">{{ doseRangeLabel }}</span>
+            <span class="text-label text-muted">{{ doseRangeLabel }}</span>
           </TuiHeader>
           <div class="mt-2.5">
             <ClientOnly>
@@ -222,7 +222,7 @@
               </template>
             </ClientOnly>
           </div>
-          <div class="flex items-baseline justify-between gap-3 mt-1 text-[11px] text-muted">
+          <div class="flex items-baseline justify-between gap-3 mt-1 text-meta text-muted">
             <span>{{ doseSummary.start }}</span>
             <span>{{ doseSummary.recent }}</span>
           </div>
@@ -231,7 +231,7 @@
         <!-- Modeled exposure (slow-release compounds only) -->
         <div v-if="exposureChart.length >= 2">
           <TuiHeader label="ESTIMATED LEVELS · MODELED">
-            <span class="text-[10.5px] text-muted">% OF PEAK</span>
+            <span class="text-label text-muted">% OF PEAK</span>
           </TuiHeader>
           <div class="mt-2.5">
             <ClientOnly>
@@ -248,7 +248,7 @@
               </template>
             </ClientOnly>
           </div>
-          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          <p class="mt-1.5 text-meta text-faint leading-[1.6]">
             Bateman superposition of your logged doses ({{ pkModelNote }}) — relative shape only, not measured serum levels.{{ exposureMarks.length ? ' Dashed guides mark lab draws.' : '' }}
           </p>
         </div>
@@ -297,10 +297,10 @@
           >
             <NuxtLink
               :to="calculatorLink"
-              class="text-[10.5px] text-accent hover:text-accent-hover"
+              class="text-label text-accent hover:text-accent-hover"
             >calculator →</NuxtLink>
           </TuiHeader>
-          <p class="mt-2 text-[11px] text-muted">
+          <p class="mt-2 text-meta text-muted">
             {{ mixLine }}
           </p>
           <div class="mt-2">
@@ -317,14 +317,14 @@
               </template>
             </ClientOnly>
           </div>
-          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          <p class="mt-1.5 text-meta text-faint leading-[1.6]">
             Based on your most recently logged mix ({{ formatDate(currentMix.date) }}). Units are for a U-100 insulin syringe (1 unit = 0.01 mL) — recalculate if you change vial size or dilution.
           </p>
         </div>
       </section>
     </div>
 
-    <p class="px-4 sm:px-6 py-3 text-[11px] text-ghost border-t border-line">
+    <p class="px-4 sm:px-6 py-3 text-meta text-ghost border-t border-line">
       {{ GENERAL_DISCLAIMER }}
     </p>
   </div>

@@ -76,7 +76,7 @@
           </UFormField>
         </div>
         <p
-          class="text-[10.5px] -mt-2.5"
+          class="text-label -mt-2.5"
           :class="form.start_precision === 'day' ? 'text-faint' : 'text-warn'"
         >
           {{ startHelp }}
@@ -134,7 +134,7 @@
                 />
                 <button
                   type="button"
-                  class="ml-auto text-[11px] text-faint hover:text-danger cursor-pointer"
+                  class="ml-auto text-meta text-faint hover:text-danger cursor-pointer"
                   :aria-label="`Remove ${item.compound || 'compound'}`"
                   @click="form.compounds.splice(i, 1)"
                 >
@@ -148,7 +148,7 @@
                     v-for="d in WEEKDAY_ORDER"
                     :key="d"
                     type="button"
-                    class="w-6 h-6 text-[10px] border cursor-pointer transition-colors"
+                    class="w-6 h-6 text-micro border cursor-pointer transition-colors"
                     :class="item.weekdays.includes(d)
                       ? 'border-line-accent text-accent bg-inset'
                       : 'border-line-soft text-faint hover:text-accent'"
@@ -157,7 +157,7 @@
                   >{{ DAY_LETTERS[d] }}</button>
                 </span>
 
-                <span class="flex items-center gap-1.5 text-[11px] text-muted">
+                <span class="flex items-center gap-1.5 text-meta text-muted">
                   wks
                   <UInput
                     v-model.number="item.fromWeek"
@@ -179,7 +179,7 @@
                   />
                 </span>
 
-                <span class="text-[10.5px] text-ghost">{{ itemHint(item) }}</span>
+                <span class="text-label text-ghost">{{ itemHint(item) }}</span>
               </div>
             </div>
 

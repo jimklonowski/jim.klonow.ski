@@ -20,7 +20,40 @@
   --font-sans: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
   --font-serif: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
   --font-display: 'Departure Mono', 'JetBrains Mono', monospace;
+}
 
+/* Type ramp. Every font size on the site is one of these (`text-label` etc. — Tailwind makes the
+   utilities from the --text-* namespace), each a multiple of --type-scale, the SIZE setting in the
+   DISPLAY picker (shared/utils/displayScale.ts; `:root` below holds the default 1). The reading
+   ramp scales 1:1; the display figures, which sit in nowrap tiles and fixed columns, at half rate
+   through --type-scale-display. The 0.5px steps are deliberate: the 3px band from label to prose
+   is where this design lives. 11.5px was folded into `small` 2026-10-19.
+
+   `inline` matters: the utilities carry the calc() itself, so var(--type-scale) resolves on the
+   element that uses it. Declared on :root alone, each token would be computed there once and
+   inherited as a finished value, and nothing could opt out — the DISPLAY picker pins its own
+   --type-scale to 1 so that previewing a size doesn't re-flow the rows under the pointer. */
+@theme static inline {
+  --text-nano: calc(9.5px * var(--type-scale));
+  --text-micro: calc(10px * var(--type-scale));
+  --text-label: calc(10.5px * var(--type-scale));
+  --text-meta: calc(11px * var(--type-scale));
+  --text-small: calc(12px * var(--type-scale));
+  --text-row: calc(12.5px * var(--type-scale));
+  --text-prose: calc(13px * var(--type-scale));
+  /* Display figures (num-display numbers, headings). */
+  --text-title: calc(15px * var(--type-scale-display));
+  --text-stat: calc(17px * var(--type-scale-display));
+  --text-head: calc(19px * var(--type-scale-display));
+  --text-figure: calc(22px * var(--type-scale-display));
+  --text-hero: calc(24px * var(--type-scale-display));
+  --text-tile: calc(26px * var(--type-scale-display));
+  --text-display: calc(28px * var(--type-scale-display));
+  --text-big: calc(32px * var(--type-scale-display));
+  --text-giant: calc(44px * var(--type-scale-display));
+}
+
+@theme static {
   /* Surfaces */
   --color-bg: #070a09;
   --color-raised: #0d1310;
@@ -118,6 +151,11 @@
   --ui-container: var(--container-12xl);
   --ui-radius: 0px;
 
+  /* The SIZE setting: themes.css redefines --type-scale per html[data-scale]; the display
+     figures follow at half the rate (XL = 1.25 body → 1.125 figures). */
+  --type-scale: 1;
+  --type-scale-display: calc(1 + (var(--type-scale) - 1) * 0.5);
+
   --ui-bg: var(--color-bg);
   --ui-bg-muted: var(--color-inset);
   --ui-bg-elevated: var(--color-raised);
@@ -157,7 +195,7 @@
     background-color: var(--color-bg);
     color: var(--color-body);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-prose);
     line-height: 1.7;
   }
 
@@ -175,7 +213,9 @@
 @layer components {
   /* TUI section header text: ┌ LABEL ───── (box-drawing fill drawn by TuiHeader.vue) */
   .tui-label {
-    font-size: 10.5px;
+    /* The calc rather than var(--text-label), so the size resolves on the element (see the
+       type ramp's `inline` note); held equal to the token by tests/theme.test.mjs. */
+    font-size: calc(10.5px * var(--type-scale));
     font-weight: 500;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -206,7 +246,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 10.5px;
+    font-size: calc(10.5px * var(--type-scale));
     font-weight: 500;
     letter-spacing: 0.1em;
     text-transform: uppercase;

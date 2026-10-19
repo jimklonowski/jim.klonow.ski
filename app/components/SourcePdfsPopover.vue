@@ -16,7 +16,7 @@
           :key="src"
           :href="src"
           target="_blank"
-          class="flex items-center gap-2 text-[12px] px-3 py-1.5 text-dim hover:bg-nav-active hover:text-accent transition-colors"
+          class="flex items-center gap-2 text-small px-3 py-1.5 text-dim hover:bg-nav-active hover:text-accent transition-colors"
         >
           <span class="text-faint shrink-0">▪</span>
           <span class="truncate">{{ pdfLabel(src) }}</span>

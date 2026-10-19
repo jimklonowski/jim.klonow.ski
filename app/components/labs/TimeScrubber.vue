@@ -18,10 +18,10 @@
           </p>
           <p class="flex items-baseline gap-2.5 min-w-0">
             <span
-              class="num-display text-[18px] leading-none whitespace-nowrap transition-colors"
+              class="num-display text-stat leading-none whitespace-nowrap transition-colors"
               :class="scrubbed ? 'text-accent' : ''"
             >{{ formatDateTerse(viewedEntry.date) }}</span>
-            <span class="text-[10.5px] text-muted tracking-[0.06em] uppercase truncate">
+            <span class="text-label text-muted tracking-[0.06em] uppercase truncate">
               <span class="hidden sm:inline">{{ fastingText(viewedIndex) }} · </span>{{ flagText(viewedIndex) }}
             </span>
           </p>
@@ -104,14 +104,14 @@
                 :ui="TOOLTIP_UI"
               >
                 <template #content>
-                  <span class="flex flex-col gap-px text-[10.5px] leading-normal">
-                    <span class="num-display text-[13px]">{{ formatDateTerse(t.date) }}</span>
+                  <span class="flex flex-col gap-px text-label leading-normal">
+                    <span class="num-display text-prose">{{ formatDateTerse(t.date) }}</span>
                     <span class="text-muted tracking-[0.06em] uppercase">{{ drawMeta(t.index) }}</span>
                   </span>
                 </template>
                 <button
                   type="button"
-                  class="absolute -translate-x-1/2 pointer-events-auto text-[10px] leading-3 tracking-[0.06em] uppercase whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
+                  class="absolute -translate-x-1/2 pointer-events-auto text-micro leading-3 tracking-[0.06em] uppercase whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
                   :class="[
                     t.active ? 'text-accent font-medium' : t.reached ? 'text-mark' : 'text-ghost',
                     t.keyLabel ? '' : t.showLabel ? 'max-sm:hidden' : 'hidden'
@@ -165,7 +165,7 @@
         >
           ↩ LATEST
         </button>
-        <span class="hidden lg:inline text-[10px] text-ghost whitespace-nowrap ml-2">← → step draws</span>
+        <span class="hidden lg:inline text-micro text-ghost whitespace-nowrap ml-2">← → step draws</span>
       </div>
     </div>
   </div>

@@ -106,7 +106,7 @@ const dotStyle = computed(() => {
     </div>
     <div
       v-if="ticks.length"
-      class="relative h-3.5 mt-1 text-[9.5px] text-faint tracking-[0.06em] tabular-nums"
+      class="relative h-3.5 mt-1 text-nano text-faint tracking-[0.06em] tabular-nums"
     >
       <span
         v-for="(tick, i) in ticks"

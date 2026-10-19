@@ -8,24 +8,24 @@
     >
       <span
         v-if="next"
-        class="text-[10.5px] text-hi"
+        class="text-label text-hi"
       >{{ formatDate(next.plan.date, 'monthDay').toUpperCase() }}</span>
     </TuiHeader>
 
     <template v-if="next">
       <div class="flex items-baseline gap-2 mt-2.5 min-w-0">
         <span
-          class="num-display text-[21px] leading-none"
+          class="num-display text-figure leading-none"
           :class="bigClass"
         >{{ big.value }}</span>
         <span
           v-if="big.unit"
-          class="text-[10.5px] text-muted"
+          class="text-label text-muted"
         >{{ big.unit }}</span>
-        <span class="ml-auto text-[11px] text-muted truncate">{{ drawLabel(next.plan) }}</span>
+        <span class="ml-auto text-meta text-muted truncate">{{ drawLabel(next.plan) }}</span>
       </div>
 
-      <div class="flex flex-col gap-1 mt-2 text-[12px]">
+      <div class="flex flex-col gap-1 mt-2 text-small">
         <div
           v-for="q in questions"
           :key="q"
@@ -56,7 +56,7 @@
 
     <p
       v-else
-      class="mt-2.5 text-[12px] text-muted"
+      class="mt-2.5 text-small text-muted"
     >
       No draw planned ·
       <NuxtLink

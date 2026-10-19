@@ -2,19 +2,19 @@
   <div class="bg-raised border border-line-soft">
     <div class="flex items-start justify-between gap-3 px-3.5 py-2.5 border-b border-line-soft">
       <div class="min-w-0">
-        <p class="text-[12.5px] text-hi truncate">
+        <p class="text-row text-hi truncate">
           {{ label }}
         </p>
         <p
           v-if="unit"
-          class="text-[10.5px] text-muted"
+          class="text-label text-muted"
         >
           {{ unit }}
         </p>
       </div>
       <div
         v-if="$slots.meta"
-        class="text-[10.5px] text-muted text-right shrink-0"
+        class="text-label text-muted text-right shrink-0"
       >
         <slot name="meta" />
       </div>

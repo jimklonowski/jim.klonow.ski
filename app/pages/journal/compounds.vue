@@ -7,18 +7,18 @@
       <template #actions>
         <NuxtLink
           to="/journal/cycles"
-          class="text-[11px] text-accent hover:text-accent-hover"
+          class="text-meta text-accent hover:text-accent-hover"
         >cycles →</NuxtLink>
-        <span class="text-ghost text-[11px]">·</span>
+        <span class="text-ghost text-meta">·</span>
         <NuxtLink
           to="/tools/calculator"
-          class="text-[11px] text-accent hover:text-accent-hover"
+          class="text-meta text-accent hover:text-accent-hover"
         >calculator →</NuxtLink>
-        <span class="text-ghost text-[11px]">·</span>
+        <span class="text-ghost text-meta">·</span>
         <NuxtLink
           v-if="canEdit"
           to="/tools/inventory"
-          class="text-[11px] text-accent hover:text-accent-hover"
+          class="text-meta text-accent hover:text-accent-hover"
         >vial inventory →</NuxtLink>
       </template>
     </JournalHeader>
@@ -36,7 +36,7 @@
           label="ACTIVE PROTOCOL ── click for dossier"
           :dashes="0"
         >
-          <span class="text-[10px] text-muted normal-case">last {{ ACTIVE_WINDOW }}d</span>
+          <span class="text-micro text-muted normal-case">last {{ ACTIVE_WINDOW }}d</span>
         </TuiHeader>
 
         <div class="flex flex-col gap-1.5 mt-2.5">
@@ -44,7 +44,7 @@
             v-for="c in active"
             :key="c.compound"
             :to="`/journal/compound/${encodeURIComponent(c.compound)}`"
-            class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_60px_100px_minmax(0,1fr)_140px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised hover:bg-row-hover transition-colors text-[12px]"
+            class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_60px_100px_minmax(0,1fr)_140px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised hover:bg-row-hover transition-colors text-small"
           >
             <span class="text-hi flex items-center gap-2 min-w-0">
               <span
@@ -77,7 +77,7 @@
 
         <p
           v-if="!active.length"
-          class="mt-2.5 text-[12px] text-muted"
+          class="mt-2.5 text-small text-muted"
         >
           No compounds dosed in the last {{ ACTIVE_WINDOW }} days.
         </p>
@@ -89,7 +89,7 @@
           label="ESTIMATED LEVELS ── modeled"
           :dashes="0"
         >
-          <span class="text-[10px] text-muted normal-case">last {{ EXPOSURE_DAYS }}d · % of each compound's peak</span>
+          <span class="text-micro text-muted normal-case">last {{ EXPOSURE_DAYS }}d · % of each compound's peak</span>
         </TuiHeader>
         <div class="mt-2.5">
           <ClientOnly>
@@ -106,7 +106,7 @@
             </template>
           </ClientOnly>
         </div>
-        <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+        <p class="mt-1.5 text-meta text-faint leading-[1.6]">
           Bateman-modeled from logged doses and typical ester/peptide half-lives — relative shape only, not measured serum levels. Dashed guides mark lab draws.
         </p>
       </section>
@@ -117,10 +117,10 @@
           label="ADHERENCE ── planned vs logged"
           :dashes="0"
         >
-          <span class="text-[10px] text-muted normal-case">last {{ ADHERENCE_WEEKS }} wks</span>
+          <span class="text-micro text-muted normal-case">last {{ ADHERENCE_WEEKS }} wks</span>
         </TuiHeader>
         <JournalAdherenceTable :rows="adherence" />
-        <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+        <p class="mt-1.5 text-meta text-faint leading-[1.6]">
           Weeks score logged dose-days against the intended cadence, so a shot slid by a day still counts. As-needed compounds aren't scored.
         </p>
       </section>
@@ -150,12 +150,12 @@
         >
           <button
             type="button"
-            class="px-2 py-1 border border-line-soft text-[10.5px] text-muted hover:text-accent hover:border-line-accent cursor-pointer uppercase tracking-[0.06em]"
+            class="px-2 py-1 border border-line-soft text-label text-muted hover:text-accent hover:border-line-accent cursor-pointer uppercase tracking-[0.06em]"
           >
             {{ group.label }} {{ group.count }} ▾
           </button>
         </UDropdownMenu>
-        <span class="ml-auto text-[10.5px] text-ghost">never-used compounds hidden until searched (⌘K)</span>
+        <span class="ml-auto text-label text-ghost">never-used compounds hidden until searched (⌘K)</span>
       </section>
     </div>
   </div>

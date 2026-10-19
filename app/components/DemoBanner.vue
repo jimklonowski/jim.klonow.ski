@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isDemo"
-    class="bg-raised border-b border-line px-3 sm:px-4 py-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] tracking-[0.06em] uppercase"
+    class="bg-raised border-b border-line px-3 sm:px-4 py-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-label tracking-[0.06em] uppercase"
   >
     <span class="text-accent font-medium">▚ demo</span>
     <span class="text-muted">fictional persona · synthetic data · sandbox resets daily</span>

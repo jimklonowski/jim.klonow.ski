@@ -59,14 +59,14 @@ const unitSuffix = computed(() => zoom.value === 'week' ? 'w' : 'mo')
         v-model="zoom"
         :options="ZOOM_OPTS"
         class="gap-2.5"
-        :class="md ? 'text-[11px]' : 'text-[10px]'"
+        :class="md ? 'text-meta' : 'text-micro'"
         :button-class="md ? 'uppercase tracking-[0.12em]' : 'normal-case'"
       />
     </TuiHeader>
 
     <p
       v-if="!rows.length"
-      class="mt-2.5 text-[12px] text-muted"
+      class="mt-2.5 text-small text-muted"
     >
       {{ emptyText }}
     </p>
@@ -87,13 +87,13 @@ const unitSuffix = computed(() => zoom.value === 'week' ? 'w' : 'mo')
       <!-- Lab draw markers + now line -->
       <div
         class="flex items-center"
-        :class="md ? 'gap-3 pt-1.5' : 'gap-2.5 text-[10px]'"
+        :class="md ? 'gap-3 pt-1.5' : 'gap-2.5 text-micro'"
       >
         <button
           v-if="hiddenCount || showAll"
           type="button"
           class="shrink-0 text-right text-faint hover:text-accent cursor-pointer truncate"
-          :class="md ? 'w-30 sm:w-38 text-[11px]' : 'w-24 sm:w-30'"
+          :class="md ? 'w-30 sm:w-38 text-meta' : 'w-24 sm:w-30'"
           @click="showAll = !showAll"
         >
           {{ showAll ? '− fewer rows' : `+ ${hiddenCount} more rows` }}
@@ -101,7 +101,7 @@ const unitSuffix = computed(() => zoom.value === 'week' ? 'w' : 'mo')
         <span
           v-else
           class="shrink-0 text-right text-muted"
-          :class="md ? 'w-30 sm:w-38 text-[11px]' : 'w-24 sm:w-30'"
+          :class="md ? 'w-30 sm:w-38 text-meta' : 'w-24 sm:w-30'"
         >lab draws</span>
 
         <div
@@ -113,7 +113,7 @@ const unitSuffix = computed(() => zoom.value === 'week' ? 'w' : 'mo')
             :key="mark.slot"
             to="/labs"
             class="absolute top-0 -translate-x-1/2 text-accent leading-none hover:text-accent-hover"
-            :class="md ? 'text-[10px]' : 'text-[8px]'"
+            :class="md ? 'text-micro' : 'text-[8px]'"
             :style="{ left: `${mark.left}%` }"
             :title="mark.title"
           >▲</NuxtLink>

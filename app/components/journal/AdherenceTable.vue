@@ -42,7 +42,7 @@ function iuTitle(compound: string, label: string): string | undefined {
     <div
       v-for="row in rows"
       :key="`${row.compound}-${row.cadence}`"
-      class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_150px_minmax(0,1fr)_50px_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-[12px]"
+      class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_150px_minmax(0,1fr)_50px_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-small"
     >
       <NuxtLink
         :to="`/journal/compound/${encodeURIComponent(row.compound)}`"
@@ -55,7 +55,7 @@ function iuTitle(compound: string, label: string): string | undefined {
         <span class="truncate">{{ row.compound }}</span>
       </NuxtLink>
       <span
-        class="text-dim text-right lg:text-left text-[11px]"
+        class="text-dim text-right lg:text-left text-meta"
         :title="iuTitle(row.compound, row.doseLabel)"
       >{{ row.doseLabel }} · {{ row.cadence }}</span>
 
@@ -75,7 +75,7 @@ function iuTitle(compound: string, label: string): string | undefined {
         :class="adherencePctClass(row.pct)"
       >{{ row.pct != null ? `${row.pct}%` : '—' }}</span>
       <span
-        class="text-right text-[10.5px] tracking-[0.06em]"
+        class="text-right text-label tracking-[0.06em]"
         :class="STATUS_CLASSES[row.status.kind]"
       >{{ showStatus ? row.status.label : '—' }}</span>
     </div>

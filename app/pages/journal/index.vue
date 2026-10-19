@@ -41,10 +41,10 @@
           to="/journal/trends"
           class="bg-raised border border-line-soft px-4 py-3.5 hover:bg-row-hover transition-colors"
         >
-          <p class="text-[10px] text-muted uppercase tracking-widest">
+          <p class="text-micro text-muted uppercase tracking-widest">
             {{ tile.label }}
           </p>
-          <p class="num-display text-[30px] leading-none mt-1.5">
+          <p class="num-display text-big leading-none mt-1.5">
             {{ tile.value }}
           </p>
           <TuiSparkline
@@ -55,7 +55,7 @@
             class="mt-2.5"
           />
           <p
-            class="text-[10.5px] mt-1"
+            class="text-label mt-1"
             :class="tile.deltaClass"
           >
             {{ tile.delta }}
@@ -63,10 +63,12 @@
         </NuxtLink>
       </div>
 
-      <!-- Today + soda/whoop -->
-      <div class="grid gap-3 lg:grid-cols-2">
+      <!-- Today + soda/whoop. grid-cols-1 matters: an implicit track is minmax(auto, 1fr) and
+           sizes to its content's min-content, so the soda row's unbreakable quick-add label used
+           to widen the whole column past a phone's edge at the larger SIZE steps. -->
+      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <section class="bg-raised border border-line-soft px-4 py-3.5">
-          <div class="flex items-baseline gap-3 text-[11px]">
+          <div class="flex items-baseline gap-3 text-meta">
             <span class="tui-label">Today · doses + workout</span>
             <NuxtLink
               v-if="isFullAccess"
@@ -77,7 +79,7 @@
 
           <p
             v-if="doseLines.length"
-            class="mt-3 text-[12.5px] leading-loose text-dim"
+            class="mt-3 text-row leading-loose text-dim"
           >
             <span
               v-for="(line, i) in doseLines"
@@ -87,14 +89,14 @@
           </p>
           <p
             v-else
-            class="mt-3 text-[12.5px] text-muted"
+            class="mt-3 text-row text-muted"
           >
             No doses logged today.
           </p>
 
           <p
             v-if="latestWorkout"
-            class="mt-2 pt-2.5 border-t border-line-soft text-[12.5px] flex flex-wrap items-baseline gap-x-2"
+            class="mt-2 pt-2.5 border-t border-line-soft text-row flex flex-wrap items-baseline gap-x-2"
           >
             <span class="text-hi">{{ latestWorkout.workout_type ?? 'Workout' }}</span>
             <span
@@ -112,17 +114,17 @@
             :readonly="!canEdit"
           />
 
-          <section class="flex-1 bg-raised border border-line-soft px-4 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12.5px] text-dim">
-            <span v-if="whoop.recovery != null">Whoop <span class="num-display text-accent text-[19px]">{{ whoop.recovery }}%</span> recov</span>
-            <span v-if="whoop.sleep">Sleep <span class="num-display text-hi text-[19px]">{{ whoop.sleep }}</span></span>
-            <span v-if="whoop.strain != null">Strain <span class="num-display text-hi text-[19px]">{{ whoop.strain }}</span></span>
+          <section class="flex-1 bg-raised border border-line-soft px-4 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-row text-dim">
+            <span v-if="whoop.recovery != null">Whoop <span class="num-display text-accent text-head">{{ whoop.recovery }}%</span> recov</span>
+            <span v-if="whoop.sleep">Sleep <span class="num-display text-hi text-head">{{ whoop.sleep }}</span></span>
+            <span v-if="whoop.strain != null">Strain <span class="num-display text-hi text-head">{{ whoop.strain }}</span></span>
             <span
               v-if="whoop.recovery == null && !whoop.sleep && whoop.strain == null"
               class="text-muted"
             >No Whoop data synced yet.</span>
             <NuxtLink
               to="/journal/trends"
-              class="ml-auto text-[11px] text-accent hover:text-accent-hover"
+              class="ml-auto text-meta text-accent hover:text-accent-hover"
             >health trends →</NuxtLink>
           </section>
         </div>
@@ -136,10 +138,10 @@
           :to="card.to"
           class="bg-inset border border-line-input px-4 py-3 hover:border-line-accent hover:bg-row-hover transition-colors"
         >
-          <p class="text-[11.5px] text-accent tracking-[0.08em]">
+          <p class="text-small text-accent tracking-[0.08em]">
             {{ card.label }} →
           </p>
-          <p class="text-[11.5px] text-muted mt-1">
+          <p class="text-small text-muted mt-1">
             {{ card.meta }}
           </p>
         </NuxtLink>

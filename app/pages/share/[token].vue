@@ -6,7 +6,7 @@
           label="SHARE LINK"
           :dashes="8"
         >
-          <span class="text-[10.5px] text-faint tracking-[0.12em] uppercase">{{ view.status }}</span>
+          <span class="text-label text-faint tracking-[0.12em] uppercase">{{ view.status }}</span>
         </TuiHeader>
 
         <div class="flex items-start gap-2.5 mt-3">
@@ -15,10 +15,10 @@
             :class="view.dotClass"
           />
           <div class="min-w-0">
-            <p class="num-display text-hi text-[17px] leading-none">
+            <p class="num-display text-hi text-stat leading-none">
               {{ view.title }}
             </p>
-            <p class="mt-2 text-[12px] leading-[1.7] text-dim">
+            <p class="mt-2 text-small leading-[1.7] text-dim">
               {{ view.body }}
             </p>
           </div>
@@ -26,14 +26,14 @@
 
         <p
           v-if="state === 'working'"
-          class="flex items-center gap-2 mt-3 text-[11px] text-faint tracking-widest uppercase"
+          class="flex items-center gap-2 mt-3 text-meta text-faint tracking-widest uppercase"
         >
           <span class="w-1.75 h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
           exchanging token
         </p>
         <p
           v-else-if="state === 'error'"
-          class="mt-3 text-[11px] text-faint tracking-widest uppercase"
+          class="mt-3 text-meta text-faint tracking-widest uppercase"
         >
           <NuxtLink
             to="/"
@@ -42,7 +42,7 @@
         </p>
       </div>
 
-      <p class="mt-2.5 text-[10.5px] text-ghost tracking-widest uppercase">
+      <p class="mt-2.5 text-label text-ghost tracking-widest uppercase">
         read-only share link · single redemption per session
       </p>
     </div>

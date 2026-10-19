@@ -6,35 +6,35 @@
     :class="clickable ? 'cursor-pointer hover:bg-row-hover transition-colors' : ''"
     @click="clickable && emit('click')"
   >
-    <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+    <p class="text-label text-muted uppercase tracking-[0.12em]">
       {{ label }}
     </p>
 
     <div class="flex items-baseline gap-1.5 mt-1.5">
-      <span class="num-display text-[26px] leading-none">{{ value ?? '—' }}</span>
+      <span class="num-display text-tile leading-none">{{ value ?? '—' }}</span>
       <span
         v-if="unit"
-        class="text-[10.5px] text-muted"
+        class="text-label text-muted"
       >{{ unit }}</span>
     </div>
 
     <p
       v-if="delta != null"
-      class="mt-1.5 text-[11px]"
+      class="mt-1.5 text-meta"
       :class="deltaClass"
     >
       {{ arrow }} {{ deltaText || fallbackDeltaText }}<span class="text-muted"> {{ deltaLabel }}</span>
     </p>
     <p
       v-else-if="subtext"
-      class="mt-1.5 text-[11px] text-muted"
+      class="mt-1.5 text-meta text-muted"
     >
       {{ subtext }}
     </p>
 
     <p
       v-if="asOf"
-      class="mt-1 text-[10.5px] text-faint"
+      class="mt-1 text-label text-faint"
     >
       as of {{ asOf }}
     </p>

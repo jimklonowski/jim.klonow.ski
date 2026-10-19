@@ -305,7 +305,7 @@ const HALO = { paintOrder: 'stroke', stroke: THEME.raised, strokeWidth: 3, strok
       >{{ f.text }}</text>
     </svg>
 
-    <figcaption class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-2 text-[9.5px] text-faint tracking-[0.06em] uppercase">
+    <figcaption class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-2 text-nano text-faint tracking-[0.06em] uppercase">
       <span class="flex items-center gap-1.5">
         <span>fat %</span>
         <span>{{ WASH_MIN_PCT }}</span>

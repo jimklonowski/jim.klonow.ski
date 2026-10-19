@@ -2,16 +2,16 @@
   <div>
     <!-- Title row -->
     <div class="flex flex-wrap items-baseline gap-x-4 gap-y-3 px-4 sm:px-6 pt-4">
-      <h1 class="num-display text-hi text-[26px] leading-none">
+      <h1 class="num-display text-hi text-tile leading-none">
         BLOODWORK
       </h1>
       <span
         v-if="timeTravelling"
-        class="text-[10.5px] tracking-[0.14em] uppercase text-accent bg-nav-active border border-line-accent px-2 py-px"
+        class="text-label tracking-[0.14em] uppercase text-accent bg-nav-active border border-line-accent px-2 py-px"
       >◷ TIME TRAVEL</span>
       <p
         v-if="latest"
-        class="text-[11px] text-muted tracking-[0.06em] uppercase"
+        class="text-meta text-muted tracking-[0.06em] uppercase"
       >
         <template v-if="timeTravelling">
           viewing <span class="text-hi font-medium">{{ formatDateTerse(latest.date) }}</span>
@@ -106,7 +106,7 @@
       </div>
       <p
         v-if="!activeMarkers.length"
-        class="py-4 text-[12px] text-muted"
+        class="py-4 text-small text-muted"
       >
         No markers recorded in this category yet.
       </p>
@@ -125,7 +125,7 @@
           <button
             v-if="echoResults.length"
             type="button"
-            class="text-[10.5px] text-accent hover:text-accent-hover cursor-pointer normal-case"
+            class="text-label text-accent hover:text-accent-hover cursor-pointer normal-case"
             @click="echoOpen = true"
           >
             view all {{ echoResults.length }} →
@@ -134,7 +134,7 @@
 
         <div
           v-if="echoResults.length"
-          class="mt-2.5 text-[12px] leading-[1.7]"
+          class="mt-2.5 text-small leading-[1.7]"
         >
           <div class="flex flex-wrap gap-x-5 gap-y-1">
             <span
@@ -151,7 +151,7 @@
         </div>
         <p
           v-else
-          class="mt-2.5 text-[12px] text-muted"
+          class="mt-2.5 text-small text-muted"
         >
           No echocardiogram on file.
         </p>
@@ -165,9 +165,9 @@
           label="GENETIC · QUALITATIVE"
           :dashes="4"
         >
-          <span class="text-[10.5px] text-muted normal-case">one-time results · not trended</span>
+          <span class="text-label text-muted normal-case">one-time results · not trended</span>
         </TuiHeader>
-        <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2.5 text-[12px]">
+        <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2.5 text-small">
           <span
             v-for="item in geneticResults"
             :key="`${item.date}-${item.name}`"
@@ -200,7 +200,7 @@
         label="COMPARE"
         class="mt-5"
       >
-        <span class="text-[10.5px] text-muted normal-case">two markers, own axes</span>
+        <span class="text-label text-muted normal-case">two markers, own axes</span>
       </TuiHeader>
       <LabsCompareCard
         class="mt-2.5"
@@ -224,7 +224,7 @@
       description="Findings from your most recent echo report"
     >
       <template #body>
-        <div class="text-[12px]">
+        <div class="text-small">
           <div
             v-for="(item, i) in echoResults"
             :key="`${item.date}-${item.name}`"

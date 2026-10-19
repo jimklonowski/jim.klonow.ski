@@ -4,7 +4,7 @@
       :label="`BODY COMPOSITION · ${formatDate(latest.date, 'monthDay').toUpperCase()} SCAN`"
       class="mt-5"
     >
-      <span class="text-[10.5px] text-muted">
+      <span class="text-label text-muted">
         <span class="hidden sm:inline">hover a region · </span>
         <NuxtLink
           to="/labs/dexa"
@@ -60,21 +60,21 @@
           :aria-label="`${cell.label} ${cell.value}${cell.unit ? ` ${cell.unit}` : ''} — open body composition`"
           class="block bg-raised border border-line-soft px-3 py-2 hover:bg-row-hover hover:border-line-input transition-colors min-w-0"
         >
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em] truncate">
+          <p class="text-label text-muted uppercase tracking-[0.12em] truncate">
             {{ cell.label }}
           </p>
           <p
-            class="num-display text-[22px] sm:text-[24px] leading-none mt-1 whitespace-nowrap"
+            class="num-display text-figure sm:text-hero leading-none mt-1 whitespace-nowrap"
             :class="cell.accent ? 'text-accent' : 'text-hi'"
           >
             {{ cell.value }}<span
               v-if="cell.unit"
-              class="text-[10.5px] text-muted ml-1 font-sans"
+              class="text-label text-muted ml-1 font-sans"
             >{{ cell.unit }}</span>
           </p>
           <p
             v-if="cell.delta"
-            class="text-[10.5px] mt-1 tabular-nums"
+            class="text-label mt-1 tabular-nums"
             :class="cell.delta.class"
           >
             {{ cell.delta.text }}
@@ -84,7 +84,7 @@
 
       <div class="min-w-0 col-span-2 sm:col-span-1 flex flex-col gap-3">
         <!-- Fat % by region. Hovering a row lights the region on the figure, and the reverse. -->
-        <div class="text-[12px]">
+        <div class="text-small">
           <div
             v-for="r in regions"
             :key="r.key"
@@ -93,7 +93,7 @@
             @pointerenter="highlight = r.key"
             @pointerleave="highlight = null"
           >
-            <span class="text-[10.5px] text-muted uppercase tracking-widest truncate">{{ r.label }}</span>
+            <span class="text-label text-muted uppercase tracking-widest truncate">{{ r.label }}</span>
             <span
               class="text-right tabular-nums"
               :class="highlight === r.key ? 'text-accent' : 'text-hi'"
@@ -106,13 +106,13 @@
               />
             </span>
             <span
-              class="text-right text-[11px] tabular-nums"
+              class="text-right text-meta tabular-nums"
               :class="r.deltaClass"
             >{{ r.delta }}</span>
           </div>
         </div>
 
-        <p class="text-[11px] text-muted flex flex-wrap gap-x-4 gap-y-0.5">
+        <p class="text-meta text-muted flex flex-wrap gap-x-4 gap-y-0.5">
           <span
             v-for="f in facts"
             :key="f.text"

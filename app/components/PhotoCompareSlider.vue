@@ -39,7 +39,7 @@
       :style="{ left: `${pct}%` }"
     />
     <div
-      class="absolute top-1/2 w-5 h-5 -mt-2.5 -ml-2.5 bg-bg border border-accent flex items-center justify-center text-[10px] text-accent pointer-events-none"
+      class="absolute top-1/2 w-5 h-5 -mt-2.5 -ml-2.5 bg-bg border border-accent flex items-center justify-center text-micro text-accent pointer-events-none"
       :style="{ left: `${pct}%` }"
     >
       ‹›
@@ -48,13 +48,13 @@
     <!-- Labels -->
     <span
       v-if="beforeLabel"
-      class="absolute bottom-2 left-2 text-[10.5px] px-1.5 py-0.5 bg-bg/85 border border-line-input text-dim pointer-events-none"
+      class="absolute bottom-2 left-2 text-label px-1.5 py-0.5 bg-bg/85 border border-line-input text-dim pointer-events-none"
     >
       {{ beforeLabel }}
     </span>
     <span
       v-if="afterLabel"
-      class="absolute bottom-2 right-2 text-[10.5px] px-1.5 py-0.5 bg-bg/85 border border-line-input text-dim pointer-events-none"
+      class="absolute bottom-2 right-2 text-label px-1.5 py-0.5 bg-bg/85 border border-line-input text-dim pointer-events-none"
     >
       {{ afterLabel }}
     </span>

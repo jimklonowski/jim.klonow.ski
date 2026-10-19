@@ -12,8 +12,8 @@
         :style="frameStyle(current)"
         draggable="false"
       >
-      <div class="absolute bottom-0 inset-x-0 flex items-baseline justify-between gap-3 px-2.5 py-1.5 bg-bg/85 text-[11px]">
-        <span class="num-display text-[13px] text-hi">{{ current ? formatDateTerse(current.date) : '' }}</span>
+      <div class="absolute bottom-0 inset-x-0 flex items-baseline justify-between gap-3 px-2.5 py-1.5 bg-bg/85 text-meta">
+        <span class="num-display text-prose text-hi">{{ current ? formatDateTerse(current.date) : '' }}</span>
         <span class="text-muted truncate">{{ caption }}</span>
       </div>
     </div>
@@ -56,7 +56,7 @@
         ▸
       </button>
     </div>
-    <p class="mt-1.5 text-[10.5px] text-ghost text-center hidden sm:block">
+    <p class="mt-1.5 text-label text-ghost text-center hidden sm:block">
       ← → step · drag the rail to scrub
     </p>
   </div>

@@ -18,7 +18,7 @@
             aria-hidden="true"
           />
         </span>
-        <span class="num-display text-[15px] tracking-tight group-hover:text-accent transition-colors">jim.klonow.ski</span>
+        <span class="num-display text-title tracking-tight group-hover:text-accent transition-colors">jim.klonow.ski</span>
       </NuxtLink>
 
       <!-- Command bar -->
@@ -28,16 +28,16 @@
         aria-label="Open command palette"
         @click="paletteOpen = true"
       >
-        <span class="text-accent text-[12px]">❯</span>
-        <span class="text-muted text-[12px] truncate">jump to a marker, day, or compound…</span>
+        <span class="text-accent text-small">❯</span>
+        <span class="text-muted text-small truncate">jump to a marker, day, or compound…</span>
         <span class="w-1.75 h-3.5 bg-accent shrink-0 animate-[tui-blink_1.1s_step-end_infinite]" />
-        <span class="ml-auto shrink-0 text-[10px] text-faint border border-line-input px-1.5 py-px">⌘K</span>
+        <span class="ml-auto shrink-0 text-micro text-faint border border-line-input px-1.5 py-px">⌘K</span>
       </button>
 
       <!-- Mobile palette trigger -->
       <button
         type="button"
-        class="md:hidden ml-auto text-[10px] text-faint border border-line-input px-2 py-1.5"
+        class="md:hidden ml-auto text-micro text-faint border border-line-input px-2 py-1.5"
         aria-label="Open command palette"
         @click="paletteOpen = true"
       >
@@ -58,7 +58,7 @@
           v-for="item in items"
           :key="item.to"
           :to="item.to"
-          class="shrink-0 px-2.5 py-1.5 text-[11px] font-medium tracking-[0.08em] uppercase whitespace-nowrap border transition-colors"
+          class="shrink-0 px-2.5 py-1.5 text-meta font-medium tracking-[0.08em] uppercase whitespace-nowrap border transition-colors"
           :class="isActive(item) ? 'bg-nav-active text-accent border-line-accent' : 'text-nav-idle border-transparent hover:text-accent'"
         >
           {{ item.label }}

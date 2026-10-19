@@ -5,7 +5,7 @@
       meta="reconstitution · u-100 syringe units"
     >
       <template #actions>
-        <span class="text-[11px] text-muted hidden sm:inline">{{ mixSummary }}</span>
+        <span class="text-meta text-muted hidden sm:inline">{{ mixSummary }}</span>
       </template>
     </ToolsHeader>
     <ToolsNav />
@@ -17,7 +17,7 @@
           label="YOUR MIX"
           :dashes="12"
         >
-          <span class="text-[10.5px] text-muted normal-case">what's in the vial</span>
+          <span class="text-label text-muted normal-case">what's in the vial</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-2.5">
@@ -63,7 +63,7 @@
             v-for="ml in COMMON_BAC_ML"
             :key="ml"
             type="button"
-            class="px-2.5 py-1 border text-[12px] cursor-pointer transition-colors"
+            class="px-2.5 py-1 border text-small cursor-pointer transition-colors"
             :class="bacWaterMl === ml
               ? 'bg-nav-active border-line-accent text-accent'
               : 'border-line-soft text-faint hover:text-accent hover:border-line-accent'"
@@ -80,7 +80,7 @@
           label="DESIRED DOSE"
           :dashes="8"
         >
-          <span class="text-[10.5px] text-muted normal-case">per injection</span>
+          <span class="text-label text-muted normal-case">per injection</span>
         </TuiHeader>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
@@ -116,37 +116,37 @@
       class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-line border-b border-line"
     >
       <div class="bg-bg px-4 sm:px-6 py-4 col-span-2 sm:col-span-1">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           Draw to
         </p>
-        <p class="num-display text-accent text-[44px] leading-none mt-1.5 whitespace-nowrap">
-          {{ roundTo(unitsNeeded, 1) }}<span class="text-[11px] text-muted ml-1.5 tracking-[0.12em] uppercase">units</span>
+        <p class="num-display text-accent text-giant leading-none mt-1.5 whitespace-nowrap">
+          {{ roundTo(unitsNeeded, 1) }}<span class="text-meta text-muted ml-1.5 tracking-[0.12em] uppercase">units</span>
         </p>
-        <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
+        <p class="mt-1.5 text-label text-muted uppercase tracking-[0.08em]">
           on a u-100 insulin syringe
         </p>
       </div>
 
       <div class="bg-bg px-4 sm:px-6 py-4">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           Volume
         </p>
-        <p class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap">
-          {{ roundTo(unitsNeeded / 100, 3) }}<span class="text-[10.5px] text-muted ml-1">mL</span>
+        <p class="num-display text-big leading-none mt-1.5 whitespace-nowrap">
+          {{ roundTo(unitsNeeded / 100, 3) }}<span class="text-label text-muted ml-1">mL</span>
         </p>
-        <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
+        <p class="mt-1.5 text-label text-muted uppercase tracking-[0.08em]">
           {{ doseSummary }}
         </p>
       </div>
 
       <div class="bg-bg px-4 sm:px-6 py-4">
-        <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+        <p class="text-label text-muted uppercase tracking-[0.12em]">
           Concentration
         </p>
-        <p class="num-display text-[32px] leading-none mt-1.5 whitespace-nowrap">
-          {{ concentration != null ? roundTo(concentration, 3) : '—' }}<span class="text-[10.5px] text-muted ml-1">{{ vialUnit }}/mL</span>
+        <p class="num-display text-big leading-none mt-1.5 whitespace-nowrap">
+          {{ concentration != null ? roundTo(concentration, 3) : '—' }}<span class="text-label text-muted ml-1">{{ vialUnit }}/mL</span>
         </p>
-        <p class="mt-1.5 text-[10.5px] text-muted uppercase tracking-[0.08em]">
+        <p class="mt-1.5 text-label text-muted uppercase tracking-[0.08em]">
           {{ mixSummary }}
         </p>
       </div>
@@ -154,14 +154,14 @@
 
     <p
       v-else
-      class="px-4 sm:px-6 py-5 text-[12.5px] text-warn border-b border-line"
+      class="px-4 sm:px-6 py-5 text-row text-warn border-b border-line"
     >
       {{ blockedMessage }}
     </p>
 
     <p
       v-if="unitsNeeded != null && bridgeNote"
-      class="px-4 sm:px-6 py-2 border-b border-line text-[11px] text-faint"
+      class="px-4 sm:px-6 py-2 border-b border-line text-meta text-faint"
     >
       {{ bridgeNote }}
     </p>
@@ -175,7 +175,7 @@
         label="QUICK REFERENCE"
         :dashes="8"
       >
-        <span class="text-[10.5px] text-muted normal-case">{{ mixSummary }}</span>
+        <span class="text-label text-muted normal-case">{{ mixSummary }}</span>
       </TuiHeader>
 
       <UTable
@@ -185,7 +185,7 @@
         :ui="{ base: 'min-w-80' }"
       >
         <template #units-cell="{ row }">
-          <span class="num-display text-[14px]">{{ row.original.units }}</span>
+          <span class="num-display text-title">{{ row.original.units }}</span>
         </template>
         <template #ml-cell="{ row }">
           <span class="text-muted">{{ row.original.ml }}</span>
@@ -196,7 +196,7 @@
       </UTable>
     </section>
 
-    <p class="px-4 sm:px-6 py-3 border-t border-line text-[11px] text-faint">
+    <p class="px-4 sm:px-6 py-3 border-t border-line text-meta text-faint">
       {{ GENERAL_DISCLAIMER }}
     </p>
   </div>

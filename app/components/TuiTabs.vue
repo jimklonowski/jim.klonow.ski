@@ -33,7 +33,7 @@ const model = defineModel<V>({ required: true })
       root: 'block',
       list: `grid ${cols} gap-px bg-line border border-line p-0 rounded-none`,
       indicator: 'hidden',
-      trigger: 'px-3 py-2.5 gap-1.5 justify-center rounded-none font-normal text-[11px] tracking-widest uppercase cursor-pointer bg-bg data-[state=inactive]:text-nav-idle hover:data-[state=inactive]:not-disabled:text-accent data-[state=active]:bg-nav-active data-[state=active]:text-accent'
+      trigger: 'px-3 py-2.5 gap-1.5 justify-center rounded-none font-normal text-meta tracking-widest uppercase cursor-pointer bg-bg data-[state=inactive]:text-nav-idle hover:data-[state=inactive]:not-disabled:text-accent data-[state=active]:bg-nav-active data-[state=active]:text-accent'
     }"
     @update:model-value="model = $event as V"
   >

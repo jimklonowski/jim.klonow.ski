@@ -47,7 +47,7 @@ const modal = computed(() => props.variant === 'modal')
     >
       <span
         v-if="!modal"
-        class="shrink-0 text-accent text-[13px] leading-none"
+        class="shrink-0 text-accent text-prose leading-none"
       >❯</span>
       <UInput
         v-model="pin"
@@ -71,7 +71,7 @@ const modal = computed(() => props.variant === 'modal')
     </UButton>
     <p
       v-if="error"
-      class="text-[12px] text-danger"
+      class="text-small text-danger"
       :class="modal ? 'text-center' : 'mt-2.5'"
     >
       {{ modal ? error : `✕ ${error}` }}

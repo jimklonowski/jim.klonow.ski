@@ -7,7 +7,7 @@
       <template #actions>
         <span
           v-if="cycle"
-          class="text-[11px] tracking-[0.08em] uppercase border px-2 py-1"
+          class="text-meta tracking-[0.08em] uppercase border px-2 py-1"
           :class="STATUS_CHIP[chipKey]"
         >{{ statusLabel }}</span>
         <template v-if="isOwner && cycle">
@@ -58,7 +58,7 @@
     <!-- Only once the list loaded: a failed fetch is the error state above, not a missing cycle. -->
     <p
       v-if="!error && !cycle"
-      class="px-4 sm:px-6 py-5 text-[12px] text-muted"
+      class="px-4 sm:px-6 py-5 text-small text-muted"
     >
       No cycle with this id. <NuxtLink
         to="/journal/cycles"
@@ -70,13 +70,13 @@
       <!-- Stat cells -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-b border-line">
         <div class="bg-bg px-4 sm:px-6 py-3.5">
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
             {{ tentativeStart ? 'Planned' : status === 'upcoming' ? 'Starts' : status === 'active' ? 'Progress' : 'Ran' }}
           </p>
-          <p class="num-display text-[28px] leading-none mt-1.5">
+          <p class="num-display text-display leading-none mt-1.5">
             {{ progressStat }}
           </p>
-          <p class="text-[11px] text-muted mt-1">
+          <p class="text-meta text-muted mt-1">
             <template v-if="tentativeStart">
               sometime in {{ tentativeStart }}
             </template>
@@ -86,34 +86,34 @@
           </p>
         </div>
         <div class="bg-bg px-4 sm:px-6 py-3.5">
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
             Adherence
           </p>
           <p
-            class="num-display text-[28px] leading-none mt-1.5"
+            class="num-display text-display leading-none mt-1.5"
             :class="adherencePctClass(adherence.pct)"
           >
             {{ adherence.pct != null ? `${adherence.pct}%` : '—' }}
           </p>
         </div>
         <div class="bg-bg px-4 sm:px-6 py-3.5">
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
             Next draw
           </p>
-          <p class="text-[13px] text-body mt-2.5">
+          <p class="text-prose text-body mt-2.5">
             {{ nextCheckpointLabel }}
           </p>
         </div>
         <div class="bg-bg px-4 sm:px-6 py-3.5">
-          <p class="text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
             Weight
           </p>
-          <p class="num-display text-[28px] leading-none mt-1.5">
+          <p class="num-display text-display leading-none mt-1.5">
             {{ weightStat.value }}
           </p>
           <p
             v-if="weightStat.sub"
-            class="text-[11px] text-muted mt-1"
+            class="text-meta text-muted mt-1"
           >
             {{ weightStat.sub }}
           </p>
@@ -123,7 +123,7 @@
       <div class="px-4 sm:px-6 py-3.5 space-y-4">
         <p
           v-if="cycle.goal"
-          class="text-[12px] text-muted"
+          class="text-small text-muted"
         >
           goal: {{ cycle.goal }}
         </p>
@@ -134,7 +134,7 @@
             label="PLAN ── by week"
             :dashes="0"
           >
-            <span class="text-[10px] text-muted normal-case">{{ totalWeeks }} wks</span>
+            <span class="text-micro text-muted normal-case">{{ totalWeeks }} wks</span>
           </TuiHeader>
           <div class="flex flex-col gap-1 mt-2.5">
             <JournalGanttRow
@@ -155,7 +155,7 @@
             label="ESTIMATED LEVELS ── planned vs logged"
             :dashes="0"
           >
-            <span class="text-[10px] text-muted normal-case">% of each compound's planned peak</span>
+            <span class="text-micro text-muted normal-case">% of each compound's planned peak</span>
           </TuiHeader>
           <div class="mt-2.5">
             <ClientOnly>
@@ -171,7 +171,7 @@
               </template>
             </ClientOnly>
           </div>
-          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          <p class="mt-1.5 text-meta text-faint leading-[1.6]">
             Faint line = the plan, solid = modeled from logged doses; divergence is deviation. Dashed guides mark the start and lab draws.{{ unmodeledNote }}
           </p>
         </section>
@@ -186,16 +186,16 @@
           >
             <!-- "pre-target" rather than "pre-start" for a tentative cycle: the window is
                  measured against an anchor month, not a date that's been committed to. -->
-            <span class="text-[10px] text-muted normal-case">{{ tentativeStart ? 'baseline forming · 4 wks pre-target' : status === 'upcoming' ? 'baseline forming · 4 wks pre-start' : 'last 2 wks vs 4 wks pre-start' }}</span>
+            <span class="text-micro text-muted normal-case">{{ tentativeStart ? 'baseline forming · 4 wks pre-target' : status === 'upcoming' ? 'baseline forming · 4 wks pre-start' : 'last 2 wks vs 4 wks pre-start' }}</span>
           </TuiHeader>
           <div class="flex flex-col gap-1.5 mt-2.5">
             <div
               v-for="s in signalRows"
               :key="s.key"
-              class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_170px_minmax(0,1fr)_130px_100px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-[12px]"
+              class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_170px_minmax(0,1fr)_130px_100px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-small"
             >
               <span class="text-hi">{{ s.label }}</span>
-              <span class="text-dim text-right lg:text-left text-[11px]">{{ s.reading }}</span>
+              <span class="text-dim text-right lg:text-left text-meta">{{ s.reading }}</span>
 
               <span class="col-span-2 lg:col-span-1 min-w-0">
                 <TuiSparkline
@@ -209,16 +209,16 @@
               </span>
 
               <span
-                class="text-right text-[11px]"
+                class="text-right text-meta"
                 :class="s.deltaClass"
               >{{ s.deltaText }}</span>
               <span
-                class="text-right text-[10.5px] tracking-[0.06em]"
+                class="text-right text-label tracking-[0.06em]"
                 :class="s.chipClass"
               >{{ s.chip }}</span>
             </div>
           </div>
-          <p class="mt-1.5 text-[11px] text-faint leading-[1.6]">
+          <p class="mt-1.5 text-meta text-faint leading-[1.6]">
             Derived from logged vitals and Whoop — nothing to enter. Noise thresholds match the digest trend engine; weight also watches rate of change, since fast gain reads as water retention long before the total looks alarming. The dashed guide marks the cycle start.
           </p>
         </section>
@@ -229,7 +229,7 @@
             label="ADHERENCE ── planned vs logged"
             :dashes="0"
           >
-            <span class="text-[10px] text-muted normal-case">cycle weeks only</span>
+            <span class="text-micro text-muted normal-case">cycle weeks only</span>
           </TuiHeader>
           <JournalAdherenceTable
             :rows="adherenceRows"
@@ -247,7 +247,7 @@
           />
           <div
             v-if="tentativeStart"
-            class="mt-2.5 px-3 py-2.5 bg-inset border border-dashed border-line-input text-[11.5px] space-y-1"
+            class="mt-2.5 px-3 py-2.5 bg-inset border border-dashed border-line-input text-small space-y-1"
           >
             <p :class="baselineAdvice.class">
               {{ baselineAdvice.text }}
@@ -265,13 +265,13 @@
             <div
               v-for="cp in checkpoints"
               :key="cp.key"
-              class="px-3 py-2.5 bg-raised text-[12px]"
+              class="px-3 py-2.5 bg-raised text-small"
             >
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="text-hi uppercase tracking-[0.06em] text-[11px]">{{ cp.label }}</span>
-                <span class="text-faint text-[11px]">{{ formatDate(cp.windowFrom, 'monthDay') }} – {{ formatDate(cp.windowTo, 'monthDay') }}</span>
+                <span class="text-hi uppercase tracking-[0.06em] text-meta">{{ cp.label }}</span>
+                <span class="text-faint text-meta">{{ formatDate(cp.windowFrom, 'monthDay') }} – {{ formatDate(cp.windowTo, 'monthDay') }}</span>
                 <span
-                  class="ml-auto text-[10.5px] tracking-[0.06em] uppercase"
+                  class="ml-auto text-label tracking-[0.06em] uppercase"
                   :class="CP_CLASSES[cp.state]"
                 >
                   <template v-if="cp.state === 'done'">
@@ -285,7 +285,7 @@
               </div>
               <div
                 v-if="cp.chips.length"
-                class="flex flex-wrap gap-x-3.5 gap-y-1 mt-1.5 text-[11.5px]"
+                class="flex flex-wrap gap-x-3.5 gap-y-1 mt-1.5 text-small"
               >
                 <NuxtLink
                   v-for="chip in cp.chips"
@@ -299,7 +299,7 @@
           </div>
           <p
             v-if="!tentativeStart"
-            class="mt-1.5 text-[11px] text-faint leading-[1.6]"
+            class="mt-1.5 text-meta text-faint leading-[1.6]"
           >
             Windows are derived from the cycle dates — nothing to schedule. Chips diff HDL/LDL, ALT/AST, hematocrit, ferritin, and estradiol against the baseline draw.
           </p>
@@ -310,7 +310,7 @@
             label="NOTES"
             :dashes="0"
           />
-          <p class="mt-2 text-[12px] text-body whitespace-pre-line leading-[1.7]">
+          <p class="mt-2 text-small text-body whitespace-pre-line leading-[1.7]">
             {{ cycle.notes }}
           </p>
         </section>

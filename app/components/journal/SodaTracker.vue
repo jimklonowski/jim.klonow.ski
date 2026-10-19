@@ -14,13 +14,17 @@
         </p>
         <p class="leading-none mt-0.5">
           <span
-            class="num-display text-[19px]"
+            class="num-display text-head"
             :class="todaySodas.length ? 'text-warn' : 'text-accent'"
-          >{{ todaySodas.length }}</span><span class="text-[10px] text-muted"> today</span>
+          >{{ todaySodas.length }}</span><span class="text-micro text-muted"> today</span>
         </p>
       </div>
 
-      <div class="flex-1 flex items-end gap-0.5 h-6.5 min-w-0">
+      <!-- The strip keeps a floor and the quick-add label truncates: that label ("+ COKE ZERO
+           20oz bottle") is the one thing in this row that can't wrap, and as a shrink-0 item it
+           took the strip's width first on a phone, then — at the larger SIZE steps — the card
+           past the viewport's edge, since the grid this sits in sizes its track to min-content. -->
+      <div class="flex-1 min-w-16 flex items-end gap-0.5 h-6.5">
         <div
           v-for="day in days"
           :key="day.date"
@@ -34,16 +38,17 @@
       <button
         v-if="!readonly"
         type="button"
-        class="tui-btn tui-btn-accent shrink-0"
+        class="tui-btn tui-btn-accent min-w-0"
         :disabled="adding"
+        :title="`+ ${quickAddLabel}`"
         @click="quickAdd()"
       >
-        {{ adding ? 'LOGGING…' : `+ ${quickAddLabel}` }}
+        <span class="truncate min-w-0">{{ adding ? 'LOGGING…' : `+ ${quickAddLabel}` }}</span>
       </button>
       <button
         v-if="!readonly"
         type="button"
-        class="shrink-0 text-[10px] text-faint hover:text-accent cursor-pointer"
+        class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer"
         :aria-label="customOpen ? 'Hide custom soda form' : 'Log a different drink'"
         @click="customOpen = !customOpen"
       >
@@ -58,7 +63,7 @@
       >
         <span
           v-if="!readonly"
-          class="flex items-baseline gap-2.5 text-[11px]"
+          class="flex items-baseline gap-2.5 text-meta"
         >
           <button
             type="button"
@@ -88,7 +93,7 @@
         />
       </div>
 
-      <div class="flex items-baseline justify-between gap-3 mt-1.5 text-[10.5px]">
+      <div class="flex items-baseline justify-between gap-3 mt-1.5 text-label">
         <span class="text-muted">{{ startLabel }}</span>
         <span class="text-muted">
           <span :class="todaySodas.length ? 'text-warn' : 'text-accent'">{{ todaySodas.length }} today</span>{{ weekSummary }}<span :class="trendClass">{{ trendArrow }}</span>
@@ -110,7 +115,7 @@
           open-on-click
           placeholder="Dr Pepper"
           class="w-full"
-          :ui="{ item: 'text-[12px]' }"
+          :ui="{ item: 'text-small' }"
         />
       </UFormField>
       <UFormField
@@ -123,7 +128,7 @@
           open-on-click
           placeholder="12oz can"
           class="w-full"
-          :ui="{ item: 'text-[12px]' }"
+          :ui="{ item: 'text-small' }"
         />
       </UFormField>
       <div class="col-span-2">
@@ -145,7 +150,7 @@
       <div
         v-for="(s, i) in todaySodas"
         :key="i"
-        class="flex items-baseline gap-3 px-1.5 py-1 text-[12px]"
+        class="flex items-baseline gap-3 px-1.5 py-1 text-small"
         :class="i % 2 ? 'bg-inset' : ''"
       >
         <span class="text-faint shrink-0">{{ s.time }}</span>
@@ -153,7 +158,7 @@
         <button
           v-if="!readonly"
           type="button"
-          class="ml-auto shrink-0 text-[11px] text-faint hover:text-danger cursor-pointer disabled:opacity-50"
+          class="ml-auto shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50"
           :disabled="removingIndex !== null"
           @click="remove(i)"
         >

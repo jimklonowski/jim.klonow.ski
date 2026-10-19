@@ -7,8 +7,8 @@
       :ui="{
         content: 'max-w-2xl bg-bg border-l border-line ring-0',
         header: 'border-b border-line',
-        title: 'num-display text-hi text-[18px]',
-        description: 'text-[11px] text-muted'
+        title: 'num-display text-hi text-stat',
+        description: 'text-meta text-muted'
       }"
     >
       <template #body>
@@ -18,7 +18,7 @@
             <TuiToggle
               v-model="filter"
               :options="FILTERS"
-              class="gap-2.5 text-[11px]"
+              class="gap-2.5 text-meta"
               button-class="uppercase tracking-[0.12em]"
             />
             <UDropdownMenu
@@ -40,7 +40,7 @@
                cron was failing. Filling them spends one model call each. -->
           <p
             v-if="isOwner && gapCount && !filling"
-            class="text-[11px] text-muted"
+            class="text-meta text-muted"
           >
             {{ gapSummary }} in the last {{ gaps?.days }} days {{ gapCount === 1 ? 'has' : 'have' }} data but no digest ·
             <button
@@ -54,14 +54,14 @@
 
           <p
             v-if="status === 'pending'"
-            class="py-8 text-center text-[12px] text-muted"
+            class="py-8 text-center text-small text-muted"
           >
             Loading…
           </p>
 
           <p
             v-else-if="!filtered.length"
-            class="py-8 text-center text-[12px] text-muted"
+            class="py-8 text-center text-small text-muted"
           >
             No {{ filter === 'all' ? '' : filter + ' ' }}digests yet.
             <br>Use <span class="text-accent">GENERATE</span> to create one now, or wait for the scheduled run.
@@ -80,10 +80,10 @@
                 :label="`${d.type === 'weekly' ? 'WEEKLY' : 'DAILY'} · ${periodLabel(d)}`"
                 :dashes="6"
               >
-                <span class="text-[10.5px] text-muted">{{ relativeTime(d.created_at) }}</span>
+                <span class="text-label text-muted">{{ relativeTime(d.created_at) }}</span>
               </TuiHeader>
 
-              <div class="mt-2.5 text-[12.5px] leading-[1.7] text-dim digest-prose">
+              <div class="mt-2.5 text-row leading-[1.7] text-dim digest-prose">
                 <Markdown :value="d.summary" />
               </div>
 
@@ -94,7 +94,7 @@
                 <span
                   v-for="chip in chips(d)"
                   :key="chip"
-                  class="text-[10.5px] px-1.5 py-0.5 border border-line-soft text-muted"
+                  class="text-label px-1.5 py-0.5 border border-line-soft text-muted"
                 >
                   {{ chip }}
                 </span>

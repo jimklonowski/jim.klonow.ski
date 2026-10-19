@@ -130,7 +130,7 @@ const props = withDefaults(defineProps<{
 }>(), { drawDates: () => [] })
 const emit = defineEmits<{ saved: [] }>()
 
-const SELECT_UI = { item: 'text-[12px]' }
+const SELECT_UI = { item: 'text-small' }
 const NO_CHECKPOINT = 'none'
 const NO_DRAW = 'none'
 /** Draws this far either side of the plan's date are offered as its fulfilment — wider than the automatic window, since this is the manual override. */

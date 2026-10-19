@@ -9,7 +9,7 @@ const page = defineModel<number>('page', { required: true })
 <template>
   <div
     v-if="totalPages > 1"
-    class="flex items-center px-4 sm:px-6 py-2.5 border-t border-line text-[11px]"
+    class="flex items-center px-4 sm:px-6 py-2.5 border-t border-line text-meta"
   >
     <button
       type="button"

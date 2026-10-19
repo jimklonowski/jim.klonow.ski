@@ -43,7 +43,7 @@ function apply() {
   >
     <template #body>
       <div class="space-y-4">
-        <p class="text-[12.5px] leading-[1.7] text-dim">
+        <p class="text-row leading-[1.7] text-dim">
           {{ lead }}
         </p>
 
@@ -60,7 +60,7 @@ function apply() {
           />
         </UFormField>
 
-        <div class="text-[11.5px] text-muted leading-[1.7] space-y-1.5">
+        <div class="text-small text-muted leading-[1.7] space-y-1.5">
           <p>
             <span class="text-hi">What changes:</span> the weight stored with this scan. The DEXA page shows it
             as "weighed" beside the scan date, and the Ask assistant quotes it when it describes this scan.
@@ -71,7 +71,7 @@ function apply() {
           </p>
         </div>
 
-        <p class="text-[11.5px] text-muted border border-line-input bg-inset px-2.5 py-2">
+        <p class="text-small text-muted border border-line-input bg-inset px-2.5 py-2">
           ❯ Nothing is written yet. The new weight lands on the preview and is saved with SAVE TO SITE.
         </p>
 

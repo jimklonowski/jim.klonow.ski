@@ -6,17 +6,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import * as fsSync from 'node:fs'
 import { ANNOTATION_STYLE, BAND_COLORS, CHART_AXIS, CHART_TOOLTIP, STATUS_COLORS, THEME } from '../app/utils/chartTheme.ts'
 import {
   DEFAULT_THEME, PRESETS, SCALE_STEPS, THEME_IDS, THEME_LIST, TOKEN_KEYS, accentScale, isThemeId
 } from '../shared/utils/themePresets.ts'
 import { DEFAULT_FONT, FONTS, FONT_IDS, FONT_LIST, isFontId } from '../shared/utils/displayFonts.ts'
+import { DEFAULT_SCALE, SCALES, SCALE_IDS, SCALE_LIST, isScaleId } from '../shared/utils/displayScale.ts'
 import { displayCss } from '../shared/utils/displayCss.ts'
 import { contrast, hexToOklch, hueDistance, oklchToHex } from '../shared/utils/oklch.ts'
 
 const root = new URL('../', import.meta.url)
 const css = readFileSync(new URL('app/assets/css/main.css', root), 'utf8')
-const themeBlock = css.slice(css.indexOf('@theme'), css.indexOf('}', css.indexOf('@theme')))
+// Every @theme block (the fonts + colors one, and the inline type ramp), bodies joined.
+const themeBlock = [...css.matchAll(/@theme[^{]*\{([\s\S]*?)\n\}/g)].map(m => m[1]).join('\n')
 const tokens = Object.fromEntries(
   [...themeBlock.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6})\b/g)].map(([, name, hex]) => [name, hex.toLowerCase()])
 )
@@ -62,7 +65,70 @@ test('app/assets/css/themes.css is what the presets generate (run `pnpm theme:cs
     const present = onDisk.includes(`html[data-font="${f.id}"]`)
     assert.equal(present, f.id !== DEFAULT_FONT, `${f.id} font block ${present ? 'present' : 'absent'}`)
   }
+  for (const s of SCALE_LIST) {
+    const present = onDisk.includes(`html[data-scale="${s.id}"]`)
+    assert.equal(present, s.id !== DEFAULT_SCALE, `${s.id} scale block ${present ? 'present' : 'absent'}`)
+  }
   assert.ok(css.includes('@import "./themes.css"'), 'main.css imports the generated file')
+})
+
+// --- the type ramp and the SIZE setting --------------------------------------------------------
+const RAMP = {
+  nano: 9.5, micro: 10, label: 10.5, meta: 11, small: 12, row: 12.5, prose: 13,
+  title: 15, stat: 17, head: 19, figure: 22, hero: 24, tile: 26, display: 28, big: 32, giant: 44
+}
+const READING = ['nano', 'micro', 'label', 'meta', 'small', 'row', 'prose']
+
+test('main.css declares the type ramp, every size a multiple of the scale', () => {
+  const sizes = Object.fromEntries([...themeBlock.matchAll(/--text-([\w-]+):\s*([^;]+);/g)].map(([, n, v]) => [n, v.trim()]))
+  assert.deepEqual(Object.keys(sizes).sort(), Object.keys(RAMP).sort(), 'the ramp is exactly these tokens')
+  for (const [name, px] of Object.entries(RAMP)) {
+    const factor = READING.includes(name) ? 'var(--type-scale)' : 'var(--type-scale-display)'
+    assert.equal(sizes[name], `calc(${px}px * ${factor})`, `--text-${name}`)
+  }
+  assert.match(css, /--type-scale:\s*1;/, ':root holds the default factor')
+  assert.match(css, /--type-scale-display:\s*calc\(1 \+ \(var\(--type-scale\) - 1\) \* 0\.5\);/, 'figures scale at half rate')
+  // The ramp is declared `inline`, so utilities resolve --type-scale on the element (the picker
+  // pins its own); the CSS-side sizes spell the calc out for the same reason, equal to the token.
+  assert.match(css, /@theme static inline \{/, 'the ramp is an inline theme block')
+  assert.match(css, /body\s*\{[^}]*font-size:\s*var\(--text-prose\)/, 'body is text-prose')
+  assert.match(css, /\.tui-label\s*\{[^}]*font-size:\s*calc\(10\.5px \* var\(--type-scale\)\)/, '.tui-label is the label size')
+  assert.match(css, /\.tui-btn\s*\{[^}]*font-size:\s*calc\(10\.5px \* var\(--type-scale\)\)/, '.tui-btn is the label size')
+  assert.equal(RAMP.label, 10.5, 'the CSS-side 10.5px above is the label token')
+  // No ramp name doubles as a color, or `text-<name>` would be ambiguous.
+  for (const name of Object.keys(RAMP)) assert.ok(!(name in tokens), `--color-${name} exists; text-${name} would be ambiguous`)
+})
+
+test('the size steps are complete, M is 1, and the picker order is ascending', () => {
+  assert.deepEqual(SCALE_LIST.map(s => s.id), [...SCALE_IDS])
+  assert.equal(DEFAULT_SCALE, 'm')
+  assert.equal(SCALES.m.factor, 1)
+  for (const s of SCALE_LIST) {
+    assert.equal(SCALES[s.id], s)
+    assert.ok(s.label && s.blurb && s.factor > 0.5 && s.factor < 2, `${s.id}`)
+  }
+  for (let i = 1; i < SCALE_LIST.length; i++) assert.ok(SCALE_LIST[i].factor > SCALE_LIST[i - 1].factor, 'ascending')
+  assert.ok(isScaleId('xl') && !isScaleId('xxl') && !isScaleId(null))
+})
+
+test('no arbitrary pixel font size is left in the app (the ramp is the only way to size text)', () => {
+  const { readdirSync, statSync } = fsSync
+  const walk = dir => readdirSync(dir).flatMap((n) => {
+    const p = `${dir}/${n}`
+    return statSync(p).isDirectory() ? walk(p) : p
+  })
+  const files = walk(new URL('app', root).pathname.replace(/^\/([A-Za-z]:)/, '$1')).filter(f => /\.(vue|ts)$/.test(f))
+  const offenders = []
+  for (const f of files) {
+    const src = readFileSync(f, 'utf8')
+    for (const m of src.matchAll(/text-\[([0-9.]+)px\]/g)) {
+      // The ticker's sprite captions and the photo badge are game/badge chrome under 10px, not
+      // reading text; they stay literal on purpose.
+      if (Number(m[1]) < 9.5) continue
+      offenders.push(`${f.replace(/.*\/app\//, 'app/')}: text-[${m[1]}px]`)
+    }
+  }
+  assert.deepEqual(offenders, [], `use a ramp token instead:\n${offenders.join('\n')}`)
 })
 
 // --- faces ------------------------------------------------------------------------------------

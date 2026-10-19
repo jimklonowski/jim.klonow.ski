@@ -6,7 +6,7 @@
     @click="open = true"
   >
     <div class="flex items-start justify-between gap-2">
-      <span class="text-[12.5px] text-hi leading-tight flex items-center gap-1 min-w-0">
+      <span class="text-row text-hi leading-tight flex items-center gap-1 min-w-0">
         <UIcon
           v-if="meta.computed"
           name="i-lucide-calculator"
@@ -16,24 +16,24 @@
         <span class="truncate">{{ meta.label }}{{ caveatCompound ? '*' : '' }}{{ readingNote ? '†' : '' }}</span>
         <span
           v-if="caveatCompound"
-          class="shrink-0 text-[9.5px] leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
+          class="shrink-0 text-nano leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
           :title="`Taken while on ${caveatCompound} — see the note inside`"
         >on {{ caveatCompound }}</span>
       </span>
       <span
-        class="text-[11px] shrink-0"
+        class="text-meta shrink-0"
         :style="{ color: statusColor }"
       >{{ statusLabel }}</span>
     </div>
 
     <div class="flex items-baseline gap-1.5 mt-2">
       <span
-        class="num-display text-[26px] leading-none"
+        class="num-display text-tile leading-none"
         :class="carried ? 'text-dim' : ''"
       ><TuiRollingNumber :value="displayValue" /></span>
       <span
         v-if="meta.unit"
-        class="text-[10.5px] text-muted"
+        class="text-label text-muted"
       >{{ meta.unit }}</span>
     </div>
 
@@ -46,7 +46,7 @@
       class="mt-3"
     />
 
-    <div class="flex items-baseline justify-between gap-2 mt-2 text-[10.5px]">
+    <div class="flex items-baseline justify-between gap-2 mt-2 text-label">
       <span class="text-muted truncate">{{ rangeCaption }}</span>
       <span
         v-if="carried && carriedFrom"
@@ -68,14 +68,14 @@
       <div class="space-y-5">
         <p
           v-if="meta.description"
-          class="text-[12.5px] leading-[1.7] text-dim"
+          class="text-row leading-[1.7] text-dim"
         >
           {{ meta.description }}
         </p>
 
         <p
           v-if="showCaveat"
-          class="text-[11.5px] leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
+          class="text-small leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
         >
           * {{ caveat!.note }}
         </p>
@@ -83,19 +83,19 @@
         <p
           v-for="n in readingNotes"
           :key="n.date"
-          class="text-[11.5px] leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
+          class="text-small leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
         >
           † {{ n.dateLabel }} — {{ n.note }}
         </p>
 
         <p
           v-if="meta.computed"
-          class="text-[11px] text-faint"
+          class="text-meta text-faint"
         >
           ⚙ computed from other markers
         </p>
 
-        <div class="space-y-1.5 text-[12px]">
+        <div class="space-y-1.5 text-small">
           <div
             v-if="hasRange"
             class="flex items-center gap-2"
@@ -132,7 +132,7 @@
             <div
               v-for="(row, i) in history"
               :key="row.date"
-              class="flex items-center justify-between gap-3 px-2 py-1.5 text-[12px]"
+              class="flex items-center justify-between gap-3 px-2 py-1.5 text-small"
               :class="i % 2 ? 'bg-inset' : ''"
             >
               <span class="text-muted">{{ row.dateLabel }}</span>
@@ -144,9 +144,9 @@
                   v-if="row.noted"
                   class="text-warn"
                 >†</span></span>
-                <span class="text-[10.5px] text-muted">{{ meta.unit }}</span>
+                <span class="text-label text-muted">{{ meta.unit }}</span>
                 <span
-                  class="text-[10.5px] w-9 text-right"
+                  class="text-label w-9 text-right"
                   :style="{ color: row.color }"
                 >{{ row.label }}</span>
               </span>
@@ -154,7 +154,7 @@
           </div>
           <p
             v-else
-            class="mt-2 text-[12px] text-muted"
+            class="mt-2 text-small text-muted"
           >
             No readings recorded yet.
           </p>
