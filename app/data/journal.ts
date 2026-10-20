@@ -238,7 +238,8 @@ export function blankEntry(date: string): JournalEntry {
     hrv: null,
     peptides: [],
     reconstitutions: [],
-    food: { breakfast: '', snack: '', lunch: '', dinner: '' },
+    // Slots are keys of shared/utils/nutrition.ts MEAL_SLOTS; the day form fills in the blanks.
+    food: {},
     sodas: [],
     water: [],
     notes: ''

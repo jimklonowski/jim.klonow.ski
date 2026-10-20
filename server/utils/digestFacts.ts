@@ -4,6 +4,7 @@ import { roundTo, shiftDays } from '#shared/utils/dates'
 import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
+import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 
 // The digest's fact sheet: reads a period's vitals / sleep / recovery / doses / workouts from D1
@@ -47,7 +48,7 @@ type HealthRow = Pick<HealthMetricsEntry,
   | 'sleep_deep_min' | 'sleep_rem_min' | 'body_fat_pct' | 'lean_body_mass_lbs'>
 type WorkoutRow = Pick<WorkoutEntry, 'date' | 'workout_type' | 'duration_min' | 'calories' | 'avg_hr'>
 
-const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, notes'
+const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, food, notes'
 
 function parseJournalRow(r: Record<string, unknown>): JournalRow {
   return {
@@ -60,7 +61,35 @@ function parseJournalRow(r: Record<string, unknown>): JournalRow {
     peptides: JSON.parse((r.peptides as string) || '[]'),
     sodas: JSON.parse((r.sodas as string) || '[]'),
     water: JSON.parse((r.water as string) || '[]'),
+    food: JSON.parse((r.food as string) || '{}'),
     notes: (r.notes as string | null) ?? null
+  }
+}
+
+/**
+ * The period's meal log against the figures (library, hand entries, model estimates): how many
+ * days logged food, kcal and protein per day over the days whose meals ALL have figures (a
+ * half-covered day reads low), and the three most-logged meals.
+ */
+function foodSummary(entries: JournalRow[], estimates: EstimateIndex) {
+  const days = entries.filter(e => MEAL_SLOTS.some(s => e.food?.[s]?.trim()))
+  let covered = 0
+  let kcal = 0
+  let protein = 0
+  for (const e of days) {
+    const n = dayNutrition(e, estimates)
+    if (!n.meals.length || n.missing.length) continue
+    covered++
+    kcal += n.kcal
+    protein += n.protein_g
+  }
+  const top = mealHistory(days).slice(0, 3).map(h => (h.count > 1 ? `${h.text} ×${h.count}` : h.text))
+  return {
+    daysLogged: days.length,
+    daysCovered: covered,
+    kcal: covered ? Math.round(kcal / covered) : 0,
+    protein_g: covered ? Math.round(protein / covered) : 0,
+    top
   }
 }
 
@@ -189,14 +218,15 @@ export interface DigestFacts {
 // `rules` is the effective dosing schedule (standing + planned cycles) and `today` the
 // home-timezone date, both for the schedule check — see scheduleContext in protocolProse.ts.
 export async function dailyDigestFacts(db: D1Database, date: string, rules: ProtocolRule[], today: string): Promise<DigestFacts> {
-  const [journal, health, workouts, prev, baseJournal, baseHealth, labDates] = await Promise.all([
+  const [journal, health, workouts, prev, baseJournal, baseHealth, labDates, estimates] = await Promise.all([
     journalInRange(db, date, date),
     healthInRange(db, date, date),
     workoutsInRange(db, date, date),
     priorJournal(db, date),
     journalInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
     healthInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
-    labDatesInRange(db, date, date)
+    labDatesInRange(db, date, date),
+    loadEstimateIndex(db)
   ])
   const entry = journal[0] ?? null
   const h = health[0] ?? null
@@ -233,6 +263,21 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   const water = waterTotals(entry?.water)
   if (water.count) lines.push(`Water: ${fmtWaterOz(water.oz)} over ${water.count} pour${water.count === 1 ? '' : 's'}`)
 
+  // The meals as typed, then the day's total — a floor while any meal has no figures.
+  const mealSlots = MEAL_SLOTS.filter(s => entry?.food?.[s]?.trim())
+  const nutrition = dayNutrition(entry, estimates)
+  if (mealSlots.length) {
+    const list = mealSlots.map(s => `${MEAL_SLOT_LABELS[s].toLowerCase()} — ${entry!.food[s]!.trim()}`).join('; ')
+    const missing = nutrition.missing.length
+    const allLabel = nutrition.meals.every(m => !m.estimate || m.estimate.source !== 'ai')
+    const figures = nutrition.estimated
+      ? ` ${allLabel ? 'Label figures' : 'Est.'} ≈ ${Math.round(nutrition.kcal)} kcal, ${Math.round(nutrition.protein_g)} g protein, ${Math.round(nutrition.carbs_g)} g carbs, ${Math.round(nutrition.fat_g)} g fat`
+      + `${nutrition.sodaKcal ? ` (incl. ~${nutrition.sodaKcal} kcal from soda)` : ''}`
+      + `${missing ? `; ${missing} meal${missing === 1 ? '' : 's'} without figures yet, so this is a floor` : ''}.`
+      : ''
+    lines.push(`Meals: ${list}.${figures}`)
+  }
+
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your note for the day — ${notes.join('; ')}`)
 
@@ -249,7 +294,9 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     workouts: workouts.length,
     sodas: sodas.count,
     soda_oz: sodas.oz || null,
-    water_oz: water.oz || null
+    water_oz: water.oz || null,
+    kcal_est: nutrition.estimated ? Math.round(nutrition.kcal) : null,
+    protein_g_est: nutrition.estimated ? Math.round(nutrition.protein_g) : null
   }
 
   // Baseline is context, not data — decide whether the day is worth summarizing first.
@@ -283,14 +330,15 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
 export async function weeklyDigestFacts(db: D1Database, start: string, end: string, rules: ProtocolRule[], today: string): Promise<DigestFacts> {
   const prevStart = shiftDays(start, -7)
   const prevEnd = shiftDays(start, -1)
-  const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates] = await Promise.all([
+  const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates, estimates] = await Promise.all([
     journalInRange(db, start, end),
     healthInRange(db, start, end),
     workoutsInRange(db, start, end),
     journalInRange(db, prevStart, prevEnd),
     healthInRange(db, prevStart, prevEnd),
     workoutsInRange(db, prevStart, prevEnd),
-    labDatesInRange(db, start, end)
+    labDatesInRange(db, start, end),
+    loadEstimateIndex(db)
   ])
 
   const weights = journal.map(e => e.weight_lbs).filter((v): v is number => v != null)
@@ -363,6 +411,13 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
     ? `Water: ~${water.perDay} oz/day over the ${water.days} day${water.days === 1 ? '' : 's'} it was logged (${fmtWaterOz(water.oz)} total)`
     : 'Water: none logged')
 
+  const food = foodSummary(journal, estimates)
+  lines.push(food.daysLogged
+    ? `Food: meals logged on ${food.daysLogged} day${food.daysLogged === 1 ? '' : 's'}`
+    + `${food.daysCovered ? `; ≈ ${food.kcal} kcal/day and ${food.protein_g} g protein/day over the ${food.daysCovered} day${food.daysCovered === 1 ? '' : 's'} with figures for every meal` : ''}`
+    + `${food.top.length ? `; most logged: ${food.top.join(', ')}` : ''}`
+    : 'Food: no meals logged')
+
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your notes this week — ${notes.join('; ')}`)
 
@@ -389,6 +444,8 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   base.push(`${pSodas.count} soda${pSodas.count === 1 ? '' : 's'}${pOz ? ` (${pOz})` : ''}`)
   const pWater = waterSummary(prevJournal)
   if (pWater.days) base.push(`water ~${pWater.perDay} oz/day`)
+  const pFood = foodSummary(prevJournal, estimates)
+  if (pFood.daysCovered) base.push(`≈ ${pFood.kcal} kcal/day, ${pFood.protein_g} g protein/day`)
   if (prevJournal.length || prevHealth.length || prevWorkouts.length) {
     lines.push(`Previous week (${fmtDay(prevStart)} – ${fmtDay(prevEnd)}), for comparison: ${base.join(', ')}`)
   }
@@ -405,7 +462,9 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
     workouts: workouts.length,
     sodas: sodas.count,
     soda_oz: sodas.oz || null,
-    water_oz_per_day: water.days ? water.perDay : null
+    water_oz_per_day: water.days ? water.perDay : null,
+    avg_kcal_est: food.daysCovered ? food.kcal : null,
+    avg_protein_g_est: food.daysCovered ? food.protein_g : null
   }
 
   const hasData = journal.length > 0 || health.length > 0 || workouts.length > 0

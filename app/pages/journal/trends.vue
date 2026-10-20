@@ -59,6 +59,29 @@
         </div>
       </section>
 
+      <!-- Food: estimates from the meal log (shared/utils/nutrition.ts), sodas included. -->
+      <section v-if="foodTiles.length">
+        <TuiHeader
+          label="FOOD ── meal log, estimated"
+          :dashes="0"
+        >
+          <span class="text-micro text-muted normal-case">≈ model estimates per meal · days with every meal estimated</span>
+        </TuiHeader>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 mt-2.5">
+          <JournalMetricTile
+            v-for="tile in foodTiles"
+            :key="tile.key"
+            :label="tile.label"
+            :unit="tile.unit"
+            :value="tile.value"
+            :series="tile.series"
+            :rows="foodRows"
+            :annotations="annotations"
+          />
+        </div>
+      </section>
+
       <!-- Health: Whoop + Apple Watch -->
       <section>
         <TuiHeader
@@ -168,6 +191,7 @@ import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations }
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
+import { dayNutrition } from '#shared/utils/nutrition'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
@@ -183,6 +207,7 @@ function retryAll() {
 }
 const { data: labsData } = await useLabsEntries()
 const { data: cyclesData } = await useCycles()
+const { index: estimateIndex } = await useMealEstimates()
 const { role } = await useAuth()
 
 const { inRange, smoothRows, notes } = useTrendRange()
@@ -309,6 +334,49 @@ const vitalTiles = computed(() => {
   ]
 })
 
+// --- food group ---
+// One point per day whose logged meals are ALL estimated (a day with one unestimated meal would
+// read low), kcal with sodas folded in. Empty until estimates exist, so the doctor view (no
+// food) and a fresh sandbox simply don't get the section.
+const FOOD_FIELDS = ['kcal', 'protein_g']
+
+const foodRows = computed(() =>
+  smoothRows(
+    inRange(entries.value).map((e) => {
+      const n = dayNutrition(e, estimateIndex.value)
+      const full = n.meals.length > 0 && n.missing.length === 0
+      return {
+        date: formatDate(e.date, 'monthDay'),
+        day: e.date,
+        kcal: full ? Math.round(n.kcal) : null,
+        protein_g: full ? Math.round(n.protein_g) : null
+      }
+    }),
+    FOOD_FIELDS
+  )
+)
+
+const foodTiles = computed(() => {
+  const rows = foodRows.value
+  if (!rows.some(r => r.kcal != null)) return []
+  return [
+    {
+      key: 'kcal',
+      label: 'Calories',
+      unit: 'kcal est.',
+      value: fmt(latest(rows, 'kcal')),
+      series: [{ key: 'kcal', name: 'kcal', color: CHART_WARN }]
+    },
+    {
+      key: 'protein_g',
+      label: 'Protein',
+      unit: 'g est.',
+      value: fmt(latest(rows, 'protein_g')),
+      series: [{ key: 'protein_g', name: 'protein', color: CHART_ACCENT }]
+    }
+  ]
+})
+
 // --- health group ---
 // Per-metric line colors: green for the "more is better" fitness markers, indigo for sleep,
 // warn for strain (a load number with no good direction).
@@ -375,7 +443,7 @@ const healthTiles = computed(() =>
   })
 )
 
-const metricCount = computed(() => vitalTiles.value.length + healthTiles.value.length + 1)
+const metricCount = computed(() => vitalTiles.value.length + foodTiles.value.length + healthTiles.value.length + 1)
 
 // --- sleep stages ---
 // Legend + stack order from the mock: awake on top, then light (the `core` column), rem, deep.

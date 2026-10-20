@@ -28,6 +28,25 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   notes TEXT
 );
 
+-- Cached calorie/macro estimates per distinct meal text (migration 0012). key = mealKey(text)
+-- from shared/utils/nutrition.ts; source 'manual' rows are hand corrections and are never
+-- overwritten by a re-estimate.
+CREATE TABLE IF NOT EXISTS meal_estimates (
+  key TEXT PRIMARY KEY,
+  text TEXT NOT NULL,
+  kcal INTEGER NOT NULL,
+  protein_g REAL NOT NULL,
+  carbs_g REAL NOT NULL,
+  fat_g REAL NOT NULL,
+  confidence TEXT NOT NULL DEFAULT 'medium',
+  assumptions TEXT,
+  source TEXT NOT NULL DEFAULT 'ai',
+  model TEXT,
+  prompt_hash TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS labs_entries (
   date TEXT PRIMARY KEY,
   fasting INTEGER NOT NULL DEFAULT 0,

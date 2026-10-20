@@ -373,24 +373,51 @@
             <TuiHeader
               label="FOOD"
               :dashes="20"
-            />
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
-              <UFormField
-                v-for="slot in MEAL_SLOTS"
-                :key="slot.key"
-                :label="slot.label"
-                :ui="FIELD_UI"
+            >
+              <!-- The day's total, sodas included — "≈ … est." when any figure is the model's,
+                   and a floor (the trailing +) while any meal has no figures at all. -->
+              <span
+                v-if="foodTotals.estimated"
+                class="text-meta text-muted"
+              >{{ foodEstimated ? '≈ ' : '' }}{{ fmtKcal(foodTotals.kcal) }} kcal · {{ fmtMacros(foodTotals) }}<span class="text-faint">{{ foodEstimated ? ' est.' : '' }}{{ foodTotals.missing.length ? ' +' : '' }}</span></span>
+            </TuiHeader>
+            <!-- Day order, one column: the three meals always, a snack slot where one was logged
+                 or opened with its "+ snack", the legacy single Snack only on days that have one. -->
+            <div class="space-y-2.5 mt-2.5">
+              <template
+                v-for="row in FOOD_ROWS"
+                :key="row.key"
               >
-                <UInputMenu
-                  v-model="form.food[slot.key]"
-                  mode="autocomplete"
-                  :items="mealHistory"
-                  open-on-click
-                  :placeholder="slot.placeholder"
-                  class="w-full"
-                  :ui="SELECT_UI"
-                />
-              </UFormField>
+                <UFormField
+                  v-if="!row.snack || snackOpen(row.key)"
+                  :label="row.label"
+                  :ui="FIELD_UI"
+                >
+                  <UInputMenu
+                    v-model="form.food[row.key]"
+                    mode="autocomplete"
+                    :items="mealHistoryBySlot[row.key]"
+                    open-on-click
+                    :placeholder="row.placeholder"
+                    class="w-full"
+                    :ui="SELECT_UI"
+                  />
+                  <template #help>
+                    <JournalMealEstimate
+                      :text="form.food[row.key]"
+                      @replace="form.food[row.key] = $event"
+                    />
+                  </template>
+                </UFormField>
+                <button
+                  v-else-if="canEdit && row.key !== 'snack'"
+                  type="button"
+                  class="block text-meta text-faint hover:text-accent cursor-pointer"
+                  @click="openSnack(row.key)"
+                >
+                  + {{ row.label.toLowerCase() }}
+                </button>
+              </template>
             </div>
           </section>
 
@@ -814,6 +841,7 @@
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, oppositeSite } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
+import { MEAL_SLOTS, dayNutrition, fmtKcal, fmtMacros, knownMeals, mealHistory, nutritionIsEstimated, resolveMealText, type MealSlot } from '#shared/utils/nutrition'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '#shared/types/journal'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
@@ -832,12 +860,31 @@ function doseHelp(p: PeptideEntry): string | undefined {
   return iuEquivalentLabel(p.compound, p.dose) ?? undefined
 }
 
-const MEAL_SLOTS = [
+// Day order (shared/utils/nutrition.ts MEAL_SLOTS). `snack` is the legacy single slot: shown
+// when a day has one, never offered as a "+ snack" — new snacks say which gap they sit in.
+const FOOD_ROWS: Array<{ key: MealSlot, label: string, placeholder: string, snack?: boolean }> = [
   { key: 'breakfast', label: 'Breakfast', placeholder: 'Protein shake + creatine' },
-  { key: 'snack', label: 'Snack', placeholder: 'Sourdough' },
+  { key: 'snack', label: 'Snack', placeholder: 'Sourdough', snack: true },
+  { key: 'snack_am', label: 'Morning snack', placeholder: 'Beef sticks', snack: true },
   { key: 'lunch', label: 'Lunch', placeholder: 'Chipotle bowl' },
-  { key: 'dinner', label: 'Dinner', placeholder: 'Steak + veggies' }
-] as const
+  { key: 'snack_pm', label: 'Afternoon snack', placeholder: 'Sourdough', snack: true },
+  { key: 'dinner', label: 'Dinner', placeholder: 'Steak + veggies' },
+  { key: 'snack_eve', label: 'Evening snack', placeholder: 'Watermelon', snack: true }
+]
+
+// Snack slots opened with "+ snack" this visit, so an empty one stays visible to type into.
+const openedSnacks = ref<MealSlot[]>([])
+function snackOpen(slot: MealSlot): boolean {
+  return form.food[slot] !== '' || openedSnacks.value.includes(slot)
+}
+function openSnack(slot: MealSlot) {
+  if (!openedSnacks.value.includes(slot)) openedSnacks.value = [...openedSnacks.value, slot]
+}
+
+/** Every slot as '' or its text — the form always holds all keys, the row only the logged ones. */
+function blankFood(food?: Partial<Record<MealSlot, string>> | null): Record<MealSlot, string> {
+  return Object.fromEntries(MEAL_SLOTS.map(s => [s, food?.[s] ?? ''])) as Record<MealSlot, string>
+}
 
 const route = useRoute()
 const toast = useToast()
@@ -860,6 +907,7 @@ const { isOwner, canEdit } = await useAuth()
 const { data: workoutsData } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
 const { data: profileData } = await useProfile()
+const { index: estimateIndex } = await useMealEstimates()
 
 /** What "+ cup" pre-fills — the tracker's cup size from the profile, or the default. */
 const cupOz = computed(() => waterSetting(profileData.value ?? {}, 'cup_oz', WATER_DEFAULT_CUP_OZ))
@@ -998,19 +1046,11 @@ function copyFromPrevious() {
 }
 
 // Pooled across all four meal slots (and all days) so an order typed for lunch once
-// autocompletes for dinner too - powers the suggestion menu on each Food input.
-const mealHistory = computed(() => {
-  const counts: Record<string, number> = {}
-  for (const e of allEntries.value ?? []) {
-    for (const slot of MEAL_SLOTS) {
-      const v = e.food?.[slot.key]?.trim()
-      if (v) counts[v] = (counts[v] ?? 0) + 1
-    }
-  }
-  return Object.entries(counts)
-    .sort(([va, a], [vb, b]) => b - a || va.localeCompare(vb))
-    .map(([v]) => v)
-})
+// autocompletes for dinner too, but ranked per slot (this slot's own history first) and with
+// every spelling of a meal folded into its most-used one — shared/utils/nutrition.ts.
+const mealHistoryBySlot = computed(() =>
+  Object.fromEntries(MEAL_SLOTS.map(s => [s, mealHistory(allEntries.value ?? [], s).map(h => h.text)])) as Record<MealSlot, string[]>
+)
 
 const form = reactive<{
   date: string
@@ -1021,7 +1061,7 @@ const form = reactive<{
   hrv: number | null
   peptides: PeptideEntry[]
   reconstitutions: ReconstitutionEntry[]
-  food: { breakfast: string, snack: string, lunch: string, dinner: string }
+  food: Record<MealSlot, string>
   sodas: SodaEntry[]
   water: WaterEntry[]
   notes: string
@@ -1041,6 +1081,17 @@ watch(existingEntry, () => {
   formGuard.markClean()
 })
 
+/**
+ * The day's nutrition as the form stands — unsaved edits included, since the chips follow the
+ * inputs. Nothing is estimated automatically: a meal with no figures shows "enter macros →" on
+ * its chip (and an explicit AI option) for the owner.
+ */
+const foodTotals = computed(() => dayNutrition({ food: form.food, sodas: form.sodas }, estimateIndex.value))
+const foodEstimated = computed(() => nutritionIsEstimated(foodTotals.value))
+
+/** Every meal with figures, for pairing a re-worded entry with the one it means (see resolveMealText). */
+const knownMealList = computed(() => knownMeals(allEntries.value ?? [], estimateIndex.value))
+
 function buildForm() {
   const entry = existingEntry.value
   if (!entry) {
@@ -1054,7 +1105,7 @@ function buildForm() {
       hrv: blank.hrv ?? null,
       peptides: [] as PeptideEntry[],
       reconstitutions: [] as ReconstitutionEntry[],
-      food: { breakfast: '', snack: '', lunch: '', dinner: '' },
+      food: blankFood(),
       sodas: [] as SodaEntry[],
       water: [] as WaterEntry[],
       notes: ''
@@ -1069,12 +1120,7 @@ function buildForm() {
     hrv: entry.hrv ?? null,
     peptides: (entry.peptides ?? []).map(p => ({ ...p })),
     reconstitutions: (entry.reconstitutions ?? []).map(r => ({ ...r })),
-    food: {
-      breakfast: entry.food?.breakfast ?? '',
-      snack: entry.food?.snack ?? '',
-      lunch: entry.food?.lunch ?? '',
-      dinner: entry.food?.dinner ?? ''
-    },
+    food: blankFood(entry.food),
     sodas: (entry.sodas ?? []).map(s => ({ ...s })),
     water: (entry.water ?? []).map(w => ({ ...w })),
     notes: entry.notes ?? ''
@@ -1128,18 +1174,31 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
   // An existing row moves: saved under the day it was opened from, then renamed. A new day is
   // simply written under the date chosen. Either way the page follows the entry.
   const moving = to !== from && existingEntry.value != null
+  // A meal typed as a new spelling of one that has figures is saved as that one (same key or a
+  // strong match) and the toast below says so; the form shows the saved spelling after refresh.
+  const paired: string[] = []
+  const food = Object.fromEntries(
+    Object.entries(form.food)
+      .filter(([, v]) => v.trim() !== '')
+      .map(([slot, v]) => {
+        const r = resolveMealText(v, knownMealList.value)
+        if (r.changed) paired.push(`${slot}: "${r.text}"`)
+        return [slot, r.text]
+      })
+  )
   const payload = {
     ...form,
     date: moving ? from : to,
-    food: Object.fromEntries(
-      Object.entries(form.food).filter(([, v]) => v !== '')
-    ),
+    food,
     // A pour row added and never filled (or cleared — v-model.number hands back '') is not a
     // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
     water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0)
   }
   await $fetch('/api/journal/save', { method: 'POST', body: payload })
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
+  if (paired.length) {
+    toast.add({ title: 'Meals matched to ones with figures', description: `Saved as ${paired.join(', ')}. Edit the field if that was wrong.`, color: 'info', icon: 'i-lucide-link' })
+  }
   // What was just saved is now the baseline, so the refresh below may rebuild from the row.
   formGuard.markClean()
   // The shell's streak / logged / soda figures come from the scalar summary, not this list.

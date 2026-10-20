@@ -30,7 +30,9 @@ export const PROFILE_FIELDS: ProfileField[] = [
   // The water tracker's two settings (shared/utils/water.ts reads them, with defaults when unset).
   // The tracker's own ▾ panel edits these too; the card is where they're listed with everything else.
   { key: 'water_goal_oz', label: 'Water goal', kind: 'number', min: 8, max: 400, unit: 'oz', hint: 'per day' },
-  { key: 'cup_oz', label: 'Water cup', kind: 'number', min: 1, max: 128, unit: 'oz', hint: 'what one + CUP tap logs — less than the cup\'s size once it\'s full of ice' }
+  { key: 'cup_oz', label: 'Water cup', kind: 'number', min: 1, max: 128, unit: 'oz', hint: 'what one + CUP tap logs — less than the cup\'s size once it\'s full of ice' },
+  // The hub's food card reads the 7-day protein average against this (shared/utils/nutrition.ts).
+  { key: 'protein_target_g', label: 'Protein target', kind: 'number', min: 20, max: 500, unit: 'g', hint: 'per day, for the food card' }
 ]
 
 export const PROFILE_KEYS = PROFILE_FIELDS.map(f => f.key)
@@ -40,4 +42,15 @@ export type Profile = Record<string, string>
 
 export function profileLabel(key: string): string {
   return PROFILE_FIELDS.find(f => f.key === key)?.label ?? key
+}
+
+/**
+ * A 'number' fact as a positive number, or the fallback. Values are stored as strings ('100'),
+ * and a cleared or mistyped one must not turn a goal or target into NaN.
+ */
+export function profileNumber(profile: Record<string, string> | null | undefined, key: string, fallback: number): number {
+  const raw = profile?.[key]
+  if (raw == null || raw === '') return fallback
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : fallback
 }

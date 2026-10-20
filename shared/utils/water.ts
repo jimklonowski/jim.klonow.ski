@@ -5,6 +5,7 @@
 // `cup_oz`) as strings, like every other wallet-card fact; the readers below turn them back into
 // numbers and fall back to the defaults when unset or unparseable, so a blank profile (the demo
 // sandbox, a fresh install) still gets a working tracker.
+import { profileNumber } from './profile.ts'
 
 /** A sensible daily target to start from; Jim's own number goes in the profile. */
 export const WATER_DEFAULT_GOAL_OZ = 100
@@ -38,15 +39,9 @@ export function fmtWaterOz(oz: number): string {
   return `${Number.isInteger(oz) ? oz : oz.toFixed(1)} oz`
 }
 
-/**
- * A profile value as a positive number, or the fallback. Profile values are strings ('100'),
- * and a cleared or mistyped one must not turn the goal into NaN.
- */
+/** The goal or cup size from the profile, or the fallback — see profileNumber. */
 export function waterSetting(profile: Record<string, string> | null | undefined, key: string, fallback: number): number {
-  const raw = profile?.[key]
-  if (raw == null || raw === '') return fallback
-  const n = Number(raw)
-  return Number.isFinite(n) && n > 0 ? n : fallback
+  return profileNumber(profile, key, fallback)
 }
 
 /** Share of the goal reached, 0–1, capped at 1 so a big day doesn't overflow a progress bar. */

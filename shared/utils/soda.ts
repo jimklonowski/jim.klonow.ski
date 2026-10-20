@@ -46,3 +46,46 @@ export function fmtSodaOz(t: SodaTotals): string {
   if (!t.count || t.oz === 0) return ''
   return `~${t.oz} oz${t.unsized ? ` (+${t.unsized} unsized)` : ''}`
 }
+
+// --- calories ---
+// Label figures per 12 oz for the SODA_DRINKS suggestions (app/data/journal.ts), lowercased.
+// Freeform drinks fall back: anything reading diet / zero / sugar-free is 0, the rest a regular
+// soda's ~150. Soda calories feed the day's nutrition total (shared/utils/nutrition.ts).
+const KCAL_PER_12OZ: Record<string, number> = {
+  'dr pepper': 150,
+  'coke': 140,
+  'cherry coke': 150,
+  'diet coke': 0,
+  'coke zero': 0,
+  'wild cherry pepsi': 160,
+  'sprite': 140,
+  'mountain dew': 170,
+  'root beer': 160,
+  'mr pibb': 140,
+  'orange fanta': 160,
+  'orange crush': 160,
+  'canada dry': 140,
+  'ginger ale': 140
+}
+const DEFAULT_KCAL_PER_12OZ = 150
+
+/** Calories for one logged soda, or null when its size carries no volume. */
+export function sodaKcal(drink: string | null | undefined, size: string | null | undefined): number | null {
+  const oz = sodaOunces(size)
+  if (oz == null) return null
+  const name = (drink ?? '').trim().toLowerCase()
+  const per12 = KCAL_PER_12OZ[name] ?? (/\b(diet|zero|sugar.?free)\b/.test(name) ? 0 : DEFAULT_KCAL_PER_12OZ)
+  return Math.round((oz / 12) * per12)
+}
+
+/** Calories summed over the sized sodas, plus how many carried no size (and so no figure). */
+export function sodaKcalTotals(sodas: Array<{ drink?: string | null, size?: string | null }>): { kcal: number, unsized: number } {
+  let kcal = 0
+  let unsized = 0
+  for (const s of sodas) {
+    const k = sodaKcal(s.drink, s.size)
+    if (k == null) unsized++
+    else kcal += k
+  }
+  return { kcal, unsized }
+}
