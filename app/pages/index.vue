@@ -167,6 +167,33 @@
             STACK
           </NuxtLink>
         </div>
+
+        <!-- One-tap soda and water from here too (useQuickLog): the same defaults the hub's
+             trackers use — the last drink logged, the profile's cup size — and the status line
+             above moves with each tap. Write roles only. -->
+        <div
+          v-if="canEdit"
+          class="flex gap-2 mt-2"
+        >
+          <button
+            type="button"
+            class="tui-btn flex-1 justify-center min-w-0"
+            :disabled="addingSoda"
+            :title="`Log a soda: ${sodaLabel}`"
+            @click="addSoda()"
+          >
+            <span class="truncate">{{ addingSoda ? 'LOGGING…' : `+ SODA · ${sodaLabel}` }}</span>
+          </button>
+          <button
+            type="button"
+            class="tui-btn flex-1 justify-center min-w-0"
+            :disabled="addingWater"
+            :title="`Log ${cupOz} oz of water`"
+            @click="addWater()"
+          >
+            <span class="truncate">{{ addingWater ? 'LOGGING…' : `+ CUP ${cupOz}oz` }}</span>
+          </button>
+        </div>
       </div>
 
       <HomeCycle
@@ -298,6 +325,7 @@ import { wardrobeOf } from '#shared/utils/tickerWardrobe'
 import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
+const { sodaLabel, cupOz, addingSoda, addingWater, addSoda, addWater } = await useQuickLog()
 const {
   hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
   allWorkouts, dosesToday, sodasToday, flagged, flagCounts,

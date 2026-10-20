@@ -67,45 +67,53 @@
            sizes to its content's min-content, so the soda row's unbreakable quick-add label used
            to widen the whole column past a phone's edge at the larger SIZE steps. -->
       <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <section class="bg-raised border border-line-soft px-4 py-3.5">
-          <div class="flex items-baseline gap-3 text-meta">
-            <span class="tui-label">Today · doses + workout</span>
-            <NuxtLink
-              v-if="isFullAccess"
-              :to="`/journal/${today}`"
-              class="ml-auto text-accent hover:text-accent-hover"
-            >entry →</NuxtLink>
-          </div>
+        <div class="flex flex-col gap-3">
+          <section class="bg-raised border border-line-soft px-4 py-3.5">
+            <div class="flex items-baseline gap-3 text-meta">
+              <span class="tui-label">Today · doses + workout</span>
+              <NuxtLink
+                v-if="isFullAccess"
+                :to="`/journal/${today}`"
+                class="ml-auto text-accent hover:text-accent-hover"
+              >entry →</NuxtLink>
+            </div>
 
-          <p
-            v-if="doseLines.length"
-            class="mt-3 text-row leading-loose text-dim"
-          >
-            <span
-              v-for="(line, i) in doseLines"
-              :key="i"
-              class="block"
-            >{{ line }}</span>
-          </p>
-          <p
-            v-else
-            class="mt-3 text-row text-muted"
-          >
-            No doses logged today.
-          </p>
+            <p
+              v-if="doseLines.length"
+              class="mt-3 text-row leading-loose text-dim"
+            >
+              <span
+                v-for="(line, i) in doseLines"
+                :key="i"
+                class="block"
+              >{{ line }}</span>
+            </p>
+            <p
+              v-else
+              class="mt-3 text-row text-muted"
+            >
+              No doses logged today.
+            </p>
 
-          <p
-            v-if="latestWorkout"
-            class="mt-2 pt-2.5 border-t border-line-soft text-row flex flex-wrap items-baseline gap-x-2"
-          >
-            <span class="text-hi">{{ latestWorkout.workout_type ?? 'Workout' }}</span>
-            <span
-              v-for="(part, i) in workoutParts"
-              :key="part"
-              class="text-muted whitespace-nowrap"
-            >{{ i ? `· ${part}` : part }}</span>
-          </p>
-        </section>
+            <p
+              v-if="latestWorkout"
+              class="mt-2 pt-2.5 border-t border-line-soft text-row flex flex-wrap items-baseline gap-x-2"
+            >
+              <span class="text-hi">{{ latestWorkout.workout_type ?? 'Workout' }}</span>
+              <span
+                v-for="(part, i) in workoutParts"
+                :key="part"
+                class="text-muted whitespace-nowrap"
+              >{{ i ? `· ${part}` : part }}</span>
+            </p>
+          </section>
+
+          <!-- Today's meals with their estimates and the one-line quick log — the daily loop. -->
+          <JournalFoodToday
+            v-if="isFullAccess"
+            :readonly="!canEdit"
+          />
+        </div>
 
         <div class="flex flex-col gap-3">
           <JournalSodaTracker

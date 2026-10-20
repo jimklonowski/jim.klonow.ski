@@ -17,6 +17,9 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+// The meal-figure cache is keyed by the app's own normalizer, so the seed uses it too (node
+// strips the types; the test suite imports shared/ the same way).
+import { mealKey } from '../../shared/utils/mealKey.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -139,7 +142,9 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
     food.breakfast = pick(BREAKFASTS)
     food.lunch = pick(LUNCHES)
     food.dinner = pick(DINNERS)
-    if (chance(0.35)) food.snack = pick(SNACKS)
+    // Snacks name their gap (shared/utils/nutrition.ts MEAL_SLOTS); the legacy `snack` key stays empty.
+    if (chance(0.35)) food.snack_pm = pick(SNACKS)
+    if (chance(0.15)) food.snack_am = pick(SNACKS)
   }
 
   // Soda habit tapers from ~0.8/day to ~0.2/day across the story.
@@ -593,8 +598,51 @@ const profileRows = [
   ['blood_type', 'O+', `${D(402)}T15:40:00.000Z`],
   // The water tracker's settings (owner-only writes, so the sandbox needs them seeded to show).
   ['water_goal_oz', '100', `${D(119)}T13:05:00.000Z`],
-  ['cup_oz', '12', `${D(119)}T13:05:00.000Z`]
+  ['cup_oz', '12', `${D(119)}T13:05:00.000Z`],
+  // The food card's protein line reads this.
+  ['protein_target_g', '150', `${D(60)}T13:05:00.000Z`]
 ]
+
+// --- meal_estimates --------------------------------------------------------------------------
+
+// Calories/macros for every meal string the persona logs (shared/utils/nutrition.ts). The demo
+// role can't call the model (owner-only) and the code library holds Jim's regulars, not these,
+// so the cache is seeded with plausible figures marked as hand-entered — the feature then reads
+// as it does for the owner: chips under the meals, a day total, the trends tiles.
+// [text, kcal, protein, carbs, fat, assumptions]
+const MEAL_FIGURES = [
+  ['eggs + oatmeal', 450, 24, 45, 18, '2 eggs, 1 cup cooked oatmeal'],
+  ['greek yogurt, berries, granola', 380, 22, 50, 10, '1 cup yogurt, 1/2 cup berries, 1/3 cup granola'],
+  ['protein shake + banana', 230, 26, 30, 2, '1 scoop whey in water, 1 banana'],
+  ['eggs, turkey bacon, toast', 420, 28, 30, 20, '2 eggs, 3 strips, 1 slice'],
+  ['overnight oats', 400, 14, 60, 12, '1/2 cup oats with milk and fruit'],
+  ['cottage cheese + peaches', 260, 24, 26, 6, '1 cup cottage cheese, 1 peach'],
+  ['skipped — coffee only', 10, 0, 1, 0, 'black coffee'],
+  ['chicken rice bowl', 650, 45, 70, 18, '6 oz chicken, 1 cup rice, vegetables'],
+  ['turkey wrap + apple', 520, 32, 60, 16, 'deli turkey wrap, 1 apple'],
+  ['leftover chili', 450, 30, 35, 20, '1.5 cups'],
+  ['tuna salad sandwich', 480, 28, 40, 22, 'on sandwich bread'],
+  ['chipotle bowl (double chicken)', 900, 75, 75, 32, 'rice, beans, salsa, cheese, double chicken'],
+  ['soup + half sandwich', 550, 25, 55, 24, 'cup of soup, half deli sandwich'],
+  ['grilled chicken caesar', 600, 42, 20, 38, 'restaurant portion with dressing'],
+  ['salmon, potatoes, asparagus', 620, 42, 40, 30, '6 oz salmon, 1 cup potatoes'],
+  ['steak + sweet potato', 700, 50, 45, 32, '8 oz steak, 1 medium sweet potato'],
+  ['ground turkey pasta', 680, 40, 75, 22, '2 cups pasta with sauce'],
+  ['sheet-pan chicken + veg', 560, 45, 30, 26, '6 oz chicken, roasted vegetables'],
+  ['tacos (3, corn tortillas)', 600, 32, 55, 26, '3 street-style tacos'],
+  ['pork tenderloin + rice', 580, 44, 55, 14, '6 oz pork, 1 cup rice'],
+  ['burger, no bun, side salad', 520, 35, 10, 36, '1/3 lb patty with cheese, side salad'],
+  ['shrimp stir fry', 520, 35, 55, 15, 'with rice'],
+  ['protein bar', 220, 20, 22, 8, 'one bar'],
+  ['almonds', 170, 6, 6, 15, '1 oz'],
+  ['apple + peanut butter', 290, 7, 30, 16, '1 apple, 2 tbsp'],
+  ['beef jerky', 120, 12, 5, 5, '1.5 oz'],
+  ['popcorn', 150, 3, 18, 8, '3 cups popped'],
+  ['cheese stick', 80, 7, 1, 6, 'one stick']
+]
+const mealEstimateRows = MEAL_FIGURES.map(([text, kcal, p, c, f, assumptions]) => [
+  mealKey(text), text, kcal, p, c, f, 'high', assumptions, 'manual', null, null, `${D(60)}T13:10:00.000Z`, `${D(60)}T13:10:00.000Z`
+])
 
 // --- Assemble ------------------------------------------------------------------------------
 
@@ -657,6 +705,11 @@ const seed = {
       cols: ['key', 'value', 'updated_at'],
       jsonCols: [],
       rows: profileRows
+    },
+    meal_estimates: {
+      cols: ['key', 'text', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'confidence', 'assumptions', 'source', 'model', 'prompt_hash', 'created_at', 'updated_at'],
+      jsonCols: [],
+      rows: mealEstimateRows
     },
     planned_draws: {
       cols: ['date', 'lab', 'panel', 'fasting', 'purpose', 'cycle_id', 'checkpoint_key', 'labs_date', 'created_at'],

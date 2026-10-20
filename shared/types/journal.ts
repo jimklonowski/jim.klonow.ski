@@ -9,6 +9,7 @@
 // are looser (optional, nullable) than what a save produces today.
 import type { z } from 'zod'
 import type { VialForm } from '../utils/vialForm'
+import type { MealSlot } from '../utils/nutrition'
 import type { zPeptideEntry, zReconstitutionEntry, zSodaEntry, zWaterEntry } from '../utils/schemas'
 
 /** Every unit a dose or a vial is logged in, stored lowercase. */
@@ -35,12 +36,8 @@ export interface JournalEntry {
   hrv?: number | null
   peptides?: PeptideEntry[]
   reconstitutions?: ReconstitutionEntry[]
-  food?: {
-    breakfast?: string
-    snack?: string
-    lunch?: string
-    dinner?: string
-  }
+  /** Meal text per slot (shared/utils/nutrition.ts MEAL_SLOTS); absent slots were not logged. */
+  food?: Partial<Record<MealSlot, string>>
   sodas?: SodaEntry[]
   water?: WaterEntry[]
   notes?: string
@@ -48,11 +45,11 @@ export interface JournalEntry {
 
 /**
  * A journal_entries row as the server's prompt builders read it: JSON columns decoded to
- * arrays, SQL NULLs kept as null, and nothing absent. Food and reconstitutions are left out —
- * no prompt reads them.
+ * arrays, SQL NULLs kept as null, and nothing absent. Reconstitutions are left out — no prompt
+ * reads them. Food joined in Oct 2026 with the meal estimates (shared/utils/nutrition.ts).
  */
 export interface JournalRow extends Pick<
-  Required<JournalEntry>, 'date' | 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv' | 'peptides' | 'sodas' | 'water'
+  Required<JournalEntry>, 'date' | 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv' | 'peptides' | 'sodas' | 'water' | 'food'
 > {
   notes: string | null
 }

@@ -9,8 +9,9 @@ import { SCHEDULED_TASKS } from '../../../schedule'
 //
 // "Digest-worthy" mirrors dailyDigestFacts' hasData signals (server/utils/digestFacts.ts) in SQL
 // — keep the two in step. Counting ANY row here used to offer days the digest then skipped: the
-// Apple Health webhook could leave a blank journal row, and a food-only day has no digest lines,
-// so the "gap" reappeared on every reload no matter how often it was "filled".
+// Apple Health webhook could leave a blank journal row, so the "gap" reappeared on every reload
+// no matter how often it was "filled". (A food-only day counts since Oct 2026: the facts carry a
+// Meals line with the day's estimated calories.)
 
 /** True while today's firing of `task`'s cron is still ahead of us (UTC hour from the schedule). */
 function beforeCronHour(task: string, now: Date): boolean {
@@ -34,6 +35,7 @@ export default defineEventHandler(async (event) => {
         OR (peptides IS NOT NULL AND peptides != '[]')
         OR (sodas IS NOT NULL AND sodas != '[]')
         OR (water IS NOT NULL AND water != '[]')
+        OR (food IS NOT NULL AND food != '{}')
         OR (notes IS NOT NULL AND notes != '')
       )
       UNION SELECT date FROM health_metrics WHERE date >= ?1 AND (

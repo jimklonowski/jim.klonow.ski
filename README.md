@@ -67,7 +67,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/labs/login` | Owner password sign-in |
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
 | `/demo` | Starts a 24-hour demo session on the synthetic sandbox and lands on the home dashboard with a short guided tour — see **Demo mode** |
-| `/journal` | Hub — vital tiles with sparklines, today's doses + workout, one-tap soda and water trackers, the Whoop strip, and cards into each spoke below |
+| `/journal` | Hub — vital tiles with sparklines, today's doses + workout, today's meals with their calorie/macro figures (a code library of regulars with label figures, hand entries, or an explicit AI estimate) and a one-line quick log, one-tap soda and water trackers, the Whoop strip, and cards into each spoke below |
 | `/journal/trends` | Every vitals + Whoop/Apple Watch chart under one shared range picker (30/60/90d/all, optional 7d smoothing) |
 | `/journal/compounds` | Active protocol and every tracked compound — modeled exposure curves for the slow-release injectables (Bateman superposition of the dose log, lab draws overlaid) and a planned-vs-logged adherence panel scoring the standing cadence plus any planned cycles — linking out to the calculator and vial inventory |
 | `/journal/cycles` | Cycle planner — named, dated protocol phases (e.g. "200 mg Primo weeks 1–16, Anavar weeks 12–16") stored week-relative to the start date, so shifting the start moves every phase. A start can also be pencilled in to a month or quarter (`start_precision`) — such a "not scheduled" cycle stays upcoming and derives nothing dated (no rings, adherence, or checkpoints) until a day is picked; editing owner only |

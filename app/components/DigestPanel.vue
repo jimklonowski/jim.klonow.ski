@@ -292,6 +292,8 @@ function chips(d: Digest): string[] {
     // Ounces beside the count when the sizes carried them — two mini cans are less than one bottle.
     push(s.sodas, v => v ? `${v} soda${v === 1 ? '' : 's'}${s.soda_oz ? ` · ~${s.soda_oz} oz` : ''}` : '')
     push(s.water_oz, v => v ? `${v} oz water` : '')
+    push(s.kcal_est, v => `≈${v} kcal`)
+    push(s.protein_g_est, v => `${v} g protein`)
   }
   else {
     push(s.avg_recovery, v => `Avg rec ${v}%`)
@@ -302,6 +304,8 @@ function chips(d: Digest): string[] {
     push(s.workouts, v => `${v} workout${v === 1 ? '' : 's'}`)
     push(s.sodas, v => `${v} soda${v === 1 ? '' : 's'}${s.soda_oz ? ` · ~${s.soda_oz} oz` : ''}`)
     push(s.water_oz_per_day, v => `~${v} oz water/day`)
+    push(s.avg_kcal_est, v => `≈${v} kcal/day`)
+    push(s.avg_protein_g_est, v => `${v} g protein/day`)
   }
   return out.filter(Boolean)
 }

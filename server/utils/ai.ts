@@ -35,7 +35,13 @@ export const AI_MODELS = {
   /** Prose trend summary for a draw. */
   summary: 'claude-opus-5-5',
   /** Freeform stockpile text → inventory rows (structured output). */
-  parse: 'claude-opus-5-5'
+  parse: 'claude-opus-5-5',
+  /**
+   * Meal text → calories/macros (structured output), estimated once per distinct meal and cached
+   * forever (server/utils/nutritionEstimate.ts). Opus because the figures become permanent
+   * record like an extraction, at a few hundred short items in total.
+   */
+  nutrition: 'claude-opus-5-5'
 } as const
 
 export type AiTask = keyof typeof AI_MODELS

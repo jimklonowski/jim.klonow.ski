@@ -18,6 +18,7 @@ import { isIsoDate } from './time.ts'
 import { DOSE_UNIT_VALUES } from '../types/journal.ts'
 import { PHOTO_CATEGORIES, type PhotoCategory } from './photoCategories.ts'
 import { WATER_MAX_OZ_PER_ENTRY } from './water.ts'
+import { MEAL_SLOTS } from './nutrition.ts'
 
 /** A real YYYY-MM-DD calendar day (rejects 2026-13-40, which `new Date()` would roll forward). */
 export const zIsoDate = z.string().refine(isIsoDate, 'expected a YYYY-MM-DD date')
@@ -91,7 +92,8 @@ export const zWaterEntry = z.object({
   oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY)
 })
 
-const MEAL_KEYS = ['breakfast', 'snack', 'lunch', 'dinner'] as const
+// The food JSON's keys (shared/utils/nutrition.ts): three meals, the legacy snack, three gap snacks.
+const MEAL_KEYS = MEAL_SLOTS
 
 /**
  * A day moved to another date (journal/move): the row is renamed, so everything in it travels.
@@ -134,6 +136,31 @@ export const zSodaRemove = z.object({
   date: zIsoDate,
   // A negative index is an invalid SQLite JSON path ('$[-1]'), which fails the whole statement.
   index: z.coerce.number().int().min(0)
+})
+
+// --- meals ---
+
+export const zMealSlot = z.enum(MEAL_KEYS)
+
+/** One slot of one day's food, written without the rest of the form (the hub's quick log). '' clears the slot. */
+export const zMealSet = z.object({
+  date: zIsoDate,
+  slot: zMealSlot,
+  text: zText(500)
+})
+
+/** Texts to estimate (owner-only, one model call): bounded like the food fields, ≤ 50 per call. */
+export const zMealEstimateRequest = z.object({
+  texts: z.array(zText(500).min(1)).min(1).max(50)
+})
+
+/** A hand correction of one meal's figures; whole kcal, grams to one decimal is plenty. */
+export const zMealCorrect = z.object({
+  text: zText(500).min(1),
+  kcal: z.number().int().min(0).max(10_000),
+  protein_g: z.number().min(0).max(1_000),
+  carbs_g: z.number().min(0).max(2_000),
+  fat_g: z.number().min(0).max(1_000)
 })
 
 // --- water (quick-add widget) --- same shape as the soda pair; `oz` is the one required field.

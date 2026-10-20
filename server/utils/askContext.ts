@@ -6,6 +6,7 @@
 import { profileLabel } from '#shared/utils/profile'
 import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
 import { waterTotals } from '#shared/utils/water'
+import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
 import type { JournalRow, SodaEntry } from '#shared/types/journal'
 import { roundTo, shiftDays } from '#shared/utils/dates'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
@@ -35,7 +36,7 @@ function waterText(entries: JournalRow[]): string | null {
 }
 
 async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]> {
-  const sql = `SELECT date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, notes
+  const sql = `SELECT date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, food, notes
     FROM journal_entries ${since ? 'WHERE date >= ?1' : ''} ORDER BY date ASC`
   const stmt = since ? db.prepare(sql).bind(since) : db.prepare(sql)
   const { results } = await stmt.all()
@@ -49,8 +50,38 @@ async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]
     peptides: JSON.parse((r.peptides as string) || '[]'),
     sodas: JSON.parse((r.sodas as string) || '[]'),
     water: JSON.parse((r.water as string) || '[]'),
+    food: JSON.parse((r.food as string) || '{}'),
     notes: (r.notes as string | null) ?? null
   }))
+}
+
+// "food ≈ 1,850 kcal/day, 95 g protein/day (4 days with figures)" over the days whose meals all
+// have figures; null when none do.
+function foodText(entries: JournalRow[], estimates: EstimateIndex): string | null {
+  let days = 0
+  let kcal = 0
+  let protein = 0
+  for (const e of entries) {
+    const n = dayNutrition(e, estimates)
+    if (!n.meals.length || n.missing.length) continue
+    days++
+    kcal += n.kcal
+    protein += n.protein_g
+  }
+  if (!days) return null
+  return `food ≈ ${Math.round(kcal / days)} kcal/day, ${Math.round(protein / days)} g protein/day (${days} day${days === 1 ? '' : 's'} with figures)`
+}
+
+// "meals: breakfast grilled cheese + guac; lunch costco pizza (≈ 1,250 kcal, 60 g protein)" — the
+// day's meals as typed, with the total when every meal has figures (a floor otherwise, said so).
+function mealsText(e: JournalRow, estimates: EstimateIndex): string | null {
+  const slots = MEAL_SLOTS.filter(s => e.food?.[s]?.trim())
+  if (!slots.length) return null
+  const n = dayNutrition(e, estimates)
+  const total = n.estimated
+    ? ` (≈ ${Math.round(n.kcal)} kcal, ${Math.round(n.protein_g)} g protein${n.missing.length ? `, floor: ${n.missing.length} without figures` : ''})`
+    : ''
+  return `meals: ${slots.map(s => `${MEAL_SLOT_LABELS[s].toLowerCase()} ${e.food[s]!.trim()}`).join('; ')}${total}`
 }
 
 /** Every lab draw with all recorded markers — the model needs raw values to answer marker questions. */
@@ -105,7 +136,7 @@ function compoundLines(journal: JournalRow[]): string[] {
 }
 
 /** Trailing weekly aggregates so month-scale questions don't need day rows. */
-function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown>>, workouts: Array<Record<string, unknown>>, today: string, weeks: number): string[] {
+function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown>>, workouts: Array<Record<string, unknown>>, today: string, weeks: number, estimates: EstimateIndex): string[] {
   const lines: string[] = []
   for (let w = weeks - 1; w >= 0; w--) {
     const end = shiftDays(today, -7 * w)
@@ -123,7 +154,8 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
       avg(h.map(e => e.sleep_total_min as number | null)) != null ? `sleep ${Math.round(avg(h.map(e => e.sleep_total_min as number | null))!)}min` : null,
       `${wo.length} workouts`,
       sodaText(j.flatMap(e => e.sodas ?? []), 'sodas'),
-      waterText(j)
+      waterText(j),
+      foodText(j, estimates)
     ].filter(Boolean)
     lines.push(`${start} → ${end}: ${parts.join(', ')}`)
   }
@@ -131,7 +163,7 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
 }
 
 /** Recent daily detail: vitals, doses, notes — where the fine-grained questions live. */
-function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>>, since: string): string[] {
+function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>>, since: string, estimates: EstimateIndex): string[] {
   const byDate = new Map(health.map(h => [h.date as string, h]))
   return journal
     .filter(e => e.date >= since)
@@ -148,6 +180,7 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
         doses ? `doses: ${doses}` : 'no doses',
         e.sodas?.length ? sodaText(e.sodas, 'soda') : null,
         e.water?.length ? `water ${waterTotals(e.water).oz} oz` : null,
+        mealsText(e, estimates),
         e.notes?.trim() ? `note: "${e.notes.trim().replace(/\s*\n+\s*/g, ' / ').slice(0, 200)}"` : null
       ].filter(Boolean)
       return `${e.date}: ${parts.join(', ')}`
@@ -171,7 +204,7 @@ const WEEKLY_WINDOW_WEEKS = 20
 
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone. */
 export async function buildAskContext(db: D1Database, today: string): Promise<string> {
-  const [journal, labs, dexa, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws] = await Promise.all([
+  const [journal, labs, dexa, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, estimates] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
@@ -184,7 +217,9 @@ export async function buildAskContext(db: D1Database, today: string): Promise<st
     vaccineContext(db, today, 'all'),
     profileLine(db),
     // The next booked draw and its questions — "when's my next draw?" and "what am I waiting on?".
-    plannedDrawContext(db, today)
+    plannedDrawContext(db, today),
+    // Meal figures (library, hand entries, model estimates) for the meals in the day and week lines.
+    loadEstimateIndex(db)
   ])
   const health = (healthRes.results ?? []) as Array<Record<string, unknown>>
   const workouts = mergeWorkouts((workoutsRes.results ?? []).map(parseWorkoutRow)) as unknown as Array<Record<string, unknown>>
@@ -214,8 +249,9 @@ export async function buildAskContext(db: D1Database, today: string): Promise<st
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,
     `Compound history (all-time, from the dose log):\n${compoundLines(journal).join('\n') || 'none'}`,
     trendLines.length ? `Sustained trends (precomputed multi-week shifts):\n${trendLines.join('\n')}` : '',
-    `Weekly aggregates, last ${WEEKLY_WINDOW_WEEKS} weeks:\n${weeklyLines(journal, health, workouts, today, WEEKLY_WINDOW_WEEKS).join('\n') || 'none'}`,
-    `Daily detail, last ${DAILY_WINDOW_DAYS} days:\n${dailyLines(journal, health, shiftDays(today, -DAILY_WINDOW_DAYS)).join('\n') || 'none'}`,
+    'Meal figures: label figures for known meals, otherwise model estimates from the meal text (about ±25 % per meal). A day marked "floor" has a meal with no figures. Treat them as trend and protein adequacy, not measured intake.',
+    `Weekly aggregates, last ${WEEKLY_WINDOW_WEEKS} weeks:\n${weeklyLines(journal, health, workouts, today, WEEKLY_WINDOW_WEEKS, estimates).join('\n') || 'none'}`,
+    `Daily detail, last ${DAILY_WINDOW_DAYS} days:\n${dailyLines(journal, health, shiftDays(today, -DAILY_WINDOW_DAYS), estimates).join('\n') || 'none'}`,
     `Recent workouts (last ${DAILY_WINDOW_DAYS} days; merged Apple+Whoop):\n${recentWorkouts.join('\n') || 'none'}`
   ]
   return sections.filter(Boolean).join('\n\n')

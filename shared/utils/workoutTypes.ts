@@ -1,7 +1,7 @@
 // Workout labels as the sources spell them. Whoop's sport_name is lowercase-kebab ("disc-golf",
 // "spin"); HealthKit's workout type is a fixed enum of English names, and several Whoop sports
 // collapse onto one broader HealthKit type — a disc golf round arrives from Apple as "Disc
-// Sports". The read-time merge (server/utils/workout-merge.ts) prefers Apple's label, so a round
+// Sports". The read-time merge (shared/utils/workoutMerge.ts) prefers Apple's label, so a round
 // read "disc-golf" after the Whoop sync and flipped to "Disc Sports" once Apple Health caught up.
 // Jim plays no other disc sport, so every spelling means the same thing.
 //

@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalMove, zJournalSave, zLabsSave,
+  zMealCorrect, zMealEstimateRequest, zMealSet,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
   zSodaRemove, zSupplementSave, zTickerRun, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWaterAdd, zWaterRemove,
   zWhoopCallbackQuery
@@ -144,6 +145,28 @@ test('water: every pour carries a positive volume, on the day form and the quick
   assert.equal(zWaterRemove.parse({ date: '2026-10-20', index: '3' }).index, 3)
   assert.ok(problem(zWaterRemove, { date: '2026-10-20', index: '-1' }))
   assert.ok(problem(zWaterRemove, { index: '0' }))
+})
+
+test('meals: one slot of one day, an estimate batch, and a hand entry', () => {
+  assert.deepEqual(zMealSet.parse({ date: '2026-10-20', slot: 'lunch', text: '  Costco pizza ' }), { date: '2026-10-20', slot: 'lunch', text: 'Costco pizza' })
+  assert.equal(zMealSet.parse({ date: '2026-10-20', slot: 'dinner', text: '' }).text, '', 'an empty text clears the slot')
+  assert.equal(zMealSet.parse({ date: '2026-10-20', slot: 'snack_pm', text: 'beef sticks' }).slot, 'snack_pm', 'the gap snacks are slots')
+  assert.ok(problem(zMealSet, { date: '2026-10-20', slot: 'brunch', text: 'x' }), 'only the known slots')
+  assert.deepEqual(zJournalSave.parse({ ...day, food: { snack_am: 'banana', lunch: 'eggs' } }).food, { snack_am: 'banana', lunch: 'eggs' }, 'the day save keeps the gap snacks')
+  assert.ok(problem(zMealSet, { date: '2026-10-20', slot: 'lunch', text: 'x'.repeat(501) }))
+  assert.ok(problem(zMealSet, { slot: 'lunch', text: 'x' }))
+
+  assert.deepEqual(zMealEstimateRequest.parse({ texts: [' gyros ', 'costco pizza'] }).texts, ['gyros', 'costco pizza'])
+  assert.ok(problem(zMealEstimateRequest, { texts: [] }), 'nothing to estimate')
+  assert.ok(problem(zMealEstimateRequest, { texts: ['   '] }), 'a blank text is not a meal')
+  assert.ok(problem(zMealEstimateRequest, { texts: Array.from({ length: 51 }, (_, i) => `meal ${i}`) }), 'at most 50 per call')
+
+  const fix = zMealCorrect.parse({ text: 'Costco pizza', kcal: 760, protein_g: 32, carbs_g: 74, fat_g: 36.5 })
+  assert.equal(fix.fat_g, 36.5)
+  assert.ok(problem(zMealCorrect, { text: 'Costco pizza', kcal: 760.5, protein_g: 32, carbs_g: 74, fat_g: 36 }), 'kcal is whole')
+  assert.ok(problem(zMealCorrect, { text: 'Costco pizza', kcal: -1, protein_g: 32, carbs_g: 74, fat_g: 36 }))
+  assert.ok(problem(zMealCorrect, { text: '', kcal: 760, protein_g: 32, carbs_g: 74, fat_g: 36 }))
+  assert.ok(problem(zMealCorrect, { text: 'Costco pizza', kcal: 760 }), 'every macro is required')
 })
 
 test('a vial needs a compound and a positive amount', () => {
