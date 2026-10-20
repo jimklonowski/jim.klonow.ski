@@ -49,7 +49,10 @@
               <span
                 v-if="profile[f.key]"
                 class="num-display text-title text-accent"
-              >{{ profile[f.key] }}</span>
+              >{{ profile[f.key] }}<span
+                v-if="f.unit"
+                class="text-meta text-muted"
+              > {{ f.unit }}</span></span>
               <span
                 v-else
                 class="text-small text-faint"
@@ -175,6 +178,25 @@
               placeholder="Pick one"
               class="w-full"
             />
+            <!-- A number stays a string in profileValue (the table's one value column is TEXT);
+                 the server checks the bounds and stores the canonical figure. -->
+            <UInput
+              v-else-if="profileField.kind === 'number'"
+              v-model="profileValue"
+              type="number"
+              inputmode="decimal"
+              :min="profileField.min"
+              :max="profileField.max"
+              :placeholder="profileField.placeholder"
+              class="w-full"
+            >
+              <template
+                v-if="profileField.unit"
+                #trailing
+              >
+                <span class="text-meta text-muted">{{ profileField.unit }}</span>
+              </template>
+            </UInput>
             <UInput
               v-else
               v-model="profileValue"

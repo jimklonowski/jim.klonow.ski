@@ -1,10 +1,10 @@
-import type { JournalEntry, SodaEntry, Vial } from '#shared/types/journal'
+import type { JournalEntry, SodaEntry, Vial, WaterEntry } from '#shared/types/journal'
 
 // The row shapes live in shared/types/journal.ts (the server reads the same rows); re-exported
 // so the pages' existing `~/data/journal` imports keep working.
 export type {
   DoseUnit, JournalEntry, PeptideEntry, ReconstitutionEntry, SodaEntry, Supplement,
-  SupplementCategory, SupplementStatus, Vial, VialStatus
+  SupplementCategory, SupplementStatus, Vial, VialStatus, WaterEntry
 } from '#shared/types/journal'
 
 export function blankVial(compound = ''): Vial {
@@ -39,6 +39,11 @@ export const SODA_SIZES = [
 
 export function blankSoda(time: string): SodaEntry {
   return { time, drink: '', size: '' }
+}
+
+/** A water row for the day form, pre-filled with the cup size so a tap is one click. */
+export function blankWater(time: string, oz: number): WaterEntry {
+  return { time, oz }
 }
 
 export const INJECTION_SITES = [
@@ -235,6 +240,7 @@ export function blankEntry(date: string): JournalEntry {
     reconstitutions: [],
     food: { breakfast: '', snack: '', lunch: '', dinner: '' },
     sodas: [],
+    water: [],
     notes: ''
   }
 }

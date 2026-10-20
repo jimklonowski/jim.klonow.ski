@@ -33,6 +33,7 @@ export default defineEventHandler(async (event) => {
         OR (bp_systolic IS NOT NULL AND bp_diastolic IS NOT NULL)
         OR (peptides IS NOT NULL AND peptides != '[]')
         OR (sodas IS NOT NULL AND sodas != '[]')
+        OR (water IS NOT NULL AND water != '[]')
         OR (notes IS NOT NULL AND notes != '')
       )
       UNION SELECT date FROM health_metrics WHERE date >= ?1 AND (

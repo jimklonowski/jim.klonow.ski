@@ -5,6 +5,7 @@
 // questions can be answered without shipping 1,200 journal rows into the prompt.
 import { profileLabel } from '#shared/utils/profile'
 import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
+import { waterTotals } from '#shared/utils/water'
 import type { JournalRow, SodaEntry } from '#shared/types/journal'
 import { roundTo, shiftDays } from '#shared/utils/dates'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
@@ -24,8 +25,17 @@ function sodaText(sodas: SodaEntry[], noun: string): string {
   return `${t.count} ${noun}${oz ? ` (${oz})` : ''}`
 }
 
+// "water ~84 oz/day (5 days logged)" — averaged over the days that logged any, since a day with
+// no taps is unknown rather than zero. null when the window has none.
+function waterText(entries: JournalRow[]): string | null {
+  const days = entries.filter(e => (e.water?.length ?? 0) > 0).length
+  if (!days) return null
+  const { oz } = waterTotals(entries.flatMap(e => e.water ?? []))
+  return `water ~${Math.round(oz / days)} oz/day (${days} day${days === 1 ? '' : 's'} logged)`
+}
+
 async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]> {
-  const sql = `SELECT date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, notes
+  const sql = `SELECT date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, notes
     FROM journal_entries ${since ? 'WHERE date >= ?1' : ''} ORDER BY date ASC`
   const stmt = since ? db.prepare(sql).bind(since) : db.prepare(sql)
   const { results } = await stmt.all()
@@ -38,6 +48,7 @@ async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]
     hrv: (r.hrv as number | null) ?? null,
     peptides: JSON.parse((r.peptides as string) || '[]'),
     sodas: JSON.parse((r.sodas as string) || '[]'),
+    water: JSON.parse((r.water as string) || '[]'),
     notes: (r.notes as string | null) ?? null
   }))
 }
@@ -111,7 +122,8 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
       avg(h.map(e => e.recovery_score as number | null)) != null ? `recovery ${roundTo(avg(h.map(e => e.recovery_score as number | null))!)}%` : null,
       avg(h.map(e => e.sleep_total_min as number | null)) != null ? `sleep ${Math.round(avg(h.map(e => e.sleep_total_min as number | null))!)}min` : null,
       `${wo.length} workouts`,
-      sodaText(j.flatMap(e => e.sodas ?? []), 'sodas')
+      sodaText(j.flatMap(e => e.sodas ?? []), 'sodas'),
+      waterText(j)
     ].filter(Boolean)
     lines.push(`${start} → ${end}: ${parts.join(', ')}`)
   }
@@ -135,6 +147,7 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
         h?.sleep_total_min != null ? `sleep ${h.sleep_total_min}min` : null,
         doses ? `doses: ${doses}` : 'no doses',
         e.sodas?.length ? sodaText(e.sodas, 'soda') : null,
+        e.water?.length ? `water ${waterTotals(e.water).oz} oz` : null,
         e.notes?.trim() ? `note: "${e.notes.trim().replace(/\s*\n+\s*/g, ' / ').slice(0, 200)}"` : null
       ].filter(Boolean)
       return `${e.date}: ${parts.join(', ')}`

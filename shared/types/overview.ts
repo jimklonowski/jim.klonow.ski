@@ -16,6 +16,8 @@ export interface OverviewSummary {
   latestRhr: number | null
   /** Sodas logged today; null for roles that don't see the soda log (doctor). */
   sodasToday: number | null
+  /** Ounces of water logged today; null for the doctor, same policy as sodas. */
+  waterOzToday: number | null
   /** The newest draw with its raw markers (derived markers are computed client-side). */
   latestDraw: { date: string, markers: Record<string, number | null> } | null
   /** Distinct source PDFs across every lab draw. */
