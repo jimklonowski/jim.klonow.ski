@@ -6,13 +6,14 @@ export default defineEventHandler(async (event) => {
 
   // The doctor view is vitals + protocol. Projected as an allowlist rather than nulling named
   // fields, so a column added later is private by default: dates, watch vitals, and the dose /
-  // reconstitution log stay; food, sodas and personal notes are blanked to their empty shapes so
-  // the client type is unchanged.
+  // reconstitution log stay; food, sodas, water and personal notes are blanked to their empty
+  // shapes so the client type is unchanged.
   if (auth.role === 'doctor') {
     return withEtag(event, entries.map(({ date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions }) => ({
       date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions,
       food: {},
       sodas: [],
+      water: [],
       notes: null
     })))
   }

@@ -13,8 +13,8 @@ export default defineEventHandler(async (event) => {
   // schema holding its historical values, and is deliberately absent from this statement so a
   // re-save doesn't null out what's already recorded.
   await db.prepare(`
-    INSERT INTO journal_entries (date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions, food, sodas, notes)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+    INSERT INTO journal_entries (date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions, food, sodas, water, notes)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
     ON CONFLICT(date) DO UPDATE SET
       weight_lbs = excluded.weight_lbs,
       bp_systolic = excluded.bp_systolic,
@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
       reconstitutions = excluded.reconstitutions,
       food = excluded.food,
       sodas = excluded.sodas,
+      water = excluded.water,
       notes = excluded.notes
   `).bind(
     body.date,
@@ -37,6 +38,7 @@ export default defineEventHandler(async (event) => {
     JSON.stringify(body.reconstitutions),
     JSON.stringify(body.food),
     JSON.stringify(body.sodas),
+    JSON.stringify(body.water),
     body.notes
   ).run()
   await recordAudit(event, { table: 'journal_entries', key: body.date, before, summary: `day ${body.date}` })

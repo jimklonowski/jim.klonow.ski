@@ -18,7 +18,7 @@ export async function useAuth() {
   )
   const role = computed<Role | null>(() => data.value?.role ?? null)
   const isOwner = computed(() => role.value === 'owner')
-  // Write affordances (journal days, sodas, supplements, vials) — demo edits land in the
+  // Write affordances (journal days, sodas, water, supplements, vials) — demo edits land in the
   // sandbox DB. Owner-only capabilities (uploads, AI, sharing, Whoop) keep gating on isOwner.
   const canEdit = computed(() => role.value === 'owner' || role.value === 'demo')
   return { role, isOwner, canEdit, refresh }

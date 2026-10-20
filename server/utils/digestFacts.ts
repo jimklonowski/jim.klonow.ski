@@ -3,6 +3,7 @@ import { fmtDay, scheduleContext } from '#shared/utils/protocolProse'
 import { roundTo, shiftDays } from '#shared/utils/dates'
 import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
+import { fmtWaterOz, waterTotals } from '#shared/utils/water'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 
 // The digest's fact sheet: reads a period's vitals / sleep / recovery / doses / workouts from D1
@@ -46,7 +47,7 @@ type HealthRow = Pick<HealthMetricsEntry,
   | 'sleep_deep_min' | 'sleep_rem_min' | 'body_fat_pct' | 'lean_body_mass_lbs'>
 type WorkoutRow = Pick<WorkoutEntry, 'date' | 'workout_type' | 'duration_min' | 'calories' | 'avg_hr'>
 
-const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, notes'
+const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, notes'
 
 function parseJournalRow(r: Record<string, unknown>): JournalRow {
   return {
@@ -58,8 +59,16 @@ function parseJournalRow(r: Record<string, unknown>): JournalRow {
     hrv: (r.hrv as number | null) ?? null,
     peptides: JSON.parse((r.peptides as string) || '[]'),
     sodas: JSON.parse((r.sodas as string) || '[]'),
+    water: JSON.parse((r.water as string) || '[]'),
     notes: (r.notes as string | null) ?? null
   }
+}
+
+/** Days of a range that logged any water, and the oz/day over just those days — unlogged days are unknown, not zero. */
+function waterSummary(entries: JournalRow[]): { days: number, oz: number, perDay: number } {
+  const days = entries.filter(e => (e.water?.length ?? 0) > 0).length
+  const { oz } = waterTotals(entries.flatMap(e => e.water ?? []))
+  return { days, oz, perDay: days ? Math.round(oz / days) : 0 }
 }
 
 async function journalInRange(db: D1Database, start: string, end: string): Promise<JournalRow[]> {
@@ -221,6 +230,9 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   const sodas = sodaSummary(journal)
   if (sodas.count) lines.push(`Sodas: ${sodaLine(sodas)}`)
 
+  const water = waterTotals(entry?.water)
+  if (water.count) lines.push(`Water: ${fmtWaterOz(water.oz)} over ${water.count} pour${water.count === 1 ? '' : 's'}`)
+
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your note for the day — ${notes.join('; ')}`)
 
@@ -236,7 +248,8 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     doses: doses.length,
     workouts: workouts.length,
     sodas: sodas.count,
-    soda_oz: sodas.oz || null
+    soda_oz: sodas.oz || null,
+    water_oz: water.oz || null
   }
 
   // Baseline is context, not data — decide whether the day is worth summarizing first.
@@ -345,6 +358,11 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   const sodas = sodaSummary(journal)
   lines.push(sodas.count ? `Sodas: ${sodaLine(sodas, 7)}` : 'Sodas: none logged')
 
+  const water = waterSummary(journal)
+  lines.push(water.days
+    ? `Water: ~${water.perDay} oz/day over the ${water.days} day${water.days === 1 ? '' : 's'} it was logged (${fmtWaterOz(water.oz)} total)`
+    : 'Water: none logged')
+
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your notes this week — ${notes.join('; ')}`)
 
@@ -369,6 +387,8 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   const pSodas = sodaSummary(prevJournal)
   const pOz = fmtSodaOz(pSodas)
   base.push(`${pSodas.count} soda${pSodas.count === 1 ? '' : 's'}${pOz ? ` (${pOz})` : ''}`)
+  const pWater = waterSummary(prevJournal)
+  if (pWater.days) base.push(`water ~${pWater.perDay} oz/day`)
   if (prevJournal.length || prevHealth.length || prevWorkouts.length) {
     lines.push(`Previous week (${fmtDay(prevStart)} – ${fmtDay(prevEnd)}), for comparison: ${base.join(', ')}`)
   }
@@ -384,7 +404,8 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
     compounds: doses.length,
     workouts: workouts.length,
     sodas: sodas.count,
-    soda_oz: sodas.oz || null
+    soda_oz: sodas.oz || null,
+    water_oz_per_day: water.days ? water.perDay : null
   }
 
   const hasData = journal.length > 0 || health.length > 0 || workouts.length > 0

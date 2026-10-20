@@ -113,6 +113,10 @@
             compact
             :readonly="!canEdit"
           />
+          <JournalWaterTracker
+            v-if="isFullAccess"
+            :readonly="!canEdit"
+          />
 
           <section class="flex-1 bg-raised border border-line-soft px-4 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-row text-dim">
             <span v-if="whoop.recovery != null">Whoop <span class="num-display text-accent text-head">{{ whoop.recovery }}%</span> recov</span>

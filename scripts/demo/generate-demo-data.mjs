@@ -148,6 +148,15 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
   if (chance(sodaRate)) sodas.push({ time: pick(['12:40', '14:15', '15:30', '19:05']), drink: pick(['Dr Pepper', 'Coke Zero', 'Root Beer', 'Diet Coke']), size: pick(['12oz can', '7.5oz mini can', '20oz bottle']) })
   if (chance(sodaRate * 0.25)) sodas.push({ time: '20:30', drink: pick(['Coke', 'Sprite']), size: '12oz can' })
 
+  // Water tracker: joins the story for the last ~120 days (the feature is newer than the soda
+  // log), most days logged, 4–9 pours of the 12 oz cup so the hub's goal bar has somewhere to go.
+  const water = []
+  if (o < 120 && chance(0.85)) {
+    const pours = 4 + Math.floor(between(0, 6))
+    const times = ['07:40', '09:15', '10:50', '12:30', '13:45', '15:10', '16:30', '18:05', '20:15']
+    for (let i = 0; i < pours; i++) water.push({ time: times[i], oz: 12 })
+  }
+
   let notes = ''
   if (o === TRT_START) notes = 'First testosterone pin this morning. Clinic walked me through everything — glute, slow push, no drama. Here we go.'
   else if (o === RETA_START) notes = 'Started retatrutide at 2 mg. Reading suggests appetite effect kicks in around week two.'
@@ -168,6 +177,7 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
     reconstitutions,
     food,
     sodas,
+    water,
     notes || null
   ])
   // BP null pairing: if systolic rolled and diastolic didn't (or vice versa) it looks broken.
@@ -580,7 +590,10 @@ const plannedDrawRows = [
 // Wallet-card facts (PROFILE_FIELDS in shared/utils/profile.ts). Without a row the card on
 // /journal/vaccines renders empty for demo visitors, which reads as a broken feature.
 const profileRows = [
-  ['blood_type', 'O+', `${D(402)}T15:40:00.000Z`]
+  ['blood_type', 'O+', `${D(402)}T15:40:00.000Z`],
+  // The water tracker's settings (owner-only writes, so the sandbox needs them seeded to show).
+  ['water_goal_oz', '100', `${D(119)}T13:05:00.000Z`],
+  ['cup_oz', '12', `${D(119)}T13:05:00.000Z`]
 ]
 
 // --- Assemble ------------------------------------------------------------------------------
@@ -590,8 +603,8 @@ const seed = {
   note: 'Synthetic demo persona. All values are generated fiction — no real health data. Regenerate with: node scripts/demo/generate-demo-data.mjs',
   tables: {
     journal_entries: {
-      cols: ['date', 'weight_lbs', 'bp_systolic', 'bp_diastolic', 'rhr', 'hrv', 'peptides', 'reconstitutions', 'food', 'sodas', 'notes'],
-      jsonCols: ['peptides', 'reconstitutions', 'food', 'sodas'],
+      cols: ['date', 'weight_lbs', 'bp_systolic', 'bp_diastolic', 'rhr', 'hrv', 'peptides', 'reconstitutions', 'food', 'sodas', 'water', 'notes'],
+      jsonCols: ['peptides', 'reconstitutions', 'food', 'sodas', 'water'],
       rows: journalRows
     },
     labs_entries: {

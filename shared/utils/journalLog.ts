@@ -22,19 +22,21 @@ export interface LoggedDayFields {
   peptides?: unknown[] | null
   reconstitutions?: unknown[] | null
   sodas?: unknown[] | null
+  water?: unknown[] | null
   food?: Record<string, string | null | undefined> | null
   notes?: string | null
 }
 
 /**
  * True when the day carries something hand-entered: a dose, a reconstitution, any food text,
- * a soda, or a note. Weight/BP/RHR/HRV are deliberately excluded — those arrive on their own
- * from the watch, so a day with nothing but vitals wasn't logged by hand.
+ * a soda, a water tap, or a note. Weight/BP/RHR/HRV are deliberately excluded — those arrive on
+ * their own from the watch, so a day with nothing but vitals wasn't logged by hand.
  */
 export function isLoggedDay(entry: LoggedDayFields): boolean {
   return (entry.peptides?.length ?? 0) > 0
     || (entry.reconstitutions?.length ?? 0) > 0
     || (entry.sodas?.length ?? 0) > 0
+    || (entry.water?.length ?? 0) > 0
     || Object.values(entry.food ?? {}).some(meal => (meal ?? '').trim() !== '')
     || (entry.notes ?? '').trim() !== ''
 }

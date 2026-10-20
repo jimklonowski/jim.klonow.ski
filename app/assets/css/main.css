@@ -119,6 +119,8 @@
   /* Misc series colors from the handoff */
   --color-indigo-dot: #8593ea;
   --color-soda: #7a2e35;
+  /* The water tracker's bars — a series identity like soda, so it stays put across presets. */
+  --color-water: #3f88c5;
 
   /* Phosphor scale so Nuxt UI's `primary` alias resolves to the accent */
   --color-phosphor-50: #eafff7;

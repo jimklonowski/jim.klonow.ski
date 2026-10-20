@@ -17,6 +17,7 @@ import { z } from 'zod'
 import { isIsoDate } from './time.ts'
 import { DOSE_UNIT_VALUES } from '../types/journal.ts'
 import { PHOTO_CATEGORIES, type PhotoCategory } from './photoCategories.ts'
+import { WATER_MAX_OZ_PER_ENTRY } from './water.ts'
 
 /** A real YYYY-MM-DD calendar day (rejects 2026-13-40, which `new Date()` would roll forward). */
 export const zIsoDate = z.string().refine(isIsoDate, 'expected a YYYY-MM-DD date')
@@ -82,6 +83,14 @@ export const zSodaEntry = z.object({
   size: zText(40).optional()
 })
 
+// A water tap always carries its volume: there is no label to parse it from later, and a 0 oz
+// row would count as a pour everywhere the taps are tallied. The day form drops blank rows
+// before saving rather than sending them here.
+export const zWaterEntry = z.object({
+  time: zText(5).default(''),
+  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY)
+})
+
 const MEAL_KEYS = ['breakfast', 'snack', 'lunch', 'dinner'] as const
 
 /**
@@ -107,6 +116,7 @@ export const zJournalSave = z.object({
   peptides: z.array(zPeptideEntry).max(50).default([]),
   reconstitutions: z.array(zReconstitutionEntry).max(50).default([]),
   sodas: z.array(zSodaEntry).max(50).default([]),
+  water: z.array(zWaterEntry).max(100).default([]),
   food: z.object(Object.fromEntries(MEAL_KEYS.map(k => [k, zText(500).optional()]))).partial().default({}),
   notes: zText(20000).default('')
 })
@@ -125,6 +135,16 @@ export const zSodaRemove = z.object({
   // A negative index is an invalid SQLite JSON path ('$[-1]'), which fails the whole statement.
   index: z.coerce.number().int().min(0)
 })
+
+// --- water (quick-add widget) --- same shape as the soda pair; `oz` is the one required field.
+
+export const zWaterAdd = z.object({
+  date: zIsoDate.optional(),
+  time: zClockTime.optional(),
+  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY)
+})
+
+export const zWaterRemove = zSodaRemove
 
 // --- vials ---
 

@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   reconstitutions TEXT NOT NULL DEFAULT '[]',
   food TEXT NOT NULL DEFAULT '{}',
   sodas TEXT NOT NULL DEFAULT '[]',
+  -- Water taps as [{time, oz}] (migration 0011); quick-added like sodas, see water.post.ts.
+  water TEXT NOT NULL DEFAULT '[]',
   notes TEXT
 );
 

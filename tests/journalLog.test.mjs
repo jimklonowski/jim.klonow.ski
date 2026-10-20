@@ -18,6 +18,7 @@ test('any hand-entered field makes the day logged', () => {
   assert.equal(isLoggedDay(dosed('2026-09-20')), true)
   assert.equal(isLoggedDay({ reconstitutions: [{ compound: 'BPC-157' }] }), true)
   assert.equal(isLoggedDay({ sodas: [{ time: '14:00' }] }), true)
+  assert.equal(isLoggedDay({ water: [{ time: '09:00', oz: 12 }] }), true)
   assert.equal(isLoggedDay({ food: { breakfast: '', lunch: 'eggs' } }), true)
   assert.equal(isLoggedDay({ notes: 'slept badly' }), true)
 })

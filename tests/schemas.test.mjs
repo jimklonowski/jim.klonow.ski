@@ -5,7 +5,8 @@ import assert from 'node:assert/strict'
 import {
   zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalMove, zJournalSave, zLabsSave,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
-  zSodaRemove, zSupplementSave, zTickerRun, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWhoopCallbackQuery
+  zSodaRemove, zSupplementSave, zTickerRun, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWaterAdd, zWaterRemove,
+  zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
 
 /** The first failure message, or null when the value parsed. */
@@ -23,7 +24,7 @@ test('a journal day fills in every optional field', () => {
   assert.deepEqual(out, {
     date: '2026-09-22',
     weight_lbs: null, bp_systolic: null, bp_diastolic: null, rhr: null, hrv: null,
-    peptides: [], reconstitutions: [], sodas: [], food: {}, notes: ''
+    peptides: [], reconstitutions: [], sodas: [], water: [], food: {}, notes: ''
   })
 })
 
@@ -122,6 +123,27 @@ test('soda add and remove', () => {
   assert.ok(problem(zSodaRemove, { date: '2026-09-22', index: '-1' }))
   assert.ok(problem(zSodaRemove, { date: '2026-09-22', index: '1.5' }))
   assert.ok(problem(zSodaRemove, { index: '0' }))
+})
+
+test('water: every pour carries a positive volume, on the day form and the quick-add alike', () => {
+  const pour = { time: '09:05', oz: 12 }
+  assert.deepEqual(zJournalSave.parse({ ...day, water: [pour] }).water, [pour])
+  assert.equal(zJournalSave.parse({ ...day, water: [{ oz: 8.5 }] }).water[0].time, '', 'a missing time is blank, not a failure')
+  // No volume is not a pour — the form drops blank rows before posting rather than storing 0.
+  assert.ok(problem(zJournalSave, { ...day, water: [{ time: '09:05' }] }))
+  assert.ok(problem(zJournalSave, { ...day, water: [{ time: '09:05', oz: 0 }] }))
+  assert.ok(problem(zJournalSave, { ...day, water: [{ time: '09:05', oz: '12' }] }), 'a numeric string is not a number')
+  assert.ok(problem(zJournalSave, { ...day, water: [{ time: '09:05', oz: 500 }] }), 'a typo-sized pour is refused')
+
+  assert.deepEqual(zWaterAdd.parse({ oz: 12 }), { oz: 12 })
+  assert.deepEqual(zWaterAdd.parse({ date: '2026-10-20', time: '14:32', oz: 9 }), { date: '2026-10-20', time: '14:32', oz: 9 })
+  assert.ok(problem(zWaterAdd, {}), 'the volume is required')
+  assert.ok(problem(zWaterAdd, { oz: -1 }))
+  assert.ok(problem(zWaterAdd, { oz: 12, time: '2:30' }), 'HH:MM must be zero-padded')
+  // Same remove shape as sodas: a coerced, non-negative index on a real day.
+  assert.equal(zWaterRemove.parse({ date: '2026-10-20', index: '3' }).index, 3)
+  assert.ok(problem(zWaterRemove, { date: '2026-10-20', index: '-1' }))
+  assert.ok(problem(zWaterRemove, { index: '0' }))
 })
 
 test('a vial needs a compound and a positive amount', () => {

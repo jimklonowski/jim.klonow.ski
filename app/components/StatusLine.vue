@@ -40,6 +40,14 @@
             :class="summary.sodasToday === 0 ? 'text-accent' : 'text-warn'"
           >{{ summary.sodasToday }}</span> today
         </span>
+
+        <!-- Same null rule as sodas: the doctor view has no water log. -->
+        <span
+          v-if="summary.latestEntryDate && summary.waterOzToday != null"
+          class="text-muted shrink-0"
+        >
+          water <span class="font-medium text-body">{{ summary.waterOzToday }}</span>oz
+        </span>
       </template>
 
       <span class="sm:ml-auto shrink-0 text-ghost normal-case tracking-normal hidden sm:inline">

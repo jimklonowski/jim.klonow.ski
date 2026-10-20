@@ -9,7 +9,7 @@
 // are looser (optional, nullable) than what a save produces today.
 import type { z } from 'zod'
 import type { VialForm } from '../utils/vialForm'
-import type { zPeptideEntry, zReconstitutionEntry, zSodaEntry } from '../utils/schemas'
+import type { zPeptideEntry, zReconstitutionEntry, zSodaEntry, zWaterEntry } from '../utils/schemas'
 
 /** Every unit a dose or a vial is logged in, stored lowercase. */
 export const DOSE_UNIT_VALUES = ['mg', 'mcg', 'iu'] as const
@@ -19,6 +19,8 @@ export type DoseUnit = typeof DOSE_UNIT_VALUES[number]
 
 export type PeptideEntry = z.output<typeof zPeptideEntry>
 export type SodaEntry = z.output<typeof zSodaEntry>
+/** One tap on the water tracker: when, and how many ounces it meant. */
+export type WaterEntry = z.output<typeof zWaterEntry>
 export type ReconstitutionEntry = z.output<typeof zReconstitutionEntry>
 
 // --- journal_entries ---
@@ -40,6 +42,7 @@ export interface JournalEntry {
     dinner?: string
   }
   sodas?: SodaEntry[]
+  water?: WaterEntry[]
   notes?: string
 }
 
@@ -49,7 +52,7 @@ export interface JournalEntry {
  * no prompt reads them.
  */
 export interface JournalRow extends Pick<
-  Required<JournalEntry>, 'date' | 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv' | 'peptides' | 'sodas'
+  Required<JournalEntry>, 'date' | 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv' | 'peptides' | 'sodas' | 'water'
 > {
   notes: string | null
 }

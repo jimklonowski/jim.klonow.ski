@@ -67,7 +67,7 @@ Personal health tracking site. Bloodwork trends, body composition, and a daily p
 | `/labs/login` | Owner password sign-in |
 | `/share/[token]` | Public landing that exchanges a share link for a role session |
 | `/demo` | Starts a 24-hour demo session on the synthetic sandbox and lands on the home dashboard with a short guided tour — see **Demo mode** |
-| `/journal` | Hub — vital tiles with sparklines, today's doses + workout, soda/Whoop strip, and cards into each spoke below |
+| `/journal` | Hub — vital tiles with sparklines, today's doses + workout, one-tap soda and water trackers, the Whoop strip, and cards into each spoke below |
 | `/journal/trends` | Every vitals + Whoop/Apple Watch chart under one shared range picker (30/60/90d/all, optional 7d smoothing) |
 | `/journal/compounds` | Active protocol and every tracked compound — modeled exposure curves for the slow-release injectables (Bateman superposition of the dose log, lab draws overlaid) and a planned-vs-logged adherence panel scoring the standing cadence plus any planned cycles — linking out to the calculator and vial inventory |
 | `/journal/cycles` | Cycle planner — named, dated protocol phases (e.g. "200 mg Primo weeks 1–16, Anavar weeks 12–16") stored week-relative to the start date, so shifting the start moves every phase. A start can also be pencilled in to a month or quarter (`start_precision`) — such a "not scheduled" cycle stays upcoming and derives nothing dated (no rings, adherence, or checkpoints) until a day is picked; editing owner only |
@@ -96,7 +96,7 @@ Cookie sessions are HMAC-signed tokens (key: `LABS_SECRET`) carrying one of four
 
 - **owner** — logs in with `LABS_PASSWORD`; full read/write. Lab uploads, lab JSON saves, and summary regeneration also need a 9-digit `LABS_UPLOAD_PIN` (a second-factor cookie, 12h).
 - **friend** — read-only mirror of the whole site, except the owner's management pages (upload, import, data, sharing, inventory) and `/ask`.
-- **doctor** — the clinical record: labs and DEXA, the journal hub, vitals and protocol trends, compounds and their dossiers, workouts, the calendar, the calculator, supplements, vaccines, and planned cycles. Daily entries, the `/journal/entries` ledger, photos, and digests are off-limits, and the journal list the doctor receives has food, sodas, and notes blanked server-side. The allowlist is `DOCTOR_PAGES` in `shared/utils/access.ts`; anything not on it is denied.
+- **doctor** — the clinical record: labs and DEXA, the journal hub, vitals and protocol trends, compounds and their dossiers, workouts, the calendar, the calculator, supplements, vaccines, and planned cycles. Daily entries, the `/journal/entries` ledger, photos, and digests are off-limits, and the journal list the doctor receives has food, sodas, water, and notes blanked server-side. The allowlist is `DOCTOR_PAGES` in `shared/utils/access.ts`; anything not on it is denied.
 - **demo** — self-serve, credential-free 24h session minted by visiting [`/demo`](https://jim.klonow.ski/demo) (replaces whatever session cookie is present). Sees and edits only the synthetic sandbox — see **Demo mode** below. Blocked from the AI, upload, import, data, and sharing pages.
 
 Guests never get a password: the owner mints **share links** (`/share/<token>`) from `/tools/sharing`, each with a role, redemption expiry, and use limit, backed by the `invites` D1 table, which stores only a SHA-256 of each link's token. Revoking a link also invalidates every session minted from it — guest requests re-check invite liveness. Sign-in/sign-out live in the footer status bar.
@@ -112,7 +112,7 @@ The Apple Health webhook authenticates with a `WEBHOOK_TOKEN` bearer token — i
 Visiting **[/demo](https://jim.klonow.ski/demo)** mints a demo-role session and lands on the home dashboard, where a short guided tour (Nuxt UI's `useTour`) introduces the app. Everything a demo visitor reads or writes is transparently routed to a **second D1 database** (`DEMO_DB`) by the one-line role branch in `getDb()` (`server/utils/db.ts`) — every endpoint works unchanged, and a demo cookie can never see or touch real data. What demo gets:
 
 - A fully **synthetic persona**: ~20 months of journal vitals and doses, 9 lab draws with story arcs (ApoB 108→71, a TRT start with the expected LH/FSH suppression and hematocrit creep), 4 DEXA scans, daily sleep/recovery metrics, workouts, a supplement stack, and a vial inventory that lines up with the logged doses.
-- **Sandboxed writes** — journal days, sodas, supplements, and vials are editable (`requireWriteAccess` guard); demo visitors share the sandbox until it resets.
+- **Sandboxed writes** — journal days, sodas, water, supplements, and vials are editable (`requireWriteAccess` guard); demo visitors share the sandbox until it resets.
 - **Canned AI** — TICKER digests and lab summaries are pre-written into the seed; no live Anthropic calls, and `/ask`, uploads, imports, the data page, and sharing stay owner-only.
 - **Nightly reset** — the `demo:reset` task (09:00 UTC cron) wipes the sandbox and reseeds it from `demo/seed.json` in R2, re-anchoring every relative date so the data always ends "yesterday".
 

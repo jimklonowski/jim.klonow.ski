@@ -142,6 +142,8 @@ export function parseJournalRow(row: Record<string, unknown>) {
     reconstitutions: JSON.parse((row.reconstitutions as string) || '[]'),
     food: JSON.parse((row.food as string) || '{}'),
     sodas: JSON.parse((row.sodas as string) || '[]'),
+    // `|| '[]'` also covers a row read before migration 0011 added the column.
+    water: JSON.parse((row.water as string) || '[]'),
     notes: (row.notes as string | null) ?? ''
   }
 }

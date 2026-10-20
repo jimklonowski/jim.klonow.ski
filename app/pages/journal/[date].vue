@@ -366,9 +366,10 @@
           </p>
         </section>
 
-        <!-- Food + sodas -->
+        <!-- Food + sodas + water: food takes the left column for both rows, the two drink logs
+             stack on the right. Below lg they simply follow one another. -->
         <div class="grid gap-5 lg:grid-cols-2">
-          <section>
+          <section class="lg:row-span-2">
             <TuiHeader
               label="FOOD"
               :dashes="20"
@@ -476,6 +477,81 @@
               class="mt-2.5 text-small text-muted"
             >
               No sodas logged.
+            </p>
+          </section>
+
+          <section>
+            <TuiHeader
+              label="WATER"
+              :dashes="20"
+            >
+              <span class="flex items-center gap-3 text-meta">
+                <span
+                  v-if="form.water.length"
+                  class="text-muted"
+                >{{ waterTotals(form.water).oz }} oz</span>
+                <button
+                  v-if="canEdit"
+                  type="button"
+                  class="text-accent hover:text-accent-hover cursor-pointer"
+                  @click="addWater"
+                >+ cup</button>
+              </span>
+            </TuiHeader>
+
+            <div
+              v-if="form.water.length"
+              class="space-y-2 mt-2.5"
+            >
+              <div
+                v-for="(w, i) in form.water"
+                :key="i"
+                class="grid grid-cols-12 gap-2 items-end"
+              >
+                <UFormField
+                  label="Time"
+                  class="col-span-4"
+                  :ui="FIELD_UI"
+                >
+                  <UInput
+                    v-model="w.time"
+                    type="time"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Ounces"
+                  class="col-span-7"
+                  :ui="FIELD_UI"
+                >
+                  <UInput
+                    v-model.number="w.oz"
+                    type="number"
+                    inputmode="decimal"
+                    min="1"
+                    :max="WATER_MAX_OZ_PER_ENTRY"
+                    step="0.5"
+                    class="w-full"
+                  />
+                </UFormField>
+                <div class="col-span-1 flex items-end pb-2">
+                  <button
+                    v-if="canEdit"
+                    type="button"
+                    class="text-small text-faint hover:text-danger cursor-pointer"
+                    :aria-label="`Remove pour ${i + 1}`"
+                    @click="removeWater(i)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p
+              v-else
+              class="mt-2.5 text-small text-muted"
+            >
+              No water logged.
             </p>
           </section>
         </div>
@@ -735,8 +811,9 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, oppositeSite } from '~/data/journal'
-import type { PeptideEntry, ReconstitutionEntry, SodaEntry } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, oppositeSite } from '~/data/journal'
+import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
+import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '#shared/types/journal'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
@@ -782,6 +859,10 @@ const { data: allEntries, error: entriesError, refresh } = await useJournalEntri
 const { isOwner, canEdit } = await useAuth()
 const { data: workoutsData } = await useWorkoutsEntries()
 const { data: photosData, refresh: refreshPhotos } = await usePhotoEntries()
+const { data: profileData } = await useProfile()
+
+/** What "+ cup" pre-fills — the tracker's cup size from the profile, or the default. */
+const cupOz = computed(() => waterSetting(profileData.value ?? {}, 'cup_oz', WATER_DEFAULT_CUP_OZ))
 
 const dayWorkouts = computed(() => (workoutsData.value ?? []).filter(w => w.date === dateParam.value))
 
@@ -887,13 +968,14 @@ const dateHelp = computed(() => {
   return isNew.value ? `Saves under ${form.date}` : `Saving moves this entry to ${form.date}`
 })
 
-/** "3 doses, weight 169.8, 2 sodas, notes" — what a day holds, for the replace confirm. */
+/** "3 doses, weight 169.8, 2 sodas, 84 oz water, notes" — what a day holds, for the replace confirm. */
 function entrySummary(e: NonNullable<typeof allEntries.value>[number]): string {
   const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
   return [
     e.peptides?.length ? n(e.peptides.length, 'dose') : null,
     e.weight_lbs != null ? `weight ${e.weight_lbs}` : null,
     e.sodas?.length ? n(e.sodas.length, 'soda') : null,
+    e.water?.length ? `${waterTotals(e.water).oz} oz water` : null,
     e.notes?.trim() ? 'notes' : null
   ].filter(Boolean).join(', ') || 'vitals only'
 }
@@ -941,6 +1023,7 @@ const form = reactive<{
   reconstitutions: ReconstitutionEntry[]
   food: { breakfast: string, snack: string, lunch: string, dinner: string }
   sodas: SodaEntry[]
+  water: WaterEntry[]
   notes: string
 }>(buildForm())
 
@@ -973,6 +1056,7 @@ function buildForm() {
       reconstitutions: [] as ReconstitutionEntry[],
       food: { breakfast: '', snack: '', lunch: '', dinner: '' },
       sodas: [] as SodaEntry[],
+      water: [] as WaterEntry[],
       notes: ''
     }
   }
@@ -992,6 +1076,7 @@ function buildForm() {
       dinner: entry.food?.dinner ?? ''
     },
     sodas: (entry.sodas ?? []).map(s => ({ ...s })),
+    water: (entry.water ?? []).map(w => ({ ...w })),
     notes: entry.notes ?? ''
   }
 }
@@ -1020,6 +1105,14 @@ function removeSoda(i: number) {
   form.sodas.splice(i, 1)
 }
 
+function addWater() {
+  form.water.push(blankWater(localTimeNow(), cupOz.value))
+}
+
+function removeWater(i: number) {
+  form.water.splice(i, 1)
+}
+
 /** The confirm stays with the caller (see useSaveAction): replacing an occupied day is asked here, once. */
 function save() {
   const target = targetEntry.value
@@ -1040,7 +1133,10 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     date: moving ? from : to,
     food: Object.fromEntries(
       Object.entries(form.food).filter(([, v]) => v !== '')
-    )
+    ),
+    // A pour row added and never filled (or cleared — v-model.number hands back '') is not a
+    // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
+    water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0)
   }
   await $fetch('/api/journal/save', { method: 'POST', body: payload })
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })

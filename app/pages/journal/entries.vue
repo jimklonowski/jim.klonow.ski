@@ -57,6 +57,7 @@
         <span>Vitals</span>
         <span>Doses</span>
         <span v-if="showSoda">Soda</span>
+        <span v-if="showSoda">Water</span>
         <span>Wk</span>
         <span class="text-right">Flags</span>
       </div>
@@ -105,6 +106,11 @@
           >{{ row.sodas || '' }}</span>
 
           <span
+            v-if="showSoda"
+            class="text-muted whitespace-nowrap"
+          >{{ row.waterOz ? `${row.waterOz}oz` : '' }}</span>
+
+          <span
             class="text-accent"
             :title="row.workouts ? `${row.workouts} workout${row.workouts > 1 ? 's' : ''}` : undefined"
           >{{ row.workouts ? '✓' : '' }}</span>
@@ -146,6 +152,7 @@
 
 <script setup lang="ts">
 import { eachDay, shiftDays } from '#shared/utils/dates'
+import { waterTotals } from '#shared/utils/water'
 import { getCompoundColor } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Entries' })
@@ -169,9 +176,10 @@ const entries = computed(() =>
 const showSoda = computed(() => role.value !== 'doctor')
 const canOpenDays = computed(() => role.value !== 'doctor')
 
+// Soda and water come and go together (both are hidden from the doctor view).
 const gridCols = computed(() =>
   showSoda.value
-    ? 'lg:grid-cols-[90px_minmax(0,1fr)_130px_60px_40px_110px] grid-cols-[auto_1fr]'
+    ? 'lg:grid-cols-[90px_minmax(0,1fr)_130px_60px_64px_40px_110px] grid-cols-[auto_1fr]'
     : 'lg:grid-cols-[90px_minmax(0,1fr)_130px_40px_110px] grid-cols-[auto_1fr]'
 )
 
@@ -244,6 +252,7 @@ const pageRows = computed(() =>
       recon: (e.reconstitutions ?? []).length,
       photos: photoCounts.value[e.date] ?? 0,
       sodas: (e.sodas ?? []).length,
+      waterOz: waterTotals(e.water).oz,
       workouts: workoutCounts.value[e.date] ?? 0,
       flags: flagsFor(e, fasting)
     }

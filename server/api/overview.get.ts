@@ -1,6 +1,7 @@
 import { isFullAccessRole } from '#shared/utils/access'
 import { isLoggedDay, loggedStreak } from '#shared/utils/journalLog'
 import { localToday } from '#shared/utils/time'
+import { waterTotals } from '#shared/utils/water'
 import type { OverviewSummary } from '#shared/types/overview'
 
 // One small response for the site shell. The status line, footer and ⌘K palette used to reach
@@ -19,7 +20,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   // One round trip. The journal table is read in full because the logged-day predicate and the
   // streak walk need every row's hand-entered fields — but it stays on the Worker.
   const [journalRes, drawRes, sourcesRes, metricsRes, dexaRes] = await db.batch<Record<string, unknown>>([
-    db.prepare('SELECT date, weight_lbs, rhr, peptides, reconstitutions, food, sodas, notes FROM journal_entries ORDER BY date ASC'),
+    db.prepare('SELECT date, weight_lbs, rhr, peptides, reconstitutions, food, sodas, water, notes FROM journal_entries ORDER BY date ASC'),
     db.prepare('SELECT date, markers FROM labs_entries ORDER BY date DESC LIMIT 1'),
     db.prepare('SELECT sources FROM labs_entries'),
     db.prepare('SELECT MAX(date) AS date FROM health_metrics'),
@@ -63,6 +64,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     latestEntryDate: latestEntry?.date ?? null,
     latestRhr: entries.findLast(e => e.rhr != null)?.rhr ?? null,
     sodasToday: auth.role === 'doctor' ? null : (todayEntry?.sodas as unknown[] | undefined)?.length ?? 0,
+    waterOzToday: auth.role === 'doctor' ? null : waterTotals(todayEntry?.water as Array<{ oz?: number }> | undefined).oz,
     latestDraw,
     pdfCount: pdfKeys.size,
     latestMetricsDate: (metricsRes?.results?.[0]?.date as string | null | undefined) ?? null,

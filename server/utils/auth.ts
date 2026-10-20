@@ -137,7 +137,7 @@ export function startDemoSession(event: H3Event) {
   setAuthCookie(event, 'demo', undefined, DEMO_SESSION_SECONDS)
 }
 
-// Writes that are safe to open to demo sessions (journal days, sodas, supplements, vials):
+// Writes that are safe to open to demo sessions (journal days, sodas, water, supplements, vials):
 // for the demo role, getDb() routes every statement into the sandbox DEMO_DB, so these
 // endpoints work unchanged. Everything else that writes stays requireOwner.
 export function requireWriteAccess(event: H3Event): AuthContext {
