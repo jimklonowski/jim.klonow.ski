@@ -312,28 +312,42 @@ export interface MealSuggestion {
   score: number
 }
 
-/** A token matches another when equal, or when one is a 3+ letter prefix of the other ("mcd" → "mcdonald"). */
-function tokenMatch(a: string, b: string): boolean {
-  return a === b || (a.length >= 3 && b.startsWith(a)) || (b.length >= 3 && a.startsWith(b))
+/** True when one token is a 3+ letter prefix of the other ("mcd" → "mcdonald"). */
+function isPrefixPair(a: string, b: string): boolean {
+  return (a.length >= 3 && b.startsWith(a)) || (b.length >= 3 && a.startsWith(b))
 }
 
-/** Jaccard over key tokens with prefix-tolerant matching, each token used once. */
-function similarity(a: string[], b: string[]): number {
-  if (!a.length || !b.length) return 0
+/**
+ * Jaccard over key tokens, each token used once. An exact token is a full hit; a prefix pair is
+ * HALF a hit and is counted separately — "chips" folds to "chip", which is a prefix of
+ * "chipotle", and at full weight "chicken quesadilla + chips" scored 1.0 against the library's
+ * "chipotle chicken quesadilla" and was silently saved as it (audit #42 item 2). An exact
+ * partner is always preferred over a prefix one.
+ */
+function similarity(a: string[], b: string[]): { score: number, prefixHits: number } {
+  if (!a.length || !b.length) return { score: 0, prefixHits: 0 }
   const used = new Set<number>()
   let hits = 0
+  let prefixHits = 0
   for (const t of a) {
-    const j = b.findIndex((u, i) => !used.has(i) && tokenMatch(t, u))
+    let j = b.findIndex((u, i) => !used.has(i) && u === t)
+    let weight = 1
+    if (j < 0) {
+      j = b.findIndex((u, i) => !used.has(i) && isPrefixPair(t, u))
+      weight = 0.5
+    }
     if (j >= 0) {
       used.add(j)
-      hits++
+      hits += weight
+      if (weight < 1) prefixHits++
     }
   }
-  return hits / (a.length + b.length - hits)
+  return { score: hits / (a.length + b.length - hits), prefixHits }
 }
 
 // 0.85: one small word on a seven-word meal pairs on its own (7/8); a missing ingredient on a
 // five-word bowl (4/5 = 0.8) is a question — "chicken bowl" is not "chicken + broccoli bowl".
+// A match that leaned on ANY prefix pair is never strong: abbreviations get offered, not applied.
 const STRONG_MATCH = 0.85
 const MAYBE_MATCH = 0.5
 
@@ -354,13 +368,14 @@ export function suggestMeal(text: string | null | undefined, known: KnownMeal[])
   if (exact) return exact.text === core ? null : { text: withQty(exact.text), strength: 'exact', score: 1 }
 
   const tokens = key.split(' ')
-  let best: { meal: KnownMeal, score: number } | null = null
+  let best: { meal: KnownMeal, score: number, prefixHits: number } | null = null
   for (const meal of known) {
-    const score = similarity(tokens, meal.key.split(' '))
-    if (!best || score > best.score || (score === best.score && meal.count > best.meal.count)) best = { meal, score }
+    const { score, prefixHits } = similarity(tokens, meal.key.split(' '))
+    if (!best || score > best.score || (score === best.score && meal.count > best.meal.count)) best = { meal, score, prefixHits }
   }
   if (!best || best.score < MAYBE_MATCH) return null
-  return { text: withQty(best.meal.text), strength: best.score >= STRONG_MATCH ? 'strong' : 'maybe', score: best.score }
+  const strong = best.score >= STRONG_MATCH && best.prefixHits === 0
+  return { text: withQty(best.meal.text), strength: strong ? 'strong' : 'maybe', score: best.score }
 }
 
 /**

@@ -10,6 +10,9 @@ import { mealKey, splitQuantity } from '../shared/utils/mealKey.ts'
 import { LIBRARY_TEXTS, MEAL_LIBRARY, libraryLookup } from '../shared/utils/mealLibrary.ts'
 import { sodaKcal, sodaKcalTotals } from '../shared/utils/soda.ts'
 
+/** The auto-pair bar in nutrition.ts (STRONG_MATCH) — a prefix hit can never reach it. */
+const STRONG = 0.85
+
 const est = (text, kcal, p, c, f, extra = {}) => ({
   key: mealKey(text), text, kcal, protein_g: p, carbs_g: c, fat_g: f,
   confidence: 'medium', assumptions: null, source: 'ai', model: 'test', created_at: 't', updated_at: 't', ...extra
@@ -212,8 +215,22 @@ test('"did you mean": same key pairs silently, close wording asks, a different m
   const strong = suggestMeal('steak n shake bacon double cheeseburger + small tots', known)
   assert.equal(strong.text, 'steak n shake bacon double cheeseburger + tots')
   assert.equal(strong.strength, 'strong')
-  // Prefix tolerance: "mcd" reads as "mcdonalds".
-  assert.equal(suggestMeal('mcd double cheeseburger fries', known)?.text, 'mcdonalds double cheeseburger + fries')
+  // Prefix tolerance: "mcd" reads as "mcdonalds" — offered, never applied on its own.
+  const abbrev = suggestMeal('mcd double cheeseburger fries', known)
+  assert.equal(abbrev?.text, 'mcdonalds double cheeseburger + fries')
+  assert.equal(abbrev?.strength, 'maybe', 'a prefix hit is half a hit and blocks strong')
+  // "chips" folds to "chip", a prefix of "chipotle": at full weight this scored 1.0 against the
+  // library's "chipotle chicken quesadilla" alias and was silently saved as the quesadilla.
+  const chips = suggestMeal('chicken quesadilla + chips', known)
+  assert.equal(chips?.text, 'chicken quesadilla')
+  assert.equal(chips?.strength, 'maybe')
+  assert.ok(chips.score < STRONG, `scored ${chips.score}`)
+  assert.deepEqual(resolveMealText('chicken quesadilla + chips', known), { text: 'chicken quesadilla + chips', changed: false })
+  assert.deepEqual(resolveMealText('chicken tacos + chips', known), { text: 'chicken tacos + chips', changed: false })
+  // Even a near-total overlap stays a question when one of the hits was a prefix.
+  const doub = suggestMeal('steak n shake bacon doub cheeseburger + small tots', known)
+  assert.equal(doub?.text, 'steak n shake bacon double cheeseburger + tots')
+  assert.equal(doub?.strength, 'maybe')
   // Maybe: a missing ingredient (4 of 5 words, 80%) is a question, not a silent pairing.
   const maybe = suggestMeal('sweet potato + chicken bowl', known)
   assert.equal(maybe.text, 'sweet potato + chicken + broccoli bowl')
