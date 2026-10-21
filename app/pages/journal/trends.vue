@@ -55,6 +55,7 @@
             :rows="vitalRows"
             :mark-lines="tile.markLines"
             :annotations="annotations"
+            :connect="tile.connect"
           />
         </div>
       </section>
@@ -191,7 +192,7 @@ import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations }
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
-import { dayNutrition } from '#shared/utils/nutrition'
+import { dayNutrition, isDayDone } from '#shared/utils/nutrition'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
@@ -313,7 +314,9 @@ const vitalTiles = computed(() => {
         { key: 'bp_systolic', name: 'sys', color: CHART_DANGER },
         { key: 'bp_diastolic', name: 'dia', color: CHART_INDIGO }
       ],
-      markLines: []
+      markLines: [],
+      // Cuff readings are taken days apart; the days between are not gaps in a stream.
+      connect: true
     },
     {
       label: 'RHR',
@@ -334,15 +337,16 @@ const vitalTiles = computed(() => {
 
 // --- food group ---
 // One point per day whose logged meals are ALL estimated (a day with one unestimated meal would
-// read low), kcal with sodas folded in. Empty until estimates exist, so the doctor view (no
-// food) and a fresh sandbox simply don't get the section.
+// read low), kcal with sodas folded in; today only once its dinner is logged, so a half day is
+// neither the "latest" figure nor a dip at the end of the line. Empty until estimates exist, so
+// the doctor view (no food) and a fresh sandbox simply don't get the section.
 const FOOD_FIELDS = ['kcal', 'protein_g']
 
 const foodRows = computed(() =>
   smoothRows(
     inRange(entries.value).map((e) => {
       const n = dayNutrition(e, estimateIndex.value)
-      const full = n.meals.length > 0 && n.missing.length === 0
+      const full = n.meals.length > 0 && n.missing.length === 0 && isDayDone(e, today.value)
       return {
         date: formatDate(e.date, 'monthDay'),
         day: e.date,

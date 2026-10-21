@@ -3,12 +3,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  dayNutrition, fmtEstimate, fmtKcal, fmtMacros, indexEstimates, knownMeals, lookupEstimate, mealHistory,
-  nutritionAverage, resolveMealText, slotForTime, suggestMeal, unestimatedMeals
+  dayNutrition, fmtEstimate, fmtKcal, fmtMacros, indexEstimates, isDayDone, knownMeals, lookupEstimate, mealHistory,
+  nutritionAverage, nutritionWindow, resolveMealText, slotForTime, suggestMeal, unestimatedMeals
 } from '../shared/utils/nutrition.ts'
 import { mealKey, splitQuantity } from '../shared/utils/mealKey.ts'
 import { LIBRARY_TEXTS, MEAL_LIBRARY, libraryLookup } from '../shared/utils/mealLibrary.ts'
 import { sodaKcal, sodaKcalTotals } from '../shared/utils/soda.ts'
+
+/** The auto-pair bar in nutrition.ts (STRONG_MATCH) — a prefix hit can never reach it. */
+const STRONG = 0.85
 
 const est = (text, kcal, p, c, f, extra = {}) => ({
   key: mealKey(text), text, kcal, protein_g: p, carbs_g: c, fat_g: f,
@@ -68,6 +71,28 @@ test('a hand entry beats the library, which beats a model estimate', () => {
   const manual = indexEstimates([est(libText, 2, 2, 2, 2, { source: 'manual' })])
   assert.equal(lookupEstimate(manual, libText).source, 'manual')
   assert.equal(lookupEstimate(manual, libText).kcal, 2)
+})
+
+test('"N x": label figures for the meal beat a cached model row for the "N x" text itself', () => {
+  const one = libraryLookup('grilled cheese + guac')
+  // A model guess for the multiplied text, cached before the library knew the meal, is shadowed.
+  const stale = indexEstimates([est('2 x grilled cheese + guac', 700, 20, 60, 35)])
+  const two = lookupEstimate(stale, '2 x grilled cheese + guac')
+  assert.equal(two.source, 'library')
+  assert.equal(two.kcal, one.kcal * 2)
+  // A hand entry for the multiplied text is the most recent intent and still wins outright.
+  const manual = indexEstimates([est('2 x grilled cheese + guac', 900, 40, 80, 40, { source: 'manual' })])
+  assert.equal(lookupEstimate(manual, '2 x grilled cheese + guac').kcal, 900)
+  // A hand entry for the BASE beats a model row for the multiplied text too.
+  const manualBase = indexEstimates([est('veggie lasagna', 600, 30, 60, 25, { source: 'manual' }), est('2 x veggie lasagna', 999, 1, 1, 1)])
+  const scaled = lookupEstimate(manualBase, '2 x veggie lasagna')
+  assert.equal(scaled.kcal, 1200)
+  assert.equal(scaled.source, 'manual')
+  // No label source at either level: the model row for the exact text beats scaling the base's.
+  const aiBoth = indexEstimates([est('veggie lasagna', 600, 30, 60, 25), est('2 x veggie lasagna', 1100, 1, 1, 1)])
+  assert.equal(lookupEstimate(aiBoth, '2 x veggie lasagna').kcal, 1100)
+  const aiBase = indexEstimates([est('veggie lasagna', 600, 30, 60, 25)])
+  assert.equal(lookupEstimate(aiBase, '2 x veggie lasagna').kcal, 1200)
 })
 
 test('the library: every entry resolves by its text and aliases, with positive figures and a source', () => {
@@ -171,20 +196,40 @@ test('the backfill list is every canonical meal no source has figures for', () =
   assert.deepEqual(unestimatedMeals(entries, indexEstimates([])), ['homemade california rolls', 'veggie lasagna'])
 })
 
-test('the weekly average counts only fully covered days inside the window', () => {
+test('a day is done once dinner is logged; every past day is done', () => {
+  assert.equal(isDayDone({ date: '2026-10-19', food: { lunch: 'alpha plate' } }, '2026-10-20'), true, 'yesterday, no dinner: done')
+  assert.equal(isDayDone({ date: '2026-10-20', food: { breakfast: 'x', lunch: 'alpha plate' } }, '2026-10-20'), false, 'today, dinner not in: running')
+  assert.equal(isDayDone({ date: '2026-10-20', food: { lunch: 'alpha plate', dinner: ' bravo plate ' } }, '2026-10-20'), true)
+  assert.equal(isDayDone(null, '2026-10-20'), false)
+})
+
+test('the weekly window ends yesterday until today’s dinner is logged, then today — seven days either way', () => {
+  const running = [{ date: '2026-10-20', food: { lunch: 'bravo plate' } }]
+  assert.deepEqual(nutritionWindow(running, '2026-10-20'), { from: '2026-10-13', to: '2026-10-19' })
+  assert.deepEqual(nutritionWindow([], '2026-10-20'), { from: '2026-10-13', to: '2026-10-19' }, 'nothing logged today: still running')
+  const done = [{ date: '2026-10-20', food: { lunch: 'bravo plate', dinner: 'alpha plate' } }]
+  assert.deepEqual(nutritionWindow(done, '2026-10-20'), { from: '2026-10-14', to: '2026-10-20' })
+  assert.deepEqual(nutritionWindow(done, '2026-10-20', 30), { from: '2026-09-21', to: '2026-10-20' })
+})
+
+test('the weekly average counts only fully covered, finished days inside the window', () => {
   // ("a" alone is a stopword and keys to nothing — a meal name needs a real word.)
   const index = indexEstimates([est('alpha plate', 1000, 50, 100, 30), est('bravo plate', 500, 25, 50, 15)])
   const entries = [
+    { date: '2026-10-12', food: { lunch: 'alpha plate', dinner: 'alpha plate' } }, // before the window: skipped
     { date: '2026-10-14', food: { lunch: 'alpha plate' } },
     { date: '2026-10-15', food: { lunch: 'alpha plate', dinner: 'bravo plate' } },
-    { date: '2026-10-16', food: { lunch: 'alpha plate', dinner: 'unknown meal' } }, // partial day: skipped
+    { date: '2026-10-16', food: { lunch: 'alpha plate', dinner: 'unknown meal' } }, // partial figures: skipped
     { date: '2026-10-17', food: {} }, // nothing logged: skipped
-    { date: '2026-10-20', food: { lunch: 'bravo plate' } },
+    { date: '2026-10-20', food: { lunch: 'bravo plate' } }, // today, dinner not in: a running total, not a day
     { date: '2026-10-21', food: { lunch: 'alpha plate' } } // after today: skipped
   ]
-  const avg = nutritionAverage(entries, index, '2026-10-20', '2026-10-14')
-  assert.deepEqual(avg, { days: 3, kcal: Math.round((1000 + 1500 + 500) / 3), protein_g: Math.round((50 + 75 + 25) / 3) })
-  assert.deepEqual(nutritionAverage([], index, '2026-10-20', '2026-10-14'), { days: 0, kcal: 0, protein_g: 0 })
+  // Oct 13–19: the 14th and 15th. The half-logged 20th used to count as a 500 kcal day.
+  assert.deepEqual(nutritionAverage(entries, index, '2026-10-20'), { days: 2, kcal: 1250, protein_g: 63 })
+  // Dinner logged → the window slides to Oct 14–20 and today joins.
+  const withDinner = entries.map(e => (e.date === '2026-10-20' ? { ...e, food: { ...e.food, dinner: 'bravo plate' } } : e))
+  assert.deepEqual(nutritionAverage(withDinner, index, '2026-10-20'), { days: 3, kcal: Math.round((1000 + 1500 + 1000) / 3), protein_g: Math.round((50 + 75 + 50) / 3) })
+  assert.deepEqual(nutritionAverage([], index, '2026-10-20'), { days: 0, kcal: 0, protein_g: 0 })
 })
 
 test('"did you mean": same key pairs silently, close wording asks, a different meal is left alone', () => {
@@ -212,8 +257,22 @@ test('"did you mean": same key pairs silently, close wording asks, a different m
   const strong = suggestMeal('steak n shake bacon double cheeseburger + small tots', known)
   assert.equal(strong.text, 'steak n shake bacon double cheeseburger + tots')
   assert.equal(strong.strength, 'strong')
-  // Prefix tolerance: "mcd" reads as "mcdonalds".
-  assert.equal(suggestMeal('mcd double cheeseburger fries', known)?.text, 'mcdonalds double cheeseburger + fries')
+  // Prefix tolerance: "mcd" reads as "mcdonalds" — offered, never applied on its own.
+  const abbrev = suggestMeal('mcd double cheeseburger fries', known)
+  assert.equal(abbrev?.text, 'mcdonalds double cheeseburger + fries')
+  assert.equal(abbrev?.strength, 'maybe', 'a prefix hit is half a hit and blocks strong')
+  // "chips" folds to "chip", a prefix of "chipotle": at full weight this scored 1.0 against the
+  // library's "chipotle chicken quesadilla" alias and was silently saved as the quesadilla.
+  const chips = suggestMeal('chicken quesadilla + chips', known)
+  assert.equal(chips?.text, 'chicken quesadilla')
+  assert.equal(chips?.strength, 'maybe')
+  assert.ok(chips.score < STRONG, `scored ${chips.score}`)
+  assert.deepEqual(resolveMealText('chicken quesadilla + chips', known), { text: 'chicken quesadilla + chips', changed: false })
+  assert.deepEqual(resolveMealText('chicken tacos + chips', known), { text: 'chicken tacos + chips', changed: false })
+  // Even a near-total overlap stays a question when one of the hits was a prefix.
+  const doub = suggestMeal('steak n shake bacon doub cheeseburger + small tots', known)
+  assert.equal(doub?.text, 'steak n shake bacon double cheeseburger + tots')
+  assert.equal(doub?.strength, 'maybe')
   // Maybe: a missing ingredient (4 of 5 words, 80%) is a question, not a silent pairing.
   const maybe = suggestMeal('sweet potato + chicken bowl', known)
   assert.equal(maybe.text, 'sweet potato + chicken + broccoli bowl')

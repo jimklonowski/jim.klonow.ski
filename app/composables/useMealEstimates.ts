@@ -36,23 +36,25 @@ export async function useMealEstimates() {
 
   /**
    * Ask the model for whichever of these texts have no estimate and aren't already being
-   * estimated. Owner-only on the server; callers hide the affordance for other roles.
+   * estimated. Owner-only on the server; callers hide the affordance for other roles. Returns
+   * the texts the answer could not be pinned to — left without figures, worth asking again.
    */
-  async function estimate(texts: string[]): Promise<void> {
+  async function estimate(texts: string[]): Promise<string[]> {
     const wanted = new Map<string, string>()
     for (const t of texts) {
       const key = mealKey(t)
       if (key && !index.value.has(key) && !inFlight.value.includes(key) && !wanted.has(key)) wanted.set(key, t.trim())
     }
-    if (!wanted.size) return
+    if (!wanted.size) return []
     const keys = [...wanted.keys()]
     inFlight.value = [...inFlight.value, ...keys]
     try {
-      const { estimates } = await $fetch<{ estimates: MealEstimate[] }>('/api/journal/meals/estimate', {
+      const { estimates, unmatched } = await $fetch<{ estimates: MealEstimate[], unmatched?: string[] }>('/api/journal/meals/estimate', {
         method: 'POST',
         body: { texts: [...wanted.values()] }
       })
       merge(estimates)
+      return unmatched ?? []
     }
     finally {
       inFlight.value = inFlight.value.filter(k => !keys.includes(k))

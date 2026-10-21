@@ -1,6 +1,7 @@
 import type { EstimateConfidence, EstimateIndex, MealEstimate } from '#shared/utils/nutrition'
 import { indexEstimates } from '#shared/utils/nutrition'
 import { mealKey } from '#shared/utils/mealKey'
+import { matchEstimateItems } from '#shared/utils/mealEstimateMatch'
 import { libraryLookup } from '#shared/utils/mealLibrary'
 
 // Meal text → calories and macros from the model, once per distinct meal, cached in
@@ -101,11 +102,18 @@ export async function estimatesForKeys(db: D1Database, keys: string[]): Promise<
   return (results ?? []).map(parseEstimateRow)
 }
 
+export interface EstimateResult {
+  estimates: MealEstimate[]
+  /** Texts the model's answer could not be pinned to (reordered, paraphrased or short) — left
+   * without figures rather than cached under a neighbour's; the caller can offer a retry. */
+  unmatched: string[]
+}
+
 /**
  * Estimates for `texts`: cached rows where they exist, one model call for the rest, the new rows
  * written and returned together. Texts that normalize to the same key are estimated once.
  */
-export async function estimateMeals(db: D1Database, texts: string[]): Promise<MealEstimate[]> {
+export async function estimateMeals(db: D1Database, texts: string[]): Promise<EstimateResult> {
   const byKey = new Map<string, string>()
   for (const t of texts) {
     const key = mealKey(t)
@@ -116,7 +124,7 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Me
   const have = new Set(cached.map(r => r.key))
   // Not cached AND not in the code library — the library answers those without a token spent.
   const todo = keys.filter(k => !have.has(k)).map(k => byKey.get(k)!).filter(t => !libraryLookup(t))
-  if (!todo.length) return cached
+  if (!todo.length) return { estimates: cached, unmatched: [] }
 
   const prompt = buildPrompt(todo)
   const startedAt = Date.now()
@@ -148,14 +156,18 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Me
     throw createError({ statusCode: 502, message: 'The nutrition estimate returned no items — nothing was saved.' })
   }
 
-  // Match by the echoed text first (the schema asks for it verbatim), by position as a fallback.
+  // The echoed text is the match; position only when the answer is one-to-one and the slot is
+  // free (shared/utils/mealEstimateMatch.ts). Anything else stays without figures — a short or
+  // reordered answer used to cache a neighbour's numbers under the wrong meal.
   const now = new Date().toISOString()
   const hash = promptHash(prompt)
   const rows: MealEstimate[] = []
-  todo.forEach((text, i) => {
-    const key = mealKey(text)
-    const item = parsed.items.find(it => mealKey(it.text) === key) ?? parsed.items[i]
-    if (!item || !Number.isFinite(item.kcal)) return
+  const { matched, unmatched } = matchEstimateItems(todo, parsed.items)
+  for (const { text, key, item } of matched) {
+    if (![item.kcal, item.protein_g, item.carbs_g, item.fat_g].every(Number.isFinite)) {
+      unmatched.push(text)
+      continue
+    }
     rows.push({
       key,
       text,
@@ -170,7 +182,7 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Me
       created_at: now,
       updated_at: now
     })
-  })
+  }
 
   if (rows.length) {
     // A manual row that appeared since the SELECT above stays manual.
@@ -184,5 +196,5 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Me
       WHERE meal_estimates.source != 'manual'
     `).bind(r.key, r.text, r.kcal, r.protein_g, r.carbs_g, r.fat_g, r.confidence, r.assumptions, r.model, hash, now)))
   }
-  return [...cached, ...rows]
+  return { estimates: [...cached, ...rows], unmatched }
 }

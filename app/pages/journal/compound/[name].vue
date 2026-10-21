@@ -516,10 +516,12 @@ const chartWindow = computed(() => {
 
 // --- Dose chart ---
 // `dosed` flags the actual dosing days: those get point markers, the held days between don't.
+// Dates are ISO days: AreaChart formats the axis and adds ’yy once the history spans years, so
+// the same month-day of two years can no longer collapse onto one x.
 const doseChart = computed(() => {
   const win = chartWindow.value
   if (!win) {
-    return dailyTotals.value.map(d => ({ date: formatDate(d.date, 'monthDay'), dose: d.dose, dosed: true }))
+    return dailyTotals.value.map(d => ({ date: d.date, dose: d.dose, dosed: true }))
   }
   // Daily grid to match the curve below. The step holds the last dose across the days between
   // injections, and forward from the latest one to today. A window clipped at 120 days opens
@@ -529,7 +531,7 @@ const doseChart = computed(() => {
   return eachDay(win.from, win.to).map((date) => {
     const dose = byDay.get(date)
     if (dose != null) held = dose
-    return { date: formatDate(date, 'monthDay'), dose: held, dosed: dose != null }
+    return { date, dose: held, dosed: dose != null }
   })
 })
 
@@ -538,7 +540,8 @@ const doseRangeLabel = computed(() => {
   const first = doseChart.value[0]?.date
   const last = doseChart.value.at(-1)?.date
   if (!first || !last) return ''
-  return `${first.toUpperCase()} → ${last.toUpperCase()}`
+  const label = (d: string) => (first.slice(0, 4) === last.slice(0, 4) ? formatDate(d, 'monthDay') : formatDateTerse(d)).toUpperCase()
+  return `${label(first)} → ${label(last)}`
 })
 
 /** Captions under the step chart: where the dose started, and where it sits now. Read off the
@@ -569,7 +572,7 @@ const exposureChart = computed(() => {
   const max = Math.max(...points.map(p => p.level))
   if (max <= 0) return []
   return points.map(p => ({
-    date: formatDate(p.date, 'monthDay'),
+    date: p.date,
     level: Math.round((p.level / max) * 1000) / 10
   }))
 })
@@ -580,7 +583,7 @@ const exposureMarks = computed(() => {
   if (!win) return []
   return (labsData.value ?? [])
     .filter(l => l.date >= win.from && l.date <= win.to)
-    .map(l => formatDate(l.date, 'monthDay'))
+    .map(l => l.date)
 })
 
 const pkModelNote = computed(() => {

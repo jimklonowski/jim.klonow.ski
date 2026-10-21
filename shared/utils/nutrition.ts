@@ -14,6 +14,7 @@
 // a model estimate is read as what it is (restaurant portions vary and the text names no
 // weights, so expect ±20–30 % per meal) and every surface marks it "est.".
 import { sodaKcalTotals } from './soda.ts'
+import { shiftDays } from './dates.ts'
 // (Not re-exported: shared/utils is auto-imported, and a name exported from two files makes Nuxt
 // warn and pick one — import mealKey / splitQuantity from './mealKey.ts' directly.)
 import { mealKey, splitQuantity } from './mealKey.ts'
@@ -80,11 +81,11 @@ export function indexEstimates(rows: MealEstimate[] | null | undefined): Estimat
   return new Map((rows ?? []).map(r => [r.key, r]))
 }
 
-/** One source's answer for exactly this key: a hand entry wins, then the code library, then a model estimate. */
-function directLookup(index: EstimateIndex, text: string, key: string): MealEstimate | null {
+/** The LABEL figures for exactly this key — a hand entry (the most recent intent), else the code library — or null. */
+function labelLookup(index: EstimateIndex, text: string, key: string): MealEstimate | null {
   const row = index.get(key) ?? null
   if (row?.source === 'manual') return row
-  return libraryLookup(text) ?? row
+  return libraryLookup(text)
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
@@ -104,20 +105,34 @@ export function scaleEstimate(e: MealEstimate, n: number, text: string): MealEst
 }
 
 /**
- * The figures for a meal text, or null. A hand entry wins (it is the most recent intent), then
- * the code library (label figures), then a model estimate. "N x <meal>" multiplies whichever of
- * those knows the meal — two sandwiches AND two guac cups, per Jim's convention — so a known
- * regular covers every quantity of itself without a second entry.
+ * The figures for a meal text, or null. Trust in the SOURCE comes first, the path second: label
+ * figures — a hand entry (the most recent intent), then the code library — beat a model estimate
+ * whether they answer the text itself or, for "N x <meal>", the meal it multiplies (two sandwiches
+ * AND two guac cups, per Jim's convention). Only when no label source knows the meal at either
+ * level does a model row answer, again the exact text before the multiplied one. So a regular
+ * joining the library takes over every quantity of itself even where an older model guess for
+ * the "2 x" text is still cached (audit #42 item 8).
  */
 export function lookupEstimate(index: EstimateIndex, text: string | null | undefined): MealEstimate | null {
   const key = mealKey(text)
   if (!key) return null
-  const direct = directLookup(index, text!, key)
-  if (direct) return direct
-  const qty = splitQuantity(text!.trim())
-  if (!qty) return null
-  const base = directLookup(index, qty.rest, mealKey(qty.rest))
-  return base ? scaleEstimate(base, qty.n, text!.trim()) : null
+  const trimmed = text!.trim()
+  const qty = splitQuantity(trimmed)
+  const base = qty ? { text: qty.rest, key: mealKey(qty.rest) } : null
+
+  const label = labelLookup(index, trimmed, key)
+  if (label) return label
+  if (base) {
+    const labelBase = labelLookup(index, base.text, base.key)
+    if (labelBase) return scaleEstimate(labelBase, qty!.n, trimmed)
+  }
+  const row = index.get(key)
+  if (row) return row
+  if (base) {
+    const rowBase = index.get(base.key)
+    if (rowBase) return scaleEstimate(rowBase, qty!.n, trimmed)
+  }
+  return null
 }
 
 /** Label figures (library or hand-entered) read as numbers; a model estimate reads as "≈ … est.". */
@@ -312,28 +327,42 @@ export interface MealSuggestion {
   score: number
 }
 
-/** A token matches another when equal, or when one is a 3+ letter prefix of the other ("mcd" → "mcdonald"). */
-function tokenMatch(a: string, b: string): boolean {
-  return a === b || (a.length >= 3 && b.startsWith(a)) || (b.length >= 3 && a.startsWith(b))
+/** True when one token is a 3+ letter prefix of the other ("mcd" → "mcdonald"). */
+function isPrefixPair(a: string, b: string): boolean {
+  return (a.length >= 3 && b.startsWith(a)) || (b.length >= 3 && a.startsWith(b))
 }
 
-/** Jaccard over key tokens with prefix-tolerant matching, each token used once. */
-function similarity(a: string[], b: string[]): number {
-  if (!a.length || !b.length) return 0
+/**
+ * Jaccard over key tokens, each token used once. An exact token is a full hit; a prefix pair is
+ * HALF a hit and is counted separately — "chips" folds to "chip", which is a prefix of
+ * "chipotle", and at full weight "chicken quesadilla + chips" scored 1.0 against the library's
+ * "chipotle chicken quesadilla" and was silently saved as it (audit #42 item 2). An exact
+ * partner is always preferred over a prefix one.
+ */
+function similarity(a: string[], b: string[]): { score: number, prefixHits: number } {
+  if (!a.length || !b.length) return { score: 0, prefixHits: 0 }
   const used = new Set<number>()
   let hits = 0
+  let prefixHits = 0
   for (const t of a) {
-    const j = b.findIndex((u, i) => !used.has(i) && tokenMatch(t, u))
+    let j = b.findIndex((u, i) => !used.has(i) && u === t)
+    let weight = 1
+    if (j < 0) {
+      j = b.findIndex((u, i) => !used.has(i) && isPrefixPair(t, u))
+      weight = 0.5
+    }
     if (j >= 0) {
       used.add(j)
-      hits++
+      hits += weight
+      if (weight < 1) prefixHits++
     }
   }
-  return hits / (a.length + b.length - hits)
+  return { score: hits / (a.length + b.length - hits), prefixHits }
 }
 
 // 0.85: one small word on a seven-word meal pairs on its own (7/8); a missing ingredient on a
 // five-word bowl (4/5 = 0.8) is a question — "chicken bowl" is not "chicken + broccoli bowl".
+// A match that leaned on ANY prefix pair is never strong: abbreviations get offered, not applied.
 const STRONG_MATCH = 0.85
 const MAYBE_MATCH = 0.5
 
@@ -354,13 +383,14 @@ export function suggestMeal(text: string | null | undefined, known: KnownMeal[])
   if (exact) return exact.text === core ? null : { text: withQty(exact.text), strength: 'exact', score: 1 }
 
   const tokens = key.split(' ')
-  let best: { meal: KnownMeal, score: number } | null = null
+  let best: { meal: KnownMeal, score: number, prefixHits: number } | null = null
   for (const meal of known) {
-    const score = similarity(tokens, meal.key.split(' '))
-    if (!best || score > best.score || (score === best.score && meal.count > best.meal.count)) best = { meal, score }
+    const { score, prefixHits } = similarity(tokens, meal.key.split(' '))
+    if (!best || score > best.score || (score === best.score && meal.count > best.meal.count)) best = { meal, score, prefixHits }
   }
   if (!best || best.score < MAYBE_MATCH) return null
-  return { text: withQty(best.meal.text), strength: best.score >= STRONG_MATCH ? 'strong' : 'maybe', score: best.score }
+  const strong = best.score >= STRONG_MATCH && best.prefixHits === 0
+  return { text: withQty(best.meal.text), strength: strong ? 'strong' : 'maybe', score: best.score }
 }
 
 /**
@@ -382,20 +412,46 @@ export interface NutritionAverage {
 }
 
 /**
- * Mean daily kcal and protein over the trailing `days` days ending `today`, counting only days
- * whose meals are all estimated — a day with one unestimated meal would drag the average down.
+ * Today's log is finished once dinner is in: until then the day is a running total, not a daily
+ * figure, and an average or a "latest" tile that read it would take half a day for a whole one.
+ * Past days are done by definition (audit #42 item 7).
+ */
+export function isDayDone(entry: (DayLike & { date: string }) | null | undefined, today: string): boolean {
+  if (!entry) return false
+  return entry.date < today || !!entry.food?.dinner?.trim()
+}
+
+/**
+ * The trailing `days`-day window for a daily average: it ends today once today's log is done
+ * (dinner logged), otherwise yesterday — so a half-logged today never counts as a whole day.
+ */
+export function nutritionWindow(
+  entries: Array<DayLike & { date: string }>,
+  today: string,
+  days = 7
+): { from: string, to: string } {
+  const todayEntry = entries.find(e => e.date === today)
+  const to = isDayDone(todayEntry, today) ? today : shiftDays(today, -1)
+  return { from: shiftDays(to, -(days - 1)), to }
+}
+
+/**
+ * Mean daily kcal and protein over the trailing `days` days (see `nutritionWindow`), counting
+ * only days whose meals are all estimated — a day with one unestimated meal would drag the
+ * average down.
  */
 export function nutritionAverage(
   entries: Array<DayLike & { date: string }>,
   index: EstimateIndex,
   today: string,
-  from: string
+  windowDays = 7
 ): NutritionAverage {
+  const { from, to } = nutritionWindow(entries, today, windowDays)
   let days = 0
   let kcal = 0
   let protein = 0
   for (const e of entries) {
-    if (e.date < from || e.date > today) continue
+    if (e.date < from || e.date > to) continue
     const n = dayNutrition(e, index)
     if (!n.meals.length || n.missing.length) continue
     days++
