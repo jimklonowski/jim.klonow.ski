@@ -294,6 +294,19 @@ function stopThinking() {
 
 onUnmounted(stopThinking)
 
+// The in-flight answer's fetch, aborted when the page unmounts. Without it the stream kept
+// writing into the shared `messages` state after navigating away, and a question asked on
+// returning could overlap it (audit #42 item 14).
+let inFlight: AbortController | null = null
+onUnmounted(() => inFlight?.abort())
+
+/** Marks an exchange as one the server did not (or may not have) saved, so it is never replayed as history. */
+function markFailed(assistant: ChatMessage) {
+  assistant.failed = true
+  const q = messages.value[messages.value.indexOf(assistant) - 1]
+  if (q?.role === 'user') q.failed = true
+}
+
 function scrollToBottom() {
   nextTick(() => bottomAnchor.value?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
 }
@@ -363,11 +376,14 @@ async function send(preset?: string) {
   phase.value = 'thinking'
   startThinking()
   scrollToBottom()
+  const controller = new AbortController()
+  inFlight = controller
 
   try {
     const res = await fetch('/api/ai/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         // Drops the empty assistant placeholder just pushed and caps the history at a user
         // turn — a bare slice(-N) opened on an assistant turn after ten exchanges and the API
@@ -411,22 +427,40 @@ async function send(preset?: string) {
       catch { trailer = null }
       assistant.content = full.slice(0, mark).trimEnd()
     }
-    if (!assistant.content.trim()) assistant.content = '*[no answer returned — try again]*'
-    if (trailer) threadId.value = trailer.threadId
-    phase.value = 'idle'
-    if (trailer && !trailer.ok) {
-      // The server kept this exchange out of the thread — its in-band note is the last line
-      // above. Mark both turns so a retry doesn't replay a half-answer as conversation.
-      assistant.failed = true
-      const q = messages.value[messages.value.indexOf(assistant) - 1]
-      if (q?.role === 'user') q.failed = true
+    if (!trailer) {
+      // The stream ended without its trailer (a dropped connection, a Worker cut off
+      // mid-answer): nothing says whether the exchange was saved or which thread it landed in.
+      // Reading that as success adopted no thread and forked the conversation on the next
+      // send — so it is a failure: left visible, kept out of future history.
+      assistant.content = [assistant.content.trimEnd(), '*[the answer was cut off before it finished — ask again]*'].filter(Boolean).join('\n\n')
+      markFailed(assistant)
+      phase.value = 'failed'
+      tickerEvent('flatline')
     }
     else {
-      tickerEvent('digest')
+      if (!assistant.content.trim()) assistant.content = '*[no answer returned — try again]*'
+      threadId.value = trailer.threadId
+      phase.value = 'idle'
+      if (trailer.ok) {
+        tickerEvent('digest')
+      }
+      else {
+        // The server kept this exchange out of the thread — its in-band note is the last line
+        // above. Mark both turns so a retry doesn't replay a half-answer as conversation.
+        markFailed(assistant)
+      }
     }
     refreshThreads()
   }
   catch (err) {
+    if (controller.signal.aborted) {
+      // Left the page mid-answer. Whatever streamed stays, marked so it is never replayed as
+      // history; no toast — nobody is on this page to read it.
+      assistant.content = [assistant.content.trimEnd(), '*[interrupted — ask again]*'].filter(Boolean).join('\n\n')
+      markFailed(assistant)
+      phase.value = 'idle'
+      return
+    }
     // Drop the failed exchange — placeholder and the question it answered — and put the
     // question back in the box so a retry is one keypress. Leaving the question in the
     // transcript would send it twice (two consecutive user turns) on that retry.
@@ -438,6 +472,7 @@ async function send(preset?: string) {
     toast.add({ title: 'Ask failed', description: extractErrorMessage(err, 'Try again in a moment.'), color: 'error' })
   }
   finally {
+    if (inFlight === controller) inFlight = null
     stopThinking()
     streaming.value = false
     scrollToBottom()
