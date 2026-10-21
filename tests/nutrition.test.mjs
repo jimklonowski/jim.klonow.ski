@@ -3,8 +3,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  dayNutrition, fmtEstimate, fmtKcal, fmtMacros, indexEstimates, knownMeals, lookupEstimate, mealHistory,
-  nutritionAverage, resolveMealText, slotForTime, suggestMeal, unestimatedMeals
+  dayNutrition, fmtEstimate, fmtKcal, fmtMacros, indexEstimates, isDayDone, knownMeals, lookupEstimate, mealHistory,
+  nutritionAverage, nutritionWindow, resolveMealText, slotForTime, suggestMeal, unestimatedMeals
 } from '../shared/utils/nutrition.ts'
 import { mealKey, splitQuantity } from '../shared/utils/mealKey.ts'
 import { LIBRARY_TEXTS, MEAL_LIBRARY, libraryLookup } from '../shared/utils/mealLibrary.ts'
@@ -174,20 +174,40 @@ test('the backfill list is every canonical meal no source has figures for', () =
   assert.deepEqual(unestimatedMeals(entries, indexEstimates([])), ['homemade california rolls', 'veggie lasagna'])
 })
 
-test('the weekly average counts only fully covered days inside the window', () => {
+test('a day is done once dinner is logged; every past day is done', () => {
+  assert.equal(isDayDone({ date: '2026-10-19', food: { lunch: 'alpha plate' } }, '2026-10-20'), true, 'yesterday, no dinner: done')
+  assert.equal(isDayDone({ date: '2026-10-20', food: { breakfast: 'x', lunch: 'alpha plate' } }, '2026-10-20'), false, 'today, dinner not in: running')
+  assert.equal(isDayDone({ date: '2026-10-20', food: { lunch: 'alpha plate', dinner: ' bravo plate ' } }, '2026-10-20'), true)
+  assert.equal(isDayDone(null, '2026-10-20'), false)
+})
+
+test('the weekly window ends yesterday until today’s dinner is logged, then today — seven days either way', () => {
+  const running = [{ date: '2026-10-20', food: { lunch: 'bravo plate' } }]
+  assert.deepEqual(nutritionWindow(running, '2026-10-20'), { from: '2026-10-13', to: '2026-10-19' })
+  assert.deepEqual(nutritionWindow([], '2026-10-20'), { from: '2026-10-13', to: '2026-10-19' }, 'nothing logged today: still running')
+  const done = [{ date: '2026-10-20', food: { lunch: 'bravo plate', dinner: 'alpha plate' } }]
+  assert.deepEqual(nutritionWindow(done, '2026-10-20'), { from: '2026-10-14', to: '2026-10-20' })
+  assert.deepEqual(nutritionWindow(done, '2026-10-20', 30), { from: '2026-09-21', to: '2026-10-20' })
+})
+
+test('the weekly average counts only fully covered, finished days inside the window', () => {
   // ("a" alone is a stopword and keys to nothing — a meal name needs a real word.)
   const index = indexEstimates([est('alpha plate', 1000, 50, 100, 30), est('bravo plate', 500, 25, 50, 15)])
   const entries = [
+    { date: '2026-10-12', food: { lunch: 'alpha plate', dinner: 'alpha plate' } }, // before the window: skipped
     { date: '2026-10-14', food: { lunch: 'alpha plate' } },
     { date: '2026-10-15', food: { lunch: 'alpha plate', dinner: 'bravo plate' } },
-    { date: '2026-10-16', food: { lunch: 'alpha plate', dinner: 'unknown meal' } }, // partial day: skipped
+    { date: '2026-10-16', food: { lunch: 'alpha plate', dinner: 'unknown meal' } }, // partial figures: skipped
     { date: '2026-10-17', food: {} }, // nothing logged: skipped
-    { date: '2026-10-20', food: { lunch: 'bravo plate' } },
+    { date: '2026-10-20', food: { lunch: 'bravo plate' } }, // today, dinner not in: a running total, not a day
     { date: '2026-10-21', food: { lunch: 'alpha plate' } } // after today: skipped
   ]
-  const avg = nutritionAverage(entries, index, '2026-10-20', '2026-10-14')
-  assert.deepEqual(avg, { days: 3, kcal: Math.round((1000 + 1500 + 500) / 3), protein_g: Math.round((50 + 75 + 25) / 3) })
-  assert.deepEqual(nutritionAverage([], index, '2026-10-20', '2026-10-14'), { days: 0, kcal: 0, protein_g: 0 })
+  // Oct 13–19: the 14th and 15th. The half-logged 20th used to count as a 500 kcal day.
+  assert.deepEqual(nutritionAverage(entries, index, '2026-10-20'), { days: 2, kcal: 1250, protein_g: 63 })
+  // Dinner logged → the window slides to Oct 14–20 and today joins.
+  const withDinner = entries.map(e => (e.date === '2026-10-20' ? { ...e, food: { ...e.food, dinner: 'bravo plate' } } : e))
+  assert.deepEqual(nutritionAverage(withDinner, index, '2026-10-20'), { days: 3, kcal: Math.round((1000 + 1500 + 1000) / 3), protein_g: Math.round((50 + 75 + 50) / 3) })
+  assert.deepEqual(nutritionAverage([], index, '2026-10-20'), { days: 0, kcal: 0, protein_g: 0 })
 })
 
 test('"did you mean": same key pairs silently, close wording asks, a different meal is left alone', () => {

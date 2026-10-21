@@ -130,7 +130,10 @@
          target when one is on file. The owner's backfill lives here because this is where the
          gap shows. -->
     <div class="mt-2.5 pt-2.5 border-t border-line-soft flex flex-wrap items-baseline gap-x-3 gap-y-1 text-meta text-muted">
-      <span v-if="avg.days">
+      <span
+        v-if="avg.days"
+        :title="avgTitle"
+      >
         7d avg ≈ <span class="text-hi">{{ fmtKcal(avg.kcal) }}</span> kcal ·
         <span
           class="text-hi"
@@ -168,7 +171,7 @@
 // like the soda and water taps.
 import {
   MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals, mealHistory, nutritionAverage,
-  nutritionIsEstimated, resolveMealText, slotForTime, unestimatedMeals, type MealSlot
+  nutritionIsEstimated, nutritionWindow, resolveMealText, slotForTime, unestimatedMeals, type MealSlot
 } from '#shared/utils/nutrition'
 import { profileNumber } from '#shared/utils/profile'
 
@@ -190,7 +193,11 @@ const day = computed(() => dayNutrition(todayEntry.value, index.value))
 const dayEstimated = computed(() => nutritionIsEstimated(day.value))
 
 const proteinTarget = computed(() => profileNumber(profileData.value, 'protein_target_g', 0) || null)
-const avg = computed(() => nutritionAverage(entries.value, index.value, today.value, shiftDays(today.value, -6)))
+// Seven days ending yesterday until today's dinner is logged, then ending today — today's running
+// total is shown above, it must not also count as a whole day here.
+const avg = computed(() => nutritionAverage(entries.value, index.value, today.value, 7))
+const avgWindow = computed(() => nutritionWindow(entries.value, today.value, 7))
+const avgTitle = computed(() => `Days with every meal estimated, ${formatDate(avgWindow.value.from, 'monthDay')} – ${avgWindow.value.to === today.value ? 'today' : 'yesterday'}; today joins once dinner is logged`)
 
 const PLACEHOLDERS: Record<MealSlot, string> = {
   breakfast: 'Protein shake + creatine',

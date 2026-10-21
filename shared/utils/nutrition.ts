@@ -14,6 +14,7 @@
 // a model estimate is read as what it is (restaurant portions vary and the text names no
 // weights, so expect ±20–30 % per meal) and every surface marks it "est.".
 import { sodaKcalTotals } from './soda.ts'
+import { shiftDays } from './dates.ts'
 // (Not re-exported: shared/utils is auto-imported, and a name exported from two files makes Nuxt
 // warn and pick one — import mealKey / splitQuantity from './mealKey.ts' directly.)
 import { mealKey, splitQuantity } from './mealKey.ts'
@@ -397,20 +398,46 @@ export interface NutritionAverage {
 }
 
 /**
- * Mean daily kcal and protein over the trailing `days` days ending `today`, counting only days
- * whose meals are all estimated — a day with one unestimated meal would drag the average down.
+ * Today's log is finished once dinner is in: until then the day is a running total, not a daily
+ * figure, and an average or a "latest" tile that read it would take half a day for a whole one.
+ * Past days are done by definition (audit #42 item 7).
+ */
+export function isDayDone(entry: (DayLike & { date: string }) | null | undefined, today: string): boolean {
+  if (!entry) return false
+  return entry.date < today || !!entry.food?.dinner?.trim()
+}
+
+/**
+ * The trailing `days`-day window for a daily average: it ends today once today's log is done
+ * (dinner logged), otherwise yesterday — so a half-logged today never counts as a whole day.
+ */
+export function nutritionWindow(
+  entries: Array<DayLike & { date: string }>,
+  today: string,
+  days = 7
+): { from: string, to: string } {
+  const todayEntry = entries.find(e => e.date === today)
+  const to = isDayDone(todayEntry, today) ? today : shiftDays(today, -1)
+  return { from: shiftDays(to, -(days - 1)), to }
+}
+
+/**
+ * Mean daily kcal and protein over the trailing `days` days (see `nutritionWindow`), counting
+ * only days whose meals are all estimated — a day with one unestimated meal would drag the
+ * average down.
  */
 export function nutritionAverage(
   entries: Array<DayLike & { date: string }>,
   index: EstimateIndex,
   today: string,
-  from: string
+  windowDays = 7
 ): NutritionAverage {
+  const { from, to } = nutritionWindow(entries, today, windowDays)
   let days = 0
   let kcal = 0
   let protein = 0
   for (const e of entries) {
-    if (e.date < from || e.date > today) continue
+    if (e.date < from || e.date > to) continue
     const n = dayNutrition(e, index)
     if (!n.meals.length || n.missing.length) continue
     days++
