@@ -55,6 +55,7 @@
             :rows="vitalRows"
             :mark-lines="tile.markLines"
             :annotations="annotations"
+            :connect="tile.connect"
           />
         </div>
       </section>
@@ -313,7 +314,9 @@ const vitalTiles = computed(() => {
         { key: 'bp_systolic', name: 'sys', color: CHART_DANGER },
         { key: 'bp_diastolic', name: 'dia', color: CHART_INDIGO }
       ],
-      markLines: []
+      markLines: [],
+      // Cuff readings are taken days apart; the days between are not gaps in a stream.
+      connect: true
     },
     {
       label: 'RHR',

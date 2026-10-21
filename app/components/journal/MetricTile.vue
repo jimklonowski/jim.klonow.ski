@@ -30,6 +30,7 @@
           :x-axis-key="xKey"
           :mark-lines="markLines"
           :annotations="placed"
+          :connect-nulls="connect"
           bare
         />
         <template #fallback>
@@ -64,23 +65,37 @@ const props = withDefaults(defineProps<{
   markLines?: string[]
   /** Protocol context to place on this tile's own points (see placed below). */
   annotations?: ChartAnnotation[]
+  /** Spot readings taken days apart (BP): one line through them instead of a break at every
+   * day without one. Streams measured daily (scale, strap) leave it off so a gap shows. */
+  connect?: boolean
   to?: string
 }>(), {
   height: 46,
   markLines: () => [],
-  annotations: () => []
+  annotations: () => [],
+  connect: false
 })
 
 const categories = computed(() =>
   Object.fromEntries(props.series.map(s => [s.key, { name: s.name, color: s.color ?? CHART_ACCENT }]))
 )
 
-// Drop rows where every series is blank so a sparse metric doesn't render a flat-line stub.
-const chartData = computed(() =>
-  props.rows.filter(r => props.series.some(s => r[s.key] != null))
-)
+// The chart spans the tile's own readings: blank rows at either end are trimmed (a sparse
+// metric would otherwise render as a stub in a corner of the tile), but a blank row INSIDE the
+// span stays, and AreaChart breaks the line there — a week with no weigh-ins is a gap, not a
+// trend drawn through it (audit #42 item 3; dropping every blank row squeezed the gap days out
+// of the axis and the line bridged them).
+const hasReading = (r: Record<string, string | number | null>) => props.series.some(s => r[s.key] != null)
+const chartData = computed(() => {
+  const rows = props.rows
+  const start = rows.findIndex(hasReading)
+  if (start < 0) return []
+  let end = rows.length - 1
+  while (end > start && !hasReading(rows[end]!)) end--
+  return rows.slice(start, end + 1)
+})
 
-const hasData = computed(() => chartData.value.length >= 2)
+const hasData = computed(() => chartData.value.filter(hasReading).length >= 2)
 
 // Rows that carry `day` chart on the ISO day itself (AreaChart formats the display), so an
 // annotation or draw guide names one exact day — a "Aug 24"-style label axis matched the same
@@ -89,8 +104,9 @@ const xKey = computed(() =>
   chartData.value.length && chartData.value.every(r => typeof r.day === 'string') ? 'day' : 'date'
 )
 
-// Placed per tile, not once per page: each tile drops the days its own series has no reading
-// for, so a change has to land on the first point THIS line actually has on or after it.
+// Placed per tile, not once per page: each tile spans only the days from its first reading to
+// its last, so a change before that has to land on the first point THIS line actually has on
+// or after it.
 const placed = computed(() => {
   if (!props.annotations.length || xKey.value !== 'day') return []
   const days = chartData.value.map(r => r.day as string)
