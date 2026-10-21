@@ -1,5 +1,6 @@
 import type { WhoopStatus } from '#shared/types/whoop'
-import { planWhoopRefreshFailure } from '#shared/utils/whoopRecords'
+import { cycleMetric, metricsByDate, planWhoopRefreshFailure } from '#shared/utils/whoopRecords'
+import type { WhoopCycleRecord } from '#shared/utils/whoopRecords'
 
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
 const WHOOP_API_BASE = 'https://api.prod.whoop.com/developer'
@@ -9,6 +10,30 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000
 // page sees only the last ~10 records. Ask for the maximum and follow `next_token` instead.
 const PAGE_LIMIT = 25
 const MAX_PAGES = 20
+
+/** How far back a strain re-read looks: the open cycle plus the couple before it (one page). */
+const STRAIN_REFRESH_LOOKBACK_MS = 3 * 86_400_000
+
+/**
+ * Re-reads the last few cycles and upserts their strain; returns the dates written. Strain is
+ * the one Whoop figure with no webhook, and it keeps moving all day — the open cycle reads as
+ * SCORED with its running total, which is what a manual re-sync was picking up. Both webhooks
+ * call this after a workout lands, so the home page's strain follows the activity (a round of
+ * disc golf used to sit beside the morning's 4.1 until the nightly sync or a manual re-sync —
+ * Jim, 2026-10-21). The caller decides whether a failure matters; the nightly sync reconciles.
+ */
+export async function refreshWhoopStrain(db: D1Database, lookbackMs = STRAIN_REFRESH_LOOKBACK_MS): Promise<string[]> {
+  const cycles = await whoopFetchAll<WhoopCycleRecord>(db, '/v2/cycle', {
+    start: new Date(Date.now() - lookbackMs).toISOString(),
+    maxPages: 1
+  })
+  const byDate = metricsByDate(cycles, c => c.start, cycleMetric)
+  const dates: string[] = []
+  for (const [date, fields] of Object.entries(byDate)) {
+    if (await upsertHealthMetrics(db, date, fields)) dates.push(date)
+  }
+  return dates.sort()
+}
 
 export interface WhoopTokens {
   access_token: string

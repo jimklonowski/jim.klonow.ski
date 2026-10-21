@@ -1,6 +1,10 @@
 import { zHealthWebhook } from '#shared/utils/schemas'
 import { VITALS_SELECT, VITALS_UPSERT_SQL, vitalsBindings, vitalsOutcome } from '#shared/utils/vitalsUpsert'
 import type { Vitals, VitalsRow } from '#shared/utils/vitalsUpsert'
+import { workoutStartMs } from '#shared/utils/time'
+
+/** Only a session from the last few days warrants a Whoop strain re-read; a backfill of old workouts doesn't. */
+const STRAIN_REFRESH_WINDOW_MS = 3 * 86_400_000
 
 interface HealthMetrics {
   vo2_max?: number
@@ -185,12 +189,32 @@ export default defineEventHandler(async (event) => {
     await upsertWorkout(db, w)
   }
 
+  // A workout moves the day's Whoop strain, and Whoop has no webhook for strain: when this
+  // delivery carries a recent session and the Whoop account is connected, re-read the open cycle
+  // so the home page's strain follows the workout (Jim, 2026-10-21: disc golf on the page, strain
+  // still the morning's 4.1 until a manual re-sync). Best effort — this is Apple's delivery, and
+  // a Whoop hiccup must not fail it; the nightly sync reconciles.
+  let strain: string[] | null = null
+  const recentWorkout = workouts.some((w) => {
+    const ms = workoutStartMs(w.start_time)
+    return ms != null && Date.now() - ms < STRAIN_REFRESH_WINDOW_MS
+  })
+  if (recentWorkout && (await getWhoopStatus(db)).connected) {
+    strain = await refreshWhoopStrain(db).catch(async (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[health-webhook] whoop strain refresh after workout failed:', message)
+      await markWhoopError(db, `strain after workout: ${message}`).catch(() => {})
+      return null
+    })
+  }
+
   return {
     ok: true,
     created: created.length,
     updated: updated.length,
     healthMetrics: healthMetricsTouched,
     workouts: workouts.length,
+    strain,
     dates: [...created, ...updated].sort()
   }
 })
