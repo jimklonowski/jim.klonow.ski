@@ -84,6 +84,7 @@
 
 <script setup lang="ts">
 import type { LabsEntry } from '#shared/types/labs'
+import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { readingNoteOn } from '~/data/markerCaveats'
 import { CHART_ACCENT, STATUS_COLORS } from '~/utils/chartTheme'
@@ -112,9 +113,9 @@ interface Dot {
   hollow: boolean
 }
 
-function fmt(v: number) {
-  return Number.isInteger(v) ? v.toString() : v.toFixed(v < 10 ? 1 : 0)
-}
+// The labs page's own rule (shared/utils/markerValue.ts): this tile's copy dropped the decimal at
+// ten and above, so hematocrit 51.7 read "52" and a 50.4 flagged high against ≤50 printed "50".
+const fmt = fmtMarkerValue
 
 function refLabel(min?: number, max?: number) {
   if (min != null && max != null) return `ref ${fmt(min)}–${fmt(max)}`

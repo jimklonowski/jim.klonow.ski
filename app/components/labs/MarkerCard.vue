@@ -166,6 +166,7 @@
 
 <script setup lang="ts">
 import { STATUS_COLORS } from '~/utils/chartTheme'
+import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, readingNoteOn } from '~/data/markerCaveats'
 
@@ -238,17 +239,15 @@ const readingNote = computed(() =>
 
 const displayValue = computed(() => {
   const v = current.value
-  if (v == null) return '—'
-  return Number.isInteger(v) ? v.toString() : v.toFixed(1)
+  return v == null ? '—' : fmtMarkerValue(v)
 })
 
 const status = computed(() => getStatus(current.value, meta.value))
 const statusColor = computed(() => STATUS_COLORS[status.value])
 const statusLabel = computed(() => STATUS_LABELS[status.value])
 
-function num(v: number) {
-  return Number.isInteger(v) ? v.toString() : v.toFixed(1)
-}
+// One rule for every printed reading, shared with the home watch tile (shared/utils/markerValue.ts).
+const num = fmtMarkerValue
 
 function bounds(min?: number, max?: number) {
   if (min !== undefined && max !== undefined) return `${num(min)}-${num(max)}`
