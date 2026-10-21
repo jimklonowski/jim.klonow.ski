@@ -8,7 +8,10 @@ import type { ParsedVial } from '#shared/types/journal'
 
 // Structured-output schema — the API guarantees the response text is JSON matching this.
 // unit_count is a plain integer (0 = not a pill bottle) rather than nullable to stay inside the
-// schema subset structured outputs accept; the handler maps 0 back to null.
+// schema subset structured outputs accept; the handler maps 0 back to null. No `minimum` on
+// the integers either: since Oct 2026 the API rejects it ("For 'integer' type, property
+// 'minimum' is not supported", a 400 that surfaced as a 502 here) — the bounds are enforced
+// below instead.
 const PARSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -21,8 +24,8 @@ const PARSE_SCHEMA = {
           form: { type: 'string', enum: ['vial', 'tablet', 'capsule'] },
           vial_amount: { type: 'number' },
           vial_unit: { type: 'string', enum: ['mg', 'mcg', 'iu'] },
-          unit_count: { type: 'integer', minimum: 0 },
-          quantity: { type: 'integer', minimum: 1 },
+          unit_count: { type: 'integer' },
+          quantity: { type: 'integer' },
           notes: { type: 'string' },
           assumption: { type: 'string' }
         },
@@ -96,9 +99,17 @@ export default defineEventHandler(async (event) => {
   if (!Array.isArray(parsed?.vials)) {
     throw createError({ statusCode: 502, message: 'Parse returned no rows — try rephrasing' })
   }
+  // The bounds the schema used to carry: a pill count is positive or absent, a quantity is at
+  // least one, and amounts can't be negative.
   const vials: ParsedVial[] = parsed.vials.map((v) => {
     const form = normalizeForm(v.form)
-    return { ...v, form, unit_count: isPillForm(form) && v.unit_count > 0 ? v.unit_count : null }
+    return {
+      ...v,
+      form,
+      vial_amount: Math.max(0, Number(v.vial_amount) || 0),
+      quantity: Math.max(1, Math.round(Number(v.quantity) || 1)),
+      unit_count: isPillForm(form) && v.unit_count > 0 ? Math.round(v.unit_count) : null
+    }
   })
   return { vials }
 })

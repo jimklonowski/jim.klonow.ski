@@ -135,7 +135,8 @@
 import { diffDays, weekStartOf } from '#shared/utils/dates'
 import { workoutStartMs } from '#shared/utils/time'
 import type { WorkoutEntry } from '#shared/types/journal'
-import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
+import { normalizeWorkoutType } from '#shared/utils/workoutTypes'
+import { CHART_ACCENT, CHART_CYAN, CHART_INDIGO } from '~/utils/chartTheme'
 
 useSeoMeta({ title: 'Journal · Workouts' })
 
@@ -189,11 +190,12 @@ const statCells = computed(() => {
 })
 
 // --- type mix over the last 90 days ---
-// Apple and Whoop between them emit ~18 distinct type strings, so bucket them into the three
-// families the mock shows rather than listing every one.
+// Apple and Whoop between them emit ~18 distinct type strings, so they're bucketed into three
+// families rather than listed. Labels go through normalizeWorkoutType first, the same fold the
+// write path applies, so a spelling the merge hasn't canonicalised yet still lands in its family.
 const TYPE_BUCKETS = [
   { label: 'Strength', color: CHART_ACCENT, match: /strength|weightlift|functional/i },
-  { label: 'Cycling', color: '#38b6d9', match: /cycling|spin/i },
+  { label: 'Cycling', color: CHART_CYAN, match: /cycling|spin/i },
   { label: 'Walk/other', color: CHART_INDIGO, match: /./ }
 ]
 
@@ -202,7 +204,8 @@ const typeMix = computed(() => {
   if (!recent.length) return []
   const counts = TYPE_BUCKETS.map(() => 0)
   for (const w of recent) {
-    const i = TYPE_BUCKETS.findIndex(b => b.match.test(w.workout_type ?? ''))
+    const label = normalizeWorkoutType(w.workout_type) ?? ''
+    const i = TYPE_BUCKETS.findIndex(b => b.match.test(label))
     counts[i < 0 ? TYPE_BUCKETS.length - 1 : i]!++
   }
   return TYPE_BUCKETS.map((b, i) => ({

@@ -23,6 +23,7 @@ export const THEME = {
   'ember': token('ember'),
   'mark': token('mark'),
   'indigo-dot': token('indigo-dot'),
+  'cyan-dot': token('cyan-dot'),
   'raised': token('raised'),
   'line': token('line'),
   'line-soft': token('line-soft'),
@@ -37,6 +38,8 @@ export const CHART_WARN = THEME.warn
 export const CHART_DANGER = THEME.danger
 export const CHART_EMBER = THEME.ember
 export const CHART_INDIGO = THEME['indigo-dot']
+/** A fourth series colour (REM sleep, cycling) — an identity token like indigo-dot, fixed across presets. */
+export const CHART_CYAN = THEME['cyan-dot']
 
 /** A lab value's status (getStatus in app/data/biomarkers.ts) as a color: marker dots, card
  * accents, flagged rows. Was hand-copied into five components. */
