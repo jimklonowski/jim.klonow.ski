@@ -321,6 +321,7 @@ import { diffDays } from '#shared/utils/dates'
 import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
 import { WATER_DEFAULT_CUP_OZ } from '#shared/utils/water'
+import { isSluggish, latestRecovery as petRecovery } from '#shared/utils/petState'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
 import type { PeptideEntry } from '~/data/journal'
@@ -463,20 +464,10 @@ const latestRhr = computed(() =>
   [...entries.value].reverse().find(e => e.rhr != null)?.rhr ?? null
 )
 
-const latestRecovery = computed(() =>
-  [...healthMetrics.value].reverse().find(m => m.recovery_score != null)?.recovery_score ?? null
-)
-
-/** Short-sleep state: entered by a <6h night, cleared only by a ≥7h one. */
-const sluggish = computed(() => {
-  let state = false
-  for (const m of healthMetrics.value) {
-    if (m.sleep_total_min == null) continue
-    if (m.sleep_total_min < 360) state = true
-    else if (m.sleep_total_min >= 420) state = false
-  }
-  return state
-})
+// Recovery and the short-sleep state come from the one shared read (shared/utils/petState.ts),
+// so this pet and the one on /ticker are always in the same mood.
+const latestRecovery = computed(() => petRecovery(healthMetrics.value))
+const sluggish = computed(() => isSluggish(healthMetrics.value))
 
 const trends = computed(() => [
   { label: 'WEIGHT lbs', values: series(entries.value, e => e.weight_lbs), decimals: 1 },

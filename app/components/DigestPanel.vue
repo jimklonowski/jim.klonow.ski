@@ -109,6 +109,7 @@
 
 <script setup lang="ts">
 import { isFullAccessRole } from '#shared/utils/access'
+import { formatDuration } from '~/data/health-metrics'
 import type { Digest } from '~/composables/useDigests'
 
 const route = useRoute()
@@ -270,13 +271,8 @@ function relativeTime(iso: string | null) {
   if (days < 7) return `${days}d ago`
   return `${Math.floor(days / 7)}w ago`
 }
-function fmtSleep(min: number) {
-  // Round the total before splitting, or 419.7 reads "6h 60m".
-  const total = Math.round(min)
-  const h = Math.floor(total / 60)
-  const m = total % 60
-  return h ? `${h}h ${m}m` : `${m}m`
-}
+// Sleep durations use the one app-wide formatter (rounds the total before splitting).
+const fmtSleep = formatDuration
 function chips(d: Digest): string[] {
   const s = d.stats ?? {}
   const out: string[] = []

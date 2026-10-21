@@ -354,6 +354,8 @@
 import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { localTimeNow } from '#shared/utils/time'
+import { isSluggish, latestRecovery, latestSleepMin } from '#shared/utils/petState'
+import { formatDuration } from '~/data/health-metrics'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
@@ -565,11 +567,15 @@ const walkProp = computed<TickerProp | null>(() => {
   return WALK_PROPS.find(p => p.match.test(main?.workout_type ?? ''))?.prop ?? null
 })
 
-const latestHealth = computed(() => (healthData.value ?? []).at(-1) ?? null)
-const recovery = computed(() => latestHealth.value?.recovery_score ?? null)
-const sleepMin = computed(() => latestHealth.value?.sleep_total_min ?? null)
-const sluggish = computed(() => (sleepMin.value ?? 420) < 420)
-const fmtSleep = (min: number) => `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}m`
+// The pet's mood inputs come from the one shared read (shared/utils/petState.ts) so this page and
+// the home page agree: recovery = newest SCORED day (the last row is null until Whoop scores it),
+// sluggish = under six hours enters, only seven clears (the home page's hysteresis — a flat
+// seven-hour line here had the two pets in different moods on a 6h40m night).
+const recovery = computed(() => latestRecovery(healthData.value ?? []))
+const sleepMin = computed(() => latestSleepMin(healthData.value ?? []))
+const sluggish = computed(() => isSluggish(healthData.value ?? []))
+// The shared formatter rounds the total before splitting — this page's own copy read "6h 59.7m".
+const fmtSleep = formatDuration
 const recoveryZone = (r: number) => r >= 67 ? 'green' : r >= 34 ? 'yellow' : 'red'
 
 const streak = computed(() => loggedStreak(entries.value, today.value))
