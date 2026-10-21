@@ -132,13 +132,16 @@ async function workoutsInRange(db: D1Database, start: string, end: string): Prom
   return mergeWorkouts((results ?? []).map(parseWorkoutRow))
 }
 
-// Most recent journal entry with a non-null weight/rhr/hrv strictly before `date`, for deltas.
-async function priorJournal(db: D1Database, date: string): Promise<JournalRow | null> {
-  const { results } = await db.prepare(
-    `SELECT ${JOURNAL_COLS} FROM journal_entries WHERE date < ?1 ORDER BY date DESC LIMIT 1`
-  ).bind(date).all()
-  const r = results?.[0]
-  return r ? parseJournalRow(r) : null
+// The most recent weigh-in strictly before `date`, for the weight delta — a row WITH a weight,
+// not merely the previous row: a soda or water tap creates a journal row with no vitals, and
+// reading that as "the prior entry" lost the delta whenever yesterday was tap-only (audit #42
+// item 13). The delta line names the day it compares against, so a weigh-in from several days
+// back reads honestly.
+async function priorWeighIn(db: D1Database, date: string): Promise<{ date: string, weight_lbs: number } | null> {
+  const row = await db.prepare(
+    'SELECT date, weight_lbs FROM journal_entries WHERE date < ?1 AND weight_lbs IS NOT NULL ORDER BY date DESC LIMIT 1'
+  ).bind(date).first<{ date: string, weight_lbs: number }>()
+  return row ?? null
 }
 
 // Dates of lab draws inside the period, so the digest can point at fresh results.
@@ -222,7 +225,7 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     journalInRange(db, date, date),
     healthInRange(db, date, date),
     workoutsInRange(db, date, date),
-    priorJournal(db, date),
+    priorWeighIn(db, date),
     journalInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
     healthInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
     labDatesInRange(db, date, date),

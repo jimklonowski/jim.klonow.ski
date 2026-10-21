@@ -320,12 +320,22 @@
 import { diffDays } from '#shared/utils/dates'
 import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
+import { WATER_DEFAULT_CUP_OZ } from '#shared/utils/water'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
 import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
-const { sodaLabel, cupOz, addingSoda, addingWater, addSoda, addWater } = await useQuickLog()
+// Same conditional-composable rule as the cycles/planned-draws fetches below: only the roles
+// that get the + SODA / + CUP buttons load their defaults. Unconditional, this ran for guests
+// too — two rejected list fetches on every landing, server-rendered and again on mount.
+const quickLog = canEdit.value ? await useQuickLog() : null
+const sodaLabel = computed(() => quickLog?.sodaLabel.value ?? 'SODA')
+const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
+const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
+const addingWater = computed(() => quickLog?.addingWater.value ?? false)
+const addSoda = () => quickLog?.addSoda()
+const addWater = () => quickLog?.addWater()
 const {
   hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
   allWorkouts, dosesToday, sodasToday, flagged, flagCounts,

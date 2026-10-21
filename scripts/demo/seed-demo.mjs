@@ -11,13 +11,15 @@
 // re-baselines from prod — run `pnpm db:migrate` (builds the empty demo DB) and then
 // `pnpm demo:seed:local` after it.
 //
-// The date-materialization logic here is duplicated in server/tasks/demo/reset.ts (the task
-// can't import from scripts/) — keep the two in sync.
+// The date materialization is shared/utils/demoSeed.ts, the same code server/tasks/demo/reset.ts
+// runs nightly (node imports the .ts directly) — one implementation, so the two can't drift.
 import { execSync } from 'node:child_process'
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { materializeSeedRows } from '../../shared/utils/demoSeed.ts'
+import { localDaysAgo } from '../../shared/utils/time.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const mode = process.argv.includes('--remote') ? 'remote' : process.argv.includes('--local') ? 'local' : null
@@ -33,28 +35,13 @@ const PHOTOS_BUCKET_NAME = 'jim-klonow-ski-photos'
 const DEMO_DB_NAME = 'jim-klonow-ski-demo'
 const seed = JSON.parse(readFileSync(SEED_PATH, 'utf8'))
 
-// --- Date materialization (mirror of server/tasks/demo/reset.ts) ----------------------------
+// --- Date materialization (shared/utils/demoSeed.ts) ----------------------------------------
 
-// Anchor = yesterday as a Chicago calendar day (same convention as shared/utils/time.ts).
-const isoDateFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit'
-})
-const anchorDate = offset => isoDateFmt.format(new Date(Date.now() - (offset + 1) * 86400000))
-
-const OFFSET_RE = /^@D(-?\d+)(.*)$/
-function materialize(value) {
-  if (typeof value !== 'string') return value
-  const m = OFFSET_RE.exec(value)
-  return m ? anchorDate(Number(m[1])) + m[2] : value
-}
-
-function materializedRows(table) {
-  const jsonCols = new Set(table.jsonCols.map(c => table.cols.indexOf(c)))
-  return table.rows.map(row => row.map((v, i) => {
-    if (jsonCols.has(i)) return JSON.stringify(v)
-    return materialize(v)
-  }))
-}
+// Anchor = yesterday as a Chicago calendar day, moved by calendar days from there. The old
+// `Date.now() - (offset + 1) * 86400000` stepped in hours, and across a DST change two offsets
+// landed on one date — a primary-key clash on journal_entries after the wipe.
+const anchor = localDaysAgo(1)
+const materializedRows = table => materializeSeedRows(table, anchor)
 
 // --- Local: programmatic bindings ------------------------------------------------------------
 
