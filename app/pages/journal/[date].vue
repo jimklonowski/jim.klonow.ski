@@ -5,18 +5,31 @@
       :meta="headingLabel"
     >
       <template #actions>
+        <!-- Both arrow slots are always there, a missing neighbour shown dimmed, so the arrows
+             never move under the pointer: scrubbing back from today used to shift ‹ one slot
+             left and put › exactly where ‹ had just been (Jim, 2026-10-21). -->
         <NuxtLink
           v-if="prevEntry"
           :to="`/journal/${prevEntry.date}`"
-          class="text-prose text-faint hover:text-accent"
+          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent"
           aria-label="Previous entry"
         >‹</NuxtLink>
+        <span
+          v-else
+          class="inline-flex w-4 justify-center text-prose text-ghost select-none"
+          aria-hidden="true"
+        >‹</span>
         <NuxtLink
           v-if="nextEntry"
           :to="`/journal/${nextEntry.date}`"
-          class="text-prose text-faint hover:text-accent"
+          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent"
           aria-label="Next entry"
         >›</NuxtLink>
+        <span
+          v-else
+          class="inline-flex w-4 justify-center text-prose text-ghost select-none"
+          aria-hidden="true"
+        >›</span>
         <NuxtLink
           to="/journal/calendar"
           class="tui-btn"
