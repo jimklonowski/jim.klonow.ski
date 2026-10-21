@@ -81,11 +81,11 @@ export function indexEstimates(rows: MealEstimate[] | null | undefined): Estimat
   return new Map((rows ?? []).map(r => [r.key, r]))
 }
 
-/** One source's answer for exactly this key: a hand entry wins, then the code library, then a model estimate. */
-function directLookup(index: EstimateIndex, text: string, key: string): MealEstimate | null {
+/** The LABEL figures for exactly this key — a hand entry (the most recent intent), else the code library — or null. */
+function labelLookup(index: EstimateIndex, text: string, key: string): MealEstimate | null {
   const row = index.get(key) ?? null
   if (row?.source === 'manual') return row
-  return libraryLookup(text) ?? row
+  return libraryLookup(text)
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
@@ -105,20 +105,34 @@ export function scaleEstimate(e: MealEstimate, n: number, text: string): MealEst
 }
 
 /**
- * The figures for a meal text, or null. A hand entry wins (it is the most recent intent), then
- * the code library (label figures), then a model estimate. "N x <meal>" multiplies whichever of
- * those knows the meal — two sandwiches AND two guac cups, per Jim's convention — so a known
- * regular covers every quantity of itself without a second entry.
+ * The figures for a meal text, or null. Trust in the SOURCE comes first, the path second: label
+ * figures — a hand entry (the most recent intent), then the code library — beat a model estimate
+ * whether they answer the text itself or, for "N x <meal>", the meal it multiplies (two sandwiches
+ * AND two guac cups, per Jim's convention). Only when no label source knows the meal at either
+ * level does a model row answer, again the exact text before the multiplied one. So a regular
+ * joining the library takes over every quantity of itself even where an older model guess for
+ * the "2 x" text is still cached (audit #42 item 8).
  */
 export function lookupEstimate(index: EstimateIndex, text: string | null | undefined): MealEstimate | null {
   const key = mealKey(text)
   if (!key) return null
-  const direct = directLookup(index, text!, key)
-  if (direct) return direct
-  const qty = splitQuantity(text!.trim())
-  if (!qty) return null
-  const base = directLookup(index, qty.rest, mealKey(qty.rest))
-  return base ? scaleEstimate(base, qty.n, text!.trim()) : null
+  const trimmed = text!.trim()
+  const qty = splitQuantity(trimmed)
+  const base = qty ? { text: qty.rest, key: mealKey(qty.rest) } : null
+
+  const label = labelLookup(index, trimmed, key)
+  if (label) return label
+  if (base) {
+    const labelBase = labelLookup(index, base.text, base.key)
+    if (labelBase) return scaleEstimate(labelBase, qty!.n, trimmed)
+  }
+  const row = index.get(key)
+  if (row) return row
+  if (base) {
+    const rowBase = index.get(base.key)
+    if (rowBase) return scaleEstimate(rowBase, qty!.n, trimmed)
+  }
+  return null
 }
 
 /** Label figures (library or hand-entered) read as numbers; a model estimate reads as "≈ … est.". */

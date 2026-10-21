@@ -73,6 +73,28 @@ test('a hand entry beats the library, which beats a model estimate', () => {
   assert.equal(lookupEstimate(manual, libText).kcal, 2)
 })
 
+test('"N x": label figures for the meal beat a cached model row for the "N x" text itself', () => {
+  const one = libraryLookup('grilled cheese + guac')
+  // A model guess for the multiplied text, cached before the library knew the meal, is shadowed.
+  const stale = indexEstimates([est('2 x grilled cheese + guac', 700, 20, 60, 35)])
+  const two = lookupEstimate(stale, '2 x grilled cheese + guac')
+  assert.equal(two.source, 'library')
+  assert.equal(two.kcal, one.kcal * 2)
+  // A hand entry for the multiplied text is the most recent intent and still wins outright.
+  const manual = indexEstimates([est('2 x grilled cheese + guac', 900, 40, 80, 40, { source: 'manual' })])
+  assert.equal(lookupEstimate(manual, '2 x grilled cheese + guac').kcal, 900)
+  // A hand entry for the BASE beats a model row for the multiplied text too.
+  const manualBase = indexEstimates([est('veggie lasagna', 600, 30, 60, 25, { source: 'manual' }), est('2 x veggie lasagna', 999, 1, 1, 1)])
+  const scaled = lookupEstimate(manualBase, '2 x veggie lasagna')
+  assert.equal(scaled.kcal, 1200)
+  assert.equal(scaled.source, 'manual')
+  // No label source at either level: the model row for the exact text beats scaling the base's.
+  const aiBoth = indexEstimates([est('veggie lasagna', 600, 30, 60, 25), est('2 x veggie lasagna', 1100, 1, 1, 1)])
+  assert.equal(lookupEstimate(aiBoth, '2 x veggie lasagna').kcal, 1100)
+  const aiBase = indexEstimates([est('veggie lasagna', 600, 30, 60, 25)])
+  assert.equal(lookupEstimate(aiBase, '2 x veggie lasagna').kcal, 1200)
+})
+
 test('the library: every entry resolves by its text and aliases, with positive figures and a source', () => {
   assert.ok(MEAL_LIBRARY.length >= 2)
   for (const meal of MEAL_LIBRARY) {
