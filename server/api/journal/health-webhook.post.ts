@@ -1,12 +1,6 @@
 import { zHealthWebhook } from '#shared/utils/schemas'
-
-interface Vitals {
-  weight_lbs?: number
-  rhr?: number
-  hrv?: number
-  bp_systolic?: number
-  bp_diastolic?: number
-}
+import { VITALS_SELECT, VITALS_UPSERT_SQL, vitalsBindings, vitalsOutcome } from '#shared/utils/vitalsUpsert'
+import type { Vitals, VitalsRow } from '#shared/utils/vitalsUpsert'
 
 interface HealthMetrics {
   vo2_max?: number
@@ -30,8 +24,6 @@ interface Workout {
   max_hr: number | null
   distance_mi: number | null
 }
-
-const VITAL_FIELDS = ['weight_lbs', 'rhr', 'hrv', 'bp_systolic', 'bp_diastolic'] as const
 
 function hoursToMin(qty: number) {
   return Math.round(qty * 60)
@@ -158,43 +150,29 @@ export default defineEventHandler(async (event) => {
   const created: string[] = []
   const updated: string[] = []
 
-  for (const [date, vitals] of Object.entries(byDate)) {
-    // A date bucket is created for every well-formed point, recognized metric or not — an
-    // unrecognized-only day used to INSERT a completely blank journal row, which then read as
-    // "data" everywhere (it was the main source of unfillable digest gaps).
-    if (Object.keys(vitals).length === 0) continue
-
-    const existing = await db.prepare('SELECT weight_lbs, rhr, hrv, bp_systolic, bp_diastolic FROM journal_entries WHERE date = ?1')
-      .bind(date).first<Record<string, number | null>>()
-
-    if (!existing) {
-      await db.prepare(`
-        INSERT INTO journal_entries (date, peptides, reconstitutions, food, notes, weight_lbs, rhr, hrv, bp_systolic, bp_diastolic)
-        VALUES (?1, '[]', '[]', '{}', '', ?2, ?3, ?4, ?5, ?6)
-      `).bind(
-        date,
-        vitals.weight_lbs ?? null,
-        vitals.rhr ?? null,
-        vitals.hrv ?? null,
-        vitals.bp_systolic ?? null,
-        vitals.bp_diastolic ?? null
-      ).run()
-      created.push(date)
-      continue
+  // A date bucket is created for every well-formed point, recognized metric or not — an
+  // unrecognized-only day used to INSERT a completely blank journal row, which then read as
+  // "data" everywhere (it was the main source of unfillable digest gaps).
+  const vitalDates = Object.entries(byDate).filter(([, vitals]) => Object.keys(vitals).length > 0)
+  if (vitalDates.length) {
+    // The write is one INSERT … ON CONFLICT DO UPDATE per date, batched, filling only blanks
+    // (shared/utils/vitalsUpsert.ts). It used to SELECT then INSERT, and a quick-add creating the
+    // row in between was a primary-key failure that dropped the whole delivery. The snapshot
+    // below only serves the created/updated report; the write does not depend on it.
+    const before = new Map<string, VitalsRow>()
+    const dates = vitalDates.map(([date]) => date)
+    for (let i = 0; i < dates.length; i += 90) {
+      const chunk = dates.slice(i, i + 90)
+      const { results } = await db.prepare(`SELECT ${VITALS_SELECT} FROM journal_entries WHERE date IN (${chunk.map((_, j) => `?${j + 1}`).join(', ')})`)
+        .bind(...chunk).all<VitalsRow>()
+      for (const row of results ?? []) before.set(row.date, row)
     }
-
-    const patch: Partial<Vitals> = {}
-    for (const field of VITAL_FIELDS) {
-      if (existing[field] == null && vitals[field] != null) patch[field] = vitals[field]
-    }
-    if (Object.keys(patch).length === 0) continue
-
-    const fields = Object.keys(patch) as Array<keyof Vitals>
-    const setClause = fields.map((f, i) => `${f} = ?${i + 2}`).join(', ')
-    await db.prepare(`UPDATE journal_entries SET ${setClause} WHERE date = ?1`)
-      .bind(date, ...fields.map(f => patch[f]))
-      .run()
-    updated.push(date)
+    const written = await db.batch<VitalsRow>(vitalDates.map(([date, vitals]) => db.prepare(VITALS_UPSERT_SQL).bind(...vitalsBindings(date, vitals))))
+    vitalDates.forEach(([date], i) => {
+      const outcome = vitalsOutcome(before.get(date), written[i]?.results?.[0])
+      if (outcome === 'created') created.push(date)
+      else if (outcome === 'updated') updated.push(date)
+    })
   }
 
   let healthMetricsTouched = 0
