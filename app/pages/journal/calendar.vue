@@ -1,8 +1,10 @@
 <template>
   <div>
+    <!-- "logged", not "entries": the count is hand-logged days (shared/utils/journalLog.ts), not
+         rows — the Apple Health webhook writes a vitals row for every day it syncs. -->
     <JournalHeader
       section="CALENDAR"
-      :meta="`${monthEntryCount} ${monthEntryCount === 1 ? 'entry' : 'entries'}`"
+      :meta="`${monthEntryCount} logged`"
     >
       <template #actions>
         <span class="flex items-center gap-2.5">
@@ -50,6 +52,7 @@
         {{ shortCompound(compound) }}
       </span>
       <span class="flex items-center gap-1 text-muted">⚗ recon</span>
+      <span class="flex items-center gap-1 text-muted">🍽 meals</span>
       <span
         v-if="showSchedule"
         class="flex items-center gap-1.5 text-muted"
@@ -246,15 +249,19 @@ function nextMonth() {
   }
 }
 
+// `logged` is the hand-entered predicate every other page uses; a row with nothing but watch
+// vitals is a row, not an entry. `meals` is how many food slots the day filled.
 const entryMap = computed(() => {
-  const map: Record<string, { compounds: string[], doseCount: number, weight: number | null, reconCount: number }> = {}
+  const map: Record<string, { compounds: string[], doseCount: number, weight: number | null, reconCount: number, meals: number, logged: boolean }> = {}
   for (const entry of entries.value) {
     const doses = entry.peptides ?? []
     map[entry.date] = {
       compounds: [...new Set(doses.map(p => p.compound))],
       doseCount: doses.length,
       weight: entry.weight_lbs ?? null,
-      reconCount: (entry.reconstitutions ?? []).length
+      reconCount: (entry.reconstitutions ?? []).length,
+      meals: Object.values(entry.food ?? {}).filter(v => (v ?? '').trim() !== '').length,
+      logged: isLoggedDay(entry)
     }
   }
   return map
@@ -272,6 +279,7 @@ interface CalendarCell {
   compounds: string[]
   /** Scheduled by PROTOCOL_RULES but not logged — a miss in the past, the plan ahead. */
   scheduled: string[]
+  // (hasEntry = a hand-logged day, per isLoggedDay — never a vitals-only webhook row.)
   /** Compact glyph run: extra doses, reconstitutions, photos, workouts. */
   marks: string
   weight: string | null
@@ -312,11 +320,13 @@ const calendarCells = computed((): CalendarCell[] => {
     // the dots already tell the whole story.
     if (entry && entry.doseCount > entry.compounds.length) marks.push(`×${entry.doseCount}`)
     if (entry?.reconCount) marks.push(entry.reconCount > 1 ? `⚗×${entry.reconCount}` : '⚗')
+    if (entry?.meals) marks.push('🍽')
     if (photos) marks.push(photos > 1 ? `📷×${photos}` : '📷')
     if (workouts) marks.push(workouts > 1 ? `♥×${workouts}` : '♥')
 
     const titleParts: string[] = []
     if (entry?.compounds.length) titleParts.push(entry.compounds.join(', '))
+    if (entry?.meals) titleParts.push(`${entry.meals} meal${entry.meals > 1 ? 's' : ''} logged`)
     if (scheduled.length) {
       const tense = dateStr > todayDate.value ? 'scheduled' : dateStr === todayDate.value ? 'due' : 'not logged'
       titleParts.push(`${tense}: ${scheduled.join(', ')}`)
@@ -333,7 +343,7 @@ const calendarCells = computed((): CalendarCell[] => {
       isFuture: dateStr > todayDate.value,
       isDraw: drawDates.value.has(dateStr),
       isPlannedDraw: plannedDates.value.has(dateStr),
-      hasEntry: !!entry,
+      hasEntry: entry?.logged ?? false,
       compounds: entry?.compounds.slice(0, MAX_DOTS) ?? [],
       scheduled: scheduled.slice(0, MAX_DOTS),
       marks: marks.join(' '),

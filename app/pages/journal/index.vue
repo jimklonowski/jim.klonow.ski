@@ -71,10 +71,20 @@
           <section class="bg-raised border border-line-soft px-4 py-3.5">
             <div class="flex items-baseline gap-3 text-meta">
               <span class="tui-label">Today · doses + workout</span>
+              <!-- The AI recaps live in a slideover (DigestPanel) that only ⌘K and the home page
+                   used to open; the journal hub is where someone looks for them. -->
+              <button
+                v-if="isFullAccess"
+                type="button"
+                class="ml-auto text-accent hover:text-accent-hover cursor-pointer"
+                @click="digestOpen = true"
+              >
+                digests →
+              </button>
               <NuxtLink
                 v-if="isFullAccess"
                 :to="`/journal/${today}`"
-                class="ml-auto text-accent hover:text-accent-hover"
+                class="text-accent hover:text-accent-hover"
               >entry →</NuxtLink>
             </div>
 
@@ -82,6 +92,11 @@
               v-if="doseLines.length"
               class="mt-3 text-row leading-loose text-dim"
             >
+              <!-- Before the first dose of the day the lines are the last dosed day's, and say so. -->
+              <span
+                v-if="doseDay"
+                class="block text-muted"
+              >No doses yet today · last logged {{ doseDay }}:</span>
               <span
                 v-for="(line, i) in doseLines"
                 :key="i"
@@ -99,6 +114,10 @@
               v-if="latestWorkout"
               class="mt-2 pt-2.5 border-t border-line-soft text-row flex flex-wrap items-baseline gap-x-2"
             >
+              <span
+                v-if="workoutDay"
+                class="text-muted"
+              >{{ workoutDay }} ·</span>
               <span class="text-hi">{{ latestWorkout.workout_type ?? 'Workout' }}</span>
               <span
                 v-for="(part, i) in workoutParts"
@@ -183,6 +202,8 @@ const { role, isOwner, canEdit } = await useAuth()
 
 const today = useToday()
 const isFullAccess = computed(() => role.value !== 'doctor')
+// The digest slideover's shared open flag (DigestPanel.vue mounts in the layout).
+const digestOpen = useState('digest-panel-open', () => false)
 
 const entries = computed(() => data.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
@@ -266,14 +287,32 @@ const vitalTiles = computed(() => {
 
 // --- today panel ---
 const todayEntry = computed(() => entries.value.find(e => e.date === today.value) ?? null)
-const shownEntry = computed(() => todayEntry.value ?? entries.value.at(-1) ?? null)
+
+/**
+ * The day whose doses the card shows: today's once a dose is in, else the most recent day that
+ * has any — and then the card SAYS so (`doseDay`), where it used to list yesterday's injections
+ * under "Today" until the first pin of the morning (audit #42 item 11). The fallback no longer
+ * depends on whether a soda tap happens to have created today's row.
+ */
+const dosesEntry = computed(() => {
+  if (todayEntry.value?.peptides?.length) return todayEntry.value
+  return [...entries.value].reverse().find(e => e.peptides?.length) ?? null
+})
+
+/** '' for today, else how the card names the day it fell back to: "yesterday", or the date. */
+function dayWord(date: string | null | undefined): string {
+  if (!date || date === today.value) return ''
+  return date === shiftDays(today.value, -1) ? 'yesterday' : formatDate(date, 'monthDay')
+}
+const doseDay = computed(() => dayWord(dosesEntry.value?.date))
+const workoutDay = computed(() => dayWord(latestWorkout.value?.date))
 
 /**
  * Dose lines, grouped by clock time so simultaneous injections read as one line
  * ("03:58 GHK-Cu 2mg + HGH 2iu"), matching the mock.
  */
 const doseLines = computed(() => {
-  const doses = [...(shownEntry.value?.peptides ?? [])].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
+  const doses = [...(dosesEntry.value?.peptides ?? [])].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
   const byTime = new Map<string, string[]>()
   const sites = new Map<string, string>()
   for (const d of doses) {

@@ -100,10 +100,13 @@
             >▲ lab draw</span>
           </span>
 
+          <!-- Ounces when the sizes carried them (ounces are what the goal tracks — two mini cans
+               are less than one bottle), the count for unsized rows, blank for none. -->
           <span
             v-if="showSoda"
-            class="text-muted"
-          >{{ row.sodas || '' }}</span>
+            class="text-muted whitespace-nowrap"
+            :title="row.sodas ? `${row.sodas} soda${row.sodas === 1 ? '' : 's'}` : undefined"
+          >{{ row.sodaOz ? `${row.sodaOz}oz` : row.sodas || '' }}</span>
 
           <span
             v-if="showSoda"
@@ -152,6 +155,7 @@
 
 <script setup lang="ts">
 import { eachDay, shiftDays } from '#shared/utils/dates'
+import { sodaTotals } from '#shared/utils/soda'
 import { waterTotals } from '#shared/utils/water'
 import { getCompoundColor } from '~/data/journal'
 
@@ -252,6 +256,7 @@ const pageRows = computed(() =>
       recon: (e.reconstitutions ?? []).length,
       photos: photoCounts.value[e.date] ?? 0,
       sodas: (e.sodas ?? []).length,
+      sodaOz: sodaTotals(e.sodas ?? []).oz,
       waterOz: waterTotals(e.water).oz,
       workouts: workoutCounts.value[e.date] ?? 0,
       flags: flagsFor(e, fasting)

@@ -64,11 +64,14 @@
       </template>
     </template>
 
+    <!-- Wider than the default dialog so the four figure fields sit on one row with their labels
+         on one line ("PROTEIN (G)" wrapped at the default width and pushed its input down). -->
     <UModal
       v-if="isOwner"
       v-model:open="formOpen"
       :title="estimate ? 'Correct the figures' : 'Enter the figures'"
       :description="text"
+      :ui="{ content: 'sm:max-w-2xl' }"
     >
       <template #body>
         <div class="space-y-3">
@@ -82,7 +85,10 @@
             > · {{ estimate.confidence }} confidence</span>
           </p>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <UFormField label="kcal">
+            <UFormField
+              label="kcal"
+              :ui="FIELD_UI"
+            >
               <UInput
                 v-model.number="draft.kcal"
                 type="number"
@@ -92,7 +98,10 @@
                 class="w-full"
               />
             </UFormField>
-            <UFormField label="Protein (g)">
+            <UFormField
+              label="Protein (g)"
+              :ui="FIELD_UI"
+            >
               <UInput
                 v-model.number="draft.protein_g"
                 type="number"
@@ -101,7 +110,10 @@
                 class="w-full"
               />
             </UFormField>
-            <UFormField label="Carbs (g)">
+            <UFormField
+              label="Carbs (g)"
+              :ui="FIELD_UI"
+            >
               <UInput
                 v-model.number="draft.carbs_g"
                 type="number"
@@ -110,7 +122,10 @@
                 class="w-full"
               />
             </UFormField>
-            <UFormField label="Fat (g)">
+            <UFormField
+              label="Fat (g)"
+              :ui="FIELD_UI"
+            >
               <UInput
                 v-model.number="draft.fat_g"
                 type="number"
@@ -197,7 +212,10 @@ const chipTitle = computed(() => {
 async function ask() {
   if (!props.text) return
   try {
-    await requestEstimate([props.text])
+    const unmatched = await requestEstimate([props.text])
+    if (unmatched.length) {
+      toast.add({ title: 'No figures came back for that meal', description: 'The answer could not be pinned to it, so nothing was saved — try again or enter the figures.', color: 'warning' })
+    }
   }
   catch (err) {
     toast.add({ title: 'Could not estimate that meal', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
@@ -206,6 +224,8 @@ async function ask() {
 
 // --- the figures form (enter or correct) ---
 const formOpen = ref(false)
+/** A figure label never wraps onto a second line — the four inputs must share one baseline. */
+const FIELD_UI = { label: 'whitespace-nowrap' }
 const saving = ref(false)
 const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: number | '', fat_g: number | '' }>({ kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
 

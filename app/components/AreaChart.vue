@@ -58,6 +58,7 @@ import { scaleOrdinal } from '@tanstack/charts/scales/ordinal'
 import { scalePoint } from '@tanstack/charts/scales/point'
 import { annotationsAt } from '#shared/utils/chartAnnotations'
 import type { PlacedAnnotation } from '#shared/utils/chartAnnotations'
+import { splitRuns } from '~/utils/chartRuns'
 import { ANNOTATION_STYLE, CHART_AXIS, CHART_GRID_FIXED, CHART_WARN, seriesSymbol } from '~/utils/chartTheme'
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
@@ -148,14 +149,20 @@ interface Row {
   src: Record<string, unknown>
 }
 
-const seriesRows = computed(() => series.value.map(({ key, label }) => ({
-  key,
-  name: label,
-  rows: props.data.flatMap((d): Row[] => {
-    const v = d[key]
-    return typeof v === 'number' && Number.isFinite(v) ? [{ x: String(d[props.xAxisKey] ?? ''), category: label, value: v, src: d }] : []
-  })
-})))
+/**
+ * Per series: every reading (`rows`, for dots, markers and the tooltip) and the same readings
+ * split into `runs` at the rows with no value — one line mark per run, so a week with no
+ * weigh-ins is a break in the line, not a trend drawn through it. `connectNulls` keeps one run.
+ */
+const seriesRows = computed(() => series.value.map(({ key, label }) => {
+  const runs = splitRuns(
+    props.data,
+    d => d[key],
+    (d, v): Row => ({ x: String(d[props.xAxisKey] ?? ''), category: label, value: v, src: d }),
+    props.connectNulls
+  )
+  return { key, name: label, rows: runs.flat(), runs }
+}))
 
 /**
  * A step that holds each value until the next x — the shape of a dose, which changes on a day
@@ -212,10 +219,19 @@ const definition = computed(() => {
   for (const [i, s] of seriesRows.value.entries()) {
     const yScale = props.dualAxis && i === 1 ? 'y2' : undefined
     const base = { x: 'x', y: 'value', color: 'category', yScale } as const
-    if (props.area) {
-      marks.push(decorative(areaY(s.rows, { ...base, y1: 0, y2: 'value', curve, fillOpacity: 0.08 })))
+    const points = !flagRows && symbol.symbol !== 'none'
+    for (const run of s.runs) {
+      // A reading with nothing measured either side has no line to sit on (a one-point path
+      // draws nothing); without point markers it would vanish, so it gets a dot of its own.
+      if (run.length === 1 && !points) {
+        marks.push(dot(run, { ...base, r: 1.5 }))
+        continue
+      }
+      if (props.area) {
+        marks.push(decorative(areaY(run, { ...base, y1: 0, y2: 'value', curve, fillOpacity: 0.08 })))
+      }
+      marks.push(lineY(run, { ...base, curve, strokeWidth: 1.5, points }))
     }
-    marks.push(lineY(s.rows, { ...base, curve, strokeWidth: 1.5, points: !flagRows && symbol.symbol !== 'none' }))
     // Point markers only on the flagged rows (dosing days of a daily step chart).
     if (flagRows) marks.push(dot(s.rows.filter(row => row.src[pointKey!]), { ...base, r: 2 }))
     // A censored reading wears a ▲ in warn; shape carries the meaning, whatever the density.

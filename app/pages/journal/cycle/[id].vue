@@ -487,7 +487,8 @@ const overlayChart = computed(() => {
   const days = diffDays(from, endDate.value) + 1
   const data = Array.from({ length: days }, (_, idx) => {
     const date = shiftDays(from, idx)
-    const point: Record<string, unknown> = { date: formatDate(date, 'monthDay') }
+    // ISO day: AreaChart formats the axis (and adds ’yy across a year boundary).
+    const point: Record<string, unknown> = { date }
     rows.forEach((row, i) => {
       point[`p${i}`] = row.planned[idx]?.pct
       if (row.actual.length) point[`a${i}`] = row.actual[idx]?.pct
@@ -503,7 +504,7 @@ const overlayMarks = computed(() => {
   const drawMarks = draws.value
     .filter(d => d.date >= from && d.date <= endDate.value)
     .map(d => d.date)
-  return [cycle.value.start_date, ...drawMarks].map(d => formatDate(d, 'monthDay'))
+  return [cycle.value.start_date, ...drawMarks]
 })
 
 const unmodeledNote = computed(() => {

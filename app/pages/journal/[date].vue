@@ -5,18 +5,31 @@
       :meta="headingLabel"
     >
       <template #actions>
+        <!-- Both arrow slots are always there, a missing neighbour shown dimmed, so the arrows
+             never move under the pointer: scrubbing back from today used to shift ‹ one slot
+             left and put › exactly where ‹ had just been (Jim, 2026-10-21). -->
         <NuxtLink
           v-if="prevEntry"
           :to="`/journal/${prevEntry.date}`"
-          class="text-prose text-faint hover:text-accent"
+          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent"
           aria-label="Previous entry"
         >‹</NuxtLink>
+        <span
+          v-else
+          class="inline-flex w-4 justify-center text-prose text-ghost select-none"
+          aria-hidden="true"
+        >‹</span>
         <NuxtLink
           v-if="nextEntry"
           :to="`/journal/${nextEntry.date}`"
-          class="text-prose text-faint hover:text-accent"
+          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent"
           aria-label="Next entry"
         >›</NuxtLink>
+        <span
+          v-else
+          class="inline-flex w-4 justify-center text-prose text-ghost select-none"
+          aria-hidden="true"
+        >›</span>
         <NuxtLink
           to="/journal/calendar"
           class="tui-btn"
@@ -842,6 +855,7 @@ import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, 
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import { MEAL_SLOTS, dayNutrition, fmtKcal, fmtMacros, knownMeals, mealHistory, nutritionIsEstimated, resolveMealText, type MealSlot } from '#shared/utils/nutrition'
+import type { DayLogFields } from '#shared/utils/journalMerge'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '#shared/types/journal'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
@@ -872,7 +886,9 @@ const FOOD_ROWS: Array<{ key: MealSlot, label: string, placeholder: string, snac
   { key: 'snack_eve', label: 'Evening snack', placeholder: 'Watermelon', snack: true }
 ]
 
-// Snack slots opened with "+ snack" this visit, so an empty one stays visible to type into.
+// Snack slots that stay visible while empty: the ones opened with "+ snack" this visit, and the
+// ones the day loaded with (seeded in buildForm) — a field must not unmount under the cursor the
+// moment its text is cleared, and the legacy Snack has no "+ snack" to bring it back.
 const openedSnacks = ref<MealSlot[]>([])
 function snackOpen(slot: MealSlot): boolean {
   return form.food[slot] !== '' || openedSnacks.value.includes(slot)
@@ -1052,6 +1068,12 @@ const mealHistoryBySlot = computed(() =>
   Object.fromEntries(MEAL_SLOTS.map(s => [s, mealHistory(allEntries.value ?? [], s).map(h => h.text)])) as Record<MealSlot, string[]>
 )
 
+// The day as this form LOADED it. Sent with the save so the server keeps anything logged
+// elsewhere while the form was open (a phone water tap, a hub quick-logged lunch, a webhook
+// weight) instead of overwriting it — shared/utils/journalMerge.ts. Re-snapshotted whenever
+// the form is rebuilt from the row, which only happens while the form is clean.
+const loadedBase = ref<DayLogFields | null>(null)
+
 const form = reactive<{
   date: string
   weight_lbs: number | null
@@ -1094,6 +1116,18 @@ const knownMealList = computed(() => knownMeals(allEntries.value ?? [], estimate
 
 function buildForm() {
   const entry = existingEntry.value
+  loadedBase.value = {
+    weight_lbs: entry?.weight_lbs ?? null,
+    bp_systolic: entry?.bp_systolic ?? null,
+    bp_diastolic: entry?.bp_diastolic ?? null,
+    rhr: entry?.rhr ?? null,
+    hrv: entry?.hrv ?? null,
+    sodas: (entry?.sodas ?? []).map(s => ({ ...s })),
+    water: (entry?.water ?? []).map(w => ({ ...w })),
+    food: { ...(entry?.food ?? {}) }
+  }
+  // The snack fields this day loaded with stay mounted even once cleared (see openedSnacks).
+  openedSnacks.value = FOOD_ROWS.filter(row => row.snack && entry?.food?.[row.key]?.trim()).map(row => row.key)
   if (!entry) {
     const blank = blankEntry(dateParam.value)
     return {
@@ -1192,12 +1226,17 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     food,
     // A pour row added and never filled (or cleared — v-model.number hands back '') is not a
     // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
-    water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0)
+    water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0),
+    // What this form started from, so the server merges rather than overwrites (see loadedBase).
+    base: loadedBase.value ?? undefined
   }
-  await $fetch('/api/journal/save', { method: 'POST', body: payload })
+  const saved = await $fetch<{ ok: boolean, date: string, kept: string[] }>('/api/journal/save', { method: 'POST', body: payload })
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
   if (paired.length) {
     toast.add({ title: 'Meals matched to ones with figures', description: `Saved as ${paired.join(', ')}. Edit the field if that was wrong.`, color: 'info', icon: 'i-lucide-link' })
+  }
+  if (saved.kept?.length) {
+    toast.add({ title: 'Kept what was logged elsewhere', description: `${saved.kept.join(', ')} had been added while this page was open and ${saved.kept.length === 1 ? 'was' : 'were'} kept.`, color: 'info', icon: 'i-lucide-merge' })
   }
   // What was just saved is now the baseline, so the refresh below may rebuild from the row.
   formGuard.markClean()

@@ -55,6 +55,7 @@
             :rows="vitalRows"
             :mark-lines="tile.markLines"
             :annotations="annotations"
+            :connect="tile.connect"
           />
         </div>
       </section>
@@ -191,9 +192,9 @@ import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations }
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
-import { dayNutrition } from '#shared/utils/nutrition'
+import { dayNutrition, isDayDone } from '#shared/utils/nutrition'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
-import { ANNOTATION_STYLE, CHART_ACCENT, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
+import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
 useSeoMeta({ title: 'Journal · Trends' })
 
@@ -210,7 +211,7 @@ const { data: cyclesData } = await useCycles()
 const { index: estimateIndex } = await useMealEstimates()
 const { role } = await useAuth()
 
-const { inRange, smoothRows, notes } = useTrendRange()
+const { inRange, smoothRows, notes, cutoff } = useTrendRange()
 const today = useToday()
 
 const entries = computed(() => journalData.value ?? [])
@@ -245,13 +246,11 @@ const annotationKey = computed(() => {
 })
 
 // --- lab draw markers ---
-const drawsInRange = computed(() => {
-  const rows = inRange(entries.value)
-  const first = rows[0]?.date
-  const last = rows.at(-1)?.date
-  if (!first || !last) return []
-  return (labsData.value ?? []).filter(l => l.date >= first && l.date <= last)
-})
+// The picker's own window, not the journal rows' span: a draw in a week with no journal row
+// (vitals synced late, a travel week) used to lose its marker.
+const drawsInRange = computed(() =>
+  (labsData.value ?? []).filter(l => (!cutoff.value || l.date >= cutoff.value) && l.date <= today.value)
+)
 
 const drawLabel = computed(() =>
   drawsInRange.value.map(d => formatDate(d.date, 'monthDay').toLowerCase()).join(' · ')
@@ -315,7 +314,9 @@ const vitalTiles = computed(() => {
         { key: 'bp_systolic', name: 'sys', color: CHART_DANGER },
         { key: 'bp_diastolic', name: 'dia', color: CHART_INDIGO }
       ],
-      markLines: []
+      markLines: [],
+      // Cuff readings are taken days apart; the days between are not gaps in a stream.
+      connect: true
     },
     {
       label: 'RHR',
@@ -336,15 +337,16 @@ const vitalTiles = computed(() => {
 
 // --- food group ---
 // One point per day whose logged meals are ALL estimated (a day with one unestimated meal would
-// read low), kcal with sodas folded in. Empty until estimates exist, so the doctor view (no
-// food) and a fresh sandbox simply don't get the section.
+// read low), kcal with sodas folded in; today only once its dinner is logged, so a half day is
+// neither the "latest" figure nor a dip at the end of the line. Empty until estimates exist, so
+// the doctor view (no food) and a fresh sandbox simply don't get the section.
 const FOOD_FIELDS = ['kcal', 'protein_g']
 
 const foodRows = computed(() =>
   smoothRows(
     inRange(entries.value).map((e) => {
       const n = dayNutrition(e, estimateIndex.value)
-      const full = n.meals.length > 0 && n.missing.length === 0
+      const full = n.meals.length > 0 && n.missing.length === 0 && isDayDone(e, today.value)
       return {
         date: formatDate(e.date, 'monthDay'),
         day: e.date,
@@ -450,7 +452,7 @@ const metricCount = computed(() => vitalTiles.value.length + foodTiles.value.len
 const SLEEP_STAGES = [
   { key: 'sleep_awake_min', name: 'awake', color: CHART_EMBER },
   { key: 'sleep_core_min', name: 'light', color: CHART_ACCENT },
-  { key: 'sleep_rem_min', name: 'rem', color: '#38b6d9' },
+  { key: 'sleep_rem_min', name: 'rem', color: CHART_CYAN },
   { key: 'sleep_deep_min', name: 'deep', color: CHART_INDIGO }
 ] as const
 

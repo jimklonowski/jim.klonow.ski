@@ -721,7 +721,8 @@ const trendCards = computed(() =>
     label: CELL_META[key]?.label ?? key,
     unit: CELL_META[key]?.unit,
     data: entries.value
-      .map(e => ({ date: formatDate(e.date, 'monthDay'), value: CELL_ACCESSORS[key]?.(e) ?? null }))
+      // ISO day: AreaChart formats the axis (’yy once the scans span years).
+      .map(e => ({ date: e.date, value: CELL_ACCESSORS[key]?.(e) ?? null }))
       .filter((p): p is { date: string, value: number } => p.value !== null)
   })).filter(card => card.data.length >= 2)
 )

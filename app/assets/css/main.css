@@ -118,6 +118,8 @@
 
   /* Misc series colors from the handoff */
   --color-indigo-dot: #8593ea;
+  /* The fourth series colour (REM sleep stage, cycling in the workout mix). */
+  --color-cyan-dot: #38b6d9;
   --color-soda: #7a2e35;
   /* The water tracker's bars — a series identity like soda, so it stays put across presets. */
   --color-water: #3f88c5;

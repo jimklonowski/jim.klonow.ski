@@ -29,6 +29,16 @@ test('a journal day fills in every optional field', () => {
   })
 })
 
+test('a day save may carry the state the form loaded (base), with the same bounds as the day itself', () => {
+  const out = zJournalSave.parse({ ...day, base: { weight_lbs: '', water: [{ time: '08:00', oz: 12 }], food: { lunch: 'gyros', junk: 'x' } } })
+  assert.deepEqual(out.base, {
+    weight_lbs: null, bp_systolic: null, bp_diastolic: null, rhr: null, hrv: null,
+    sodas: [], water: [{ time: '08:00', oz: 12 }], food: { lunch: 'gyros' }
+  })
+  assert.equal('base' in zJournalSave.parse(day), false, 'absent base stays absent — the import saves whole days')
+  assert.ok(problem(zJournalSave, { ...day, base: { water: [{ time: '08:00' }] } }), 'a base pour without a volume is refused like a form one')
+})
+
 test('the date has to be a real calendar day', () => {
   assert.match(problem(zJournalSave, { date: '2026-13-40' }), /date: expected a YYYY-MM-DD date/)
   assert.match(problem(zJournalSave, { date: '2026-9-1' }), /date/)

@@ -123,7 +123,8 @@ const visible = computed(() =>
   && isFullAccessRole(role.value)
 )
 
-// Shared state so the footer status bar / command palette can open the panel too.
+// Shared state so the command palette, the home page's digest links and the journal hub's
+// "digests →" can open the panel too.
 const open = useState('digest-panel-open', () => false)
 const { data, status, execute, refresh } = useDigests()
 
