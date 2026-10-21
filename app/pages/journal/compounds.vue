@@ -342,7 +342,8 @@ const exposureChart = computed(() => {
     categories[`c${i}`] = { name: row.compound, color: getCompoundColor(row.compound) }
   })
   const data = rows[0]!.points.map((p, idx) => {
-    const point: Record<string, unknown> = { date: formatDate(p.date, 'monthDay') }
+    // ISO day: AreaChart formats the axis (and adds ’yy across a year boundary).
+    const point: Record<string, unknown> = { date: p.date }
     rows.forEach((row, i) => {
       point[`c${i}`] = row.points[idx]?.pct
     })
@@ -355,7 +356,7 @@ const exposureMarks = computed(() => {
   const from = localDaysAgo(EXPOSURE_DAYS - 1)
   return (labsData.value ?? [])
     .filter(l => l.date >= from && l.date <= today.value)
-    .map(l => formatDate(l.date, 'monthDay'))
+    .map(l => l.date)
 })
 
 // --- adherence ---

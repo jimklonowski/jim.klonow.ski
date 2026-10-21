@@ -292,7 +292,8 @@ const deltaClass = computed(() => {
 
 const chartPoints = computed(() =>
   withValue.value.map(e => ({
-    date: formatDate(e.date, 'monthDay'),
+    // ISO day: AreaChart formats the axis (’yy once the draws span years).
+    date: e.date,
     value: e.markers[props.biomarkerKey] as number,
     // A reading with its own note (a censored or different-assay value) gets an upward triangle
     // instead of the usual dot, so the segment into it cannot be misread as a measured move.

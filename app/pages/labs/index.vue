@@ -192,7 +192,7 @@
           :label="BIOMARKERS[key]?.label ?? key"
           :unit="BIOMARKERS[key]?.unit"
           :data="chartData(key)"
-          :mark-lines="timeTravelling && latest ? [formatDate(latest.date, 'monthDay')] : []"
+          :mark-lines="timeTravelling && latest ? [latest.date] : []"
         />
       </div>
 
@@ -414,6 +414,6 @@ const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_
 function chartData(markerKey: string) {
   return entries.value
     .filter(e => e.markers[markerKey] != null)
-    .map(e => ({ date: formatDate(e.date, 'monthDay'), value: e.markers[markerKey] as number }))
+    .map(e => ({ date: e.date, value: e.markers[markerKey] as number }))
 }
 </script>
