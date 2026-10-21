@@ -10,6 +10,9 @@ export default defineEventHandler(async (event) => {
   if (!key) throw createError({ statusCode: 400, message: 'That meal text has nothing to key on' })
 
   const db = getDb(event)
+  // Audited like every other hand edit (audit #42 item 16): the row as it was — a model guess, an
+  // earlier correction, or nothing — goes in the log, so a slip of the keyboard is one undo away.
+  const before = await auditBefore(event, 'meal_estimates', key)
   const now = new Date().toISOString()
   await db.prepare(`
     INSERT INTO meal_estimates (key, text, kcal, protein_g, carbs_g, fat_g, confidence, assumptions, source, model, prompt_hash, created_at, updated_at)
@@ -19,6 +22,12 @@ export default defineEventHandler(async (event) => {
       confidence = 'high', assumptions = 'corrected by hand', source = 'manual', model = NULL, prompt_hash = NULL,
       updated_at = excluded.updated_at
   `).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now).run()
+  await recordAudit(event, {
+    table: 'meal_estimates',
+    key,
+    before,
+    summary: `figures for "${body.text.trim()}": ${body.kcal} kcal · ${body.protein_g}P / ${body.carbs_g}C / ${body.fat_g}F`
+  })
 
   const [estimate] = await estimatesForKeys(db, [key])
   return { estimate }
