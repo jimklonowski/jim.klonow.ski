@@ -1,5 +1,7 @@
 /// <reference path="../../../worker-configuration.d.ts" />
 import { localDaysAgo } from '#shared/utils/time'
+import { materializeSeedRows } from '#shared/utils/demoSeed'
+import type { SeedTable } from '#shared/utils/demoSeed'
 
 // Nightly wipe + reseed of the demo sandbox (DEMO_DB) from the seed stored in R2
 // (demo/seed.json in LABS_BUCKET, uploaded by `pnpm demo:seed:remote`). Two jobs in one:
@@ -11,13 +13,8 @@ import { localDaysAgo } from '#shared/utils/time'
 // in the Worker bundle. Bindings come straight off the env — never
 // getDb(), which is role-routed and has no auth context in a cron anyway.
 //
-// The @D<n> materialization below mirrors scripts/demo/seed-demo.mjs — keep the two in sync.
-
-interface SeedTable {
-  cols: string[]
-  jsonCols: string[]
-  rows: unknown[][]
-}
+// The @D<n> / @Z materialization is shared/utils/demoSeed.ts, the same code
+// scripts/demo/seed-demo.mjs runs — anchored to yesterday as a Chicago calendar day.
 
 interface SeedFile {
   version: number
@@ -25,17 +22,8 @@ interface SeedFile {
 }
 
 const SEED_KEY = 'demo/seed.json'
-const OFFSET_RE = /^@D(-?\d+)(.*)$/
 
 interface ResetResult { tables: number, rows: number }
-
-// "@D<n>rest" -> (yesterday - n days) + rest, in the app's home timezone. Negative offsets
-// look forward (vial expiries).
-function materialize(value: unknown): unknown {
-  if (typeof value !== 'string') return value
-  const m = OFFSET_RE.exec(value)
-  return m ? localDaysAgo(Number(m[1]) + 1) + m[2] : value
-}
 
 export default defineTask({
   meta: {
@@ -80,9 +68,9 @@ async function resetDemo(env: Env): Promise<ResetResult> {
   }
 
   let total = 0
+  const anchor = localDaysAgo(1)
   for (const [name, table] of Object.entries(seed.tables)) {
-    const jsonCols = new Set(table.jsonCols.map(c => table.cols.indexOf(c)))
-    const rows = table.rows.map(row => row.map((v, i) => (jsonCols.has(i) ? JSON.stringify(v) : materialize(v))))
+    const rows = materializeSeedRows(table, anchor)
 
     // Multi-row inserts, sized under D1's ~100 bound-params-per-statement cap.
     const perStatement = Math.max(1, Math.floor(90 / table.cols.length))

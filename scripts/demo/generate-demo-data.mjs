@@ -367,7 +367,9 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
       null, // external_id: mirrors Apple Health rows, deduped on natural key
       D(o),
       s.type,
-      `${D(o)} ${s.time}:00 -0500`,
+      // Local time + the home zone's offset for THAT day (@Z is filled in at materialization,
+      // shared/utils/demoSeed.ts): a fixed -0500 read an hour early all winter.
+      `${D(o)} ${s.time}:00 @Z`,
       dur,
       Math.round(dur * between(6.5, 9.5)),
       Math.round(s.hr[0]),
