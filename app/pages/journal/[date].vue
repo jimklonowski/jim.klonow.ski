@@ -873,7 +873,9 @@ const FOOD_ROWS: Array<{ key: MealSlot, label: string, placeholder: string, snac
   { key: 'snack_eve', label: 'Evening snack', placeholder: 'Watermelon', snack: true }
 ]
 
-// Snack slots opened with "+ snack" this visit, so an empty one stays visible to type into.
+// Snack slots that stay visible while empty: the ones opened with "+ snack" this visit, and the
+// ones the day loaded with (seeded in buildForm) — a field must not unmount under the cursor the
+// moment its text is cleared, and the legacy Snack has no "+ snack" to bring it back.
 const openedSnacks = ref<MealSlot[]>([])
 function snackOpen(slot: MealSlot): boolean {
   return form.food[slot] !== '' || openedSnacks.value.includes(slot)
@@ -1111,6 +1113,8 @@ function buildForm() {
     water: (entry?.water ?? []).map(w => ({ ...w })),
     food: { ...(entry?.food ?? {}) }
   }
+  // The snack fields this day loaded with stay mounted even once cleared (see openedSnacks).
+  openedSnacks.value = FOOD_ROWS.filter(row => row.snack && entry?.food?.[row.key]?.trim()).map(row => row.key)
   if (!entry) {
     const blank = blankEntry(dateParam.value)
     return {

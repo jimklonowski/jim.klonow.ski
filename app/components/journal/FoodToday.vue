@@ -89,7 +89,12 @@
             v-else
             class="text-hi"
           >{{ row.text }}</span>
-          <JournalMealEstimate :text="row.text" />
+          <!-- A saved meal with no figures may offer "did you mean …?": taking it re-saves the
+               slot as that spelling, the one that already has figures. -->
+          <JournalMealEstimate
+            :text="row.text"
+            @replace="pairSlot(row.slot, $event)"
+          />
         </div>
 
         <button
@@ -266,12 +271,22 @@ function applyFoodLocally(date: string, food: Partial<Record<MealSlot, string>>)
   }
 }
 
+/** Saves the typed draft. A spelling of a meal that already has figures is saved AS that meal
+ * (same key, or a strong match), and said so — the log converges on one spelling instead of
+ * growing variants. */
 async function saveSlot(slot: MealSlot) {
-  if (saving.value) return
-  // A spelling of a meal that already has figures is saved AS that meal (same key, or a strong
-  // match), and said so — the log converges on one spelling instead of growing variants.
   const resolved = resolveMealText(draft.value, known.value)
-  const text = resolved.text
+  await writeSlot(slot, resolved.text, resolved.changed)
+}
+
+/** A saved row's "did you mean …?" taken: the slot is re-saved as that spelling. */
+async function pairSlot(slot: MealSlot, text: string) {
+  await writeSlot(slot, text, true)
+}
+
+/** The one write for today's slot, mirrored locally; `matched` says the text was swapped for a meal that has figures. */
+async function writeSlot(slot: MealSlot, text: string, matched: boolean) {
+  if (saving.value) return
   saving.value = true
   const date = today.value
   try {
@@ -281,7 +296,7 @@ async function saveSlot(slot: MealSlot) {
     })
     applyFoodLocally(date, food)
     editing.value = null
-    if (resolved.changed) {
+    if (matched) {
       toast.add({ title: `Saved as "${text}"`, description: 'Matched a meal that already has figures. Edit the slot if that was wrong.', color: 'info', icon: 'i-lucide-link' })
     }
     // The shell's streak / logged figures count food (shared/utils/journalLog.ts). A meal with
