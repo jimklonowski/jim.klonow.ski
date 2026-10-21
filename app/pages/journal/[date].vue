@@ -842,6 +842,7 @@ import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, 
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import { MEAL_SLOTS, dayNutrition, fmtKcal, fmtMacros, knownMeals, mealHistory, nutritionIsEstimated, resolveMealText, type MealSlot } from '#shared/utils/nutrition'
+import type { DayLogFields } from '#shared/utils/journalMerge'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '#shared/types/journal'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
@@ -1052,6 +1053,12 @@ const mealHistoryBySlot = computed(() =>
   Object.fromEntries(MEAL_SLOTS.map(s => [s, mealHistory(allEntries.value ?? [], s).map(h => h.text)])) as Record<MealSlot, string[]>
 )
 
+// The day as this form LOADED it. Sent with the save so the server keeps anything logged
+// elsewhere while the form was open (a phone water tap, a hub quick-logged lunch, a webhook
+// weight) instead of overwriting it — shared/utils/journalMerge.ts. Re-snapshotted whenever
+// the form is rebuilt from the row, which only happens while the form is clean.
+const loadedBase = ref<DayLogFields | null>(null)
+
 const form = reactive<{
   date: string
   weight_lbs: number | null
@@ -1094,6 +1101,16 @@ const knownMealList = computed(() => knownMeals(allEntries.value ?? [], estimate
 
 function buildForm() {
   const entry = existingEntry.value
+  loadedBase.value = {
+    weight_lbs: entry?.weight_lbs ?? null,
+    bp_systolic: entry?.bp_systolic ?? null,
+    bp_diastolic: entry?.bp_diastolic ?? null,
+    rhr: entry?.rhr ?? null,
+    hrv: entry?.hrv ?? null,
+    sodas: (entry?.sodas ?? []).map(s => ({ ...s })),
+    water: (entry?.water ?? []).map(w => ({ ...w })),
+    food: { ...(entry?.food ?? {}) }
+  }
   if (!entry) {
     const blank = blankEntry(dateParam.value)
     return {
@@ -1192,12 +1209,17 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     food,
     // A pour row added and never filled (or cleared — v-model.number hands back '') is not a
     // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
-    water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0)
+    water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0),
+    // What this form started from, so the server merges rather than overwrites (see loadedBase).
+    base: loadedBase.value ?? undefined
   }
-  await $fetch('/api/journal/save', { method: 'POST', body: payload })
+  const saved = await $fetch<{ ok: boolean, date: string, kept: string[] }>('/api/journal/save', { method: 'POST', body: payload })
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
   if (paired.length) {
     toast.add({ title: 'Meals matched to ones with figures', description: `Saved as ${paired.join(', ')}. Edit the field if that was wrong.`, color: 'info', icon: 'i-lucide-link' })
+  }
+  if (saved.kept?.length) {
+    toast.add({ title: 'Kept what was logged elsewhere', description: `${saved.kept.join(', ')} had been added while this page was open and ${saved.kept.length === 1 ? 'was' : 'were'} kept.`, color: 'info', icon: 'i-lucide-merge' })
   }
   // What was just saved is now the baseline, so the refresh below may rebuild from the row.
   formGuard.markClean()

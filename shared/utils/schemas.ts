@@ -106,6 +106,24 @@ export const zJournalMove = z.object({
   replace: z.boolean().default(false)
 }).refine(v => v.from !== v.to, { message: 'from and to are the same day', path: ['to'] })
 
+const zFood = z.object(Object.fromEntries(MEAL_KEYS.map(k => [k, zText(500).optional()]))).partial().default({})
+
+/**
+ * The day as the form LOADED it (shared/utils/journalMerge.ts): with it, journal/save keeps
+ * whatever was logged elsewhere while the form was open instead of overwriting it. Optional, so
+ * callers that save a whole day deliberately (the Apple Health import) keep the plain upsert.
+ */
+export const zDayBase = z.object({
+  weight_lbs: zOptNum,
+  bp_systolic: zOptNum,
+  bp_diastolic: zOptNum,
+  rhr: zOptNum,
+  hrv: zOptNum,
+  sodas: z.array(zSodaEntry).max(50).default([]),
+  water: z.array(zWaterEntry).max(100).default([]),
+  food: zFood
+})
+
 export const zJournalSave = z.object({
   date: zIsoDate,
   weight_lbs: zOptNum,
@@ -119,8 +137,9 @@ export const zJournalSave = z.object({
   reconstitutions: z.array(zReconstitutionEntry).max(50).default([]),
   sodas: z.array(zSodaEntry).max(50).default([]),
   water: z.array(zWaterEntry).max(100).default([]),
-  food: z.object(Object.fromEntries(MEAL_KEYS.map(k => [k, zText(500).optional()]))).partial().default({}),
-  notes: zText(20000).default('')
+  food: zFood,
+  notes: zText(20000).default(''),
+  base: zDayBase.optional()
 })
 
 // --- sodas (quick-add widget) ---

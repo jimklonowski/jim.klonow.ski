@@ -1,4 +1,5 @@
 import { zJournalSave } from '#shared/utils/schemas'
+import { mergeDaySave } from '#shared/utils/journalMerge'
 
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
@@ -9,6 +10,18 @@ export default defineEventHandler(async (event) => {
 
   const db = getDb(event)
   const before = await auditBefore(event, 'journal_entries', body.date)
+  // The row as it stands now, for the merge below. auditBefore already read it for the owner;
+  // the demo sandbox isn't audited, so it reads its own copy.
+  const current = before ?? await db.prepare('SELECT * FROM journal_entries WHERE date = ?1').bind(body.date).first<Record<string, unknown>>() ?? null
+
+  // A form that says what it loaded (`base`) gets a three-way merge: its own edits win, and
+  // anything logged elsewhere while it was open — a phone soda or water tap, a hub quick-logged
+  // meal, a webhook vital — is kept instead of overwritten (audit #42 item 1). Without a base
+  // (the Apple Health import) the save is the whole day, as before.
+  const { fields, kept } = body.base && current
+    ? mergeDaySave(body, body.base, parseJournalRow(current))
+    : { fields: body, kept: [] as string[] }
+
   // The `day` column (a hand-typed notebook index) is no longer read or written. It stays in the
   // schema holding its historical values, and is deliberately absent from this statement so a
   // re-save doesn't null out what's already recorded.
@@ -29,19 +42,19 @@ export default defineEventHandler(async (event) => {
       notes = excluded.notes
   `).bind(
     body.date,
-    body.weight_lbs,
-    body.bp_systolic,
-    body.bp_diastolic,
-    body.rhr,
-    body.hrv,
+    fields.weight_lbs,
+    fields.bp_systolic,
+    fields.bp_diastolic,
+    fields.rhr,
+    fields.hrv,
     JSON.stringify(body.peptides),
     JSON.stringify(body.reconstitutions),
-    JSON.stringify(body.food),
-    JSON.stringify(body.sodas),
-    JSON.stringify(body.water),
+    JSON.stringify(fields.food),
+    JSON.stringify(fields.sodas),
+    JSON.stringify(fields.water),
     body.notes
   ).run()
-  await recordAudit(event, { table: 'journal_entries', key: body.date, before, summary: `day ${body.date}` })
+  await recordAudit(event, { table: 'journal_entries', key: body.date, before, summary: `day ${body.date}${kept.length ? ` (kept ${kept.join(', ')} logged elsewhere)` : ''}` })
 
-  return { ok: true, date: body.date }
+  return { ok: true, date: body.date, kept }
 })
