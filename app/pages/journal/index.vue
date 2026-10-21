@@ -71,10 +71,20 @@
           <section class="bg-raised border border-line-soft px-4 py-3.5">
             <div class="flex items-baseline gap-3 text-meta">
               <span class="tui-label">Today · doses + workout</span>
+              <!-- The AI recaps live in a slideover (DigestPanel) that only ⌘K and the home page
+                   used to open; the journal hub is where someone looks for them. -->
+              <button
+                v-if="isFullAccess"
+                type="button"
+                class="ml-auto text-accent hover:text-accent-hover cursor-pointer"
+                @click="digestOpen = true"
+              >
+                digests →
+              </button>
               <NuxtLink
                 v-if="isFullAccess"
                 :to="`/journal/${today}`"
-                class="ml-auto text-accent hover:text-accent-hover"
+                class="text-accent hover:text-accent-hover"
               >entry →</NuxtLink>
             </div>
 
@@ -183,6 +193,8 @@ const { role, isOwner, canEdit } = await useAuth()
 
 const today = useToday()
 const isFullAccess = computed(() => role.value !== 'doctor')
+// The digest slideover's shared open flag (DigestPanel.vue mounts in the layout).
+const digestOpen = useState('digest-panel-open', () => false)
 
 const entries = computed(() => data.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
