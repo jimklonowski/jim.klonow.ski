@@ -197,7 +197,10 @@ const chipTitle = computed(() => {
 async function ask() {
   if (!props.text) return
   try {
-    await requestEstimate([props.text])
+    const unmatched = await requestEstimate([props.text])
+    if (unmatched.length) {
+      toast.add({ title: 'No figures came back for that meal', description: 'The answer could not be pinned to it, so nothing was saved — try again or enter the figures.', color: 'warning' })
+    }
   }
   catch (err) {
     toast.add({ title: 'Could not estimate that meal', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })

@@ -308,12 +308,25 @@ async function backfill() {
   done.value = 0
   total.value = texts.length
   try {
+    // Texts the model's answer could not be pinned to stay without figures (never a neighbour's
+    // numbers); they are named so a second press can pick them up.
+    const unmatched: string[] = []
     for (let i = 0; i < texts.length; i += 50) {
       const batch = texts.slice(i, i + 50)
-      await estimate(batch)
+      unmatched.push(...await estimate(batch))
       done.value = Math.min(texts.length, i + batch.length)
     }
-    toast.add({ title: `Estimated ${total.value} meal${total.value === 1 ? '' : 's'}`, color: 'success', icon: 'i-lucide-check' })
+    const got = total.value - unmatched.length
+    if (unmatched.length) {
+      toast.add({
+        title: `Estimated ${got} of ${total.value} meal${total.value === 1 ? '' : 's'}`,
+        description: `No figures came back for: ${unmatched.slice(0, 5).join(', ')}${unmatched.length > 5 ? ', …' : ''}. Press ESTIMATE again to retry them.`,
+        color: 'warning'
+      })
+    }
+    else {
+      toast.add({ title: `Estimated ${got} meal${got === 1 ? '' : 's'}`, color: 'success', icon: 'i-lucide-check' })
+    }
   }
   catch (err) {
     toast.add({
