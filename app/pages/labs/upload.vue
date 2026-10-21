@@ -249,13 +249,16 @@
 
       <!-- Actions -->
       <div class="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3.5 border-t border-line">
+        <!-- Disabled once saved: a second click re-ran the save AND its paid summary and wiped
+             the "Saved" notice. An edit after saving (fasting flip, scale weight) re-arms it. -->
         <button
           type="button"
           class="tui-btn tui-btn-accent disabled:opacity-50"
-          :disabled="saving"
+          :disabled="saving || saved"
+          :title="saved ? 'Saved — edit a figure to save again' : undefined"
           @click="saveToSite"
         >
-          {{ saving ? 'SAVING…' : '↑ SAVE TO SITE' }}
+          {{ saving ? 'SAVING…' : saved ? '✓ SAVED' : '↑ SAVE TO SITE' }}
         </button>
         <button
           type="button"
@@ -403,6 +406,17 @@ const filename = ref('')
 const result = ref<LabResult | null>(null)
 const saving = ref(false)
 const saveResult = ref<{ ok: boolean, date?: string, message?: string, planned?: { id: number, date: string } | null } | null>(null)
+const saved = computed(() => saveResult.value?.ok === true)
+
+/**
+ * A figure changed after a save: the row on the site no longer matches what's on screen, so the
+ * save result is cleared — SAVE re-arms, "Saved" goes, and the leave-guard below is dirty again
+ * (audit #42 item 22: post-save edits used to be unguarded and un-saveable without a second,
+ * duplicate-summary click).
+ */
+function editedAfterSave() {
+  if (saveResult.value?.ok) saveResult.value = null
+}
 const summarizing = ref(false)
 const summary = ref('')
 const summaryError = ref('')
@@ -530,7 +544,9 @@ const resultCells = computed<ResultCell[]>(() => {
 })
 
 function toggleFasting() {
-  if (result.value) result.value.fasting = !result.value.fasting
+  if (!result.value) return
+  result.value.fasting = !result.value.fasting
+  editedAfterSave()
 }
 
 function openWeightModal() {
@@ -541,6 +557,7 @@ function openWeightModal() {
 // SITE all carry it — the same way the fasting toggle works.
 function applyWeight(weight: number) {
   if (result.value) result.value.weight_lbs = weight
+  editedAfterSave()
   weightModalOpen.value = false
 }
 
