@@ -49,23 +49,15 @@ export default defineEventHandler(async (event) => {
   const today = body.today ?? localToday()
   const db = getDb(event)
 
-  // The thread this exchange lands in. A new conversation gets its row now, so its id can go
-  // back in a header before the first byte of the answer; it's removed again if nothing is saved.
+  // The thread this exchange lands in. An existing one is checked now; a NEW one gets its row
+  // only once the model has started answering (below) — the fact sheet, the client and the
+  // first event can all fail before that, and a row inserted ahead of them was stranded as an
+  // untitled empty thread by any of those failures (audit #42 item 15).
   let threadId = body.threadId ?? null
   let createdThread = false
   if (threadId != null) {
     const exists = await db.prepare('SELECT 1 FROM ask_threads WHERE id = ?1').bind(threadId).first()
     if (!exists) throw createError({ statusCode: 404, message: 'That conversation no longer exists — start a new one' })
-  }
-  else {
-    const now = new Date().toISOString()
-    const res = await db.prepare('INSERT INTO ask_threads (title, created_at, updated_at) VALUES (?1, ?2, ?2)')
-      .bind(titleFrom(question), now).run()
-    threadId = res.meta.last_row_id
-    createdThread = true
-  }
-  const dropEmptyThread = async () => {
-    if (createdThread) await db.prepare('DELETE FROM ask_threads WHERE id = ?1').bind(threadId).run().catch(() => {})
   }
 
   const context = await buildAskContext(db, today)
@@ -99,8 +91,27 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     stream.abort()
-    await dropEmptyThread()
     throw aiError(err, 'chat')
+  }
+
+  // Generation is under way: a new conversation gets its row now. From here on the only way
+  // it can end up empty is a mid-stream failure, and `dropEmptyThread` covers that.
+  if (threadId == null) {
+    try {
+      const now = new Date().toISOString()
+      const res = await db.prepare('INSERT INTO ask_threads (title, created_at, updated_at) VALUES (?1, ?2, ?2)')
+        .bind(titleFrom(question), now).run()
+      threadId = res.meta.last_row_id
+      createdThread = true
+    }
+    catch (err) {
+      stream.abort()
+      console.error('[ai] could not create the thread:', err instanceof Error ? err.message : err)
+      throw createError({ statusCode: 500, message: 'Could not start the conversation — try again' })
+    }
+  }
+  const dropEmptyThread = async () => {
+    if (createdThread) await db.prepare('DELETE FROM ask_threads WHERE id = ?1').bind(threadId).run().catch(() => {})
   }
 
   // Plain chunked text (not SSE): the client appends whatever arrives. Once the first byte is

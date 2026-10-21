@@ -22,7 +22,10 @@ export const AUDIT_KEYS = {
   cycles: 'id',
   planned_draws: 'id',
   progress_photos: 'id',
-  profile: 'key'
+  profile: 'key',
+  // A hand-entered figure for a meal (correct.post.ts): the one meal_estimates write a person
+  // makes; model rows are regenerable and not logged.
+  meal_estimates: 'key'
 } as const
 
 export type AuditTable = keyof typeof AUDIT_KEYS
