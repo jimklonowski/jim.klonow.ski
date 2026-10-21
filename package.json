@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.21b",
+  "version": "2026.10.21c",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -33,7 +33,7 @@
     "theme:css": "node scripts/theme/build-themes-css.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.135.0",
+    "@anthropic-ai/sdk": "^0.136.0",
     "@nuxt/ui": "^4.12.0",
     "@nuxtjs/seo": "6.0.1",
     "@tanstack/charts": "^1.1.0",

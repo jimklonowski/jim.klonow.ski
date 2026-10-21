@@ -35,7 +35,7 @@
         </TuiHeader>
         <div class="mt-1.5">
           <div
-            v-for="f in PROFILE_FIELDS"
+            v-for="f in profileFields"
             :key="f.key"
             class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
           >
@@ -314,14 +314,17 @@
 
 <script setup lang="ts">
 import type { ProfileField } from '#shared/utils/profile'
-import { PROFILE_FIELDS } from '#shared/utils/profile'
+import { profileFieldsFor } from '#shared/utils/profile'
 import type { Vaccination, VaccineCoverage } from '#shared/utils/vaccines'
 import { VACCINE_NAMES, vaccineCoverage } from '#shared/utils/vaccines'
 
 useSeoMeta({ title: 'Journal · Vaccines' })
 
 // Owner-only edits (not canEdit): the demo sandbox has neither table to write into.
-const { isOwner } = await useAuth()
+const { role, isOwner } = await useAuth()
+// The card lists what the API returns for this role: the doctor's view has no water or food
+// tracking, so their cup size and protein target are neither sent nor shown as "not recorded".
+const profileFields = computed(() => profileFieldsFor(role.value))
 
 const [{ data, refresh, error }, { data: profileData, refresh: refreshProfile }] = await Promise.all([
   useVaccinations(),

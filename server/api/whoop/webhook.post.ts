@@ -60,7 +60,16 @@ async function handle(db: D1Database, hook: Hook) {
       const row = workout && whoopWorkoutRow(workout)
       if (!row) return { skipped: 'workout no longer exists' }
       await upsertWorkout(db, row)
-      return { dates: [row.date], workout: row.workout_type }
+      // The day's strain moved with this activity and Whoop never pushes strain — re-read the
+      // open cycle now, so the home page's figure follows the workout instead of waiting for
+      // the nightly sync or a manual re-sync. Best effort: the workout is saved either way.
+      const strain = await refreshWhoopStrain(db).catch(async (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('[whoop:webhook] strain refresh after workout failed:', message)
+        await markWhoopError(db, `strain after workout: ${message}`).catch(() => {})
+        return null
+      })
+      return { dates: [row.date], workout: row.workout_type, strain }
     }
     case 'workout.deleted': {
       // Automated writes aren't audited (server/utils/audit.ts covers owner edits).
