@@ -108,6 +108,7 @@ const sprites = new Map<TickerPose, { image: HTMLCanvasElement, rows: number }>(
 const art = new Map<'full' | 'dented' | 'crumpled', HTMLCanvasElement>()
 const pressed = new Set<string>()
 let ro: ResizeObserver | undefined
+let stopTheme: (() => void) | undefined
 
 const render = (cells: Cells, cols: number, rows: number) => renderCells(cells, cols, rows, inks)
 
@@ -419,6 +420,8 @@ function onVisibility() {
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   prepare()
+  // A preset picked mid-game re-reads the palette and rebakes the sprites.
+  stopTheme = onThemeChange(prepare)
   resize()
   ro = new ResizeObserver(resize)
   if (canvas.value?.parentElement) ro.observe(canvas.value.parentElement)
@@ -443,6 +446,7 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(raf)
   ro?.disconnect()
+  stopTheme?.()
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('keyup', onKeyUp)
   document.removeEventListener('visibilitychange', onVisibility)

@@ -6,6 +6,7 @@
 import { profileLabel } from '#shared/utils/profile'
 import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
 import { waterTotals } from '#shared/utils/water'
+import { bpAverageLabel, bpLabel } from '#shared/utils/bloodPressure'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
 import type { JournalRow, SodaEntry } from '#shared/types/journal'
 import { roundTo, shiftDays } from '#shared/utils/dates'
@@ -149,7 +150,9 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
       avg(j.map(e => e.weight_lbs)) != null ? `weight ${roundTo(avg(j.map(e => e.weight_lbs))!)}` : null,
       avg(j.map(e => e.rhr)) != null ? `rhr ${roundTo(avg(j.map(e => e.rhr))!)}` : null,
       avg(j.map(e => e.hrv)) != null ? `hrv ${roundTo(avg(j.map(e => e.hrv))!)}` : null,
-      avg(j.map(e => e.bp_systolic)) != null ? `bp ${Math.round(avg(j.map(e => e.bp_systolic))!)}/${Math.round(avg(j.map(e => e.bp_diastolic))! || 0)}` : null,
+      // Full readings only (shared/utils/bloodPressure.ts): a week whose one cuff day lacked a
+      // diastolic used to read "bp 128/0".
+      bpAverageLabel(j) ? `bp ${bpAverageLabel(j)}` : null,
       avg(h.map(e => e.recovery_score as number | null)) != null ? `recovery ${roundTo(avg(h.map(e => e.recovery_score as number | null))!)}%` : null,
       avg(h.map(e => e.sleep_total_min as number | null)) != null ? `sleep ${Math.round(avg(h.map(e => e.sleep_total_min as number | null))!)}min` : null,
       `${wo.length} workouts`,
@@ -172,7 +175,7 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
       const doses = (e.peptides ?? []).map(p => `${p.compound} ${p.dose}${p.unit}`).join(' + ')
       const parts = [
         e.weight_lbs != null ? `${e.weight_lbs}lbs` : null,
-        e.bp_systolic != null ? `bp ${e.bp_systolic}/${e.bp_diastolic}` : null,
+        bpLabel(e) ? `bp ${bpLabel(e)}` : null,
         e.rhr != null ? `rhr ${e.rhr}` : null,
         e.hrv != null ? `hrv ${e.hrv}` : null,
         h?.recovery_score != null ? `recovery ${h.recovery_score}%` : null,

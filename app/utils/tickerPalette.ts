@@ -43,3 +43,17 @@ export function resolveInks(): Record<TickerInk, string> {
 export function themeColor(token: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(token).trim()
 }
+
+/**
+ * Runs `callback` whenever the display preset changes while a canvas game is open, so it can
+ * re-read its palette and rebake its sprites (audit #42 item 28: the games read the tokens once
+ * on mount, and a preset picked mid-game kept the old ground and inks). Watches the root
+ * element's attributes — `data-theme` for a preset, `class` for the light/dark flip — the way
+ * BodyMesh's shader does, so the computed styles are already current when it fires. Returns the
+ * disconnect for onUnmounted.
+ */
+export function onThemeChange(callback: () => void): () => void {
+  const observer = new MutationObserver(callback)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] })
+  return () => observer.disconnect()
+}

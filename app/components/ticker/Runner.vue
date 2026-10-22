@@ -106,6 +106,7 @@ let colors = { ground: '#333', text: '#888', faint: '#666', star: '#444', accent
 const sprites = new Map<TickerPose, { image: HTMLCanvasElement, rows: number }>()
 const art = new Map<ObstacleKind, HTMLCanvasElement>()
 let ro: ResizeObserver | undefined
+let stopTheme: (() => void) | undefined
 
 const render = (cells: Cells, cols: number, rows: number) => renderCells(cells, cols, rows, inks)
 
@@ -380,6 +381,8 @@ function onVisibility() {
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   prepare()
+  // A preset picked mid-game re-reads the palette and rebakes the sprites.
+  stopTheme = onThemeChange(prepare)
   state = createRunner(600)
   resize()
   ro = new ResizeObserver(resize)
@@ -394,6 +397,7 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(raf)
   ro?.disconnect()
+  stopTheme?.()
   window.removeEventListener('keydown', onKey)
   document.removeEventListener('visibilitychange', onVisibility)
 })

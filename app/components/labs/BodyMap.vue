@@ -311,7 +311,7 @@ const HALO = { paintOrder: 'stroke', stroke: THEME.raised, strokeWidth: 3, strok
         <span>{{ WASH_MIN_PCT }}</span>
         <span
           class="inline-block w-14 h-1.5"
-          :style="{ background: `linear-gradient(90deg, rgba(232,179,75,${washOpacity(WASH_MIN_PCT)}), rgba(232,179,75,${washOpacity(WASH_MAX_PCT)}))` }"
+          :style="{ background: `linear-gradient(90deg, color-mix(in srgb, var(--color-warn) ${Math.round(washOpacity(WASH_MIN_PCT) * 100)}%, transparent), color-mix(in srgb, var(--color-warn) ${Math.round(washOpacity(WASH_MAX_PCT) * 100)}%, transparent))` }"
         />
         <span>{{ WASH_MAX_PCT }}+</span>
       </span>
