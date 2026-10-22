@@ -318,10 +318,12 @@ export const zVaccinationSave = z.object({
 })
 
 // The key is checked against PROFILE_FIELDS in the handler (a select field also checks its
-// options there); '' or a missing value clears the fact.
+// options there); '' or a missing value clears the fact. A number is accepted and stored as its
+// string: a number input emits one, and the card modal's post of `9` for the water cup was a 400
+// "expected string, received number" in production (2026-10-22).
 export const zProfileSave = z.object({
   key: z.string().max(40),
-  value: zText(200).nullish().transform(v => v ?? '')
+  value: z.union([zText(200), z.number().finite()]).nullish().transform(v => (v == null ? '' : String(v)))
 })
 
 // --- cycles ---
