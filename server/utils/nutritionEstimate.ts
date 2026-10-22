@@ -66,14 +66,19 @@ Meals:
 ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
 }
 
-/** Every cached estimate, keyed — '' rows on a database without the table yet (the sandbox before its migration). */
+/**
+ * Every cached estimate, keyed. Empty on a database without the table yet (the sandbox before
+ * its migration) — ONLY that: any other failure propagates, so a D1 outage reads as the error it
+ * is and not as "no figures" across every digest and ask sheet (audit #42 item 31).
+ */
 export async function loadEstimateIndex(db: D1Database): Promise<EstimateIndex> {
   try {
     const { results } = await db.prepare('SELECT * FROM meal_estimates').all<Record<string, unknown>>()
     return indexEstimates((results ?? []).map(parseEstimateRow))
   }
-  catch {
-    return new Map()
+  catch (err) {
+    if (isMissingTable(err)) return new Map()
+    throw err
   }
 }
 

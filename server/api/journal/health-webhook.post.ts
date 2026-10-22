@@ -179,15 +179,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  let healthMetricsTouched = 0
-  for (const [date, metricsForDate] of Object.entries(healthByDate)) {
-    if (Object.keys(metricsForDate).length === 0) continue // same blank-bucket rule as vitals
-    if (await upsertHealthMetrics(db, date, metricsForDate)) healthMetricsTouched++
-  }
+  // Health metrics and workouts in batches, not a round trip per row (server/utils/db.ts).
+  const metricStatements = Object.entries(healthByDate)
+    .filter(([, metricsForDate]) => Object.keys(metricsForDate).length > 0) // same blank-bucket rule as vitals
+    .map(([date, metricsForDate]) => healthMetricsStatement(db, date, metricsForDate))
+    .filter((s): s is D1PreparedStatement => s != null)
+  const healthMetricsTouched = await runBatched(db, metricStatements)
 
-  for (const w of workouts) {
-    await upsertWorkout(db, w)
-  }
+  await upsertWorkouts(db, workouts)
 
   // A workout moves the day's Whoop strain, and Whoop has no webhook for strain: when this
   // delivery carries a recent session and the Whoop account is connected, re-read the open cycle
