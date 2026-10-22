@@ -376,8 +376,8 @@ const ekgPoints = computed(() => {
   36% { transform: scale(1.05, 0.97); }
 }
 @keyframes ticker-glow {
-  0%, 100% { filter: drop-shadow(0 0 5px rgba(232, 106, 94, 0.35)); }
-  12% { filter: drop-shadow(0 0 11px rgba(232, 106, 94, 0.75)); }
+  0%, 100% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-danger) 35%, transparent)); }
+  12% { filter: drop-shadow(0 0 11px color-mix(in srgb, var(--color-danger) 75%, transparent)); }
 }
 @keyframes ekg-sweep {
   0% { stroke-dashoffset: 92; }
@@ -426,7 +426,7 @@ const ekgPoints = computed(() => {
 /* RECOVERY >80% — glow to max, two hops, sparkles pop at the corners. */
 .ev-celebrate .heart {
   animation: ticker-hop 1.1s ease-in-out;
-  filter: drop-shadow(0 0 12px rgba(232, 106, 94, 0.85));
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--color-danger) 85%, transparent));
 }
 @keyframes ticker-hop {
   0%, 45%, 90%, 100% { transform: translateY(0); }
@@ -504,7 +504,7 @@ const ekgPoints = computed(() => {
   animation:
     ticker-big-beat 0.6s ease-in-out,
     ticker-glow var(--beat) ease-in-out infinite;
-  filter: drop-shadow(0 0 12px rgba(232, 106, 94, 0.8));
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--color-danger) 80%, transparent));
 }
 @keyframes ticker-big-beat {
   0%, 100% { transform: scale(1); }

@@ -1050,7 +1050,7 @@ const leaderFits = (c: Placed) => (c.side === 'left' ? c.ax > leaderEnd(c) + 4 :
         <span>8</span>
         <span
           class="inline-block w-14 h-1.5"
-          style="background: repeating-linear-gradient(180deg, rgba(232,179,75,0.9) 0 1px, transparent 1px 3px); opacity: 0.85;"
+          style="background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--color-warn) 90%, transparent) 0 1px, transparent 1px 3px); opacity: 0.85;"
         />
         <span>35+</span>
       </span>
