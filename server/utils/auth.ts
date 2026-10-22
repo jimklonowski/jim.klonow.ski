@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
-import type { Role } from '#shared/utils/access'
+import { canAccessPage, type Role } from '#shared/utils/access'
 
 // Cookie auth with HMAC-signed tokens (key: LABS_SECRET). Replaces the old scheme where the
 // cookie value was LABS_SECRET itself — a bearer copy of the signing secret that couldn't be
@@ -151,6 +151,17 @@ export function requireWriteAccess(event: H3Event): AuthContext {
 export function requireRole(event: H3Event, ...roles: Role[]): AuthContext {
   const auth = requireLabsAuth(event)
   if (!roles.includes(auth.role)) throw createError({ statusCode: 403, message: 'Not available for this role' })
+  return auth
+}
+
+/**
+ * The /ticker pet's APIs admit exactly the roles that may open the page (shared/utils/access.ts
+ * `canAccessPage`), so the two can't drift: the doctor, whose curated view has no pet page, used
+ * to be able to pet it, log a run and leave a visit through the API alone (audit #42 item 39).
+ */
+export function requireTickerAccess(event: H3Event): AuthContext {
+  const auth = requireLabsAuth(event)
+  if (!canAccessPage(auth.role, '/ticker')) throw createError({ statusCode: 403, message: 'Not available for this role' })
   return auth
 }
 
