@@ -41,6 +41,37 @@ export function isLoggedDay(entry: LoggedDayFields): boolean {
     || (entry.notes ?? '').trim() !== ''
 }
 
+// JS `.trim()` strips every whitespace kind; SQLite's TRIM strips spaces only unless told which
+// characters — spaces, tab, newline, carriage return cover what a textarea produces.
+const SQL_WS = `' ' || char(9) || char(10) || char(13)`
+
+/**
+ * The same predicate as `isLoggedDay`, as a SQL expression over a journal_entries row — so
+ * /api/overview can count and list logged days in the database instead of reading every row's
+ * JSON into the Worker (audit #42 item 34). tests/journalLogSql.test.mjs runs both over the
+ * same rows on the real schema so the two cannot drift.
+ */
+export const LOGGED_DAY_SQL = `(
+  json_array_length(COALESCE(peptides, '[]')) > 0
+  OR json_array_length(COALESCE(reconstitutions, '[]')) > 0
+  OR json_array_length(COALESCE(sodas, '[]')) > 0
+  OR json_array_length(COALESCE(water, '[]')) > 0
+  OR EXISTS (SELECT 1 FROM json_each(COALESCE(food, '{}')) AS meal WHERE TRIM(COALESCE(meal.value, ''), ${SQL_WS}) <> '')
+  OR TRIM(COALESCE(notes, ''), ${SQL_WS}) <> ''
+)`
+
+/** `loggedStreak` over the logged DATES alone — what the overview gets back from LOGGED_DAY_SQL. */
+export function loggedStreakFromDates(loggedDates: Iterable<string>, today: string): number {
+  const logged = new Set(loggedDates)
+  let cursor = logged.has(today) ? today : shiftDays(today, -1)
+  let count = 0
+  while (logged.has(cursor)) {
+    count++
+    cursor = shiftDays(cursor, -1)
+  }
+  return count
+}
+
 /**
  * Consecutive logged days ending today, or ending yesterday when today hasn't been logged yet
  * — a streak shouldn't read 0 all morning. Anything staler than that is a broken streak.
@@ -51,14 +82,7 @@ export function isLoggedDay(entry: LoggedDayFields): boolean {
  * this pure.
  */
 export function loggedStreak(entries: Array<LoggedDayFields & { date: string }>, today: string): number {
-  const logged = new Set(entries.filter(isLoggedDay).map(e => e.date))
-  let cursor = logged.has(today) ? today : shiftDays(today, -1)
-  let count = 0
-  while (logged.has(cursor)) {
-    count++
-    cursor = shiftDays(cursor, -1)
-  }
-  return count
+  return loggedStreakFromDates(entries.filter(isLoggedDay).map(e => e.date), today)
 }
 
 /**
