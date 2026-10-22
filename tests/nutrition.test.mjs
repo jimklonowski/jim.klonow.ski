@@ -27,6 +27,10 @@ test('the key folds spelling, order, case, punctuation and plurals, but not diff
   assert.equal(mealKey('2 x mcdonalds double cheeseburger + fries'), mealKey('2x McDonalds double cheeseburger & fries'))
   assert.notEqual(mealKey('costco pizza'), mealKey('costco cheese pizza'))
   assert.equal(mealKey('Costco Bacon Egg and Cheese'), mealKey('costco bacon, egg & cheese'))
+  // An x that starts a word is not a multiplier: "2 xl pizza" keeps "xl", and is not "2x l pizza".
+  assert.equal(mealKey('2 xl pizza'), '2 pizza xl')
+  assert.notEqual(mealKey('2 xl pizza'), mealKey('2 x l pizza'))
+  assert.equal(mealKey('2x pizza'), mealKey('2 × pizza'))
   assert.equal(mealKey(''), '')
   assert.equal(mealKey('   '), '')
   assert.equal(mealKey(null), '')
@@ -225,11 +229,14 @@ test('the weekly average counts only fully covered, finished days inside the win
     { date: '2026-10-21', food: { lunch: 'alpha plate' } } // after today: skipped
   ]
   // Oct 13–19: the 14th and 15th. The half-logged 20th used to count as a 500 kcal day.
-  assert.deepEqual(nutritionAverage(entries, index, '2026-10-20'), { days: 2, kcal: 1250, protein_g: 63 })
+  assert.deepEqual(nutritionAverage(entries, index, '2026-10-20'), { days: 2, kcal: 1250, protein_g: 63, estimated: true })
   // Dinner logged → the window slides to Oct 14–20 and today joins.
   const withDinner = entries.map(e => (e.date === '2026-10-20' ? { ...e, food: { ...e.food, dinner: 'bravo plate' } } : e))
-  assert.deepEqual(nutritionAverage(withDinner, index, '2026-10-20'), { days: 3, kcal: Math.round((1000 + 1500 + 1000) / 3), protein_g: Math.round((50 + 75 + 50) / 3) })
-  assert.deepEqual(nutritionAverage([], index, '2026-10-20'), { days: 0, kcal: 0, protein_g: 0 })
+  assert.deepEqual(nutritionAverage(withDinner, index, '2026-10-20'), { days: 3, kcal: Math.round((1000 + 1500 + 1000) / 3), protein_g: Math.round((50 + 75 + 50) / 3), estimated: true })
+  assert.deepEqual(nutritionAverage([], index, '2026-10-20'), { days: 0, kcal: 0, protein_g: 0, estimated: false })
+  // Label figures only (a hand entry) → not "est.".
+  const manual = indexEstimates([est('alpha plate', 1000, 50, 100, 30, { source: 'manual' })])
+  assert.equal(nutritionAverage([{ date: '2026-10-19', food: { lunch: 'alpha plate' } }], manual, '2026-10-20').estimated, false)
 })
 
 test('"did you mean": same key pairs silently, close wording asks, a different meal is left alone', () => {

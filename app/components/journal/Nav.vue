@@ -49,6 +49,8 @@ function isActive(tab: { to: string }) {
     return false
   }
   if (tab.to === '/journal/compounds') return path.startsWith('/journal/compound/')
+  // A day's entry page (/journal/2026-10-21) belongs to the day log — nothing lit otherwise.
+  if (tab.to === '/journal/entries') return path.startsWith('/journal/entries') || /^\/journal\/\d{4}-\d{2}-\d{2}$/.test(path)
   // The dossier pages live at the singular /journal/cycle/<id>.
   if (tab.to === '/journal/cycles') return path.startsWith('/journal/cycle/')
   return path.startsWith(tab.to + '/')

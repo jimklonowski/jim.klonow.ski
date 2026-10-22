@@ -150,7 +150,7 @@
           class="text-hi"
           :class="proteinTarget && avg.protein_g >= proteinTarget ? 'text-accent' : ''"
         >{{ avg.protein_g }}</span> g protein<template v-if="proteinTarget"> / {{ proteinTarget }} g</template>
-        <span class="text-faint">· {{ avg.days }} day{{ avg.days === 1 ? '' : 's' }} est.</span>
+        <span class="text-faint">· {{ avg.days }} day{{ avg.days === 1 ? '' : 's' }}{{ avg.estimated ? ' est.' : '' }}</span>
       </span>
       <span
         v-else
@@ -293,6 +293,9 @@ const liveDraft = refDebounced(draft, 350)
 const known = computed(() => knownMeals(entries.value, index.value))
 
 function startEdit(slot: MealSlot) {
+  // Not while a save is in flight: switching slots mid-save let the finishing save close the new
+  // edit under the cursor (audit #42 item 38).
+  if (saving.value) return
   draft.value = todayEntry.value?.food?.[slot] ?? ''
   editing.value = slot
 }

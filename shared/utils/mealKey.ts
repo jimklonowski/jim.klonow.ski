@@ -15,7 +15,9 @@ export function mealKey(text: string | null | undefined): string {
   if (!text) return ''
   const tokens = text
     .toLowerCase()
-    .replace(/(\d+)\s*[x×]\s*/g, '$1x ')
+    // "2 x" / "2x" / "2 ×" → "2x" — only where the x IS the multiplier: a letter after it ("2 xl
+    // pizza") is a word, not a quantity (audit #42 item 38).
+    .replace(/(\d+)\s*[x×](?![a-z])\s*/g, '$1x ')
     .replace(/[^a-z0-9+]+/g, ' ')
     .replace(/\+/g, ' ')
     .split(' ')

@@ -385,8 +385,9 @@ const trackedCompounds = computed(() => {
   return set.size
 })
 
+// Seven days including today: `-7` with `>=` counted eight (audit #42 item 38).
 const workoutsThisWeek = computed(() => {
-  const from = shiftDays(today.value, -7)
+  const from = shiftDays(today.value, -6)
   return (workoutsData.value ?? []).filter(w => w.date >= from).length
 })
 

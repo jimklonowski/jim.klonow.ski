@@ -192,7 +192,7 @@ import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations }
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
-import { dayNutrition, isDayDone } from '#shared/utils/nutrition'
+import { dayNutrition, isDayDone, nutritionIsEstimated } from '#shared/utils/nutrition'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
@@ -342,6 +342,9 @@ const vitalTiles = computed(() => {
 // the doctor view (no food) and a fresh sandbox simply don't get the section.
 const FOOD_FIELDS = ['kcal', 'protein_g']
 
+// "est." on the tiles only when a charted day leans on a model figure — label figures aren't estimates.
+const foodEstimated = computed(() => inRange(entries.value).some(e => nutritionIsEstimated(dayNutrition(e, estimateIndex.value))))
+
 const foodRows = computed(() =>
   smoothRows(
     inRange(entries.value).map((e) => {
@@ -365,14 +368,14 @@ const foodTiles = computed(() => {
     {
       key: 'kcal',
       label: 'Calories',
-      unit: 'kcal est.',
+      unit: foodEstimated.value ? 'kcal est.' : 'kcal',
       value: fmt(latest(rows, 'kcal')),
       series: [{ key: 'kcal', name: 'kcal', color: CHART_WARN }]
     },
     {
       key: 'protein_g',
       label: 'Protein',
-      unit: 'g est.',
+      unit: foodEstimated.value ? 'g est.' : 'g',
       value: fmt(latest(rows, 'protein_g')),
       series: [{ key: 'protein_g', name: 'protein', color: CHART_ACCENT }]
     }

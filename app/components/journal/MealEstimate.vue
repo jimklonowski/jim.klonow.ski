@@ -142,8 +142,9 @@
           </div>
           <p class="text-micro text-faint">
             Label figures from the package or the chain's nutrition page are best. What you enter
-            is kept for every spelling of this meal and is never re-estimated. A regular worth
-            keeping in code with its source goes in shared/utils/mealLibrary.ts.
+            is kept under this meal's name — spellings that normalize to it, and the ones the log
+            pairs with it ("did you mean") — and is never re-estimated. A regular worth keeping in
+            code with its source goes in shared/utils/mealLibrary.ts.
           </p>
           <div class="flex justify-end gap-2 pt-1">
             <button

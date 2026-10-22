@@ -409,6 +409,8 @@ export interface NutritionAverage {
   days: number
   kcal: number
   protein_g: number
+  /** True when any counted day leans on a model estimate — label figures alone are not "est." */
+  estimated: boolean
 }
 
 /**
@@ -450,6 +452,7 @@ export function nutritionAverage(
   let days = 0
   let kcal = 0
   let protein = 0
+  let estimated = false
   for (const e of entries) {
     if (e.date < from || e.date > to) continue
     const n = dayNutrition(e, index)
@@ -457,8 +460,9 @@ export function nutritionAverage(
     days++
     kcal += n.kcal
     protein += n.protein_g
+    if (nutritionIsEstimated(n)) estimated = true
   }
   return days
-    ? { days, kcal: Math.round(kcal / days), protein_g: Math.round(protein / days) }
-    : { days: 0, kcal: 0, protein_g: 0 }
+    ? { days, kcal: Math.round(kcal / days), protein_g: Math.round(protein / days), estimated }
+    : { days: 0, kcal: 0, protein_g: 0, estimated: false }
 }
