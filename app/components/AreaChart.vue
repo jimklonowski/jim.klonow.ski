@@ -58,6 +58,7 @@ import { scaleOrdinal } from '@tanstack/charts/scales/ordinal'
 import { scalePoint } from '@tanstack/charts/scales/point'
 import { annotationsAt } from '#shared/utils/chartAnnotations'
 import type { PlacedAnnotation } from '#shared/utils/chartAnnotations'
+import { SCALES } from '#shared/utils/displayScale'
 import { splitRuns } from '~/utils/chartRuns'
 import { ANNOTATION_STYLE, CHART_AXIS, CHART_GRID_FIXED, CHART_WARN, seriesSymbol } from '~/utils/chartTheme'
 
@@ -183,6 +184,23 @@ const stepAfter = (() => {
   }
 })()
 
+/**
+ * The fixed gutters, scaled with the SIZE setting: the chart's axis text follows --type-scale
+ * (10 px → 12.5 px at XL), but CHART_GRID_FIXED was sized for the 10 px face, so a four-character
+ * y-label at XL ran into the left edge (audit #42 item 37 — measured 2 px of clearance left on a
+ * two-character label). Both charts of a stacked pair scale alike, so they stay flush.
+ */
+const { activeScale } = useTheme()
+const scaledGutter = computed(() => {
+  const factor = SCALES[activeScale.value]?.factor ?? 1
+  return {
+    top: Math.round(CHART_GRID_FIXED.top * factor),
+    left: Math.round(CHART_GRID_FIXED.left * factor),
+    right: Math.round(CHART_GRID_FIXED.right * factor),
+    bottom: Math.round(CHART_GRID_FIXED.bottom * factor)
+  }
+})
+
 const definition = computed(() => {
   const names = series.value.map(s => s.label)
   const all = labels.value
@@ -273,7 +291,7 @@ const definition = computed(() => {
     },
     // A bare tile keeps a little headroom for the stroke and nothing else; stacked charts take
     // the fixed gutters so their plots stay flush whatever their y-labels measure.
-    margin: props.bare ? { top: 4, right: 2, bottom: 2, left: 2 } : props.fixedGutter ? CHART_GRID_FIXED : undefined,
+    margin: props.bare ? { top: 4, right: 2, bottom: 2, left: 2 } : props.fixedGutter ? scaledGutter.value : undefined,
     focus: 'group-x',
     // The default only focuses a point within 48px, which leaves dead zones between sparse points.
     maxFocusDistance: Number.POSITIVE_INFINITY

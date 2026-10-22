@@ -25,7 +25,7 @@
         class="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 items-baseline text-row"
       >
         <span
-          class="text-micro uppercase tracking-widest pt-1"
+          class="text-micro uppercase tracking-widest pt-1 whitespace-nowrap"
           :class="row.snack && !row.text && editing !== row.slot ? 'text-ghost' : 'text-muted'"
         >{{ row.snack && !row.text && editing !== row.slot ? '' : row.label }}</span>
 
@@ -105,7 +105,7 @@
           v-else-if="!readonly && row.snack"
           type="button"
           class="text-left text-meta text-ghost hover:text-accent cursor-pointer"
-          :aria-label="`Add ${row.label.toLowerCase()}`"
+          :aria-label="`Add ${row.fullLabel.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
           + {{ row.label.toLowerCase() }}
@@ -115,7 +115,7 @@
           type="button"
           class="text-left cursor-pointer"
           :class="row.slot === suggestedSlot ? 'text-accent hover:text-accent-hover' : 'text-faint hover:text-accent'"
-          :aria-label="`Add ${row.label.toLowerCase()}`"
+          :aria-label="`Add ${row.fullLabel.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
           + add{{ row.slot === suggestedSlot ? ` ${row.label.toLowerCase()}` : '' }}
@@ -222,10 +222,15 @@ const PLACEHOLDERS: Record<MealSlot, string> = {
 
 // The legacy single Snack appears only on a day that has one; the gap snacks always have a row
 // (as "+ snack" when empty).
+// The card's label column is 5.5rem wide: "AFTERNOON SNACK" wrapped onto two lines in it, so the
+// gap snacks show short names here; accessible names and titles keep the full slot label.
+const CARD_LABELS: Partial<Record<MealSlot, string>> = { snack_am: 'AM snack', snack_pm: 'PM snack', snack_eve: 'Eve snack' }
+
 const slotRows = computed(() => MEAL_SLOTS
   .map(slot => ({
     slot,
-    label: MEAL_SLOT_LABELS[slot],
+    label: CARD_LABELS[slot] ?? MEAL_SLOT_LABELS[slot],
+    fullLabel: MEAL_SLOT_LABELS[slot],
     snack: isSnackSlot(slot),
     text: todayEntry.value?.food?.[slot]?.trim() ?? '',
     placeholder: PLACEHOLDERS[slot]

@@ -289,7 +289,7 @@
               <span class="truncate">{{ a.name }}</span>
               <span
                 v-if="a.reward"
-                class="tui-label text-[8.5px] shrink-0"
+                class="tui-label text-nano shrink-0"
               >wearable</span>
             </p>
             <p class="text-label leading-tight text-faint">

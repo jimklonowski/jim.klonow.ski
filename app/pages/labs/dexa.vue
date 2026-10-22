@@ -172,7 +172,7 @@
                   :class="litRegion === row.key ? 'text-hi' : 'text-dim'"
                 >{{ row.label }}<span
                   v-if="pinnedRegion === row.key"
-                  class="ml-2 text-[9px] tracking-[0.12em] text-accent"
+                  class="ml-2 text-nano tracking-[0.12em] text-accent"
                 >LOCKED</span></span>
                 <span class="text-hi">{{ row.pct }}</span>
                 <span class="text-body">{{ row.fat }}</span>
