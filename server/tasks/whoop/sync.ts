@@ -68,23 +68,21 @@ async function syncWhoop(db: D1Database) {
   metricsByDate(sleep, s => s.end, sleepMetric, byDate)
   metricsByDate(cycles, c => c.start, cycleMetric, byDate)
 
-  let touched = 0
-  for (const [date, fields] of Object.entries(byDate)) {
-    if (await upsertHealthMetrics(db, date, fields)) touched++
-  }
+  // One upsert per date, batched (server/utils/db.ts runBatched) — not a round trip per day.
+  const metricStatements = Object.entries(byDate)
+    .map(([date, fields]) => healthMetricsStatement(db, date, fields))
+    .filter((s): s is D1PreparedStatement => s != null)
+  const touched = await runBatched(db, metricStatements)
 
   // Workouts are fetched separately and tolerantly: a token granted before read:workout was
   // added will 403 here, and that must not abort the recovery/sleep/strain sync above. The
   // connection keeps working; workouts start flowing once the user reconnects to grant the scope.
   let workouts = 0
   try {
-    for (const record of await whoopFetchAll<WhoopWorkoutRecord>(db, '/v2/activity/workout', { start })) {
-      const row = whoopWorkoutRow(record)
-      if (row) {
-        await upsertWorkout(db, row)
-        workouts++
-      }
-    }
+    const rows = (await whoopFetchAll<WhoopWorkoutRecord>(db, '/v2/activity/workout', { start }))
+      .map(whoopWorkoutRow)
+      .filter((row): row is NonNullable<typeof row> => row != null)
+    workouts = await upsertWorkouts(db, rows)
   }
   catch (err) {
     const message = err instanceof Error ? err.message : String(err)
