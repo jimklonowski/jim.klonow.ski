@@ -7,7 +7,7 @@ import { visitsForGuest, visitsForOwner } from '#shared/utils/tickerVisits'
 // owner's reaction stamps or another guest's name (the leaderboard names its holder only to the
 // owner and to the holder, see shared/utils/tickerVisits.ts).
 export default defineEventHandler(async (event): Promise<TickerStateResponse> => {
-  const auth = requireLabsAuth(event)
+  const auth = requireTickerAccess(event)
   if (auth.role === 'demo') throw createError({ statusCode: 403, message: 'The demo pet remembers in the browser' })
 
   const [state, visits] = await Promise.all([readTickerState(event), readVisits(event)])

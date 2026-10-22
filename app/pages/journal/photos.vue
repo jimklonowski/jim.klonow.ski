@@ -394,7 +394,7 @@
               <!-- The border colour alone is easy to miss at thumbnail size on a phone. -->
               <span
                 v-if="opt.value === beforeId || opt.value === afterId"
-                class="absolute top-0 left-0 px-1 text-[9px] leading-normal text-bg"
+                class="absolute top-0 left-0 px-1 text-nano leading-normal text-bg"
                 :class="opt.value === beforeId ? 'bg-warn' : 'bg-accent'"
               >{{ opt.value === beforeId ? 'B' : 'A' }}</span>
             </button>

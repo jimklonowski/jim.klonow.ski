@@ -102,16 +102,18 @@
 
           <!-- Ounces when the sizes carried them (ounces are what the goal tracks — two mini cans
                are less than one bottle), the count for unsized rows, blank for none. -->
+          <!-- Below lg the column header is hidden, so a bare "36oz 84oz" said nothing about
+               which was which — each figure carries its word there. -->
           <span
             v-if="showSoda"
             class="text-muted whitespace-nowrap"
             :title="row.sodas ? `${row.sodas} soda${row.sodas === 1 ? '' : 's'}` : undefined"
-          >{{ row.sodaOz ? `${row.sodaOz}oz` : row.sodas || '' }}</span>
+          ><template v-if="row.sodaOz || row.sodas"><span class="lg:hidden text-faint">soda </span>{{ row.sodaOz ? `${row.sodaOz}oz` : row.sodas }}</template></span>
 
           <span
             v-if="showSoda"
             class="text-muted whitespace-nowrap"
-          >{{ row.waterOz ? `${row.waterOz}oz` : '' }}</span>
+          ><template v-if="row.waterOz"><span class="lg:hidden text-faint">water </span>{{ row.waterOz }}oz</template></span>
 
           <span
             class="text-accent"

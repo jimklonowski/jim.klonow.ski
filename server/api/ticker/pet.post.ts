@@ -8,7 +8,9 @@ import type { TickerPets } from '#shared/types/ticker'
 // so two pats landing together (a double-tap, the owner and a guest at once) both count. The
 // read-then-write version had both read N and both write N+1.
 export default defineEventHandler(async (event): Promise<TickerPets> => {
-  const auth = requireRole(event, 'owner', 'friend', 'doctor')
+  // The roles that may open /ticker (access.ts) minus the demo, whose pet remembers in the browser.
+  const auth = requireTickerAccess(event)
+  if (auth.role === 'demo') throw createError({ statusCode: 403, message: 'The demo pet remembers in the browser' })
   const today = localToday()
   const db = getDb(event)
   const now = new Date().toISOString()
