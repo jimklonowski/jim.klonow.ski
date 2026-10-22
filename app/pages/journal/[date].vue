@@ -854,7 +854,10 @@
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, oppositeSite } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
-import { MEAL_SLOTS, dayNutrition, fmtKcal, fmtMacros, knownMeals, mealHistory, nutritionIsEstimated, resolveMealText, type MealSlot } from '#shared/utils/nutrition'
+import {
+  MEAL_SLOTS, MEAL_SLOT_LABELS, MEAL_SLOT_PLACEHOLDERS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals,
+  mealHistoryBySlot as mealHistoryBySlotOf, nutritionIsEstimated, resolveMealText, type MealSlot
+} from '#shared/utils/nutrition'
 import type { DayLogFields } from '#shared/utils/journalMerge'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 import type { WorkoutEntry } from '#shared/types/journal'
@@ -876,15 +879,14 @@ function doseHelp(p: PeptideEntry): string | undefined {
 
 // Day order (shared/utils/nutrition.ts MEAL_SLOTS). `snack` is the legacy single slot: shown
 // when a day has one, never offered as a "+ snack" — new snacks say which gap they sit in.
-const FOOD_ROWS: Array<{ key: MealSlot, label: string, placeholder: string, snack?: boolean }> = [
-  { key: 'breakfast', label: 'Breakfast', placeholder: 'Protein shake + creatine' },
-  { key: 'snack', label: 'Snack', placeholder: 'Sourdough', snack: true },
-  { key: 'snack_am', label: 'Morning snack', placeholder: 'Beef sticks', snack: true },
-  { key: 'lunch', label: 'Lunch', placeholder: 'Chipotle bowl' },
-  { key: 'snack_pm', label: 'Afternoon snack', placeholder: 'Sourdough', snack: true },
-  { key: 'dinner', label: 'Dinner', placeholder: 'Steak + veggies' },
-  { key: 'snack_eve', label: 'Evening snack', placeholder: 'Watermelon', snack: true }
-]
+// Derived from the shared slot tables (shared/utils/nutrition.ts) rather than spelled out here —
+// the hub's food card lists the same labels and placeholders.
+const FOOD_ROWS: Array<{ key: MealSlot, label: string, placeholder: string, snack?: boolean }> = MEAL_SLOTS.map(key => ({
+  key,
+  label: MEAL_SLOT_LABELS[key],
+  placeholder: MEAL_SLOT_PLACEHOLDERS[key],
+  snack: isSnackSlot(key) || undefined
+}))
 
 // Snack slots that stay visible while empty: the ones opened with "+ snack" this visit, and the
 // ones the day loaded with (seeded in buildForm) — a field must not unmount under the cursor the
@@ -1064,9 +1066,7 @@ function copyFromPrevious() {
 // Pooled across all four meal slots (and all days) so an order typed for lunch once
 // autocompletes for dinner too, but ranked per slot (this slot's own history first) and with
 // every spelling of a meal folded into its most-used one — shared/utils/nutrition.ts.
-const mealHistoryBySlot = computed(() =>
-  Object.fromEntries(MEAL_SLOTS.map(s => [s, mealHistory(allEntries.value ?? [], s).map(h => h.text)])) as Record<MealSlot, string[]>
-)
+const mealHistoryBySlot = computed(() => mealHistoryBySlotOf(allEntries.value ?? []))
 
 // The day as this form LOADED it. Sent with the save so the server keeps anything logged
 // elsewhere while the form was open (a phone water tap, a hub quick-logged lunch, a webhook

@@ -5,7 +5,7 @@
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
-import { diffDays, weekdayOf } from './dates.ts'
+import { diffDays, monthDay, weekdayOf } from './dates.ts'
 import type { ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
 import {
   AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, doseLabelOn, doseStepOn, nextDueDay, ruleActiveOn,
@@ -29,8 +29,7 @@ export function cadenceOf(weekdays: number[]): string {
 /** "Wed Sep 9" — every date the digest prompts show carries its weekday, because the schedule
  * is expressed in weekdays and the model should never have to derive one from a date. */
 export function fmtDay(d: string): string {
-  const monthDay = new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-  return `${DAY_NAMES[weekdayOf(d)]} ${monthDay}`
+  return `${DAY_NAMES[weekdayOf(d)]} ${monthDay(d)}`
 }
 
 /** "A, B, and C" */

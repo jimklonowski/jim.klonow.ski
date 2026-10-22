@@ -11,7 +11,7 @@
 import type { HealthMetricsEntry, JournalRow } from '../types/journal'
 // Explicit .ts: runtime imports the test runner must resolve without Vite.
 import { PROTOCOL_RULES, ruleActiveOn } from './protocolRules.ts'
-import { diffDays, roundTo, shiftDays } from './dates.ts'
+import { diffDays, monthDay, roundTo, shiftDays } from './dates.ts'
 import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
 
 // The slices of the shared row shapes the trend engine reads.
@@ -384,9 +384,7 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
   return { changes, findings }
 }
 
-function fmtDate(d: string): string {
-  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-}
+const fmtDate = monthDay
 
 // Renders the trends as fact-sheet lines for the digest prompt. `endDate` lets each protocol
 // change carry its age, so the model can treat a weeks-old stop as background rather than news.

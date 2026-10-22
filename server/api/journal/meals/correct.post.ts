@@ -1,5 +1,6 @@
 import { zMealCorrect } from '#shared/utils/schemas'
 import { mealKey } from '#shared/utils/mealKey'
+import { MEAL_ESTIMATE_MANUAL_UPSERT } from '#shared/utils/mealEstimateSql'
 
 // A hand correction of one meal's figures. Stored as source 'manual', which the estimator's
 // upsert never overwrites — so a fixed "Costco pizza" stays fixed across every spelling of it.
@@ -14,14 +15,7 @@ export default defineEventHandler(async (event) => {
   // earlier correction, or nothing — goes in the log, so a slip of the keyboard is one undo away.
   const before = await auditBefore(event, 'meal_estimates', key)
   const now = new Date().toISOString()
-  await db.prepare(`
-    INSERT INTO meal_estimates (key, text, kcal, protein_g, carbs_g, fat_g, confidence, assumptions, source, model, prompt_hash, created_at, updated_at)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'high', 'corrected by hand', 'manual', NULL, NULL, ?7, ?7)
-    ON CONFLICT(key) DO UPDATE SET
-      kcal = excluded.kcal, protein_g = excluded.protein_g, carbs_g = excluded.carbs_g, fat_g = excluded.fat_g,
-      confidence = 'high', assumptions = 'corrected by hand', source = 'manual', model = NULL, prompt_hash = NULL,
-      updated_at = excluded.updated_at
-  `).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now).run()
+  await db.prepare(MEAL_ESTIMATE_MANUAL_UPSERT).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now).run()
   await recordAudit(event, {
     table: 'meal_estimates',
     key,

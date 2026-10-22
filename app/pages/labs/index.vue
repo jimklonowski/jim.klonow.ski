@@ -401,13 +401,7 @@ const normalCount = computed(() =>
   echoResults.value.filter(r => qualitativeColor(r.result) === 'success').length
 )
 
-function colorClass(result: string) {
-  return {
-    warning: 'text-warn',
-    success: 'text-accent',
-    neutral: 'text-body'
-  }[qualitativeColor(result)]
-}
+const colorClass = qualitativeClass
 
 const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin', 'la_volume_index']
 

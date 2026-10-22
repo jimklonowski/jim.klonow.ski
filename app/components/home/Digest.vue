@@ -135,7 +135,8 @@
 </template>
 
 <script setup lang="ts">
-import { diffDays } from '#shared/utils/dates'
+import { diffDays, relativeDay } from '#shared/utils/dates'
+import { isPeakRecovery } from '#shared/utils/recovery'
 import type { Digest } from '~/composables/useDigests'
 import type { TickerBuild, TickerProp } from '#shared/utils/tickerSprite'
 
@@ -146,7 +147,7 @@ const props = withDefaults(defineProps<{
   rhr?: number | null
   /** Short-sleep state (last night <6h, no ≥7h night since). */
   sluggish?: boolean
-  /** Latest Whoop recovery %, for the >80 celebration. */
+  /** Latest Whoop recovery %, for the peak-recovery (≥80, shared/utils/recovery.ts) celebration. */
   recovery?: number | null
   /** Live count of sodas logged today, for the #3 flatline gag. */
   sodasToday?: number
@@ -200,11 +201,7 @@ const weeklyPeriod = computed(() => {
 const today = useToday()
 
 function relative(date: string) {
-  const days = diffDays(date, today.value)
-  if (days <= 0) return 'today'
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days}d ago`
-  return formatDate(date, 'monthDay').toLowerCase()
+  return relativeDay(date, today.value).toLowerCase()
 }
 
 // One regenerate per digest, each with its own pending state so both can run at once. Daily
@@ -281,7 +278,7 @@ onMounted(() => {
       return
     }
     const day = today.value
-    if (props.recovery != null && props.recovery > 80
+    if (isPeakRecovery(props.recovery)
       && localStorage.getItem('ticker:celebrated') !== day) {
       localStorage.setItem('ticker:celebrated', day)
       companion.value?.trigger('celebrate')

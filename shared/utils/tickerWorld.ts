@@ -45,6 +45,7 @@
 // shared/utils), so the names that both games have — gravity, jump, stride — carry a WORLD_
 // prefix, and what is the same is imported from the runner rather than declared twice.
 import { MAX_DT, makeRng } from './tickerRunner.ts'
+import { RECOVERY_GREEN_MIN, RECOVERY_PEAK_MIN, RECOVERY_RED_MAX } from './recovery.ts'
 
 export const TILE = 24
 export const ROWS = 16
@@ -339,11 +340,15 @@ export const NO_INPUT: WorldInput = { left: false, right: false, jump: false, ju
 
 // --- the generator ------------------------------------------------------------------------------
 
-/** Hills: a great recovery lifts the ground two rows, a decent one a row; a rough or unknown day is flat. */
+/**
+ * Hills: a peak recovery lifts the ground two rows, a green one a row; a yellow, red or unknown
+ * day is flat. Whoop's bands (shared/utils/recovery.ts), the same lines the pet and the digest
+ * read — this file drew its own at 60 and 40 until audit #42 item 41.
+ */
 export function groundRowFor(recovery: number | null): number {
   if (recovery == null) return BASE_ROW
-  if (recovery >= 80) return BASE_ROW - 2
-  if (recovery >= 60) return BASE_ROW - 1
+  if (recovery >= RECOVERY_PEAK_MIN) return BASE_ROW - 2
+  if (recovery >= RECOVERY_GREEN_MIN) return BASE_ROW - 1
   return BASE_ROW
 }
 
@@ -352,11 +357,11 @@ export function platformLength(workoutMin: number): number {
   return Math.max(3, Math.min(10, 3 + Math.floor(workoutMin / 20)))
 }
 
-/** Germs on a day: none when recovery was green, one on an ordinary or unknown day, three on a rough one. */
+/** Germs on a day: none at a peak recovery, one on an ordinary or unknown day, three in the red. */
 export function germCount(recovery: number | null): number {
   if (recovery == null) return 1
-  if (recovery >= 80) return 0
-  if (recovery < 40) return 3
+  if (recovery >= RECOVERY_PEAK_MIN) return 0
+  if (recovery < RECOVERY_RED_MAX) return 3
   return 1
 }
 
@@ -533,7 +538,7 @@ export function buildLevel(days: DayInput[], rng: () => number = Math.random): L
 
   // One green day hides a star, one logged day hides a heart.
   const logged = days.map((d, i) => (d.logged ? i : -1)).filter(i => i >= 0)
-  const green = logged.filter(i => (days[i]!.recovery ?? 0) >= 80)
+  const green = logged.filter(i => (days[i]!.recovery ?? 0) >= RECOVERY_PEAK_MIN)
   if (green.length) block('star', green[Math.floor(rng() * green.length)]!, true)
   if (logged.length) block('heart', logged[Math.floor(rng() * logged.length)]!, true)
 

@@ -2,7 +2,7 @@
 // webhook (one record per event), so a pushed record lands on exactly the date and in exactly the
 // shape the reconciling cron would give it. Framework-free: tested under node, and the signature
 // check uses only WebCrypto, which Workers and node both have.
-import { HOME_TZ } from './time.ts'
+import { localDayOf } from './time.ts'
 
 /**
  * What a failed token refresh means for the stored connection (server/utils/whoop.ts acts on it).
@@ -98,14 +98,13 @@ const SCORED = 'SCORED'
 // on the next day, where it could no longer line up with the Apple Health copy of the same
 // session. Convert to home timezone before taking the date. HOME_TZ comes from
 // shared/utils/time.ts, which is also where "today" is derived for the same reason.
-const localDateFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: HOME_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
-})
-
+// The formatter itself is time.ts's (`localDayOf`), the one Chicago-day formatter — this file
+// had a second copy until audit #42 item 40. The guard stays: localDayOf throws on an invalid
+// timestamp, and a webhook can hand us one.
 export function whoopLocalDate(ts?: string | null): string | null {
   if (!ts) return null
   const parsed = new Date(ts)
-  return Number.isNaN(parsed.getTime()) ? null : localDateFmt.format(parsed)
+  return Number.isNaN(parsed.getTime()) ? null : localDayOf(ts)
 }
 
 const KJ_PER_KCAL = 4.184

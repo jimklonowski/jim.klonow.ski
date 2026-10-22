@@ -108,8 +108,12 @@ function randomMonth(seed, n = 30) {
 
 test('hills follow recovery, platforms follow the session length', () => {
   assert.equal(groundRowFor(null), BASE_ROW)
+  // Whoop's bands (shared/utils/recovery.ts): yellow is flat, green a row, peak two.
   assert.equal(groundRowFor(45), BASE_ROW)
-  assert.equal(groundRowFor(65), BASE_ROW - 1)
+  assert.equal(groundRowFor(66), BASE_ROW)
+  assert.equal(groundRowFor(67), BASE_ROW - 1)
+  assert.equal(groundRowFor(79), BASE_ROW - 1)
+  assert.equal(groundRowFor(80), BASE_ROW - 2)
   assert.equal(groundRowFor(90), BASE_ROW - 2)
   assert.equal(platformLength(10), 3)
   assert.equal(platformLength(60), 6)

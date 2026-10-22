@@ -1,5 +1,7 @@
 import type { SodaEntry, WaterEntry } from '#shared/types/journal'
 import { WATER_DEFAULT_CUP_OZ, waterSetting, waterTotals } from '#shared/utils/water'
+import { lastSoda as lastSodaOf, quickAddLabel } from '#shared/utils/soda'
+import { patchJournalDay } from '~/utils/journalPatch'
 
 // One-tap soda and water logging for places that aren't the journal hub (the home page's LOG
 // TODAY row). Same endpoints, same "last drink" and "cup size" defaults as the two tracker
@@ -19,32 +21,18 @@ export async function useQuickLog() {
   const entries = computed(() => data.value ?? [])
   const todayEntry = computed(() => entries.value.find(e => e.date === today.value) ?? null)
 
-  // --- soda: the most recently logged drink + size is what the button logs ---
-  const lastSoda = computed<SodaEntry | null>(() => {
-    const all = entries.value.flatMap(e => (e.sodas ?? []).map(s => ({ ...s, date: e.date })))
-    all.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-    return all.at(-1) ?? null
-  })
+  // --- soda: the most recently logged drink + size is what the button logs (shared/utils/soda.ts) ---
+  const lastSoda = computed(() => lastSodaOf(entries.value))
   /** "DR PEPPER 12oz can" — what + SODA will log. */
-  const sodaLabel = computed(() => {
-    const drink = (lastSoda.value?.drink || 'Soda').toUpperCase()
-    return lastSoda.value?.size ? `${drink} ${lastSoda.value.size}` : drink
-  })
+  const sodaLabel = computed(() => quickAddLabel(lastSoda.value))
   const sodasToday = computed(() => (todayEntry.value?.sodas ?? []).length)
 
   // --- water: the profile's cup size ---
   const cupOz = computed(() => waterSetting(profileData.value, 'cup_oz', WATER_DEFAULT_CUP_OZ))
   const waterOzToday = computed(() => waterTotals(todayEntry.value?.water).oz)
 
-  // Reassigns `data.value` so useAsyncData's reactivity sees the change (same rule as the widgets).
-  function patchToday(patch: Partial<{ sodas: SodaEntry[], water: WaterEntry[] }>) {
-    if (!data.value) return
-    const date = today.value
-    const idx = data.value.findIndex(e => e.date === date)
-    data.value = idx >= 0
-      ? data.value.map((e, i) => (i === idx ? { ...e, ...patch } : e))
-      : [...data.value, { date, ...patch }].sort((a, b) => a.date.localeCompare(b.date))
-  }
+  // The shared local mirror (app/utils/journalPatch.ts) — the same one the widgets use.
+  const patchToday = (patch: Partial<{ sodas: SodaEntry[], water: WaterEntry[] }>) => patchJournalDay(data, today.value, patch)
 
   const addingSoda = ref(false)
   const addingWater = ref(false)

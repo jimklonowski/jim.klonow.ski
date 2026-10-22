@@ -175,6 +175,7 @@
 // inline. Writes go through /api/journal/soda and are reflected into the shared journal store.
 import { SODA_DRINKS, SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
+import { lastSoda as lastSodaOf, quickAddLabel as quickAddLabelOf } from '#shared/utils/soda'
 
 withDefaults(defineProps<{
   readonly?: boolean
@@ -208,19 +209,14 @@ const todaySodas = computed<SodaEntry[]>(() =>
   entries.value.find(e => e.date === today.value)?.sodas ?? []
 )
 
-const lastSoda = computed<SodaEntry | null>(() => {
-  const all = entries.value.flatMap(e => (e.sodas ?? []).map(s => ({ ...s, date: e.date })))
-  all.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  return all.at(-1) ?? null
-})
+// The last drink and the quick-add's label come from shared/utils/soda.ts — the home page's
+// + SODA button reads the same two, so they can't disagree.
+const lastSoda = computed(() => lastSodaOf(entries.value))
 const lastDrink = computed(() => lastSoda.value?.drink ?? '')
 const lastSize = computed(() => lastSoda.value?.size ?? '')
 
 /** Header action label — the drink the quick-add will actually log, e.g. "DR PEPPER 12oz". */
-const quickAddLabel = computed(() => {
-  const drink = (lastDrink.value || 'Soda').toUpperCase()
-  return lastSize.value ? `${drink} ${lastSize.value}` : drink
-})
+const quickAddLabel = computed(() => quickAddLabelOf(lastSoda.value))
 
 function sodaLabel(s: SodaEntry) {
   const drink = s.drink || 'Soda'
@@ -235,14 +231,7 @@ const adding = ref(false)
 // Reassigns `data.value` (rather than mutating an entry in place) so the update is guaranteed to
 // be picked up by `useAsyncData`'s reactivity regardless of its `deep` option.
 function applySodasLocally(date: string, sodas: SodaEntry[]) {
-  if (!data.value) return
-  const idx = data.value.findIndex(e => e.date === date)
-  if (idx >= 0) {
-    data.value = data.value.map((e, i) => i === idx ? { ...e, sodas } : e)
-  }
-  else {
-    data.value = [...data.value, { date, sodas }].sort((a, b) => a.date.localeCompare(b.date))
-  }
+  patchJournalDay(data, date, { sodas })
 }
 
 async function quickAdd(useCustom = false) {
@@ -307,10 +296,7 @@ const days = computed(() => {
     const n = (e.sodas ?? []).length
     if (n) counts.set(e.date, n)
   }
-  const series = Array.from({ length: WINDOW_DAYS }, (_, i) => {
-    const date = daysFromToday(i - (WINDOW_DAYS - 1))
-    return { date, count: counts.get(date) ?? 0 }
-  })
+  const series = trailingDays(today.value, WINDOW_DAYS).map(date => ({ date, count: counts.get(date) ?? 0 }))
   const max = Math.max(1, ...series.map(d => d.count))
   // Percentages rather than px so the same bars fit the tall panel and the short hub widget.
   return series.map(d => ({

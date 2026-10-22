@@ -2,6 +2,7 @@ import type { EstimateConfidence, EstimateIndex, MealEstimate } from '#shared/ut
 import { indexEstimates } from '#shared/utils/nutrition'
 import { mealKey } from '#shared/utils/mealKey'
 import { matchEstimateItems } from '#shared/utils/mealEstimateMatch'
+import { MEAL_ESTIMATE_AI_UPSERT } from '#shared/utils/mealEstimateSql'
 import { libraryLookup } from '#shared/utils/mealLibrary'
 
 // Meal text → calories and macros from the model, once per distinct meal, cached in
@@ -191,15 +192,8 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Es
 
   if (rows.length) {
     // A manual row that appeared since the SELECT above stays manual.
-    await db.batch(rows.map(r => db.prepare(`
-      INSERT INTO meal_estimates (key, text, kcal, protein_g, carbs_g, fat_g, confidence, assumptions, source, model, prompt_hash, created_at, updated_at)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ai', ?9, ?10, ?11, ?11)
-      ON CONFLICT(key) DO UPDATE SET
-        text = excluded.text, kcal = excluded.kcal, protein_g = excluded.protein_g, carbs_g = excluded.carbs_g,
-        fat_g = excluded.fat_g, confidence = excluded.confidence, assumptions = excluded.assumptions,
-        model = excluded.model, prompt_hash = excluded.prompt_hash, updated_at = excluded.updated_at
-      WHERE meal_estimates.source != 'manual'
-    `).bind(r.key, r.text, r.kcal, r.protein_g, r.carbs_g, r.fat_g, r.confidence, r.assumptions, r.model, hash, now)))
+    await db.batch(rows.map(r => db.prepare(MEAL_ESTIMATE_AI_UPSERT)
+      .bind(r.key, r.text, r.kcal, r.protein_g, r.carbs_g, r.fat_g, r.confidence, r.assumptions, r.model, hash, now)))
   }
   return { estimates: [...cached, ...rows], unmatched }
 }

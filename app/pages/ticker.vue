@@ -352,9 +352,10 @@
 // runner's record, which things it has already reacted to) lives in the database for the owner
 // and in the browser for the demo pet — see the memory section.
 import { isLoggedDay, loggedStreak, longestLoggedStreak } from '#shared/utils/journalLog'
-import { diffDays, shiftDays } from '#shared/utils/dates'
+import { diffDays, shiftDays, trailingDays } from '#shared/utils/dates'
 import { localTimeNow } from '#shared/utils/time'
 import { isSluggish, latestRecovery, latestSleepMin } from '#shared/utils/petState'
+import { RECOVERY_RED_MAX, isPeakRecovery, recoveryZone } from '#shared/utils/recovery'
 import { formatDuration } from '~/data/health-metrics'
 import { countdownLabel, drawLabel, nextPlannedDraw } from '#shared/utils/plannedDraws'
 import { PROTOCOL_RULES, scheduledFor, tallySchedule } from '#shared/utils/protocolRules'
@@ -576,7 +577,8 @@ const sleepMin = computed(() => latestSleepMin(healthData.value ?? []))
 const sluggish = computed(() => isSluggish(healthData.value ?? []))
 // The shared formatter rounds the total before splitting — this page's own copy read "6h 59.7m".
 const fmtSleep = formatDuration
-const recoveryZone = (r: number) => r >= 67 ? 'green' : r >= 34 ? 'yellow' : 'red'
+// recoveryZone and the peak/red lines come from shared/utils/recovery.ts — the digest, the trends
+// tile and the world draw the same bands.
 
 const streak = computed(() => loggedStreak(entries.value, today.value))
 
@@ -840,8 +842,8 @@ const heldPose = computed<TickerPose | null>(() => {
   if (nextDraw.value?.status === 'overdue') return 'impatient'
   if (sluggish.value) return null // the sluggish prop draws the coffee slump itself
   if (sodasToday.value >= 3) return 'worried'
-  if (recovery.value != null && recovery.value >= 80) return 'happy'
-  if (recovery.value != null && recovery.value < 34) return 'worried'
+  if (isPeakRecovery(recovery.value)) return 'happy'
+  if (recovery.value != null && recovery.value < RECOVERY_RED_MAX) return 'worried'
   return null
 })
 
@@ -853,8 +855,8 @@ const moodWord = computed(() => {
   if (nextDraw.value?.status === 'overdue') return 'impatient'
   if (sluggish.value) return 'sleepy'
   if (sodasToday.value >= 3) return 'queasy'
-  if (recovery.value != null && recovery.value >= 80) return 'great'
-  if (recovery.value != null && recovery.value < 34) return 'rough'
+  if (isPeakRecovery(recovery.value)) return 'great'
+  if (recovery.value != null && recovery.value < RECOVERY_RED_MAX) return 'rough'
   return 'steady'
 })
 
@@ -1358,7 +1360,7 @@ const quotes = computed(() => {
   const lines: Array<string | null> = [
     weight.value != null ? `${weight.value} lb at the last weigh-in. it's holding that for you.` : null,
     r != null
-      ? `recovery ${r}% — ${recoveryZone(r)}. ${r >= 67 ? 'go lift something.' : r >= 34 ? 'an ordinary day, then.' : 'it votes for a nap.'}`
+      ? `recovery ${r}% — ${recoveryZone(r)}. ${recoveryZone(r) === 'green' ? 'go lift something.' : recoveryZone(r) === 'yellow' ? 'an ordinary day, then.' : 'it votes for a nap.'}`
       : null,
     sleepMin.value != null
       ? `${fmtSleep(sleepMin.value)} of sleep last night.${sleepMin.value < 420 ? ' it felt that.' : ' it slept well too.'}`
@@ -1542,8 +1544,7 @@ const worldDays = computed<DayInput[]>(() => {
   const tallies = rulesApply ? tallySchedule(rules.value, first, today.value, doseDates.value, today.value) : []
   const hitDates = new Set(tallies.flatMap(t => t.hit))
   const missedDates = new Set(tallies.flatMap(t => t.missed))
-  return Array.from({ length: WORLD_DAYS }, (_, i) => {
-    const date = shiftDays(today.value, -(WORLD_DAYS - 1 - i))
+  return trailingDays(today.value, WORLD_DAYS).map((date) => {
     const e = byDate.get(date)
     const workoutMin = minutesOn(date)
     return {
@@ -1842,8 +1843,8 @@ function arrivalLine(): string {
   if (draw?.status === 'overdue') return `the ${draw.plan.lab ?? 'planned'} draw was ${countdownLabel(draw.inDays)} and nothing's on file — it keeps checking`
   if (draw && draw.inDays <= 3) return `draw ${countdownLabel(draw.inDays)}${draw.plan.fasting ? ' — fasting, remember' : ''}`
   const r = recovery.value
-  if (r != null && r >= 80) return `recovery's at ${r}% — TICKER is thriving`
-  if (r != null && r < 34) return `recovery ${r}% — TICKER is taking it easy today`
+  if (isPeakRecovery(r)) return `recovery's at ${r}% — TICKER is thriving`
+  if (r != null && recoveryZone(r) === 'red') return `recovery ${r}% — TICKER is taking it easy today`
   if (streak.value > 0 && streak.value % 50 === 0) return `${streak.value} days logged in a row. it counted.`
   if (unloggedThisWeek.value >= 3) return `${unloggedThisWeek.value} of the last 7 days unlogged — it's getting dusty in here`
   if (oldestOpen.value && oldestOpen.value.days >= 28) return `the ${oldestOpen.value.compound} vial has been open ${oldestOpen.value.days} days — it checked the date`

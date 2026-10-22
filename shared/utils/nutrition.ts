@@ -43,8 +43,33 @@ export const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
   snack_eve: 'Evening snack'
 }
 
+/** The example in each empty slot — Jim's regulars (the hub card and the day page share these). */
+export const MEAL_SLOT_PLACEHOLDERS: Record<MealSlot, string> = {
+  breakfast: 'Protein shake + creatine',
+  snack: 'Sourdough',
+  snack_am: 'Beef sticks',
+  lunch: 'Chipotle bowl',
+  snack_pm: 'Sourdough',
+  dinner: 'Steak + veggies',
+  snack_eve: 'Watermelon'
+}
+
 export function isSnackSlot(slot: MealSlot): boolean {
   return slot === 'snack' || slot === 'snack_am' || slot === 'snack_pm' || slot === 'snack_eve'
+}
+
+/** Every slot's ranked autocomplete history (texts only) — see mealHistory. */
+export function mealHistoryBySlot(entries: FoodEntry[]): Record<MealSlot, string[]> {
+  return Object.fromEntries(MEAL_SLOTS.map(s => [s, mealHistory(entries, s).map(h => h.text)])) as Record<MealSlot, string[]>
+}
+
+/**
+ * A day whose logged meals ALL have figures — the one rule for counting it in a daily total or
+ * an average (a day with one unestimated meal would read low). `DayNutrition.complete` is this
+ * plus every soda sized.
+ */
+export function hasFullFigures(n: DayNutrition): boolean {
+  return n.meals.length > 0 && n.missing.length === 0
 }
 
 /** Snacks share one history: what was a morning snack once suggests itself for an afternoon one. */
@@ -456,7 +481,7 @@ export function nutritionAverage(
   for (const e of entries) {
     if (e.date < from || e.date > to) continue
     const n = dayNutrition(e, index)
-    if (!n.meals.length || n.missing.length) continue
+    if (!hasFullFigures(n)) continue
     days++
     kcal += n.kcal
     protein += n.protein_g

@@ -79,6 +79,21 @@ export function sodaKcal(drink: string | null | undefined, size: string | null |
 }
 
 /** Calories summed over the sized sodas, plus how many carried no size (and so no figure). */
+/** The most recently logged soda across the journal, with its day — what a quick-add repeats (audit #42 item 41: the hub widget and the home button each found it). */
+export function lastSoda<T extends { time: string, drink?: string | null, size?: string | null }>(
+  entries: Array<{ date: string, sodas?: T[] | null }>
+): (T & { date: string }) | null {
+  const all = entries.flatMap(e => (e.sodas ?? []).map(s => ({ ...s, date: e.date })))
+  all.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+  return all.at(-1) ?? null
+}
+
+/** "DR PEPPER 12oz can" — the quick-add's own label for the drink it will log; "SODA" with no history. */
+export function quickAddLabel(last: { drink?: string | null, size?: string | null } | null | undefined): string {
+  const drink = (last?.drink || 'Soda').toUpperCase()
+  return last?.size ? `${drink} ${last.size}` : drink
+}
+
 export function sodaKcalTotals(sodas: Array<{ drink?: string | null, size?: string | null }>): { kcal: number, unsized: number } {
   let kcal = 0
   let unsized = 0

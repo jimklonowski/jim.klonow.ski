@@ -21,7 +21,7 @@ import type { ProtocolRule } from './protocolRules'
 import type { DoseUnit } from '../types/journal'
 // Explicit .ts: runtime imports, and the plain-node test runner can't resolve them extensionless.
 import { pkDoseAmount, type PkDose, type PkModel } from './pk.ts'
-import { diffDays, shiftDays } from './dates.ts'
+import { diffDays, shiftDays, weekdayOf } from './dates.ts'
 
 export interface CyclePlanItem {
   /** Must match a KNOWN_COMPOUNDS name — that's what links colors, PK models, and dose logs. */
@@ -291,7 +291,9 @@ export function plannedDoses(cycle: Cycle, compound: string, model?: PkModel): P
     const amount = model ? pkDoseAmount(item.dose, item.unit, model) : item.dose
     if (amount == null || amount <= 0) continue
     for (let d = window.from; d <= window.to; d = shiftDays(d, 1)) {
-      if (item.weekdays.includes(new Date(d + 'T12:00:00').getDay())) {
+      // weekdayOf, not a local-time Date: `new Date(d + 'T12:00:00').getDay()` read the RUNTIME's
+      // zone, so a Worker (UTC) and a browser (Chicago) could disagree on a day's weekday.
+      if (item.weekdays.includes(weekdayOf(d))) {
         dates.push({ date: d, amount })
       }
     }
