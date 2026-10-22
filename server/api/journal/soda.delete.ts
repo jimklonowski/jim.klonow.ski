@@ -1,4 +1,5 @@
 import { zSodaRemove } from '#shared/utils/schemas'
+import { removeAtSql } from '#shared/utils/journalRemove'
 
 // Removes one entry (by index) from a day's `sodas` array - lets the dashboard widget undo a mis-tap.
 //
@@ -11,6 +12,10 @@ import { zSodaRemove } from '#shared/utils/schemas'
 // JS-splice-then-UPDATE, for the same lost-update-under-concurrency reason as soda.post.ts. The
 // updated array is fetched with a follow-up SELECT rather than an `UPDATE ... RETURNING`, which
 // separately also hung when it landed within ~1s of another write to the same row.
+//
+// The UPDATE matches only when the index exists (shared/utils/journalRemove.ts), so a stale
+// index is a no-op that is NOT audited — it used to log an "update" whose before image equalled
+// the row (audit #42 item 24).
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
@@ -20,12 +25,11 @@ export default defineEventHandler(async (event) => {
 
   const db = getDb(event)
   const before = await auditBefore(event, 'journal_entries', date)
-  await db.prepare(`
-    UPDATE journal_entries SET sodas = json_remove(sodas, '$[' || CAST(?2 AS INTEGER) || ']') WHERE date = ?1
-  `).bind(date, index).run()
-  if (before) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− soda on ${date}` })
+  const res = await db.prepare(removeAtSql('sodas')).bind(date, index).run()
+  const removed = (res.meta.changes ?? 0) > 0
+  if (before && removed) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− soda on ${date}` })
 
   const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
   const sodas = JSON.parse(row?.sodas ?? '[]') as Array<{ time: string, drink?: string, size?: string }>
-  return { ok: true, date, sodas }
+  return { ok: true, date, sodas, removed }
 })
