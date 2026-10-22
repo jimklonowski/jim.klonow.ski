@@ -87,6 +87,7 @@
           cell.isFuture ? 'opacity-40' : ''
         ]"
         :title="cell.title || undefined"
+        :aria-label="cell.date ? [formatDate(cell.date, 'short'), cell.isToday ? 'today' : null, cell.title || null].filter(Boolean).join(', ') : undefined"
         @click="cell.date && canOpenDays && navigateTo(`/journal/${cell.date}`)"
       >
         <template v-if="cell.date">

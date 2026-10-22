@@ -8,7 +8,9 @@ import { visitsForGuest } from '#shared/utils/tickerVisits'
 // that game's visitors' leaderboard. The crusher's record also remembers whether a wall was ever
 // cleared; the world's whether the month was, and which feats a finished month ever earned.
 export default defineEventHandler(async (event): Promise<TickerRunResponse> => {
-  const auth = requireRole(event, 'owner', 'friend', 'doctor')
+  // The roles that may open /ticker (access.ts) minus the demo, whose pet remembers in the browser.
+  const auth = requireTickerAccess(event)
+  if (auth.role === 'demo') throw createError({ statusCode: 403, message: 'The demo pet remembers in the browser' })
   const { score, game, cleared, feats } = await readValidatedJson(event, zTickerRun)
   const today = localToday()
   const db = getDb(event)

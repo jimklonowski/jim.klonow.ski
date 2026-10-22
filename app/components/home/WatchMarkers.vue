@@ -13,7 +13,7 @@
         v-for="t in tiles"
         :key="t.key"
         :to="{ path: '/labs', query: { marker: t.key } }"
-        :aria-label="`${t.label} — open its history on the labs page`"
+        :aria-label="t.aria"
         class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-row-hover hover:border-line-input transition-colors min-w-0"
       >
         <div class="flex items-baseline justify-between gap-2 min-w-0">
@@ -168,10 +168,13 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((key) => {
     return [{ date: p.date, x: xOf(i), y: yOf(p.value), color: p.censored ? STATUS_COLORS.low : color, hollow: p.censored }]
   })
 
+  const label = meta.label.replace(/\s*\(.*\)$/, '')
+  const foot = latest.censored ? `† ${fmt(latest.value)} is a ceiling` : refLabel(meta.refMin, meta.refMax)
+  const statusWord = { optimal: 'in range', low: 'low', high: 'high', unknown: 'no reference range' }[status] ?? status
   return [{
     key,
     // "Testosterone (Total)" → "Testosterone": the parenthetical doesn't fit a quarter-width tile.
-    label: meta.label.replace(/\s*\(.*\)$/, ''),
+    label,
     unit: meta.unit,
     value: fmt(latest.value),
     censored: latest.censored,
@@ -179,8 +182,11 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((key) => {
     guideY: guideShown ? yOf(guide) : null,
     linePoints,
     dots,
-    foot: latest.censored ? `† ${fmt(latest.value)} is a ceiling` : refLabel(meta.refMin, meta.refMax),
-    asOf: `as of ${formatDate(latest.date, 'monthDay')}`
+    foot,
+    asOf: `as of ${formatDate(latest.date, 'monthDay')}`,
+    // What the tile says (the value, its status, the reference, the date) — a reader used to get
+    // only the marker's name and where the link goes.
+    aria: `${label}: ${fmt(latest.value)} ${meta.unit}${latest.censored ? ' (a ceiling)' : ''}, ${statusWord}; ${foot}; as of ${formatDate(latest.date, 'monthDay')} — open its history on the labs page`
   }]
 }))
 </script>

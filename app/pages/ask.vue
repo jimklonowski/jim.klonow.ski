@@ -81,8 +81,13 @@
         </div>
       </div>
 
-      <!-- Transcript -->
-      <div class="flex-1 px-4 sm:px-6 py-4 space-y-4">
+      <!-- Transcript. A polite live region that is BUSY while an answer streams: a reader
+           announces the finished answer once, not every token as it lands. -->
+      <div
+        class="flex-1 px-4 sm:px-6 py-4 space-y-4"
+        aria-live="polite"
+        :aria-busy="streaming"
+      >
         <div
           v-if="!messages.length"
           class="space-y-3"
@@ -160,7 +165,8 @@
             placeholder="ask ticker about our data…"
             class="flex-1"
             :ui="{ base: 'resize-none text-row placeholder:text-ghost' }"
-            :disabled="streaming"
+            :readonly="streaming"
+            aria-label="Your question"
             @keydown.enter.exact.prevent="send()"
           />
           <button

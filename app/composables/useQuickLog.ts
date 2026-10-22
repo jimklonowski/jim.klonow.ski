@@ -58,6 +58,8 @@ export async function useQuickLog() {
         body: { date: today.value, time: localTimeNow(), drink: lastSoda.value?.drink || undefined, size: lastSoda.value?.size || undefined }
       })
       patchToday({ sodas })
+      // The status line moves too, but a tap deserves a word of its own (audit #42 item 38).
+      toast.add({ title: `Logged ${sodaLabel.value}`, description: `${sodas.length} soda${sodas.length === 1 ? '' : 's'} today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
     }
     catch (err) {
@@ -77,6 +79,7 @@ export async function useQuickLog() {
         body: { date: today.value, time: localTimeNow(), oz: cupOz.value }
       })
       patchToday({ water })
+      toast.add({ title: `Logged ${cupOz.value} oz of water`, description: `${waterTotals(water).oz} oz today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
     }
     catch (err) {

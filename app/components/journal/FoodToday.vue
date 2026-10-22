@@ -25,7 +25,7 @@
         class="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 items-baseline text-row"
       >
         <span
-          class="text-micro uppercase tracking-widest pt-1"
+          class="text-micro uppercase tracking-widest pt-1 whitespace-nowrap"
           :class="row.snack && !row.text && editing !== row.slot ? 'text-ghost' : 'text-muted'"
         >{{ row.snack && !row.text && editing !== row.slot ? '' : row.label }}</span>
 
@@ -34,6 +34,8 @@
           class="min-w-0"
         >
           <div class="flex items-center gap-2 min-w-0">
+            <!-- Enter saves and Escape cancels, yielding to the suggestion menu when it has a say
+                 (see onDraftKey) — the keys used to need the mouse for ✓ and ✕. -->
             <UInputMenu
               v-model="draft"
               mode="autocomplete"
@@ -43,6 +45,7 @@
               :placeholder="row.placeholder"
               class="flex-1 min-w-0"
               :ui="{ item: 'text-small' }"
+              @keydown.capture="onDraftKey($event, row.slot)"
             />
             <button
               type="button"
@@ -97,10 +100,12 @@
           />
         </div>
 
+        <!-- Each opener names its slot for assistive tech: six "+ add" buttons read the same otherwise. -->
         <button
           v-else-if="!readonly && row.snack"
           type="button"
           class="text-left text-meta text-ghost hover:text-accent cursor-pointer"
+          :aria-label="`Add ${row.fullLabel.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
           + {{ row.label.toLowerCase() }}
@@ -110,6 +115,7 @@
           type="button"
           class="text-left cursor-pointer"
           :class="row.slot === suggestedSlot ? 'text-accent hover:text-accent-hover' : 'text-faint hover:text-accent'"
+          :aria-label="`Add ${row.fullLabel.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
           + add{{ row.slot === suggestedSlot ? ` ${row.label.toLowerCase()}` : '' }}
@@ -144,7 +150,7 @@
           class="text-hi"
           :class="proteinTarget && avg.protein_g >= proteinTarget ? 'text-accent' : ''"
         >{{ avg.protein_g }}</span> g protein<template v-if="proteinTarget"> / {{ proteinTarget }} g</template>
-        <span class="text-faint">· {{ avg.days }} day{{ avg.days === 1 ? '' : 's' }} est.</span>
+        <span class="text-faint">· {{ avg.days }} day{{ avg.days === 1 ? '' : 's' }}{{ avg.estimated ? ' est.' : '' }}</span>
       </span>
       <span
         v-else
@@ -216,10 +222,15 @@ const PLACEHOLDERS: Record<MealSlot, string> = {
 
 // The legacy single Snack appears only on a day that has one; the gap snacks always have a row
 // (as "+ snack" when empty).
+// The card's label column is 5.5rem wide: "AFTERNOON SNACK" wrapped onto two lines in it, so the
+// gap snacks show short names here; accessible names and titles keep the full slot label.
+const CARD_LABELS: Partial<Record<MealSlot, string>> = { snack_am: 'AM snack', snack_pm: 'PM snack', snack_eve: 'Eve snack' }
+
 const slotRows = computed(() => MEAL_SLOTS
   .map(slot => ({
     slot,
-    label: MEAL_SLOT_LABELS[slot],
+    label: CARD_LABELS[slot] ?? MEAL_SLOT_LABELS[slot],
+    fullLabel: MEAL_SLOT_LABELS[slot],
     snack: isSnackSlot(slot),
     text: todayEntry.value?.food?.[slot]?.trim() ?? '',
     placeholder: PLACEHOLDERS[slot]
@@ -249,12 +260,42 @@ function historyFor(slot: MealSlot): string[] {
 // --- quick log --- (declared before slotRows reads it? No: computeds are lazy, so order is fine.)
 const editing = ref<MealSlot | null>(null)
 const draft = ref('')
+
+/**
+ * Keyboard on the quick-log input (capture phase, so it sees the key before the combobox). Enter
+ * saves — unless an autocomplete option is really highlighted, in which case the menu picks it
+ * and the next Enter saves. Escape cancels — unless the menu is showing options, in which case
+ * it closes first. The gate reads the DOM, not the combobox's flags: it reports itself expanded
+ * with an empty list while you type, and keeps `aria-activedescendant` pointing at an option
+ * that was typed away, so trusting either swallowed every Enter.
+ */
+function onDraftKey(e: KeyboardEvent, slot: MealSlot) {
+  const input = e.target as HTMLElement | null
+  const listbox = document.getElementById(input?.getAttribute('aria-controls') ?? '')
+  const options = listbox?.querySelectorAll('[role="option"]').length ?? 0
+  const activeId = input?.getAttribute('aria-activedescendant')
+  const highlighted = options > 0 && !!activeId && !!document.getElementById(activeId)
+  if (e.key === 'Enter') {
+    if (highlighted) return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    void saveSlot(slot)
+  }
+  else if (e.key === 'Escape') {
+    if (options > 0) return
+    e.stopImmediatePropagation()
+    editing.value = null
+  }
+}
 const saving = ref(false)
 // The chip under the input follows the draft a beat behind, so it doesn't flicker per keystroke.
 const liveDraft = refDebounced(draft, 350)
 const known = computed(() => knownMeals(entries.value, index.value))
 
 function startEdit(slot: MealSlot) {
+  // Not while a save is in flight: switching slots mid-save let the finishing save close the new
+  // edit under the cursor (audit #42 item 38).
+  if (saving.value) return
   draft.value = todayEntry.value?.food?.[slot] ?? ''
   editing.value = slot
 }
