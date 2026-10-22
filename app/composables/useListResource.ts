@@ -23,6 +23,13 @@
 //    earlier (or flipped the page to its TuiDataState error panel). When the browser already
 //    holds content for the key, the fetcher returns that instead and raises a toast saying the
 //    list couldn't refresh. A failed FIRST load still throws, and the page's error panel shows it.
+//
+// 4. A local write during a fetch is not overwritten by it. The quick-log widgets assign
+//    `data.value` straight after their POST; a mount-time revalidation already in flight then
+//    resolved with the list as it was BEFORE the tap and put that on screen — the soda or pour
+//    was saved, but vanished until the next refresh (audit #42 item 23). Every assignment that
+//    isn't the fetcher's own is stamped; a response requested before the latest stamp is stale,
+//    so the fetcher hands back what's on screen and fetches once more for the server's truth.
 
 interface ListResourceOptions<Raw, T> {
   /** Reshape the response once, before it's cached (e.g. the labs list's derived markers). */
@@ -62,6 +69,10 @@ function refreshFailedToast(toast: ReturnType<typeof useToast>, label: string, e
 const lastFetchStarted = new Map<string, number>()
 const JUST_FETCHED_MS = 2000
 
+// Rule 4: when each key's `data` was last assigned by something other than the fetcher (a
+// widget's local patch after a write). Client-only, like lastFetchStarted.
+const lastPatchedAt = new Map<string, number>()
+
 /** Whether a cached value is worth serving. An empty list or object reads as a miss and refetches. */
 function hasContent(value: unknown): boolean {
   if (value == null) return false
@@ -79,22 +90,42 @@ export function useListResource<T, Raw = T>(key: string, url: string, options: L
   // Created while hydrating a hard load: the SSR payload was fetched for this very render.
   const fromSsr = import.meta.client && nuxtApp.isHydrating
 
+  // The value the fetcher last handed to useAsyncData: any other value seen in `data` is a
+  // local patch (rule 4).
+  let lastFetched: T | undefined
+
   const result = useAsyncData<T>(
     key,
     async () => {
-      if (import.meta.client) lastFetchStarted.set(key, Date.now())
+      const startedAt = Date.now()
+      if (import.meta.client) lastFetchStarted.set(key, startedAt)
       try {
         // Nuxt 4.6's route-typed fetch can't prove its result assignable to an unconstrained
         // generic, so the cast goes on the result rather than the call.
         const raw = await requestFetch(url) as Raw
-        return transform ? transform(raw) : (raw as unknown as T)
+        const value = transform ? transform(raw) : (raw as unknown as T)
+        // Rule 4: a write landed while this request was out, so the response predates what's on
+        // screen. Keep the screen, and ask again for the list that includes the write. The screen
+        // is the live ref, not the payload: Nuxt writes the payload only when a fetch resolves,
+        // so it never holds a widget's local patch.
+        const current = live.data.value
+        if (import.meta.client && (lastPatchedAt.get(key) ?? 0) > startedAt && hasContent(current)) {
+          queueMicrotask(() => {
+            result.refresh({ dedupe: 'cancel' })
+          })
+          lastFetched = current as T
+          return current as T
+        }
+        lastFetched = value
+        return value
       }
       catch (err) {
-        // Rule 3: keep the last good value rather than let useAsyncData wipe it. The payload
-        // holds the last successful (already transformed) result for this key.
-        const current = nuxtApp.payload.data[key]
+        // Rule 3: keep the last good value rather than let useAsyncData wipe it — what's on
+        // screen (local patches included), else the payload's last successful result.
+        const current = live.data.value ?? nuxtApp.payload.data[key]
         if (import.meta.client && hasContent(current)) {
           refreshFailedToast(toast, label, err)
+          lastFetched = current as T
           return current as T
         }
         throw err
@@ -114,6 +145,18 @@ export function useListResource<T, Raw = T>(key: string, url: string, options: L
       }
     }
   )
+
+  // The list as the page sees it right now, local patches included (rules 3 and 4 read it from
+  // inside the fetcher, which only runs after this line).
+  const live = useNuxtData<T>(key)
+
+  // Rule 4's stamp: `data` set to anything but the fetcher's own result is a local patch. Sync
+  // flush, so the stamp is taken at the assignment, before a response can be compared to it.
+  if (import.meta.client) {
+    watch(result.data, (v) => {
+      if (v !== lastFetched) lastPatchedAt.set(key, Date.now())
+    }, { flush: 'sync' })
+  }
 
   // Revalidate on mount. This is deliberately not tied to whether getCachedData served the
   // data: when another mounted component already holds the key (the header menu, or the
