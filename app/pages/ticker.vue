@@ -747,7 +747,14 @@ const WEARABLE_META: Partial<Record<TickerProp, { id: string, name: string, desc
   medal: { id: 'medal', name: 'Two Fifty', desc: 'two hundred and fifty logged days — the medal', icon: 'i-lucide-medal' }
 }
 
-const achievements = computed<Achievement[]>(() => [
+// Achievements the demo persona can never earn, so they are not shown to it (audit #42 item 29):
+// Clean Week needs schedule rules (the sandbox has none — `rulesApply`), Luscious ninety days of
+// finasteride (not in the seed), Open House visits from friends (the sandbox gets none).
+const DEMO_UNREACHABLE = new Set(['clean-week', 'luscious', 'open-house'])
+
+const achievements = computed<Achievement[]>(() => allAchievements.value.filter(a => role.value !== 'demo' || !DEMO_UNREACHABLE.has(a.id)))
+
+const allAchievements = computed<Achievement[]>(() => [
   ...milestones.value.map(m => ({ ...WEARABLE_META[m.prop]!, goal: m.goal, progress: m.progress, unit: m.unit, reward: m.prop })),
   { id: 'grown', name: 'Hatched', desc: 'thirty logged days — it grew limbs', icon: 'i-lucide-egg', goal: TIER_DAYS.grown, progress: loggedDays.value, unit: 'logged days' },
   { id: 'elder', name: 'Elder', desc: 'five hundred logged days — the cane', icon: 'i-lucide-hourglass', goal: TIER_DAYS.elder, progress: loggedDays.value, unit: 'logged days' },
