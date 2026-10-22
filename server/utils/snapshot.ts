@@ -22,13 +22,20 @@ export async function snapshotDatabase(db: D1Database, database: string): Promis
     migrations: (applied ?? []).map(m => m.name),
     tables: {}
   }
+  // Every table's shape and contents in ONE round trip: a PRAGMA (column order from the schema, so
+  // an empty table still records its shape) and a SELECT per table, batched — this used to await
+  // two statements per table in turn, ~30 round trips a snapshot (audit #42 item 35).
+  const statements = names.flatMap(name => [
+    db.prepare(`PRAGMA table_info(${name})`),
+    db.prepare(`SELECT * FROM ${name}`)
+  ])
+  const results = statements.length ? await db.batch<Record<string, unknown>>(statements) : []
   let rows = 0
-  for (const name of names) {
-    // Column order from the schema, so an empty table still records its shape.
-    const { results: info } = await db.prepare(`PRAGMA table_info(${name})`).all<{ name: string }>()
-    const { results } = await db.prepare(`SELECT * FROM ${name}`).all<Record<string, unknown>>()
-    backup.tables[name] = toBackupTable(results ?? [], (info ?? []).map(c => c.name))
-    rows += results?.length ?? 0
-  }
+  names.forEach((name, i) => {
+    const info = (results[i * 2]?.results ?? []) as Array<{ name: string }>
+    const data = results[i * 2 + 1]?.results ?? []
+    backup.tables[name] = toBackupTable(data, info.map(c => c.name))
+    rows += data.length
+  })
   return { backup, rows }
 }

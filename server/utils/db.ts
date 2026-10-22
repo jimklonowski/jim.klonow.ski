@@ -195,16 +195,35 @@ export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
 // "missing", race to INSERT, and the loser die on the PRIMARY KEY — a 502 that Whoop retried and
 // the menu wore as ⚠ until the next clean sync. ON CONFLICT touches only this call's fields, so
 // concurrent writers with different fields still merge instead of clobbering each other.
-export async function upsertHealthMetrics(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): Promise<boolean> {
+/** The health_metrics upsert for one date as a statement, or null when there is nothing to write. */
+export function healthMetricsStatement(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): D1PreparedStatement | null {
   const cols = HEALTH_METRIC_FIELDS.filter(f => fields[f] != null)
-  if (cols.length === 0) return false
-
-  await db.prepare(`
+  if (cols.length === 0) return null
+  return db.prepare(`
     INSERT INTO health_metrics (date, ${cols.join(', ')})
     VALUES (?1, ${cols.map((_, i) => `?${i + 2}`).join(', ')})
     ON CONFLICT(date) DO UPDATE SET ${cols.map(f => `${f} = excluded.${f}`).join(', ')}
-  `).bind(date, ...cols.map(f => fields[f]!)).run()
+  `).bind(date, ...cols.map(f => fields[f]!))
+}
+
+export async function upsertHealthMetrics(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): Promise<boolean> {
+  const stmt = healthMetricsStatement(db, date, fields)
+  if (!stmt) return false
+  await stmt.run()
   return true
+}
+
+/**
+ * Runs prepared statements in batches (one round trip each) instead of one await per row — the
+ * Whoop sync, the health webhook and the snapshot used to loop `await …run()` over every date and
+ * workout, a D1 round trip apiece (audit #42 item 35). A batch is one transaction, so the chunk
+ * size keeps a single failure from rolling back more than a slice; twenty mirrors the demo reset.
+ */
+export async function runBatched(db: D1Database, statements: D1PreparedStatement[], size = 20): Promise<number> {
+  for (let i = 0; i < statements.length; i += size) {
+    await db.batch(statements.slice(i, i + size))
+  }
+  return statements.length
 }
 
 export function parseWorkoutRow(row: Record<string, unknown>) {
@@ -290,26 +309,52 @@ export interface WorkoutUpsert {
 // offers no protection (SQLite treats NULLs as distinct) and Health Auto Export re-sends
 // overlapping windows on a schedule — so id-less rows are deduped on their natural key
 // (date + start_time + workout_type) instead of inserted unconditionally.
-export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<void> {
+/**
+ * A workout with an external id upserts in one statement — returned here so a sync can batch
+ * dozens of them. Null for a workout without an id: that path needs a read first (upsertWorkout).
+ */
+export function workoutStatement(db: D1Database, w: WorkoutUpsert): D1PreparedStatement | null {
+  if (!w.external_id) return null
   // One spelling per activity whichever source wrote it: Whoop's "disc-golf" and Apple's "Disc
   // Sports" both land as "Disc Golf", so the read-time merge can't flip the label between syncs.
   const workoutType = normalizeWorkoutType(w.workout_type)
-  if (w.external_id) {
-    await db.prepare(`
-      INSERT INTO workouts (external_id, date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-      ON CONFLICT(external_id) DO UPDATE SET
-        date = excluded.date,
-        workout_type = excluded.workout_type,
-        start_time = excluded.start_time,
-        duration_min = excluded.duration_min,
-        calories = excluded.calories,
-        avg_hr = excluded.avg_hr,
-        max_hr = excluded.max_hr,
-        distance_mi = excluded.distance_mi
-    `).bind(w.external_id, w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+  return db.prepare(`
+    INSERT INTO workouts (external_id, date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+    ON CONFLICT(external_id) DO UPDATE SET
+      date = excluded.date,
+      workout_type = excluded.workout_type,
+      start_time = excluded.start_time,
+      duration_min = excluded.duration_min,
+      calories = excluded.calories,
+      avg_hr = excluded.avg_hr,
+      max_hr = excluded.max_hr,
+      distance_mi = excluded.distance_mi
+  `).bind(w.external_id, w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi)
+}
+
+/**
+ * Many workouts in as few round trips as possible: the ones with an external id go in batches,
+ * the rare id-less ones one at a time (their read-then-write cannot be batched).
+ */
+export async function upsertWorkouts(db: D1Database, workouts: WorkoutUpsert[]): Promise<number> {
+  const statements: D1PreparedStatement[] = []
+  for (const w of workouts) {
+    const stmt = workoutStatement(db, w)
+    if (stmt) statements.push(stmt)
+    else await upsertWorkout(db, w)
+  }
+  await runBatched(db, statements)
+  return workouts.length
+}
+
+export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<void> {
+  const stmt = workoutStatement(db, w)
+  if (stmt) {
+    await stmt.run()
   }
   else {
+    const workoutType = normalizeWorkoutType(w.workout_type)
     // `IS` instead of `=` so NULL start_time/workout_type still match their own kind.
     const existing = await db.prepare(`
       SELECT id FROM workouts

@@ -269,6 +269,11 @@ test('photos, shots and profile facts', () => {
   assert.ok(problem(zVaccinationSave, { date: '2026-09-10', vaccine: '' }))
   assert.equal(zProfileSave.parse({ key: 'blood_type' }).value, '', 'no value clears the fact')
   assert.equal(zProfileSave.parse({ key: 'blood_type', value: ' O+ ' }).value, 'O+')
+  // A number input emits a number; the fact is stored as its string (the card modal's 400, 2026-10-22).
+  assert.equal(zProfileSave.parse({ key: 'cup_oz', value: 9 }).value, '9')
+  assert.equal(zProfileSave.parse({ key: 'cup_oz', value: 12.5 }).value, '12.5')
+  assert.equal(zProfileSave.parse({ key: 'cup_oz', value: '12' }).value, '12')
+  assert.equal(zProfileSave.safeParse({ key: 'cup_oz', value: Number.NaN }).success, false)
 })
 
 test('cycle save: types and bounds here, cross-field rules in the handler', () => {

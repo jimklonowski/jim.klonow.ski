@@ -94,6 +94,34 @@
             <span class="text-muted">{{ rows.length }} total rows</span>
             <span class="ml-auto text-muted">{{ selectedCount }} selected</span>
           </div>
+          <!-- New days start unselected: each one imported becomes a journal day with nothing but
+               a vital on it. Selecting them is one click, and the count is said out loud. -->
+          <p
+            v-if="newCount"
+            class="mt-1.5 text-meta"
+            :class="selectedNewCount ? 'text-warn' : 'text-muted'"
+          >
+            <template v-if="selectedNewCount">
+              {{ selectedNewCount }} new {{ selectedNewCount === 1 ? 'day' : 'days' }} will be created as journal entries with only these vitals — they count as logged days.
+              <button
+                type="button"
+                class="text-accent hover:text-accent-hover cursor-pointer"
+                @click="selectNew(false)"
+              >
+                deselect new days
+              </button>
+            </template>
+            <template v-else>
+              New days are not selected — only existing days get their missing vitals filled.
+              <button
+                type="button"
+                class="text-accent hover:text-accent-hover cursor-pointer"
+                @click="selectNew(true)"
+              >
+                select the {{ newCount }} new {{ newCount === 1 ? 'day' : 'days' }} too
+              </button>
+            </template>
+          </p>
 
           <!-- Preview table. An export reaches back years (1,000+ days), so past a few hundred rows
                it virtualizes; striping then comes from the row index, since recycled rows would
@@ -430,7 +458,11 @@ function buildRows(byDate: Record<string, HealthData>): ParsedRow[] {
 
       if (Object.keys(updates).length === 0) return []
 
-      return [{ date, ...data, updates, action: existing ? 'update' : 'create', selected: true }]
+      // Fills of days already in the journal are selected; NEW days are not. A multi-year export
+      // carries a scale or watch reading for almost every day, and importing them all used to
+      // create hundreds of vitals-only journal rows — each a "logged day" to the streak, the
+      // calendar and the digests (audit #42 item 32). New days are a deliberate opt-in below.
+      return [{ date, ...data, updates, action: existing ? 'update' : 'create', selected: !!existing }]
     })
 }
 
@@ -494,6 +526,7 @@ function bpText(row: ParsedRow) {
 const newCount = computed(() => rows.value.filter(r => r.action === 'create').length)
 const updateCount = computed(() => rows.value.filter(r => r.action === 'update').length)
 const selectedCount = computed(() => rows.value.filter(r => r.selected).length)
+const selectedNewCount = computed(() => rows.value.filter(r => r.action === 'create' && r.selected).length)
 const allSelected = computed(() => rows.value.length > 0 && rows.value.every(r => r.selected))
 const someSelected = computed(() => rows.value.some(r => r.selected))
 
@@ -501,6 +534,11 @@ const someSelected = computed(() => rows.value.some(r => r.selected))
 function toggleAll(value: boolean | 'indeterminate') {
   const next = value === true
   for (const row of rows.value) row.selected = next
+}
+
+/** The opt-in for new days (the fills keep whatever they have). */
+function selectNew(value: boolean) {
+  for (const row of rows.value) if (row.action === 'create') row.selected = value
 }
 
 // --- Import ---

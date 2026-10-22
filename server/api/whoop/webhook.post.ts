@@ -49,7 +49,9 @@ async function handle(db: D1Database, hook: Hook) {
       const byDate = metricsByDate(recovery ? [recovery] : [], r => r.created_at, recoveryMetric)
       metricsByDate([sleep], s => s.end, sleepMetric, byDate)
       metricsByDate(cycles, c => c.start, cycleMetric, byDate)
-      for (const [date, fields] of Object.entries(byDate)) await upsertHealthMetrics(db, date, fields)
+      await runBatched(db, Object.entries(byDate)
+        .map(([date, fields]) => healthMetricsStatement(db, date, fields))
+        .filter((s): s is D1PreparedStatement => s != null))
       return {
         dates: Object.keys(byDate).sort(),
         fields: [...new Set(Object.values(byDate).flatMap(f => Object.keys(f)))].sort()

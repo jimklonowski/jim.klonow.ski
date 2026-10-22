@@ -96,6 +96,29 @@ export default defineNuxtConfig({
         }
       }
     },
+    // The other token-spending routes (audit #42 item 30). All owner-only, so these are caps on a
+    // runaway client or a leaked owner cookie, not on normal use: one meal-estimate call per batch
+    // of 50 texts, one Opus call per PDF, one per summary, one per digest. The backfill is the
+    // expensive one — one request can write many digests — hence the tightest cap.
+    '/api/journal/meals/estimate': {
+      security: { rateLimiter: { tokensPerInterval: 20, interval: 300000, ipHeader: 'cf-connecting-ip' } }
+    },
+    '/api/journal/vials/parse': {
+      security: { rateLimiter: { tokensPerInterval: 20, interval: 300000, ipHeader: 'cf-connecting-ip' } }
+    },
+    '/api/journal/digest/generate': {
+      security: { rateLimiter: { tokensPerInterval: 10, interval: 300000, ipHeader: 'cf-connecting-ip' } }
+    },
+    '/api/journal/digest/backfill': {
+      security: { rateLimiter: { tokensPerInterval: 3, interval: 600000, ipHeader: 'cf-connecting-ip' } }
+    },
+    // (/api/labs/process-pdf gets its limiter below, on its existing body-size rule.)
+    '/api/labs/generate-summary': {
+      security: { rateLimiter: { tokensPerInterval: 10, interval: 300000, ipHeader: 'cf-connecting-ip' } }
+    },
+    '/api/dexa/generate-summary': {
+      security: { rateLimiter: { tokensPerInterval: 10, interval: 300000, ipHeader: 'cf-connecting-ip' } }
+    },
     '/demo': {
       security: {
         rateLimiter: {
@@ -126,7 +149,9 @@ export default defineNuxtConfig({
       security: {
         requestSizeLimiter: {
           maxUploadFileRequestInBytes: 20000000 // multipart lab-PDF uploads
-        }
+        },
+        // One Opus call per PDF (audit #42 item 30) — the same runaway cap as the other spenders.
+        rateLimiter: { tokensPerInterval: 10, interval: 300000, ipHeader: 'cf-connecting-ip' }
       }
     }
   },

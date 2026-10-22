@@ -178,8 +178,10 @@
               placeholder="Pick one"
               class="w-full"
             />
-            <!-- A number stays a string in profileValue (the table's one value column is TEXT);
-                 the server checks the bounds and stores the canonical figure. -->
+            <!-- UInput type="number" emits a NUMBER into profileValue; saveProfile sends it as the
+                 string the API stores (the table's one value column is TEXT) — posting the raw
+                 number was a 400 "expected string, received number" (2026-10-22). The server
+                 checks the bounds and stores the canonical figure. -->
             <UInput
               v-else-if="profileField.kind === 'number'"
               v-model="profileValue"
@@ -354,6 +356,8 @@ const meta = computed(() => {
 
 const profileModalOpen = ref(false)
 const profileField = ref<ProfileField | null>(null)
+// Typed as the inputs' v-model is (string), but at runtime the number input hands back a NUMBER
+// (Nuxt UI casts it) — saveProfile stringifies whatever arrives.
 const profileValue = ref('')
 
 function openProfileModal(f: ProfileField) {
@@ -369,8 +373,9 @@ const { run: runSaveProfile, pending: profileSaving } = useSaveAction(async (fie
   profileModalOpen.value = false
 }, { success: (_, field, value) => value ? `${field.label} saved` : `${field.label} cleared` })
 
-async function saveProfile(value: string) {
-  if (profileField.value) await runSaveProfile(profileField.value, value)
+/** Whatever the input emitted goes over the wire as the string the profile table stores. */
+async function saveProfile(value: string | number) {
+  if (profileField.value) await runSaveProfile(profileField.value, value === '' ? '' : String(value))
 }
 
 // --- shots ---

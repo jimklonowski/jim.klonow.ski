@@ -190,15 +190,20 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
     })
 }
 
-/** Wallet-card facts (blood type, …) — looked up, never trended. '' when none, or no table yet. */
+/**
+ * Wallet-card facts (blood type, …) — looked up, never trended. '' when none, or on a database
+ * without the table yet; any other failure propagates rather than reading as "no facts on file"
+ * (audit #42 item 31).
+ */
 async function profileLine(db: D1Database): Promise<string> {
   try {
     const { results } = await db.prepare('SELECT key, value FROM profile').all<{ key: string, value: string }>()
     const rows = results ?? []
     return rows.length ? `Personal facts on file: ${rows.map(r => `${profileLabel(r.key)} ${r.value}`).join('; ')}.` : ''
   }
-  catch {
-    return ''
+  catch (err) {
+    if (isMissingTable(err)) return ''
+    throw err
   }
 }
 
