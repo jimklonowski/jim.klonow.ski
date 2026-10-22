@@ -34,6 +34,8 @@
           class="min-w-0"
         >
           <div class="flex items-center gap-2 min-w-0">
+            <!-- Enter saves and Escape cancels, yielding to the suggestion menu when it has a say
+                 (see onDraftKey) — the keys used to need the mouse for ✓ and ✕. -->
             <UInputMenu
               v-model="draft"
               mode="autocomplete"
@@ -43,6 +45,7 @@
               :placeholder="row.placeholder"
               class="flex-1 min-w-0"
               :ui="{ item: 'text-small' }"
+              @keydown.capture="onDraftKey($event, row.slot)"
             />
             <button
               type="button"
@@ -97,10 +100,12 @@
           />
         </div>
 
+        <!-- Each opener names its slot for assistive tech: six "+ add" buttons read the same otherwise. -->
         <button
           v-else-if="!readonly && row.snack"
           type="button"
           class="text-left text-meta text-ghost hover:text-accent cursor-pointer"
+          :aria-label="`Add ${row.label.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
           + {{ row.label.toLowerCase() }}
@@ -110,6 +115,7 @@
           type="button"
           class="text-left cursor-pointer"
           :class="row.slot === suggestedSlot ? 'text-accent hover:text-accent-hover' : 'text-faint hover:text-accent'"
+          :aria-label="`Add ${row.label.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
           + add{{ row.slot === suggestedSlot ? ` ${row.label.toLowerCase()}` : '' }}
@@ -249,6 +255,33 @@ function historyFor(slot: MealSlot): string[] {
 // --- quick log --- (declared before slotRows reads it? No: computeds are lazy, so order is fine.)
 const editing = ref<MealSlot | null>(null)
 const draft = ref('')
+
+/**
+ * Keyboard on the quick-log input (capture phase, so it sees the key before the combobox). Enter
+ * saves — unless an autocomplete option is really highlighted, in which case the menu picks it
+ * and the next Enter saves. Escape cancels — unless the menu is showing options, in which case
+ * it closes first. The gate reads the DOM, not the combobox's flags: it reports itself expanded
+ * with an empty list while you type, and keeps `aria-activedescendant` pointing at an option
+ * that was typed away, so trusting either swallowed every Enter.
+ */
+function onDraftKey(e: KeyboardEvent, slot: MealSlot) {
+  const input = e.target as HTMLElement | null
+  const listbox = document.getElementById(input?.getAttribute('aria-controls') ?? '')
+  const options = listbox?.querySelectorAll('[role="option"]').length ?? 0
+  const activeId = input?.getAttribute('aria-activedescendant')
+  const highlighted = options > 0 && !!activeId && !!document.getElementById(activeId)
+  if (e.key === 'Enter') {
+    if (highlighted) return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    void saveSlot(slot)
+  }
+  else if (e.key === 'Escape') {
+    if (options > 0) return
+    e.stopImmediatePropagation()
+    editing.value = null
+  }
+}
 const saving = ref(false)
 // The chip under the input follows the draft a beat behind, so it doesn't flicker per keystroke.
 const liveDraft = refDebounced(draft, 350)

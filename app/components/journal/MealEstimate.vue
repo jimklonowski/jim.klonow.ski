@@ -20,7 +20,12 @@
         :class="chipClass"
         :title="chipTitle"
       >{{ chipText }}</span>
-      <span class="text-faint">{{ sourceMark }}</span>
+      <!-- The glyph is for the eye; a reader gets the word instead. -->
+      <span
+        class="text-faint"
+        aria-hidden="true"
+      >{{ sourceMark }}</span>
+      <span class="sr-only">{{ sourceLabel }}</span>
     </template>
 
     <span
@@ -198,6 +203,12 @@ const sourceMark = computed(() => {
   const e = estimate.value
   if (!e) return ''
   return e.source === 'library' ? '≡' : e.source === 'manual' ? '✎' : 'est.'
+})
+/** What the glyph means, for screen readers. */
+const sourceLabel = computed(() => {
+  const e = estimate.value
+  if (!e) return ''
+  return e.source === 'library' ? 'meal library figures' : e.source === 'manual' ? 'entered by hand' : 'model estimate'
 })
 // A low-confidence model guess reads fainter; label figures read as the muted default.
 const chipClass = computed(() => (estimate.value?.source === 'ai' && estimate.value.confidence === 'low' ? 'text-faint' : 'text-muted'))
