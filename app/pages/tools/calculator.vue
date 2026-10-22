@@ -159,6 +159,17 @@
       {{ blockedMessage }}
     </p>
 
+    <!-- A u-100 insulin syringe holds 100 units (1 mL): a draw past that is more than one
+         syringe, which usually means the vial wants less bac water or the dose a split. -->
+    <p
+      v-if="unitsNeeded != null && syringesNeeded > 1"
+      class="px-4 sm:px-6 py-2.5 border-b border-line text-meta text-warn"
+      role="status"
+    >
+      ⚠ {{ roundTo(unitsNeeded, 1) }} units is more than one u-100 syringe — {{ syringesNeeded }} full draws
+      ({{ roundTo(unitsNeeded / 100, 2) }} mL). Reconstitute with less bac water for a smaller volume, or split the dose.
+    </p>
+
     <p
       v-if="unitsNeeded != null && bridgeNote"
       class="px-4 sm:px-6 py-2 border-b border-line text-meta text-faint"
@@ -244,6 +255,9 @@ const mismatchedUnits = computed(() => {
   const massBased = (u: DoseUnit) => u === 'mg' || u === 'mcg'
   return massBased(vialUnit.value) !== massBased(doseUnit.value)
 })
+
+/** How many u-100 syringes the draw fills — more than one is worth a warning (audit #42 item 33). */
+const syringesNeeded = computed(() => (unitsNeeded.value != null ? Math.ceil(unitsNeeded.value / 100) : 0))
 
 const unitsNeeded = computed(() =>
   calcUnits(dose.value, doseUnit.value, vialAmount.value, vialUnit.value, bacWaterMl.value, compound.value || undefined)
