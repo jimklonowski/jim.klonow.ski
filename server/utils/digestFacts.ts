@@ -4,6 +4,7 @@ import { roundTo, shiftDays } from '#shared/utils/dates'
 import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
+import { bpLabel } from '#shared/utils/bloodPressure'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 
@@ -239,7 +240,8 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     const delta = prev?.weight_lbs != null ? ` (${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${roundTo(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDay(prev.date)})` : ''
     lines.push(`Weight: ${entry.weight_lbs} lbs${delta}`)
   }
-  if (entry?.bp_systolic != null && entry?.bp_diastolic != null) lines.push(`Blood pressure: ${entry.bp_systolic}/${entry.bp_diastolic}`)
+  const bp = bpLabel(entry)
+  if (bp) lines.push(`Blood pressure: ${bp}`)
   if (entry?.rhr != null) lines.push(`Resting HR: ${entry.rhr} bpm`)
   if (entry?.hrv != null) lines.push(`HRV: ${entry.hrv} ms`)
   if (h?.recovery_score != null) lines.push(`Whoop recovery: ${h.recovery_score}%`)

@@ -204,6 +204,7 @@ let weekSeen = -1
 let cardAt = -1
 let cardText = ''
 let ro: ResizeObserver | undefined
+let stopTheme: (() => void) | undefined
 
 function prepare() {
   inks = resolveInks()
@@ -988,6 +989,8 @@ onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   touch.value = window.matchMedia('(pointer: coarse)').matches
   prepare()
+  // A preset picked mid-game re-reads the palette and rebakes the sprites.
+  stopTheme = onThemeChange(prepare)
   resize()
   emit('fit', ROWS * TILE + HUD_H)
   ro = new ResizeObserver(resize)
@@ -1035,6 +1038,7 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(raf)
   ro?.disconnect()
+  stopTheme?.()
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('keyup', onKeyUp)
   document.removeEventListener('visibilitychange', onVisibility)

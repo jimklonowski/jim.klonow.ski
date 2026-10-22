@@ -138,9 +138,11 @@
           </div>
 
           <div class="min-w-0 space-y-5">
-            <!-- Regional table -->
-            <div class="border border-line text-row">
-              <div class="grid grid-cols-[1fr_repeat(4,auto)] gap-x-4 px-2.5 py-1.5 border-b border-line text-right">
+            <!-- Regional table. ONE grid: the header and each row are subgrids spanning all five
+                 tracks, so the `auto` columns are sized by every cell together. As separate
+                 grids each sized its own tracks and the columns drifted row to row. -->
+            <div class="border border-line text-row grid grid-cols-[1fr_repeat(4,auto)]">
+              <div class="col-span-5 grid grid-cols-subgrid gap-x-4 px-2.5 py-1.5 border-b border-line text-right">
                 <span class="tui-label text-left">region</span>
                 <span class="tui-label">fat %</span>
                 <span class="tui-label">fat lbs</span>
@@ -154,7 +156,7 @@
                 role="button"
                 tabindex="0"
                 :aria-pressed="pinnedRegion === row.key"
-                class="grid grid-cols-[1fr_repeat(4,auto)] gap-x-4 px-2.5 py-1.5 text-right tabular-nums cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                class="col-span-5 grid grid-cols-subgrid gap-x-4 px-2.5 py-1.5 text-right tabular-nums cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-accent"
                 :class="[
                   litRegion === row.key ? 'bg-nav-active' : i % 2 ? 'bg-inset' : '',
                   row.spaced ? 'border-t border-line-soft' : ''

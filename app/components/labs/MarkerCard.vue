@@ -279,13 +279,14 @@ const deltaText = computed(() => {
   return `${d > 0 ? '▲ +' : '▼ -'}${magnitude}`
 })
 
-// Direction is only meaningful when the marker has a "better" direction; otherwise the
-// delta is reported without a judgement color.
+// Direction is only meaningful when the marker declares a "better" direction (BIOMARKERS
+// `higherIsBetter`); otherwise the delta is reported in the neutral colour — a rise in
+// estradiol or LDL is not good news just because it points up (audit #42 item 26: the code
+// coloured up accent / down warn for every undeclared marker, against this very comment).
 const deltaClass = computed(() => {
   const d = delta.value
-  if (d == null) return 'text-muted'
   const better = meta.value.higherIsBetter
-  if (better === undefined) return d > 0 ? 'text-accent' : 'text-warn'
+  if (d == null || better === undefined) return 'text-muted'
   return (better ? d > 0 : d < 0) ? 'text-accent' : 'text-danger'
 })
 
