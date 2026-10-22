@@ -262,14 +262,10 @@ function periodLabel(d: Digest) {
 // Reactive: a render-time helper reading localToday() went stale on an open panel after midnight.
 const today = useToday()
 
+// Calendar days in HOME_TZ (shared/utils/dates.ts relativeDay): older than a week reads as the
+// date, as the home card does, rather than "2w ago".
 function relativeTime(iso: string | null) {
-  if (!iso) return ''
-  // Calendar days in HOME_TZ, not elapsed hours: 11:50pm yesterday is "yesterday" at 8am.
-  const days = diffDays(localDayOf(iso), today.value)
-  if (days <= 0) return 'today'
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days}d ago`
-  return `${Math.floor(days / 7)}w ago`
+  return iso ? relativeDay(localDayOf(iso), today.value) : ''
 }
 // Sleep durations use the one app-wide formatter (rounds the total before splitting).
 const fmtSleep = formatDuration

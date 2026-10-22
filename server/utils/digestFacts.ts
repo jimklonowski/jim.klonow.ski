@@ -1,6 +1,7 @@
 import type { ProtocolRule } from '#shared/utils/protocolRules'
 import { fmtDay, scheduleContext } from '#shared/utils/protocolProse'
 import { roundTo, shiftDays } from '#shared/utils/dates'
+import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
@@ -21,11 +22,7 @@ function fmtDuration(min: number): string {
   return h ? `${h}h ${m}m` : `${m}m`
 }
 
-function avg(nums: number[]): number | null {
-  const vals = nums.filter(n => n != null && !Number.isNaN(n))
-  if (!vals.length) return null
-  return vals.reduce((a, b) => a + b, 0) / vals.length
-}
+const avg = mean
 
 // compound → the dates it was logged, the shape tallySchedule scores against.
 function doseDatesOf(entries: JournalRow[]): Map<string, Set<string>> {
@@ -51,21 +48,8 @@ type WorkoutRow = Pick<WorkoutEntry, 'date' | 'workout_type' | 'duration_min' | 
 
 const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, food, notes'
 
-function parseJournalRow(r: Record<string, unknown>): JournalRow {
-  return {
-    date: r.date as string,
-    weight_lbs: (r.weight_lbs as number | null) ?? null,
-    bp_systolic: (r.bp_systolic as number | null) ?? null,
-    bp_diastolic: (r.bp_diastolic as number | null) ?? null,
-    rhr: (r.rhr as number | null) ?? null,
-    hrv: (r.hrv as number | null) ?? null,
-    peptides: JSON.parse((r.peptides as string) || '[]'),
-    sodas: JSON.parse((r.sodas as string) || '[]'),
-    water: JSON.parse((r.water as string) || '[]'),
-    food: JSON.parse((r.food as string) || '{}'),
-    notes: (r.notes as string | null) ?? null
-  }
-}
+// Rows are parsed by server/utils/db.ts parseJournalRow — the one copy. This file carried its own
+// (notes null instead of '', no reconstitutions) until audit #42 item 40.
 
 /**
  * The period's meal log against the figures (library, hand entries, model estimates): how many

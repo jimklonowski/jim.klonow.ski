@@ -37,6 +37,7 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/data/journal'
 import type { HealthMetricsEntry } from '#shared/types/journal'
+import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 
 const props = defineProps<{
   /** Journal entries, oldest first. */
@@ -146,7 +147,7 @@ const rows = computed(() => {
     out.push({
       label: 'RECOVERY',
       value: `${Math.round(recovery.current)}%`,
-      accentValue: recovery.current >= 60,
+      accentValue: recovery.current >= RECOVERY_GREEN_MIN,
       delta: recovery.prev != null ? delta(recovery.current, recovery.prev, 'up-good', '', 0) : undefined
     })
   }

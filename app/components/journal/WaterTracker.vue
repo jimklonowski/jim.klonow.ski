@@ -189,7 +189,7 @@
 // (owner) sets the cup size and the daily goal, which live in the profile table. Writes go
 // through /api/journal/water and are reflected into the shared journal store, so the entry form,
 // the ledger and the status line all move with each tap.
-import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, WATER_MAX_OZ_PER_ENTRY, waterProgress, waterSetting, waterTotals } from '#shared/utils/water'
+import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, WATER_MAX_OZ_PER_ENTRY, fmtOzValue, waterProgress, waterSetting, waterTotals } from '#shared/utils/water'
 import type { WaterEntry } from '~/data/journal'
 
 withDefaults(defineProps<{
@@ -222,9 +222,8 @@ const lastPour = computed(() => [...todayWater.value].sort((a, b) => a.time.loca
 const quickAddLabel = computed(() => `CUP ${fmtOz(cupOz.value)}oz`)
 
 /** 12 → "12", 8.5 → "8.5" — the unit is written by the caller. */
-function fmtOz(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1)
-}
+// The bare figure; shared/utils/water.ts fmtWaterOz adds the unit for the prompt builders.
+const fmtOz = fmtOzValue
 
 function isValidOz(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= WATER_MAX_OZ_PER_ENTRY
@@ -236,14 +235,7 @@ const adding = ref(false)
 
 // Reassigns `data.value` rather than mutating in place, so useAsyncData's reactivity sees it.
 function applyWaterLocally(date: string, water: WaterEntry[]) {
-  if (!data.value) return
-  const idx = data.value.findIndex(e => e.date === date)
-  if (idx >= 0) {
-    data.value = data.value.map((e, i) => i === idx ? { ...e, water } : e)
-  }
-  else {
-    data.value = [...data.value, { date, water }].sort((a, b) => a.date.localeCompare(b.date))
-  }
+  patchJournalDay(data, date, { water })
 }
 
 async function quickAdd(oz: number | '', fromPanel = false) {
@@ -343,8 +335,7 @@ const days = computed(() => {
     const t = waterTotals(e.water)
     if (t.count) byDate.set(e.date, t)
   }
-  const series = Array.from({ length: WINDOW_DAYS }, (_, i) => {
-    const date = shiftDays(today.value, i - (WINDOW_DAYS - 1))
+  const series = trailingDays(today.value, WINDOW_DAYS).map((date) => {
     const t = byDate.get(date)
     return { date, oz: t?.oz ?? 0, count: t?.count ?? 0 }
   })

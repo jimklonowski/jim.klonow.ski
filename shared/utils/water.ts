@@ -34,9 +34,14 @@ export function waterTotals(entries: Array<{ oz?: number | null }> | null | unde
 }
 
 /** "84 oz" / "84.5 oz" — '' when nothing was logged. */
+/** The bare ounces figure: whole numbers as themselves, else one decimal ("12", "8.5"). */
+export function fmtOzValue(oz: number): string {
+  return Number.isInteger(oz) ? String(oz) : oz.toFixed(1)
+}
+
 export function fmtWaterOz(oz: number): string {
   if (!oz) return ''
-  return `${Number.isInteger(oz) ? oz : oz.toFixed(1)} oz`
+  return `${fmtOzValue(oz)} oz`
 }
 
 /** The goal or cup size from the profile, or the fallback — see profileNumber. */

@@ -48,6 +48,11 @@ export function pdfLabel(src: string): string {
 // Free-text narrative findings can't be reliably graded word-for-word, so this only flags
 // results that name an actual severity/finding — everything else (including full descriptive
 // sentences that merely mention "normal"/"no stenosis"/etc.) reads as reassuring, not alarming.
+/** The text class for a qualitative finding — the one mapping the labs page and the upload preview both had (audit #42 item 41). */
+export function qualitativeClass(result: string): string {
+  return { warning: 'text-warn', success: 'text-accent', neutral: 'text-body' }[qualitativeColor(result)]
+}
+
 export function qualitativeColor(result: string): 'warning' | 'success' | 'neutral' {
   const text = result.toLowerCase()
   const concerning = /\b(mild|moderate|severe|abnormal|elevated|thicken|dilat|enlarg|reduced|decreased|positive|heterozygous|homozygous)\b/.test(text)

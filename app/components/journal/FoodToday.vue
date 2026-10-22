@@ -181,8 +181,8 @@
 // POST /api/journal/meal (one slot, json_set) and are reflected into the shared journal store
 // like the soda and water taps.
 import {
-  MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals, mealHistory, nutritionAverage,
-  nutritionIsEstimated, nutritionWindow, resolveMealText, slotForTime, unestimatedMeals, type MealSlot
+  MEAL_SLOTS, MEAL_SLOT_LABELS, MEAL_SLOT_PLACEHOLDERS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals, mealHistoryBySlot,
+  nutritionAverage, nutritionIsEstimated, nutritionWindow, resolveMealText, slotForTime, unestimatedMeals, type MealSlot
 } from '#shared/utils/nutrition'
 import { profileNumber } from '#shared/utils/profile'
 
@@ -210,16 +210,6 @@ const avg = computed(() => nutritionAverage(entries.value, index.value, today.va
 const avgWindow = computed(() => nutritionWindow(entries.value, today.value, 7))
 const avgTitle = computed(() => `Days with every meal estimated, ${formatDate(avgWindow.value.from, 'monthDay')} – ${avgWindow.value.to === today.value ? 'today' : 'yesterday'}; today joins once dinner is logged`)
 
-const PLACEHOLDERS: Record<MealSlot, string> = {
-  breakfast: 'Protein shake + creatine',
-  snack: 'Sourdough',
-  snack_am: 'Beef sticks',
-  lunch: 'Chipotle bowl',
-  snack_pm: 'Sourdough',
-  dinner: 'Steak + veggies',
-  snack_eve: 'Watermelon'
-}
-
 // The legacy single Snack appears only on a day that has one; the gap snacks always have a row
 // (as "+ snack" when empty).
 // The card's label column is 5.5rem wide: "AFTERNOON SNACK" wrapped onto two lines in it, so the
@@ -233,7 +223,7 @@ const slotRows = computed(() => MEAL_SLOTS
     fullLabel: MEAL_SLOT_LABELS[slot],
     snack: isSnackSlot(slot),
     text: todayEntry.value?.food?.[slot]?.trim() ?? '',
-    placeholder: PLACEHOLDERS[slot]
+    placeholder: MEAL_SLOT_PLACEHOLDERS[slot]
   }))
   .filter(row => row.slot !== 'snack' || row.text || editing.value === 'snack')
 )
@@ -250,9 +240,7 @@ const suggestedSlot = computed(() => slotForTime(clock.value))
 
 // Slot-ranked history: what was logged for lunch floats first on the lunch input, and every
 // spelling of a meal is one entry (shared/utils/nutrition.ts mealHistory).
-const historyBySlot = computed(() =>
-  Object.fromEntries(MEAL_SLOTS.map(s => [s, mealHistory(entries.value, s).map(h => h.text)])) as Record<MealSlot, string[]>
-)
+const historyBySlot = computed(() => mealHistoryBySlot(entries.value))
 function historyFor(slot: MealSlot): string[] {
   return historyBySlot.value[slot]
 }
@@ -300,16 +288,9 @@ function startEdit(slot: MealSlot) {
   editing.value = slot
 }
 
-// Reassigns `data.value` so useAsyncData's reactivity sees it (same rule as the soda widget).
+// The shared local mirror (app/utils/journalPatch.ts), same as the soda and water widgets.
 function applyFoodLocally(date: string, food: Partial<Record<MealSlot, string>>) {
-  if (!data.value) return
-  const idx = data.value.findIndex(e => e.date === date)
-  if (idx >= 0) {
-    data.value = data.value.map((e, i) => i === idx ? { ...e, food } : e)
-  }
-  else {
-    data.value = [...data.value, { date, food }].sort((a, b) => a.date.localeCompare(b.date))
-  }
+  patchJournalDay(data, date, { food })
 }
 
 /** Saves the typed draft. A spelling of a meal that already has figures is saved AS that meal

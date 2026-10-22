@@ -192,7 +192,8 @@ import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations }
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
 import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
-import { dayNutrition, isDayDone, nutritionIsEstimated } from '#shared/utils/nutrition'
+import { dayNutrition, hasFullFigures, isDayDone, nutritionIsEstimated } from '#shared/utils/nutrition'
+import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
@@ -349,7 +350,7 @@ const foodRows = computed(() =>
   smoothRows(
     inRange(entries.value).map((e) => {
       const n = dayNutrition(e, estimateIndex.value)
-      const full = n.meals.length > 0 && n.missing.length === 0 && isDayDone(e, today.value)
+      const full = hasFullFigures(n) && isDayDone(e, today.value)
       return {
         date: formatDate(e.date, 'monthDay'),
         day: e.date,
@@ -442,7 +443,7 @@ const healthTiles = computed(() =>
       unit: key === 'sleep_total_min' ? '' : meta.unit,
       value: v == null ? '—' : key === 'sleep_total_min' ? formatDuration(v) : fmt(v, Number.isInteger(v) ? 0 : 1),
       // Recovery is the one metric the mock tints when it's in a good place.
-      accent: key === 'recovery_score' && v != null && v >= 67,
+      accent: key === 'recovery_score' && v != null && v >= RECOVERY_GREEN_MIN,
       series: [{ key, name: meta.label, color: HEALTH_COLORS[key] ?? CHART_ACCENT }]
     }
   })

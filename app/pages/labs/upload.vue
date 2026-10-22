@@ -571,13 +571,7 @@ const saveMessage = computed(() => {
   return `Saved ${res.date ? formatDate(res.date, 'long') : 'this draw'} — the dashboard will update automatically.${linked}`
 })
 
-function colorClass(res: string) {
-  return {
-    warning: 'text-warn',
-    success: 'text-accent',
-    neutral: 'text-body'
-  }[qualitativeColor(res)]
-}
+const colorClass = qualitativeClass
 
 async function upload(file: File) {
   if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {

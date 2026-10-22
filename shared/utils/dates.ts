@@ -50,3 +50,30 @@ export function roundTo(n: number, dp = 1): number {
   const f = 10 ** dp
   return Math.round(n * f) / f
 }
+
+/**
+ * "Sep 18" for a YYYY-MM-DD, formatted at UTC noon so the day never shifts with the runtime's
+ * zone — the one copy of what protocolProse, trends and the digest prompts each spelled out
+ * (audit #42 item 40).
+ */
+export function monthDay(date: string): string {
+  return new Date(noonUtc(date)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+}
+
+/**
+ * "today" / "yesterday" / "3d ago" / "Oct 3" for a calendar day relative to `today` — the one
+ * copy of what the digest panel and the home digest card each spelled out (audit #42 item 41).
+ * Calendar days, not elapsed hours: 11:50 pm last night is "yesterday" at 8 am.
+ */
+export function relativeDay(date: string, today: string): string {
+  const days = diffDays(date, today)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days}d ago`
+  return monthDay(date)
+}
+
+/** The `n` calendar days ending on `today`, oldest first — the x-axis of every trailing-window strip. */
+export function trailingDays(today: string, n: number): string[] {
+  return Array.from({ length: n }, (_, i) => shiftDays(today, i - (n - 1)))
+}

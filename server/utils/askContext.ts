@@ -10,14 +10,11 @@ import { bpAverageLabel, bpLabel } from '#shared/utils/bloodPressure'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
 import type { JournalRow, SodaEntry } from '#shared/types/journal'
 import { roundTo, shiftDays } from '#shared/utils/dates'
+import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
 import { eventContext } from '#shared/utils/protocolEvents'
 
-function avg(vals: Array<number | null | undefined>): number | null {
-  const nums = vals.filter((v): v is number => v != null && !Number.isNaN(v))
-  if (!nums.length) return null
-  return nums.reduce((a, b) => a + b, 0) / nums.length
-}
+const avg = mean
 
 // "3 sodas (~27 oz)" — ounces alongside the count, since two mini cans read as "two" but are
 // less soda than one 20 oz bottle (shared/utils/soda.ts).
@@ -41,19 +38,8 @@ async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]
     FROM journal_entries ${since ? 'WHERE date >= ?1' : ''} ORDER BY date ASC`
   const stmt = since ? db.prepare(sql).bind(since) : db.prepare(sql)
   const { results } = await stmt.all()
-  return (results ?? []).map(r => ({
-    date: r.date as string,
-    weight_lbs: (r.weight_lbs as number | null) ?? null,
-    bp_systolic: (r.bp_systolic as number | null) ?? null,
-    bp_diastolic: (r.bp_diastolic as number | null) ?? null,
-    rhr: (r.rhr as number | null) ?? null,
-    hrv: (r.hrv as number | null) ?? null,
-    peptides: JSON.parse((r.peptides as string) || '[]'),
-    sodas: JSON.parse((r.sodas as string) || '[]'),
-    water: JSON.parse((r.water as string) || '[]'),
-    food: JSON.parse((r.food as string) || '{}'),
-    notes: (r.notes as string | null) ?? null
-  }))
+  // server/utils/db.ts parseJournalRow — the one copy (this file had its own inline mapping).
+  return (results ?? []).map(parseJournalRow)
 }
 
 // "food ≈ 1,850 kcal/day, 95 g protein/day (4 days with figures)" over the days whose meals all
