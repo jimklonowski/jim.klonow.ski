@@ -333,13 +333,27 @@ export interface KnownMeal {
 export function knownMeals(entries: FoodEntry[], index: EstimateIndex): KnownMeal[] {
   const out = new Map<string, KnownMeal>()
   for (const h of mealHistory(entries)) {
-    if (lookupEstimate(index, h.text)) out.set(h.key, { text: h.text, key: h.key, count: h.count })
+    if (!lookupEstimate(index, h.text)) continue
+    // A meal logged as "2 x <meal>" is known as the MEAL: suggestMeal strips the typed quantity
+    // and puts it back on the match, so a quantity-bearing candidate would answer "3 x <meal>"
+    // with "3 x 2 x <meal>" (audit #42 item 43). The history is ranked by count, so the first
+    // spelling seen for a key is its most common one; later loggings add to the count.
+    const qty = splitQuantity(h.text)
+    const text = qty ? qty.rest : h.text
+    const key = qty ? mealKey(text) : h.key
+    if (!key) continue
+    const cur = out.get(key)
+    out.set(key, cur ? { ...cur, count: cur.count + h.count } : { text, key, count: h.count })
   }
   for (const { text, key } of LIBRARY_KNOWN) {
     if (!out.has(key)) out.set(key, { text, key, count: 0 })
   }
+  // Cached rows for a "2 x <meal>" text are candidates as the meal too, for the same reason.
   for (const row of index.values()) {
-    if (!out.has(row.key)) out.set(row.key, { text: row.text, key: row.key, count: 0 })
+    const qty = splitQuantity(row.text)
+    const text = qty ? qty.rest : row.text
+    const key = qty ? mealKey(text) : row.key
+    if (key && !out.has(key)) out.set(key, { text, key, count: 0 })
   }
   return [...out.values()]
 }

@@ -42,8 +42,6 @@ export const PROFILE_FIELDS: ProfileField[] = [
   { key: 'protein_target_g', label: 'Protein target', kind: 'number', min: 20, max: 500, unit: 'g', hint: 'per day, for the food card', tracker: true }
 ]
 
-export const PROFILE_KEYS = PROFILE_FIELDS.map(f => f.key)
-
 /**
  * The fields a role may see: everything for the full-access roles, clinical facts only for the
  * doctor — whose view has no water or food tracking, so its cup size and protein target are not
