@@ -52,6 +52,14 @@ const DEFAULT_TIMEOUT_MS = 90_000
 const DEFAULT_MAX_RETRIES = 2
 
 /**
+ * The two prose summaries (labs, DEXA) run Opus at medium effort over a whole panel, and the
+ * SDK retries a timed-out attempt from scratch: the 65-marker Whoop draw of 2026-10-17 took 62 s
+ * and then 84 s on single attempts, six seconds inside the default, and a slower run would have
+ * burned three full attempts (each still billed) before a 504. One long attempt and one retry.
+ */
+export const SUMMARY_CLIENT_OPTIONS = { timeout: 240_000, maxRetries: 1 } as const
+
+/**
  * An SDK client with the key read once and sane request bounds. Throws a 500 naming the missing
  * variable rather than letting the SDK fail with "apiKey is required".
  */

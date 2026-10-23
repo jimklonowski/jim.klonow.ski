@@ -43,13 +43,37 @@ export interface ReadingNote {
   date: string
   /** Shown in the detail modal, prefixed with the dagger and the draw date. */
   note: string
+  /**
+   * The value sits at the instrument's floor or ceiling and is a bound, not a measurement: the
+   * home watch tile floats it as a hollow dot off the trend line. A note without it is
+   * provenance (a different assay or lab) — the value is real, just not comparable with its
+   * neighbours, so it keeps its place on the line and carries only the dagger.
+   */
+  censored?: boolean
 }
 
+// The labs summary prompt reads these too (server/api/labs/generate-summary.post.ts daggers the
+// value in the marker history and prints the note), so write each one for the model as much as
+// for the modal: say what the value is, what it may be compared with, and what it may not.
 export const READING_NOTES: Record<string, ReadingNote[]> = {
   testosterone_total: [
     {
       date: '2026-09-09',
+      censored: true,
       note: 'Run on the CHW panel, which measures total testosterone by immunoassay rather than LC/MS-MS and reports only as high as 1500 ng/dL. The result came back flagged high at exactly 1500, so read it as "at least 1500" — a censored ceiling, not a measurement. The true value is unknown and may sit well above it; the LC/MS-MS draw three weeks earlier was 2211. That panel also carried its own 264-916 ng/dL reference range rather than the 250-1100 stored here, so the flag understates how far out of range the reading is. Treat this point as a floor and leave it out when judging the trend.'
+    }
+  ],
+  // Two estradiol assays exist on the same sample whenever the Whoop Advanced Labs panel (standard
+  // immunoassay) is paired with the Jason Health ultrasensitive LC/MS/MS add-on, and the value on
+  // file is whichever report was uploaded last (save-json merges per key, last upload wins).
+  estradiol: [
+    {
+      date: '2026-08-15',
+      note: 'Ultrasensitive LC/MS/MS estradiol (Quest order code 30289) from a separate same-day add-on. The Whoop Advanced Labs panel drawn from the same sample ran the standard immunoassay and read 85; the add-on was uploaded last, so this is the value on file. Compare it only with other ultrasensitive readings.'
+    },
+    {
+      date: '2026-10-17',
+      note: 'Two estradiol assays were run on this sample: the Whoop Advanced Labs panel\'s standard immunoassay (157) and a separate ultrasensitive LC/MS/MS add-on (127). The value on file is whichever report was uploaded last. The ultrasensitive 127 is the one to trend — against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20% — and the immunoassay 157 must never be set against the LC/MS/MS series. If 157 is the value shown, the add-on report has not been uploaded yet and any change computed from it is cross-assay; say so rather than quantify it.'
     }
   ]
 }

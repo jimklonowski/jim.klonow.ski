@@ -652,8 +652,9 @@ async function saveToSite() {
   }
 }
 
-// A run counter: RESET or UPLOAD ANOTHER during the (10–30 s) summary call used to let the old
-// result land under the next PDF's preview as its "✦ AI SUMMARY". A superseded run is dropped.
+// A run counter: RESET or UPLOAD ANOTHER during the summary call (a minute or two for a full
+// panel) used to let the old result land under the next PDF's preview as its "✦ AI SUMMARY".
+// A superseded run is dropped.
 let summaryRun = 0
 async function generateSummary(endpoint: string, date: string) {
   const run = ++summaryRun
