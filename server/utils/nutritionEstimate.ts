@@ -134,19 +134,21 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Es
 
   const prompt = buildPrompt(todo)
   const startedAt = Date.now()
-  let response
-  try {
-    response = await createAnthropic().messages.create({
-      model: AI_MODELS.nutrition,
-      // Thinking plus output share this cap; 50 short items are a few thousand tokens of JSON.
-      max_tokens: 16_000,
-      output_config: { format: { type: 'json_schema', schema: ESTIMATE_SCHEMA } },
-      messages: [{ role: 'user', content: prompt }]
-    })
-  }
-  catch (err) {
+  // Streamed, though nothing reads the chunks: the SDK's 90 s timeout wraps the whole fetch, and
+  // a plain create() resolves only after the last token, so it covered the entire generation. A
+  // 50-item batch ran 78 s on 2026-10-23; a slower one was aborted at 90 s, retried from scratch
+  // and billed again. A stream resolves the fetch at the first byte, so the timeout guards the
+  // connection and a slow batch simply finishes. Low effort: this is menu recall and portion
+  // arithmetic, not reasoning, and Opus 5.5's default (medium) spent most of each call thinking.
+  const response = await createAnthropic().messages.stream({
+    model: AI_MODELS.nutrition,
+    // Thinking plus output share this cap; 50 short items are a few thousand tokens of JSON.
+    max_tokens: 16_000,
+    output_config: { format: { type: 'json_schema', schema: ESTIMATE_SCHEMA }, effort: 'low' },
+    messages: [{ role: 'user', content: prompt }]
+  }).finalMessage().catch((err: unknown) => {
     throw aiError(err, 'nutrition')
-  }
+  })
   logAiUsage('nutrition', AI_MODELS.nutrition, response.usage, response.stop_reason, startedAt)
   assertCompleted(response.stop_reason, 'nutrition')
 
