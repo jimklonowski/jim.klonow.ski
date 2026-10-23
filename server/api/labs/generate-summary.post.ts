@@ -1,5 +1,6 @@
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
+import { readingNoteOn } from '../../../app/data/markerCaveats'
 import { eventContext } from '#shared/utils/protocolEvents'
 
 interface LabsRow {
@@ -55,13 +56,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Entry has no numeric markers to summarize' })
   }
 
+  // A reading with its own note (READING_NOTES: a censored ceiling, a different assay) gets a
+  // dagger in its history line and the note printed below the history. Without this the model
+  // read the Sep 9 immunoassay "1500" as a measurement and computed a change against it, and
+  // trended an immunoassay estradiol against an ultrasensitive one.
+  const readingNotes: string[] = []
   const markerLines = keys.map((key) => {
     const meta = BIOMARKERS[key]
+    const label = meta?.label ?? key
     const bracket = [meta?.unit, refRange(key)].filter(Boolean).join(', ')
-    const head = `${meta?.label ?? key}${bracket ? ` [${bracket}]` : ''}`
+    const head = `${label}${bracket ? ` [${bracket}]` : ''}`
     const history = draws
       .filter(d => d.markers[key] != null)
-      .map(d => `${d.date === date ? 'NEW ' : ''}${d.date}: ${d.markers[key]}`)
+      .map((d) => {
+        const note = readingNoteOn(key, d.date)
+        if (note) readingNotes.push(`† ${label} on ${d.date}${note.censored ? ' (censored at the instrument limit)' : ''}: ${note.note}`)
+        return `${d.date === date ? 'NEW ' : ''}${d.date}: ${d.markers[key]}${note ? ' †' : ''}`
+      })
       .join(' -> ')
     return `${head}: ${history}`
   })
@@ -88,17 +99,17 @@ export default defineEventHandler(async (event) => {
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, markerLines, qualitativeBlock
+    date, fasting: target.fasting, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()
   let response
   try {
-    response = await createAnthropic().messages.create({
+    response = await createAnthropic(SUMMARY_CLIENT_OPTIONS).messages.create({
       model: AI_MODELS.summary,
-      // 3-5 paragraphs of prose. The old 2048 cap could truncate a summary of a wide panel
-      // mid-sentence, and the truncated text was stored as though it were finished. Adaptive
-      // thinking shares the max_tokens budget with the prose, hence the headroom.
+      // ~600 words of prose plus the step lines. The old 2048 cap could truncate a summary of a
+      // wide panel mid-sentence, and the truncated text was stored as though it were finished.
+      // Adaptive thinking shares the max_tokens budget with the prose, hence the headroom.
       max_tokens: 16_000,
       output_config: { effort: 'medium' },
       messages: [{ role: 'user', content: prompt }]

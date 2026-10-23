@@ -2,9 +2,10 @@ import { protocolSchedule } from '#shared/utils/protocolProse'
 
 // The two long-form summary prompts — the labs trend summary and the DEXA body-composition
 // summary — out of their handlers (audit #42 item 42), so the prompt text lives beside the
-// digest's (digestPrompts.ts) and a wording change is one diff in one place. The text is
-// byte-for-byte what the handlers held, so the prompt hashes stored with existing summaries
-// still match and nothing reads as regenerated.
+// digest's (digestPrompts.ts) and a wording change is one diff in one place. The extraction
+// kept the text byte-for-byte; the 2026-10-23 revision of the labs prompt (reading notes,
+// censored values, a word budget, trend wording) changed it on purpose, so summaries stored
+// before then carry the older hash and read as written under the older wording — correct.
 
 export interface LabsSummaryInputs {
   date: string
@@ -18,8 +19,10 @@ export interface LabsSummaryInputs {
   vaccineBlock: string
   eventBlock: string
   plannedBlock: string
-  /** One "Label [unit, ref]: date: value -> NEW date: value" line per marker. */
+  /** One "Label [unit, ref]: date: value -> NEW date: value" line per marker; a daggered value (†) has a reading note. */
   markerLines: string[]
+  /** One "† Label on date: note" line per daggered reading (READING_NOTES), or []. */
+  readingNotes: string[]
   /** The qualitative results block, already framed, or ''. */
   qualitativeBlock: string
 }
@@ -34,18 +37,20 @@ The oral stack above matters here: supplements move blood markers (iron dosing m
 New draw: ${i.date} (${i.fasting ? 'fasting' : 'non-fasting'})
 Draws included for comparison: ${i.draws.map(d => `${d.date}${d.fasting ? ' (fasting)' : ' (non-fasting)'}`).join(', ')}
 ${i.protocolBlock}
-Marker history (oldest -> newest, "NEW" marks the new draw):
+Marker history (oldest -> newest, "NEW" marks the new draw; a dagger † after a value means that reading has a note below):
 ${i.markerLines.join('\n')}
+${i.readingNotes.length ? `\nReading notes — caveats that belong to one reading (a different assay, a different lab, a value censored at the instrument limit). They override whatever the bare numbers suggest: when a note says a value is not comparable with its neighbours, do not compute a change against it, and say in a clause why not:\n${i.readingNotes.join('\n')}\n` : ''}
+A value the lab reported as "<X" or ">X" is stored as X. A reading sitting exactly on an assay floor or ceiling (LH 0.2 and FSH 0.7 under suppressive therapy, a total testosterone of exactly 1500 on an immunoassay panel) is therefore censored, not measured: read it as "below the floor" or "at least the ceiling", never trend it, and never compute a change from it.
 ${i.qualitativeBlock}
-Write 3-5 short paragraphs, in order of importance:
+Cover these, in order of importance:
 1. The most significant changes versus the previous draw, with specific numbers and % change.
 2. Any values in the new draw outside their reference range.
-3. Notable trends across multiple draws (steady climbs or declines). Where the timing lines up with a protocol change above, say so plainly and explain the likely physiological mechanism in a sentence (e.g. testosterone stimulates erythropoiesis, so red cell production rises and draws down ferritin/iron stores) — frame it as the likely driver, not a certainty.
+3. Notable trends across multiple draws (steady climbs or declines). When you call something a trend, give the whole series across the draws that measured it (49 -> 56 -> 55 -> 59), not just its two endpoints — a flat series that happens to start lower is not a climb. Where the timing lines up with a protocol change above, say so plainly and explain the likely physiological mechanism in a sentence (e.g. testosterone stimulates erythropoiesis, so red cell production rises and draws down ferritin/iron stores) — frame it as the likely driver, not a certainty.
 4. For each marker that is out of range or trending in a concerning direction, give 2-3 concrete steps to improve it (specific dietary changes, supplementation with typical doses and timing, spacing interfering substances, blood donation where relevant, and when to retest to confirm the trend). Skip this for markers that are stable and in range.
 
-When a hormone-sensitive marker (total/free testosterone, estradiol, hematocrit) moved versus prior draws, weigh the draw-timing lines above before calling it a real change — near-peak vs near-trough sampling can explain an apparent shift on an unchanged protocol, and you should say so when it does.
+When a hormone-sensitive marker (total/free testosterone, estradiol, hematocrit) moved versus prior draws, weigh the draw-timing lines above before calling it a real change — near-peak vs near-trough sampling can explain an apparent shift on an unchanged protocol, and you should say so when it does. Those lines are an estimate from the dose log: call them "the dose-timing estimate", never "the model".
 
-Be factual, specific, and concise. If everything is stable and in range, say so briefly — do not manufacture concerns. No greeting, no closing, no medical-advice disclaimers or "consult your doctor" boilerplate. Plain text only — no markdown, no headers, no bullet characters.`
+Be factual, specific, and concise, and keep the whole thing to roughly 500-600 words — the dashboard shows it above the draw, so it has to be read in a few minutes, not studied. Points 1-3 are short prose paragraphs. Point 4 may put its steps one per line, numbered, under a one-line label naming the marker; that is the only list allowed. Write dates in prose as "Aug 24", not "2026-08-24". If everything is stable and in range, say so briefly — do not manufacture concerns. No greeting, no closing, no medical-advice disclaimers or "consult your doctor" boilerplate. Plain text only — no markdown, no headers, no bullet characters.`
 }
 
 export interface DexaSummaryInputs {

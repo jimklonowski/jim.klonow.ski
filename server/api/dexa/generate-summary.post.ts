@@ -132,7 +132,7 @@ export default defineEventHandler(async (event) => {
   const startedAt = Date.now()
   let response
   try {
-    response = await createAnthropic().messages.create({
+    response = await createAnthropic(SUMMARY_CLIENT_OPTIONS).messages.create({
       model: AI_MODELS.summary,
       // Same budget as the labs summary: 3-4 paragraphs of prose plus adaptive thinking.
       max_tokens: 16_000,

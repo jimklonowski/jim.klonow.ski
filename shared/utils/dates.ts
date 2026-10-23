@@ -40,6 +40,8 @@ export function weekStartOf(date: string): string {
 
 /** Every date from `from` to `to` inclusive, stepping `step` days; empty when `from > to`. */
 export function eachDay(from: string, to: string, step = 1): string[] {
+  // A zero or negative step never reaches `to` — loud, not an infinite loop (audit #42 item 44).
+  if (!Number.isInteger(step) || step < 1) throw new RangeError(`eachDay: step must be a positive whole number of days, got ${step}`)
   const out: string[] = []
   for (let d = from; d <= to; d = shiftDays(d, step)) out.push(d)
   return out
