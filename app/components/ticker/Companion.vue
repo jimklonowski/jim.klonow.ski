@@ -77,8 +77,8 @@
 // pixel sprite from shared/utils/tickerSprite.ts that beats at the live RHR, with an EKG sweep
 // below and JS-triggered event one-shots (double-beat, celebration, thump, flatline gag) that
 // each strike a pose. Pure CSS/SVG, no assets.
-import { TICKER_POSES, tickerSprite } from '#shared/utils/tickerSprite'
-import type { TickerBuild, TickerFigure, TickerPose, TickerProp, TickerSprite } from '#shared/utils/tickerSprite'
+import { spriteFor } from '#shared/utils/tickerSprite'
+import type { TickerBuild, TickerFigure, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
 
 const props = withDefaults(defineProps<{
   /**
@@ -193,11 +193,6 @@ defineExpose({ trigger, blink })
 // Events that have a pose win over the held mood, and the mood over the short-sleep slump;
 // digest and bigbeat are pure animation and keep whatever pose is showing.
 
-const SPRITES = Object.fromEntries((['full', 'face'] as const).map(figure => [
-  figure,
-  Object.fromEntries(TICKER_POSES.map(p => [p, tickerSprite(p, figure)]))
-])) as Record<TickerFigure, Record<TickerPose, TickerSprite>>
-
 const pose = computed<TickerPose>(() => {
   if (activeEvent.value === 'celebrate') return 'happy'
   if (activeEvent.value === 'thump') return 'worried'
@@ -207,14 +202,11 @@ const pose = computed<TickerPose>(() => {
   return props.sluggish ? 'sleepy' : 'idle'
 })
 
-// Bare poses come from the cache; with props or a build the sprite is composed on the fly (a few
-// hundred cells).
+// Every sprite — bare or dressed — comes from the module-level cache in tickerSprite.ts, built
+// once per combination and shared by every companion on the page.
 const sprite = computed(() => {
   const figure: TickerFigure = isFull.value ? 'full' : 'face'
-  const custom = props.accessories.length > 0 || Object.keys(props.build).length > 0
-  return custom
-    ? tickerSprite(pose.value, figure, props.accessories, props.build)
-    : SPRITES[figure][pose.value]
+  return spriteFor(pose.value, figure, props.accessories, props.build)
 })
 
 // EKG polyline per state. The dash sweep uses a fixed dasharray (~92, matching the

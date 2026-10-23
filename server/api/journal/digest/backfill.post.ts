@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
       results.push({ date, ok: true, ...(r.skipped ? { skipped: true } : {}) })
     }
     catch (err) {
-      results.push({ date, ok: false, error: err instanceof Error ? err.message : String(err) })
+      results.push({ date, ok: false, error: errorMessage(err) })
     }
   }
   return { kind, results }

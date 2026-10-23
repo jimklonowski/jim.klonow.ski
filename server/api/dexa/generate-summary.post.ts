@@ -1,7 +1,6 @@
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { eventContext } from '#shared/utils/protocolEvents'
-import { protocolSchedule } from '#shared/utils/protocolProse'
 
 // The DEXA counterpart of /api/labs/generate-summary: narrates the newest scan against the ones
 // before it and stores the prose on the row with its provenance. The upload page calls it right
@@ -127,24 +126,8 @@ export default defineEventHandler(async (event) => {
   const cycleBlock = await cycleContext(db, date)
   const eventBlock = eventContext(date)
 
-  const prompt = `You are writing a body-composition summary for a personal health dashboard. The reader is the person who was scanned — address them as "you". They lift seriously, track their body closely and understand DEXA output. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH and hCG, with ancillary peptides rotating around that core (the schedule below is what was running as of this scan), and they are in a lean-mass phase: adding muscle — arms and chest especially — while holding body fat in the fit range. Treat regional lean changes and left/right symmetry as training signals worth a sentence each.
-
-${protocolSchedule(date)}
-${protocolBlock}${supplementBlock ? `\n${supplementBlock}\n` : ''}${cycleBlock ? `\n${cycleBlock}\n` : ''}${eventBlock ? `\n${eventBlock}\n` : ''}
-DEXA scans on file (oldest -> newest; "NEW" marks the new scan; masses in lbs). "Scale weight" is the clinic-typed figure from the report header and can lag — the DEXA total is the measured one:
-${scanBlock.join('\n')}
-
-${trainingBlock}
-
-Reference points from the scan provider: VAT volume under 52 in³ is ideal, 52–112 elevated, above that high; an A/G ratio under 1.0 is optimal; a total-body BMD T-score above -1.0 is normal and -1.0 to -2.5 is osteopenia; typical left/right lean imbalance is up to 0.5 lbs for arms and 1.5 lbs for legs. Total-body BMD is not the hip/spine DEXA used for osteoporosis screening — say so if you comment on bone.
-
-Write 3-4 short paragraphs, in order of importance:
-1. The headline change versus the previous scan, with specific numbers and % change: fat mass against lean mass, body fat %, and where the lean went by region (arms, legs, trunk). If this is the first scan, describe where the baseline sits instead.
-2. Fat distribution and visceral fat — android vs gynoid, A/G ratio, VAT — and what those levels mean for metabolic risk.
-3. Symmetry and bone: the left/right lean differences against the typical ranges above and what to do about them in training; bone density context in a sentence or two.
-4. Attribution and next steps: how much of any lean change is plausibly tissue rather than water and glycogen (creatine, carbohydrate, HGH-related fluid), how the DEXA squares with the scale and Withings readings around each scan, what in the protocol and training context above most likely drove the change, and what to watch or change before the next scan — including when to rescan.
-
-Be factual, specific and concise, and keep the whole thing to roughly 350 words — the dashboard shows it above the scan, so it has to be read in a minute, not studied. If little changed, say so briefly — do not manufacture concerns. No greeting, no closing, no medical-advice disclaimers or "consult your doctor" boilerplate. Plain text only — no markdown, no headers, no bullet characters.`
+  // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the labs'.
+  const prompt = dexaSummaryPrompt({ date, protocolBlock, supplementBlock, cycleBlock, eventBlock, scanBlock, trainingBlock })
 
   const startedAt = Date.now()
   let response

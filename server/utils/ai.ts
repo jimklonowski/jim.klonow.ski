@@ -81,8 +81,8 @@ interface UsageLike {
  */
 export function logAiUsage(task: AiTask, model: string, usage: UsageLike | undefined, stopReason?: string | null, startedAt?: number) {
   const ms = startedAt ? Date.now() - startedAt : undefined
-  console.info(
-    `[ai] ${task} model=${model}`
+  logInfo('ai',
+    `${task} model=${model}`
     + ` in=${usage?.input_tokens ?? 0}`
     + ` cache_write=${usage?.cache_creation_input_tokens ?? 0}`
     + ` cache_read=${usage?.cache_read_input_tokens ?? 0}`
@@ -121,7 +121,7 @@ export function aiError(err: unknown, task: AiTask): ReturnType<typeof createErr
   // An h3 error from our own guards above already carries the right status.
   if (err && typeof err === 'object' && 'statusCode' in err) return err as ReturnType<typeof createError>
 
-  console.error(`[ai] ${task} failed:`, err instanceof Error ? err.message : err)
+  logError('ai', `${task} failed`, err)
 
   if (err instanceof Anthropic.RateLimitError) {
     return createError({ statusCode: 503, message: 'The AI service is rate limited right now — try again shortly.' })

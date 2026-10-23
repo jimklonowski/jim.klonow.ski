@@ -48,7 +48,7 @@ async function record(db: D1Database, row: { task: string, started: number, ok: 
   catch (err) {
     // Logging must never change a task's outcome: a missing table (migration not applied yet)
     // or a D1 hiccup is reported, and the task's own result or error still stands.
-    console.error(`task_runs: could not record ${row.task}:`, err instanceof Error ? err.message : err)
+    logError('tasks', `could not record ${row.task}`, err)
   }
 }
 
@@ -75,8 +75,8 @@ export async function runLogged<T>(db: D1Database, task: string, fn: () => Promi
     return result
   }
   catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error(`${task} failed:`, message)
+    const message = errorMessage(err)
+    logError(task, 'failed', message)
     await record(db, { task, started, ok: false, error: message, result: err instanceof TaskFailure ? err.result : undefined })
     throw err
   }

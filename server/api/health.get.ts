@@ -26,7 +26,7 @@ interface LatestRow {
 
 /** The error as one bounded line of detail. */
 function reason(err: unknown): string {
-  return (err instanceof Error ? err.message : String(err)).slice(0, 200)
+  return errorMessage(err).slice(0, 200)
 }
 
 async function taskChecks(db: D1Database, now: number): Promise<HealthCheck[]> {
