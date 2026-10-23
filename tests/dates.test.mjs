@@ -51,6 +51,10 @@ test('eachDay is inclusive and empty when reversed', () => {
   assert.deepEqual(eachDay('2026-09-14', '2026-09-14'), ['2026-09-14'])
   assert.deepEqual(eachDay('2026-09-15', '2026-09-14'), [])
   assert.deepEqual(eachDay('2026-09-06', '2026-09-27', 7), ['2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27'])
+  // A step that cannot advance is refused rather than looping forever.
+  assert.throws(() => eachDay('2026-09-06', '2026-09-27', 0), RangeError)
+  assert.throws(() => eachDay('2026-09-06', '2026-09-27', -1), RangeError)
+  assert.throws(() => eachDay('2026-09-06', '2026-09-27', 1.5), RangeError)
 })
 
 test('roundTo defaults to one decimal', () => {
