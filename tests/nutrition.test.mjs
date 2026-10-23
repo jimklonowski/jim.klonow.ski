@@ -305,6 +305,39 @@ test('"did you mean": same key pairs silently, close wording asks, a different m
   assert.deepEqual(resolveMealText('watermelon', known), { text: 'watermelon', changed: false })
 })
 
+test('a meal known only under a quantity is a candidate by its core, so another quantity never stacks on it', () => {
+  // Not in the library — the "2 x costco cheese pizza" case above passed only because the
+  // library supplies the quantity-free canonical (audit #42 item 43).
+  const index = indexEstimates([est('2 x alpha dinner plate', 1200, 60, 100, 50, { source: 'manual' })])
+  const known = knownMeals([{ food: { dinner: '2 x alpha dinner plate' } }, { food: { dinner: '2 x Alpha Dinner Plate' } }], index)
+  const core = known.find(k => k.key === 'alpha dinner plate')
+  assert.ok(core, 'the core is the known meal')
+  assert.equal(core.text, 'alpha dinner plate', 'spelled without the quantity')
+  assert.equal(core.count, 2, 'both loggings count for it')
+  // (The library's own "2 x mcdonalds …" meal is a deliberate entry with its own figures and stays a candidate.)
+  assert.ok(!known.some(k => /^\d+ x alpha/i.test(k.text)), 'no quantity-bearing candidate for it')
+  assert.equal(suggestMeal('3 x alpha dinner plate', known), null, 'already canonical under its own quantity')
+  assert.equal(suggestMeal('alpha dinner plate', known), null)
+  assert.deepEqual(suggestMeal('3 x Alpha Dinner Plates', known), { text: '3 x alpha dinner plate', strength: 'exact', score: 1 })
+  assert.deepEqual(resolveMealText('3 x alpha dinner plate', known), { text: '3 x alpha dinner plate', changed: false })
+  // The base logged in its own right keeps its most common spelling and the quantity loggings add to its count.
+  const both = knownMeals([{ food: { lunch: 'Alpha Dinner Plate' } }, { food: { dinner: '2 x alpha dinner plate' } }, { food: { dinner: 'Alpha Dinner Plate' } }], indexEstimates([est('alpha dinner plate', 600, 30, 50, 25, { source: 'manual' })]))
+  assert.deepEqual(both.find(k => k.key === 'alpha dinner plate'), { text: 'Alpha Dinner Plate', key: 'alpha dinner plate', count: 3 })
+})
+
+test('alias-collision guard: no two library meals answer to the same key', () => {
+  const owners = new Map()
+  for (const meal of MEAL_LIBRARY) {
+    for (const spelling of [meal.text, ...(meal.aliases ?? [])]) {
+      const key = mealKey(spelling)
+      assert.ok(key, `"${spelling}" has a key`)
+      const owner = owners.get(key)
+      assert.ok(!owner || owner === meal.text, `"${spelling}" of "${meal.text}" collides with "${owner}" on the key "${key}"`)
+      owners.set(key, meal.text)
+    }
+  }
+})
+
 test('soda calories: label figures per 12 oz, zero for diet, a regular default for unknown drinks, null when unsized', () => {
   assert.equal(sodaKcal('Dr Pepper', '12oz can'), 150)
   assert.equal(sodaKcal('Dr Pepper', '20oz bottle'), 250)
