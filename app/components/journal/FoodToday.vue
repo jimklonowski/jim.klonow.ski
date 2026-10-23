@@ -336,6 +336,12 @@ async function writeSlot(slot: MealSlot, text: string, matched: boolean) {
 // --- backfill (owner) ---
 // Every distinct meal in the history with no estimate, in batches the endpoint accepts. Each
 // batch is cached as it lands, so a failure part-way keeps what was done.
+//
+// A batch is one model call whose length grows with its size (50 items ran 78 s on 2026-10-23),
+// so half-size batches finish sooner and the counter moves more often; two in flight roughly
+// halve the wall clock without crowding the output-token rate limit. The endpoint takes up to 50.
+const BATCH_SIZE = 25
+const IN_FLIGHT = 2
 const unestimated = computed(() => unestimatedMeals(entries.value, index.value))
 const backfilling = ref(false)
 const done = ref(0)
@@ -355,11 +361,28 @@ async function backfill() {
     // Texts the model's answer could not be pinned to stay without figures (never a neighbour's
     // numbers); they are named so a second press can pick them up.
     const unmatched: string[] = []
-    for (let i = 0; i < texts.length; i += 50) {
-      const batch = texts.slice(i, i + 50)
-      unmatched.push(...await estimate(batch))
-      done.value = Math.min(texts.length, i + batch.length)
+    const batches: string[][] = []
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) batches.push(texts.slice(i, i + BATCH_SIZE))
+    // Workers pull from one queue; the first failure stops the pulling (the other worker's
+    // in-flight batch still lands and is kept) and is rethrown once both have settled, so the
+    // error toast's count is what was actually saved.
+    let next = 0
+    let failure: { err: unknown } | null = null
+    const worker = async () => {
+      while (!failure && next < batches.length) {
+        const batch = batches[next++]!
+        try {
+          unmatched.push(...await estimate(batch))
+        }
+        catch (err) {
+          failure = { err }
+          return
+        }
+        done.value += batch.length
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(IN_FLIGHT, batches.length) }, worker))
+    if (failure) throw (failure as { err: unknown }).err
     const got = total.value - unmatched.length
     if (unmatched.length) {
       toast.add({
