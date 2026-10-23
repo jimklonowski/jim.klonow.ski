@@ -66,8 +66,8 @@ async function handle(db: D1Database, hook: Hook) {
       // open cycle now, so the home page's figure follows the workout instead of waiting for
       // the nightly sync or a manual re-sync. Best effort: the workout is saved either way.
       const strain = await refreshWhoopStrain(db).catch(async (err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err)
-        console.error('[whoop:webhook] strain refresh after workout failed:', message)
+        const message = errorMessage(err)
+        logError('whoop:webhook', 'strain refresh after workout failed', message)
         await markWhoopError(db, `strain after workout: ${message}`).catch(() => {})
         return null
       })
@@ -117,13 +117,13 @@ export default defineEventHandler(async (event) => {
 
   try {
     const result = await runLogged(db, 'whoop:webhook', async () => ({ type: hook.type, ...await handle(db, hook) }))
-    console.info(`[whoop:webhook] ${hook.type} ${hook.id} →`, JSON.stringify(result))
+    logInfo('whoop:webhook', `${hook.type} ${hook.id} → ${JSON.stringify(result)}`)
     return { ok: true, ...result }
   }
   catch (err) {
     // Surface it where the cron's failures show (the journal header's Whoop ⚠) until the next
     // clean sync clears it, and let Whoop retry.
-    const message = err instanceof Error ? err.message : String(err)
+    const message = errorMessage(err)
     await markWhoopError(db, `webhook ${hook.type}: ${message}`).catch(() => {})
     throw createError({ statusCode: 502, message: 'Webhook processing failed; Whoop will retry' })
   }

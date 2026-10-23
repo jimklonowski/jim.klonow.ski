@@ -3,24 +3,12 @@ import { ASK_TRAILER_MARK, type AskStreamTrailer } from '#shared/types/ask'
 import { checkAskHistory } from '#shared/utils/askHistory'
 import { localToday } from '#shared/utils/time'
 import { zAsk } from '#shared/utils/schemas'
-import { TICKER_CHAT_VOICE, readerContext } from '../../utils/digestPrompts'
+import { askSystemPrompt } from '../../utils/askPrompt'
 
 // Ask-the-data chat, answered by TICKER: freeform questions over the full tracked history (labs,
 // DEXA, journal, Whoop, protocol). Owner-only — same policy as digest generation: nobody else
 // gets to spend Anthropic tokens. Streams plain-text deltas; the client renders them as they
 // land. Each finished exchange is saved to its thread (ask_threads / ask_messages).
-
-// The schedule inside readerContext is as of `today`, which the client pins for the whole
-// conversation, so the rules stay byte-identical across turns and the prompt cache still hits.
-const systemRules = (today: string) => `You are answering the owner's questions about his own data on his personal health dashboard. ${readerContext(today)}
-
-${TICKER_CHAT_VOICE}
-
-Ground rules:
-- Answer from the fact sheet below.
-- Trends measured against protocol dates are observed associations — say so; don't assert causation.
-- Formatting: light Markdown — **bold** the numbers that matter, short bullet lists where they read better than prose. No headings, no tables. Keep answers tight; this is a terminal, not an essay.
-- No greeting and no medical-advice disclaimers.`
 
 /** The text of a streamed delta, or null for the structural events around it. */
 function textDelta(event: Anthropic.MessageStreamEvent): string | null {
@@ -75,7 +63,7 @@ export default defineEventHandler(async (event) => {
     // sheet at ~10% of input price instead of re-paying for it (5-minute TTL, refreshed by each
     // hit — a question more than five minutes after the last answer re-warms it at 1.25×).
     // Usage is logged below; cache_read should be non-zero from the second turn on.
-    system: [{ type: 'text', text: `${systemRules(today)}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: `${askSystemPrompt(today)}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
     messages
   })
 
@@ -106,7 +94,7 @@ export default defineEventHandler(async (event) => {
     }
     catch (err) {
       stream.abort()
-      console.error('[ai] could not create the thread:', err instanceof Error ? err.message : err)
+      logError('ai', 'could not create the thread', err)
       throw createError({ statusCode: 500, message: 'Could not start the conversation — try again' })
     }
   }
@@ -140,7 +128,7 @@ export default defineEventHandler(async (event) => {
           // Sonnet 5.5 declines in more categories than Sonnet 5, and a decline can land after
           // part of an answer streamed. Say so in-band and keep the exchange out of the thread,
           // like a failure: a half-answer shouldn't be replayed as history on the next turn.
-          console.warn('[ai] chat declined:', JSON.stringify((final as { stop_details?: unknown }).stop_details ?? null))
+          logWarn('ai', 'chat declined', (final as { stop_details?: unknown }).stop_details ?? null)
           controller.enqueue(encoder.encode('\n\n*[I can\'t help with that one as asked — try rephrasing it]*'))
           return
         }
@@ -152,7 +140,7 @@ export default defineEventHandler(async (event) => {
         completed = answer.trim().length > 0
       }
       catch (err) {
-        console.error('[ai] chat stream failed:', err instanceof Error ? err.message : err)
+        logError('ai', 'chat stream failed', err)
         try {
           controller.enqueue(encoder.encode('\n\n*[generation failed — try again]*'))
         }
@@ -170,7 +158,7 @@ export default defineEventHandler(async (event) => {
               db.prepare('INSERT INTO ask_messages (thread_id, role, content, created_at) VALUES (?1, \'user\', ?2, ?3)').bind(threadId, question, now),
               db.prepare('INSERT INTO ask_messages (thread_id, role, content, model, created_at) VALUES (?1, \'assistant\', ?2, ?3, ?4)').bind(threadId, answer, AI_MODELS.chat, now),
               db.prepare('UPDATE ask_threads SET updated_at = ?2 WHERE id = ?1').bind(threadId, now)
-            ]).catch(err => console.error('[ai] could not save the exchange:', err instanceof Error ? err.message : err))
+            ]).catch(err => logError('ai', 'could not save the exchange', err))
           }
           else {
             await dropEmptyThread()

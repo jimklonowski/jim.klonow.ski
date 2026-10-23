@@ -582,6 +582,26 @@ const PROPS: Record<TickerProp, PropCell[]> = {
 
 const WEARABLES = new Set<TickerProp>(['sweatband', 'shades', 'medal', 'gold-star', 'lab-coat', 'mane-1', 'mane-2', 'mane-3', 'bandage'])
 
+// Built sprites, keyed by everything that shapes one. Every companion on a page used to build
+// all 46 bare sprites of its own on setup, and the /ticker page composed the dressed figure again
+// (a few hundred cells) on every pose change (audit #42 item 42); now the first build of any
+// pose/figure/props/build combination is the last, shared by every instance. Bounded, so a long
+// visit with changing props can't grow it without end — the oldest entry goes first.
+const SPRITE_CACHE = new Map<string, TickerSprite>()
+const SPRITE_CACHE_MAX = 160
+
+/** tickerSprite, memoized. The sprite is shared — render it, never mutate it. */
+export function spriteFor(pose: TickerPose, figure: TickerFigure = 'full', props: TickerProp[] = [], build: TickerBuild = {}): TickerSprite {
+  const key = `${figure}|${pose}|${props.join(',')}|${JSON.stringify(build)}`
+  let sprite = SPRITE_CACHE.get(key)
+  if (!sprite) {
+    sprite = tickerSprite(pose, figure, props, build)
+    if (SPRITE_CACHE.size >= SPRITE_CACHE_MAX) SPRITE_CACHE.delete(SPRITE_CACHE.keys().next().value!)
+    SPRITE_CACHE.set(key, sprite)
+  }
+  return sprite
+}
+
 export function tickerSprite(pose: TickerPose, figure: TickerFigure = 'full', props: TickerProp[] = [], build: TickerBuild = {}): TickerSprite {
   const grid = body()
   face(grid, pose, figure)

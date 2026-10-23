@@ -48,7 +48,7 @@ export async function auditBefore(event: H3Event, table: AuditTable, key: string
     return await currentRow(getDb(event), table, key)
   }
   catch (err) {
-    console.error(`audit: could not read ${table} ${key}:`, err instanceof Error ? err.message : err)
+    logError('audit', `could not read ${table} ${key}`, err)
     return null
   }
 }
@@ -72,7 +72,7 @@ export async function recordAudit(event: H3Event, entry: AuditWrite): Promise<vo
     await stmt.run()
   }
   catch (err) {
-    console.error(`audit: could not record write on ${entry.table} ${entry.key}:`, err instanceof Error ? err.message : err)
+    logError('audit', `could not record write on ${entry.table} ${entry.key}`, err)
   }
 }
 

@@ -39,10 +39,6 @@ export const HEALTH_METRICS_META: Record<string, DexaMetricMeta> = {
   }
 }
 
-export function formatDuration(min: number): string {
-  // Round the total BEFORE splitting: floor/round separately turned 419.7 into "6h 60m".
-  const total = Math.round(min)
-  const h = Math.floor(total / 60)
-  const m = total % 60
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
-}
+// The formatter itself lives in shared/utils/duration.ts (the pet's voice needs it off the client
+// too); every page keeps importing it from here.
+export { formatDuration } from '#shared/utils/duration'

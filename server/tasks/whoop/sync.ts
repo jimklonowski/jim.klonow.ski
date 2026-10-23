@@ -54,9 +54,9 @@ async function syncWhoop(db: D1Database) {
   const errors: string[] = []
   function settled<T>(res: PromiseSettledResult<T[]>, label: string): T[] {
     if (res.status === 'fulfilled') return res.value
-    const message = res.reason instanceof Error ? res.reason.message : String(res.reason)
+    const message = errorMessage(res.reason)
     errors.push(`${label}: ${message}`)
-    console.error(`Whoop ${label} sync skipped:`, message)
+    logError('whoop:sync', `${label} sync skipped`, message)
     return []
   }
 
@@ -85,9 +85,9 @@ async function syncWhoop(db: D1Database) {
     workouts = await upsertWorkouts(db, rows)
   }
   catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = errorMessage(err)
     errors.push(`workout: ${message}`)
-    console.error('Whoop workout sync skipped:', message)
+    logError('whoop:sync', 'workout sync skipped', message)
   }
 
   // Only a clean run advances the watermark — a partial failure has to be re-fetched tomorrow,

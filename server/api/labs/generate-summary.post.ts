@@ -1,7 +1,6 @@
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { eventContext } from '#shared/utils/protocolEvents'
-import { protocolSchedule } from '#shared/utils/protocolProse'
 
 interface LabsRow {
   date: string
@@ -87,27 +86,10 @@ export default defineEventHandler(async (event) => {
   // questions it was meant to answer, and the summary opens with them.
   const plannedBlock = await plannedDrawContext(db, date)
 
-  const prompt = `You are writing a trend summary for a personal bloodwork dashboard. The reader is the person whose labs these are — address them as "you". They track their own biomarkers closely and understand them well. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH, and hCG, with ancillary peptides rotating around that core (the schedule below says what was running as of this draw) — and they are weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals — so markers that gate that decision (lipids, especially HDL; liver enzymes; hematocrit/hemoglobin; iron/ferritin; blood pressure proxies) deserve extra attention when present. They are not currently taking an aromatase inhibitor but keep Anastrozole on hand from their TRT clinic for symptomatic use; estradiol has been climbing and may read over 100 pg/mL on new draws. Treat elevated estradiol as a known, watched issue: quantify the trend against prior draws, name the specific symptoms and risks worth monitoring at that level, and frame the on-hand Anastrozole as the discussion point for symptom-driven use — not something to start reflexively.
-
-${protocolSchedule(date)}
-${supplementBlock ? `\n${supplementBlock}\n` : ''}${cycleBlock ? `\n${cycleBlock}\n` : ''}${vaccineBlock ? `\n${vaccineBlock}\n` : ''}${eventBlock ? `\n${eventBlock}\n` : ''}${plannedBlock ? `\n${plannedBlock}\n` : ''}
-The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT and roughly halve PSA once 6–12 months in, so double an on-treatment PSA before comparing it with pre-treatment draws; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
-
-New draw: ${date} (${target.fasting ? 'fasting' : 'non-fasting'})
-Draws included for comparison: ${draws.map(d => `${d.date}${d.fasting ? ' (fasting)' : ' (non-fasting)'}`).join(', ')}
-${protocolBlock}
-Marker history (oldest -> newest, "NEW" marks the new draw):
-${markerLines.join('\n')}
-${qualitativeBlock}
-Write 3-5 short paragraphs, in order of importance:
-1. The most significant changes versus the previous draw, with specific numbers and % change.
-2. Any values in the new draw outside their reference range.
-3. Notable trends across multiple draws (steady climbs or declines). Where the timing lines up with a protocol change above, say so plainly and explain the likely physiological mechanism in a sentence (e.g. testosterone stimulates erythropoiesis, so red cell production rises and draws down ferritin/iron stores) — frame it as the likely driver, not a certainty.
-4. For each marker that is out of range or trending in a concerning direction, give 2-3 concrete steps to improve it (specific dietary changes, supplementation with typical doses and timing, spacing interfering substances, blood donation where relevant, and when to retest to confirm the trend). Skip this for markers that are stable and in range.
-
-When a hormone-sensitive marker (total/free testosterone, estradiol, hematocrit) moved versus prior draws, weigh the draw-timing lines above before calling it a real change — near-peak vs near-trough sampling can explain an apparent shift on an unchanged protocol, and you should say so when it does.
-
-Be factual, specific, and concise. If everything is stable and in range, say so briefly — do not manufacture concerns. No greeting, no closing, no medical-advice disclaimers or "consult your doctor" boilerplate. Plain text only — no markdown, no headers, no bullet characters.`
+  // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
+  const prompt = labsSummaryPrompt({
+    date, fasting: target.fasting, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, markerLines, qualitativeBlock
+  })
 
   const startedAt = Date.now()
   let response

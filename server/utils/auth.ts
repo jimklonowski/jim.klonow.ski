@@ -218,7 +218,7 @@ export async function ownerSessionCutoff(event: H3Event): Promise<number> {
     // An unreadable KV must not lock the owner out of their own site; log and allow — but keep
     // the LAST KNOWN cutoff rather than memoizing 0, which re-admitted signed-out-everywhere
     // tokens for the next 15 seconds on any KV blip.
-    console.error('session cutoff: KV read failed:', err instanceof Error ? err.message : err)
+    logError('auth', 'session cutoff: KV read failed', err)
     value = cutoffMemo?.value ?? 0
   }
   cutoffMemo = { value, at: Date.now() }

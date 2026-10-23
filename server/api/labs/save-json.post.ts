@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     // numbers. The pages render every figure as optional (a report can omit any of them), but a
     // string or an invented key where a number is expected would still be a crash at read time.
     const scan = sanitizeDexa(body)
-    if (scan.dropped.length) console.warn(`[labs] DEXA ${date}: ignored unrecognized figures — ${scan.dropped.join(', ')}`)
+    if (scan.dropped.length) logWarn('labs', `DEXA ${date}: ignored unrecognized figures — ${scan.dropped.join(', ')}`)
     const before = await auditBefore(event, 'dexa_entries', date)
     await db.prepare(`
       INSERT INTO dexa_entries (date, weight_lbs, sources, total, regions, vat, ag_ratio, bone_density, symmetry)
@@ -113,7 +113,7 @@ export default defineEventHandler(async (event) => {
   ).run()
   await recordAudit(event, { table: 'labs_entries', key: date, before, summary: `${reportType ?? 'bloodwork'} ${date}` })
 
-  if (dropped.length) console.warn(`[labs] ${date}: ignored unrecognized marker keys — ${dropped.join(', ')}`)
+  if (dropped.length) logWarn('labs', `${date}: ignored unrecognized marker keys — ${dropped.join(', ')}`)
 
   // Close the loop with a planned draw: the nearest plan still waiting on results that this draw
   // could be (canFulfil — inside the window, and not booked after the draw) gets this row as its

@@ -200,8 +200,8 @@ export default defineEventHandler(async (event) => {
   })
   if (recentWorkout && (await getWhoopStatus(db)).connected) {
     strain = await refreshWhoopStrain(db).catch(async (err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error('[health-webhook] whoop strain refresh after workout failed:', message)
+      const message = errorMessage(err)
+      logError('health-webhook', 'whoop strain refresh after workout failed', message)
       await markWhoopError(db, `strain after workout: ${message}`).catch(() => {})
       return null
     })

@@ -342,7 +342,6 @@ onMounted(async () => {
   }
   try {
     const THREE = await import('three')
-    const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
     if (cancelled) return
 
     // Without WebGL 2 the constructor throws, and the catch below hands the page to the SVG map.
@@ -363,41 +362,13 @@ onMounted(async () => {
       el.remove()
     })
 
-    const gltf = await new GLTFLoader().loadAsync('/models/body.glb')
+    // The GLB is fetched and baked to metres once per page load (app/utils/bodyGlb.ts); this
+    // mount works on its own clone and disposes it with the renderer below.
+    const model = await loadBodyModel()
     if (cancelled) return
-    gltf.scene.updateMatrixWorld(true)
-    const source = gltf.scene.getObjectByProperty('type', 'Mesh') as InstanceType<typeof THREE.Mesh> | undefined
-    if (!source) throw new Error('body.glb has no mesh')
-    const geometry = source.geometry
-
-    // The GLB is quantized (KHR_mesh_quantization): positions are 16-bit integers and the node
-    // carries the transform that puts them back in metres. Taking the geometry on its own would
-    // render the body about twice life-size and off-centre, so bake that transform into float
-    // positions — and its scale into the morph deltas — before anything measures it in metres.
-    const toMetres = source.matrixWorld.clone()
-    const scaleOnly = new THREE.Matrix3().setFromMatrix4(toMetres)
-    const bake = (attr: InstanceType<typeof THREE.BufferAttribute> | InstanceType<typeof THREE.InterleavedBufferAttribute>, full: boolean) => {
-      const out = new THREE.Float32BufferAttribute(attr.count * 3, 3)
-      const v = new THREE.Vector3()
-      for (let i = 0; i < attr.count; i++) {
-        v.fromBufferAttribute(attr, i)
-        if (full) v.applyMatrix4(toMetres)
-        else v.applyMatrix3(scaleOnly)
-        out.setXYZ(i, v.x, v.y, v.z)
-      }
-      return out
-    }
-    const position = bake(geometry.getAttribute('position') as InstanceType<typeof THREE.BufferAttribute>, true)
-    geometry.setAttribute('position', position)
-    if (geometry.morphAttributes.position) {
-      geometry.morphAttributes.position = geometry.morphAttributes.position.map(a => bake(a as InstanceType<typeof THREE.BufferAttribute>, false))
-    }
-    // Both bounds, not just the sphere: the loader's box is in the quantized space and the
-    // raycaster tests it before any triangle, so a stale one makes every hover miss.
-    geometry.computeBoundingBox()
-    geometry.computeBoundingSphere()
-
-    const extras = (source.userData ?? {}) as { base?: string, alt?: string | null, height?: number, bands?: { android: number[], gynoid: number[] }, landmarks?: { armpit?: number, crotch?: number, chin?: number, torsoHalfWidth?: number } }
+    const geometry = model.geometry.clone()
+    const position = geometry.getAttribute('position') as InstanceType<typeof THREE.BufferAttribute>
+    const extras = model.extras
     meshDates.value = { base: extras.base ?? '', alt: extras.alt ?? null }
     const height = extras.height ?? 1.87
     const bands = extras.bands ?? { android: [1.1, 1.21], gynoid: [0.72, 0.94] }
