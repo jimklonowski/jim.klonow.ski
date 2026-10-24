@@ -219,6 +219,43 @@ CREATE TABLE IF NOT EXISTS supplements (
   created_at TEXT NOT NULL
 );
 
+-- The standing protocol as data (the protocol plan, P1–P2; migration 0013). protocol_items is
+-- everything taken, and `kind` says how it is tracked: 'logged' rows are weekday-scheduled and
+-- scored against journal_entries.peptides (today's PROTOCOL_RULES), 'standing' rows are taken
+-- daily but deliberately not logged (STANDING_COMPOUNDS plus the whole supplements stack), and
+-- 'as_needed' rows have no schedule at all. protocol_versions is each item's dated history: a
+-- dose change, a cadence change, a start or a stop are all a new version, so "hCG 300 IU
+-- Tue/Fri/Sun until 2026-10-23, then 250 IU Tue/Fri" is two rows and nothing is edited in place.
+-- Whether an item is active is derived from its versions (an open to_date), never stored.
+-- NOT YET READ by the app: the code constants and the supplements table stay the source of truth
+-- until the loader (P4) and the cutover (P11/P12). 0013 copies the supplements table generically
+-- (both databases); scripts/protocol-seed.mjs seeds the constants into the main database only.
+CREATE TABLE IF NOT EXISTS protocol_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,                        -- for 'logged' items, exactly the dose-log compound name
+  kind TEXT NOT NULL,                        -- 'logged' | 'standing' | 'as_needed'
+  category TEXT NOT NULL,                    -- 'injectable' | 'oral' | 'supplement' | 'skin'
+  injected INTEGER NOT NULL DEFAULT 0,
+  on_hand INTEGER NOT NULL DEFAULT 0,        -- owned but not being taken; such an item has no versions
+  notes TEXT,                                -- prompt clause while it runs: how to READ the data, pronoun-free
+  stop_note TEXT,                            -- prompt clause once its last version has ended: why it stopped
+  sort INTEGER NOT NULL DEFAULT 100,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_protocol_items_kind ON protocol_items(kind);
+
+CREATE TABLE IF NOT EXISTS protocol_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES protocol_items(id) ON DELETE CASCADE,
+  from_date TEXT,       -- first day at this dose/cadence; NULL = long-standing, before records began ('logged' items always have one)
+  to_date TEXT,         -- last day, inclusive; NULL while current
+  dose_label TEXT,      -- "250 IU", "5 mg tablet", "2 capsules"; NULL when unknown
+  weekdays TEXT,        -- JSON array of 0–6 (0 = Sunday); all seven = daily; NULL = no fixed days
+  note TEXT,            -- prompt clause for this version: why it changed, or a freeform schedule
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_protocol_versions_item ON protocol_versions(item_id, from_date);
+
 -- Planned protocol cycles ("blasts"/"runs") — a named, dated phase layered on top of the
 -- standing schedule. The plan is stored relative to start_date (per-compound week numbers in
 -- the compounds JSON, shape shared/utils/cycles.ts:CyclePlanItem[]) so shifting the start is a

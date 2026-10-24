@@ -30,6 +30,9 @@
     "demo:generate": "node scripts/demo/generate-demo-data.mjs",
     "demo:seed:local": "node scripts/demo/seed-demo.mjs --local",
     "demo:seed:remote": "node scripts/demo/seed-demo.mjs --remote",
+    "protocol:seed": "node scripts/protocol-seed.mjs",
+    "protocol:seed:local": "node scripts/protocol-seed.mjs --local",
+    "protocol:seed:remote": "node scripts/protocol-seed.mjs --remote",
     "theme:css": "node scripts/theme/build-themes-css.mjs"
   },
   "dependencies": {
