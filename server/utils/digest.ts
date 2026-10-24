@@ -121,7 +121,7 @@ export async function generateDigest(
   // timing frames every trend on it; a vaccine or a travel weekend explains a bad-looking few
   // days; a draw booked for Friday explains the biotin and iron going quiet on Tuesday).
   const [supplements, cyclesCtx, vaccines, plannedDraws] = await Promise.all([
-    supplementContext(db, end),
+    supplementContext(db, end, protocol),
     cycleContext(db, end, cycles),
     vaccineContext(db, end),
     plannedDrawContext(db, end)

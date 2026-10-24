@@ -27,10 +27,11 @@ export const PROTOCOL_CONSTANTS: LoadedProtocol = {
   source: 'constants'
 }
 
-/** `rows` null = the tables don't exist. Tables without a single logged item are unseeded —
- * only the supplements copy has run — and fall back too. */
+/** `rows` null = the tables don't exist; empty tables are a database nobody has seeded. Both
+ * read as the constants. Tables with rows are the protocol, whatever they hold — the demo
+ * sandbox has only the supplements copy (no logged item), and that IS its protocol until P9. */
 export function protocolFrom(rows: ProtocolRows | null): LoadedProtocol {
-  if (!rows || !rows.items.some(i => i.kind === 'logged')) return PROTOCOL_CONSTANTS
+  if (!rows || !rows.items.length) return PROTOCOL_CONSTANTS
   return { ...protocolFromRows(rows.items, rows.versions), source: 'tables' }
 }
 

@@ -68,12 +68,18 @@ test('before migration 0013 the tables are missing, and the constants are the pr
   assert.equal(p.rules, PROTOCOL_RULES)
 })
 
-test('migrated but unseeded: the supplements copy alone is not a schedule, so the constants still apply', async () => {
+test('migrated but empty tables are the constants; tables with rows are the protocol, logged items or not', async () => {
+  assert.equal(await loadProtocol(fakeD1(sqlite())), PROTOCOL_CONSTANTS, 'nobody seeded this database')
+  assert.equal(protocolFrom(null), PROTOCOL_CONSTANTS)
+  // Only the supplements copy ran (the demo sandbox until P9): that IS its protocol — no rules,
+  // and the stack from the tables.
   const d1 = fakeD1(sqlite({ supplements: true }))
   const rows = await readProtocolRows(d1)
   assert.deepEqual(rows.items.map(i => [i.name, i.kind]), [['Boron', 'standing']])
-  assert.equal(await loadProtocol(d1), PROTOCOL_CONSTANTS)
-  assert.equal(protocolFrom(null), PROTOCOL_CONSTANTS)
+  const p = await loadProtocol(d1)
+  assert.equal(p.source, 'tables')
+  assert.deepEqual(p.rules, [])
+  assert.deepEqual(p.supplements.map(s => s.name), ['Boron'])
 })
 
 test('seeded: the tables are the protocol, and they read exactly like the constants', async () => {
@@ -117,9 +123,10 @@ test('protocolFor reads the role\'s database once per request, however often it 
   assert.equal(main.batches, 1)
   assert.equal(demo.batches, 0)
 
-  // A demo session is routed to the sandbox, which has no schedule yet (P9).
+  // A demo session is routed to the sandbox, whose own rows (the supplements copy) are its protocol.
   const visitor = event(main, 'demo', demo)
-  assert.equal((await protocolFor(visitor)).source, 'constants')
+  assert.equal((await protocolFor(visitor)).source, 'tables')
+  assert.deepEqual((await protocolFor(visitor)).rules, [])
   assert.equal(demo.batches, 1)
   assert.equal(main.batches, 1)
 })

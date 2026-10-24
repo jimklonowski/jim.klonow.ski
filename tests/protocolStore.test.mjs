@@ -9,7 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { buildSeedSql } from '../scripts/protocol-seed.mjs'
-import { BEFORE_RECORDS, parseWeekdays, protocolFromRows, scheduleText } from '../shared/utils/protocolStore.ts'
+import { BEFORE_RECORDS, parseWeekdays, protocolFromRows, scheduleText, versionOverlaps } from '../shared/utils/protocolStore.ts'
 import {
   AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, doseLabelOn, scheduledFor, tallySchedule
 } from '../shared/utils/protocolRules.ts'
@@ -148,6 +148,16 @@ test('weekday JSON and schedule spellings round-trip, and malformed JSON reads a
   assert.equal(scheduleText(version(1, null, null, null, [5, 2])), 'Tuesdays + Fridays')
   assert.equal(scheduleText(version(1, null, null, null, null, { note: 'each morning after shower' })), 'each morning after shower')
   assert.equal(scheduleText(null), 'daily')
+})
+
+test('versions overlap when their inclusive ranges share a day; an unknown start or an open end reaches all the way', () => {
+  const v = (from_date, to_date) => ({ from_date, to_date })
+  assert.equal(versionOverlaps(v('2026-01-01', '2026-01-31'), v('2026-02-01', null)), false, 'adjacent days do not overlap')
+  assert.equal(versionOverlaps(v('2026-01-01', '2026-01-31'), v('2026-01-31', null)), true, 'a shared last/first day does')
+  assert.equal(versionOverlaps(v('2026-01-01', null), v('2026-06-01', null)), true, 'two open versions always do')
+  assert.equal(versionOverlaps(v(null, '2026-01-31'), v('2025-01-01', '2025-01-02')), true, 'an unknown start reaches back')
+  assert.equal(versionOverlaps(v(null, '2026-01-31'), v('2026-02-01', '2026-02-02')), false)
+  assert.equal(versionOverlaps(v('2026-03-01', '2026-03-10'), v('2026-03-05', '2026-03-06')), true, 'containment')
 })
 
 test('the supplements copy in 0013 round-trips: the stack reads the same from the new tables as from the old', () => {

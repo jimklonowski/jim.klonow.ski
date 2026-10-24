@@ -234,6 +234,46 @@ export const zSupplementSave = z.object({
   sort: zNumWithDefault(100, s => s.int())
 })
 
+// --- the protocol (protocol_items / protocol_versions — the protocol plan, P7) ---
+
+export const PROTOCOL_KINDS = ['logged', 'standing', 'as_needed'] as const
+export const PROTOCOL_CATEGORIES = ['injectable', 'oral', 'supplement', 'skin'] as const
+
+export const zProtocolItemSave = z.object({
+  id: zId.optional(),
+  name: zText(120).min(1, 'name is required'),
+  kind: z.enum(PROTOCOL_KINDS),
+  category: z.enum(PROTOCOL_CATEGORIES),
+  injected: z.boolean().default(false),
+  on_hand: z.boolean().default(false),
+  notes: zOptText(2000),
+  stop_note: zOptText(2000),
+  sort: zNumWithDefault(100, s => s.int())
+})
+
+// 0–6 (0 = Sunday), deduplicated and sorted so two spellings of one cadence compare equal.
+const zWeekdays = z.array(z.number().int().min(0).max(6)).max(7)
+  .nullish()
+  .transform(d => (d == null ? null : [...new Set(d)].sort((a, b) => a - b)))
+
+// A version's own consistency only: the cross-version rules (no overlap within an item, a
+// logged compound needs weekdays and a start) need the sibling rows, so the handler enforces them.
+export const zProtocolVersionSave = z.object({
+  id: zId.optional(),
+  item_id: zId,
+  from_date: zOptDate,
+  to_date: zOptDate,
+  dose_label: zOptText(120),
+  weekdays: zWeekdays,
+  note: zOptText(2000)
+}).refine(v => v.from_date == null || v.to_date == null || v.from_date <= v.to_date, {
+  message: 'the last day cannot come before the first', path: ['to_date']
+})
+
+/** Exactly one of the two: a whole item (its versions go with it) or a single version. */
+export const zProtocolDelete = z.object({ item_id: zId.optional(), version_id: zId.optional() })
+  .refine(v => (v.item_id == null) !== (v.version_id == null), 'name either item_id or version_id')
+
 // --- credentials ---
 
 // A wrong type reads as a wrong credential (401 from safeEqual), not a 400: the endpoint's only

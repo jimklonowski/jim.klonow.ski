@@ -46,6 +46,8 @@ export default defineNuxtConfig({
     // sharing out of /labs — into the TOOLS section (Aug 2026). Old bookmarks land on the new
     // homes; the naked section URL resolves to the calculator while there's no /tools hub page.
     '/journal/calculator': { redirect: { to: '/tools/calculator', statusCode: 301 } },
+    // The supplements page became the protocol page (the protocol plan, P6, Oct 2026).
+    '/journal/supplements': { redirect: { to: '/journal/protocol', statusCode: 301 } },
     '/journal/inventory': { redirect: { to: '/tools/inventory', statusCode: 301 } },
     '/journal/import': { redirect: { to: '/tools/import', statusCode: 301 } },
     '/labs/sharing': { redirect: { to: '/tools/sharing', statusCode: 301 } },

@@ -78,6 +78,18 @@ export function parseWeekdays(json: string | null): number[] | null {
   }
 }
 
+/** Whether two versions of one item overlap: ranges are inclusive, an unknown start reaches
+ * back to the dawn of records and an open end reaches forward forever. The save endpoint
+ * refuses an overlap — the mapper would otherwise read two doses for one day. */
+export function versionOverlaps(
+  a: { from_date: string | null, to_date: string | null },
+  b: { from_date: string | null, to_date: string | null }
+): boolean {
+  const lo = (v: typeof a) => v.from_date ?? ''
+  const hi = (v: typeof a) => v.to_date ?? '9999-12-31'
+  return lo(a) <= hi(b) && lo(b) <= hi(a)
+}
+
 function sameDays(a: number[] | null, b: number[] | null): boolean {
   if (a == null || b == null || a.length !== b.length) return false
   const sb = [...b].sort((x, y) => x - y)
