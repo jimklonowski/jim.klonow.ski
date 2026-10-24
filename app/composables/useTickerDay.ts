@@ -4,6 +4,7 @@ import { isSluggish, latestRecovery, latestSleepMin } from '#shared/utils/petSta
 import { nextPlannedDraw } from '#shared/utils/plannedDraws'
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
 import { scheduledFor } from '#shared/utils/protocolRules'
+import type { ProtocolRule } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
 import type { Cycle } from '#shared/utils/cycles'
 import {
@@ -31,6 +32,8 @@ export interface TickerDaySources {
   /** Null for a role without a pantry to mention (the vial list is owner/demo only). */
   vials: Ref<DayVial[] | null | undefined> | null
   today: Ref<string>
+  /** The standing schedule (useProtocol().rules): the protocol tables, or the code constants until seeded. */
+  rules: Ref<ProtocolRule[]>
   /** The schedule applies. Not for the demo persona, whose dose dates drift across weekdays by design. */
   rulesApply: boolean
   /** The stage has gone dark (useTickerClock) — due doses still unlogged then make it hungry. */
@@ -92,7 +95,7 @@ export function useTickerDay(s: TickerDaySources) {
   // --- hunger: what the schedule says is due today, against what the journal says went down --
   // The standing rules merged with every cycle (effectiveRules), scored on today only — the
   // yesterday fallback above is for the FEED replay, not for whether it has eaten.
-  const rules = computed(() => rulesApply ? effectiveRules(s.cycles.value ?? []) : [])
+  const rules = computed(() => rulesApply ? effectiveRules(s.cycles.value ?? [], s.rules.value) : [])
   const dueToday = computed(() => scheduledFor(today.value, rules.value))
   const loggedCompounds = computed(() => new Set((todayEntry.value?.peptides ?? []).map(p => p.compound)))
   const eaten = computed(() => dueToday.value.filter(r => loggedCompounds.value.has(r.compound)))
@@ -154,7 +157,7 @@ export function useTickerDay(s: TickerDaySources) {
   const nextMane = computed(() => nextManeTier(entries.value, today.value))
   const bandaged = computed(() => dosesToday.value.some(d => /bpc/i.test(d.compound)))
   /** A jab or a swallow, by the standing rule, the oral words, then the compound catalogue (app/utils/vialInventory.ts). */
-  const injected = (compound: string) => isInjected(compound, defaultVialForm)
+  const injected = (compound: string) => isInjected(compound, defaultVialForm, s.rules.value)
   const bowl = computed(() => bowlFor(hunger.value, dosesToday.value, injected))
   const doseKeys = computed(() => doseKeysOf(dosesToday.value))
 

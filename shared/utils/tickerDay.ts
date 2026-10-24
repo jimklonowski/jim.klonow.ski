@@ -300,8 +300,8 @@ export function moodWordOf(i: MoodInputs): string {
 export const ORAL_WORDS = /iron|ferr|vitamin|magnesium|zinc|omega|creatine|berberine|melatonin|caffeine|aspirin|nac\b|tablet|capsule|gummy/i
 
 /** A jab or a swallow: the standing rule says, else the oral words, else the catalogue's form (`defaultForm`). */
-export function isInjected(compound: string, defaultForm: (compound: string) => string): boolean {
-  if (PROTOCOL_RULES.some(r => r.compound === compound && r.injected)) return true
+export function isInjected(compound: string, defaultForm: (compound: string) => string, rules: ProtocolRule[] = PROTOCOL_RULES): boolean {
+  if (rules.some(r => r.compound === compound && r.injected)) return true
   if (ORAL_WORDS.test(compound)) return false
   return defaultForm(compound) === 'vial'
 }

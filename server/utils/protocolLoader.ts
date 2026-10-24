@@ -5,16 +5,12 @@
 // code: a database before 0013, or one migrated but not yet given `pnpm protocol:seed:remote`
 // (the supplements copy alone makes no logged item), reads exactly as it does today.
 import type { H3Event } from 'h3'
+import type { Role } from '#shared/utils/access'
 import { AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS } from '#shared/utils/protocolRules'
-import { protocolFromRows, type ProtocolData, type ProtocolItemRow, type ProtocolVersionRow } from '#shared/utils/protocolStore'
+import {
+  EMPTY_PROTOCOL, protocolFromRows, type LoadedProtocol, type ProtocolItemRow, type ProtocolVersionRow
+} from '#shared/utils/protocolStore'
 import { getDb, isMissingTable } from './db'
-
-export type ProtocolSource = 'tables' | 'constants'
-
-export interface LoadedProtocol extends ProtocolData {
-  /** Where it came from — surfaced for the cutover check, never for behaviour. */
-  source: ProtocolSource
-}
 
 export interface ProtocolRows {
   items: ProtocolItemRow[]
@@ -67,4 +63,14 @@ export function protocolFor(event: H3Event): Promise<LoadedProtocol> {
   const ctx = event.context as { protocol?: Promise<LoadedProtocol> }
   ctx.protocol ??= loadProtocol(getDb(event))
   return ctx.protocol
+}
+
+/**
+ * What a session may be told. The demo sandbox has no schedule of its own yet (P9) and its
+ * loader falls back to the owner's constants, which no demo session may see — so demo gets an
+ * empty schedule instead, which is what the hidden adherence panel and rings already assume.
+ * Every other role gets the request's protocol as loaded.
+ */
+export function publicProtocol(protocol: LoadedProtocol, role: Role | null | undefined): LoadedProtocol {
+  return role === 'demo' && protocol.source !== 'tables' ? EMPTY_PROTOCOL : protocol
 }

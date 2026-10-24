@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fmtDay, protocolSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
 import { PROTOCOL_GOALS, eventContext, goalContext } from '../shared/utils/protocolEvents.ts'
-import { PROTOCOL_RULES, cadenceOf, doseLabelOn } from '../shared/utils/protocolRules.ts'
+import { PROTOCOL_RULES, STANDING_COMPOUNDS, cadenceOf, doseLabelOn } from '../shared/utils/protocolRules.ts'
 import { COMPOUND_INFO } from '../app/data/compoundInfo.ts'
 
 const lineFor = (text, needle) => text.split('\n').find(l => l.includes(needle))
@@ -59,6 +59,14 @@ test('a cadence change reads as one compound changing, not a stop and a start', 
   const sunday = scheduleContext(PROTOCOL_RULES, '2026-10-25', '2026-10-25', new Map(), '2026-10-26')
   assert.match(sunday, /due today: HGH 2\.5 IU \(daily\), Finasteride 1 mg \(daily\)\./)
   assert.match(sunday, /Not due today: Testosterone Cypionate \(Mon\+Thu; next Mon Oct 26\), hCG \(Tue\+Fri; next Tue Oct 27\)\./)
+})
+
+test('the as-needed list is a parameter like the rules, for the loaded protocol', () => {
+  const none = protocolSchedule('2026-10-27', PROTOCOL_RULES, STANDING_COMPOUNDS, [])
+  assert.doesNotMatch(none, /as-needed only/)
+  const zinc = protocolSchedule('2026-10-27', PROTOCOL_RULES, STANDING_COMPOUNDS, [{ compound: 'Zinc', note: 'for colds' }])
+  assert.equal(lineFor(zinc, 'Zinc'), '- Zinc is as-needed only (for colds), so sporadic logging is expected, not a lapse.')
+  assert.doesNotMatch(zinc, /BPC-157/)
 })
 
 test('a stopped rule leaves the schedule once its ~4 months of relevance pass', () => {

@@ -7,8 +7,9 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { buildSeedSql } from '../scripts/protocol-seed.mjs'
-import { PROTOCOL_CONSTANTS, loadProtocol, protocolFor, protocolFrom, readProtocolRows } from '../server/utils/protocolLoader.ts'
+import { PROTOCOL_CONSTANTS, loadProtocol, protocolFor, protocolFrom, publicProtocol, readProtocolRows } from '../server/utils/protocolLoader.ts'
 import { AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS } from '../shared/utils/protocolRules.ts'
+import { EMPTY_PROTOCOL } from '../shared/utils/protocolStore.ts'
 import { protocolSchedule } from '../shared/utils/protocolProse.ts'
 
 const DIR = 'server/database/migrations'
@@ -94,6 +95,15 @@ test('any other database failure propagates instead of reading as "the constants
   }
   await assert.rejects(readProtocolRows(broken), /locked/)
   await assert.rejects(loadProtocol(broken), /locked/)
+})
+
+test('a demo session is never told the owner\'s constants: an unseeded sandbox reads as no schedule', async () => {
+  const fromTables = await loadProtocol(fakeD1(sqlite({ seed: true })))
+  assert.equal(publicProtocol(PROTOCOL_CONSTANTS, 'demo'), EMPTY_PROTOCOL)
+  assert.equal(EMPTY_PROTOCOL.source, 'none')
+  assert.deepEqual(EMPTY_PROTOCOL.rules, [])
+  assert.equal(publicProtocol(fromTables, 'demo'), fromTables, 'a seeded sandbox (P9) is its own schedule')
+  for (const role of ['owner', 'friend', 'doctor', null]) assert.equal(publicProtocol(PROTOCOL_CONSTANTS, role), PROTOCOL_CONSTANTS, String(role))
 })
 
 test('protocolFor reads the role\'s database once per request, however often it is asked', async () => {

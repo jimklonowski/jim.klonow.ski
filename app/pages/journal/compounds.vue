@@ -131,6 +131,7 @@
           v-model:zoom="zoom"
           :label="timelineLabel"
           :entries="entries"
+          :standing="protocolStanding"
           :lab-dates="labDates"
           :from="historyStart"
           :today="today"
@@ -175,6 +176,7 @@ useSeoMeta({ title: 'Journal · Compounds' })
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: cyclesData } = await useCycles()
+const { rules: protocolRules, standing: protocolStanding } = await useProtocol()
 const { canEdit, role } = await useAuth()
 
 const entries = computed(() => data.value ?? [])
@@ -188,11 +190,12 @@ const today = useToday()
  */
 const ACTIVE_WINDOW = 14
 
-// The standing schedule with planned cycles layered in (override semantics — see mergeRules):
-// the intent both the dose shorthand and the adherence panel read. Empty for the demo persona,
-// whose dose dates re-anchor nightly and drift across weekdays by design, so weekday-based
-// scoring would read as constant failure there.
-const scheduleRules = computed(() => role.value === 'demo' ? [] : effectiveRules(cyclesData.value ?? []))
+// The standing schedule (useProtocol — the protocol tables, or the code constants until seeded)
+// with planned cycles layered in (override semantics — see mergeRules): the intent both the dose
+// shorthand and the adherence panel read. Empty for the demo persona, whose dose dates re-anchor
+// nightly and drift across weekdays by design, so weekday-based scoring would read as constant
+// failure there.
+const scheduleRules = computed(() => role.value === 'demo' ? [] : effectiveRules(cyclesData.value ?? [], protocolRules.value))
 
 interface Usage {
   compound: string

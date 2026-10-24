@@ -47,6 +47,18 @@ export interface ProtocolData {
   supplements: Array<SupplementRow & { sort: number }>
 }
 
+/** Where a request's protocol came from: the tables; the code constants (a database before 0013,
+ * or before `protocol:seed`); or nothing — the demo sandbox has no schedule of its own yet (P9),
+ * and the owner's constants must never stand in for it. */
+export type ProtocolSource = 'tables' | 'constants' | 'none'
+
+export interface LoadedProtocol extends ProtocolData {
+  /** Surfaced for the cutover check and the demo rule, never for behaviour. */
+  source: ProtocolSource
+}
+
+export const EMPTY_PROTOCOL: LoadedProtocol = { rules: [], standing: [], asNeeded: [], supplements: [], source: 'none' }
+
 /** Stands in for an unknown start (a NULL from_date): before any record, so the date math stays
  * total and the calendar timeline clamps it away. */
 export const BEFORE_RECORDS = '1970-01-01'

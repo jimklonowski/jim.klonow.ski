@@ -391,6 +391,7 @@ const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: plannedData } = await usePlannedDraws()
 const { data: cyclesData } = await useCycles()
+const { rules: protocolRules } = await useProtocol()
 const { data: dexaData } = await useDexaEntries()
 // The vial list is owner/demo only (the API says so); a friend's TICKER has no pantry to mention.
 const vialsData = canEdit.value ? await useVials() : null
@@ -426,6 +427,7 @@ const {
   scans: dexaData,
   vials: vialsData?.data ?? null,
   today,
+  rules: protocolRules,
   rulesApply,
   night
 })

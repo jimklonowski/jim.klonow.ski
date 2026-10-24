@@ -464,13 +464,14 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
 
 // Protocol change-points and sustained metric shifts over the ~4 months ending `end`, so the
 // recap can connect a month of elevated RHR to the TRT start instead of only seeing the
-// period's own numbers.
-export async function digestTrends(db: D1Database, end: string): Promise<{ lines: string[], findings: TrendFinding[] }> {
+// period's own numbers. `rules` is the standing schedule (the protocol tables, or the code
+// constants until seeded) that decides which changes may anchor a trend for months.
+export async function digestTrends(db: D1Database, end: string, rules: ProtocolRule[]): Promise<{ lines: string[], findings: TrendFinding[] }> {
   const windowStart = shiftDays(end, -119)
   const [journal, health] = await Promise.all([
     journalInRange(db, windowStart, end),
     healthInRange(db, windowStart, end)
   ])
-  const trends = computeTrends(journal, health, end)
-  return { lines: formatTrendLines(trends, end), findings: trends.findings }
+  const trends = computeTrends(journal, health, end, rules)
+  return { lines: formatTrendLines(trends, end, rules), findings: trends.findings }
 }

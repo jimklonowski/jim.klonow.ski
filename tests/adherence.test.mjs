@@ -69,6 +69,8 @@ test('inactive rules are filtered unless asked for, and a rule with nothing expe
   assert.equal(kept.length, 1)
   assert.equal(kept[0].pct, null, 'its window ended before the weeks in view')
   assert.equal(effectiveRules([]), PROTOCOL_RULES, 'no cycles: the standing schedule itself')
+  const loaded = [rule('L', [1])]
+  assert.equal(effectiveRules([], loaded), loaded, 'the loaded schedule when one is passed (useProtocol)')
 })
 
 test('a cycle is scored from its first week through today, finished runs included', () => {

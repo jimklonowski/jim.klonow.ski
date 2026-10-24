@@ -147,11 +147,12 @@ export function computeAdherence(
     })
 }
 
-/** The standing schedule with every planned cycle layered in (override semantics — see
- * mergeRules). What the adherence panel and calendar rings should score against. */
-export function effectiveRules(cycles: Cycle[]): ProtocolRule[] {
-  if (!cycles.length) return PROTOCOL_RULES
-  return mergeRules(PROTOCOL_RULES, cycles)
+/** The standing schedule (useProtocol().rules — the protocol tables, or the code constants until
+ * seeded) with every planned cycle layered in (override semantics — see mergeRules). What the
+ * adherence panel and calendar rings should score against. */
+export function effectiveRules(cycles: Cycle[], rules: ProtocolRule[] = PROTOCOL_RULES): ProtocolRule[] {
+  if (!cycles.length) return rules
+  return mergeRules(rules, cycles)
 }
 
 export interface CycleAdherence {

@@ -225,10 +225,12 @@ const carried = computed(() => current.value != null && carriedFrom.value !== so
 const hasRange = computed(() => meta.value.refMin !== undefined || meta.value.refMax !== undefined)
 
 // Medication caveat (PSA on finasteride): decided per reading off the protocol dates, so the
-// badge follows the reading actually on screen and pre-treatment history stays unstarred.
+// badge follows the reading actually on screen and pre-treatment history stays unstarred. The
+// schedule comes from useProtocol (the protocol tables, or the code constants until seeded).
+const { rules: protocolRules } = useProtocol()
 const caveat = computed(() => MARKER_CAVEATS[props.biomarkerKey])
 const caveatCompound = computed(() =>
-  carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value) : null
+  carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value, protocolRules.value) : null
 )
 
 // Assay caveat (the censored 2026-09-09 immunoassay testosterone): belongs to one draw rather
@@ -311,7 +313,7 @@ const history = computed(() =>
       value: num(value),
       color: STATUS_COLORS[s],
       label: STATUS_LABELS[s],
-      flagged: caveatCompoundOn(props.biomarkerKey, e.date) != null,
+      flagged: caveatCompoundOn(props.biomarkerKey, e.date, protocolRules.value) != null,
       noted: readingNoteOn(props.biomarkerKey, e.date) != null
     }
   })

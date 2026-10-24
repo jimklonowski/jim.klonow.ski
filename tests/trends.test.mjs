@@ -164,6 +164,16 @@ test('a compound whose rule has ended is ancillary too (the GHK-Cu regression)',
   assert.ok(formatTrendLines(trends, END).every(l => !l.includes('GHK-Cu')))
 })
 
+test('the standing schedule is a parameter: the loaded rules decide who is exempt from the age-out', () => {
+  // The same GHK-Cu history, judged against a schedule on which it is still running (the protocol
+  // tables could say so where the constants do not): standing, so its stop anchors past six weeks.
+  const stillRunning = [{ compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01' }]
+  const trends = computeTrends(stopHistory('GHK-Cu'), [], END, stillRunning)
+  assert.equal(trends.findings[0]?.since?.kind, 'stop')
+  assert.deepEqual(trends.findings[0].since.compounds, ['GHK-Cu'])
+  assert.ok(formatTrendLines(trends, END, stillRunning).some(l => l.startsWith('Protocol changes: GHK-Cu stopped')))
+})
+
 test('a standing compound still anchors past six weeks', () => {
   const start = '2026-07-27' // a Monday, 55 days before END; testosterone's rule is active on END
   const journal = merge(dosing('Testosterone Cypionate', start, END, [1, 4]), rhrStep(start, 60, 68))

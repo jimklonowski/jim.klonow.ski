@@ -6,7 +6,7 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { diffDays, monthDay, weekdayOf } from './dates.ts'
-import type { ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
+import type { AsNeededCompound, ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
 import {
   AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, cadenceOf, doseLabelOn, doseStepOn, mondayFirst,
   nextDueDay, predecessorOf, ruleActiveOn, successorOf, tallySchedule
@@ -83,7 +83,8 @@ function standingLine(s: StandingCompound): string {
 export function protocolSchedule(
   asOf: string,
   rules: ProtocolRule[] = PROTOCOL_RULES,
-  standing: StandingCompound[] = STANDING_COMPOUNDS
+  standing: StandingCompound[] = STANDING_COMPOUNDS,
+  asNeeded: AsNeededCompound[] = AS_NEEDED_COMPOUNDS
 ): string {
   const active = rules.filter(r => ruleActiveOn(r, asOf))
   // A row another row of the same compound took over from (a cadence change) is not a stop: its
@@ -100,7 +101,7 @@ export function protocolSchedule(
   if (injectables.length) {
     lines.push(`- ${joinAnd(injectables)} ${injectables.length === 1 ? 'is the only injectable' : 'are the only injectables'} currently running.`)
   }
-  for (const a of AS_NEEDED_COMPOUNDS) {
+  for (const a of asNeeded) {
     lines.push(`- ${a.compound} is as-needed only (${a.note}), so sporadic logging is expected, not a lapse.`)
   }
   for (const r of stopped) {

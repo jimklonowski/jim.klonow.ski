@@ -157,6 +157,7 @@
         v-model:zoom="zoom"
         :label="timelineLabel"
         :entries="entries"
+        :standing="protocolStanding"
         :lab-dates="labDates"
         :from="firstPeptideDate"
         :today="todayDate"
@@ -185,17 +186,19 @@ const { role, canEdit } = await useAuth()
 const photosResource = role.value !== 'doctor' ? await usePhotoEntries() : null
 const photosData = computed(() => photosResource?.data.value ?? [])
 const { data: cyclesData } = await useCycles()
+const { rules: protocolRules, standing: protocolStanding } = await useProtocol()
 
 // Daily entries are a full-access surface (owner / friend / demo); the doctor is bounced from
 // /journal/<date> by the route policy, so the grid must not offer the jump in the first place.
 const canOpenDays = computed(() => isFullAccessRole(role.value))
 
-// Scheduled-dose rings come from PROTOCOL_RULES plus any planned cycles (effectiveRules) —
-// so an upcoming cycle previews its rings on future days before a single dose is logged.
-// The demo persona's dose dates re-anchor nightly and drift across weekdays by design, so
-// the rings would flag misses that aren't real — hidden for demo sessions.
+// Scheduled-dose rings come from the standing schedule (useProtocol — the protocol tables, or
+// the code constants until seeded) plus any planned cycles (effectiveRules) — so an upcoming
+// cycle previews its rings on future days before a single dose is logged. The demo persona's
+// dose dates re-anchor nightly and drift across weekdays by design, so the rings would flag
+// misses that aren't real — hidden for demo sessions.
 const showSchedule = computed(() => role.value !== 'demo')
-const scheduleRules = computed(() => effectiveRules(cyclesData.value ?? []))
+const scheduleRules = computed(() => effectiveRules(cyclesData.value ?? [], protocolRules.value))
 
 const entries = computed(() => data.value ?? [])
 
