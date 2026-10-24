@@ -42,7 +42,7 @@ function seedSource() {
     INSERT INTO journal_entries (date, weight_lbs, peptides, notes) VALUES
       ('2026-09-20', 181.4, '[{"compound":"HGH","dose":2.5,"unit":"iu"}]', 'Jim''s "rough" night; 2nd line' || char(10) || 'more'),
       ('2026-09-21', NULL, '[]', NULL);
-    INSERT INTO supplements (name, dose, notes, sort, created_at) VALUES ('Mg', '400 mg', 'it''s fine -- really', 3, '2026-09-01T00:00:00Z');
+    INSERT INTO protocol_items (name, kind, category, notes, sort, created_at) VALUES ('Mg', 'standing', 'supplement', 'it''s fine -- really', 3, '2026-09-01T00:00:00Z');
     INSERT INTO vials (compound, vial_amount, cost, created_at) VALUES ('BPC-157', 5, 0.1 + 0.2, 'x');
     INSERT INTO ask_threads (id, title, created_at, updated_at) VALUES
       (1, 'Hematocrit creep', '2026-09-25T10:00:00Z', '2026-09-25T10:01:00Z'),

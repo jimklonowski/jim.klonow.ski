@@ -8,7 +8,7 @@ import {
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
-import { cadenceOf } from '#shared/utils/protocolProse'
+import { cadenceOf } from '#shared/utils/protocolRules'
 
 function itemLine(item: CyclePlanItem, plannedWeeks: number): string {
   const to = item.toWeek ?? plannedWeeks

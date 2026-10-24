@@ -1,10 +1,10 @@
 import { mergeRules } from '#shared/utils/cycles'
-import { PROTOCOL_RULES } from '#shared/utils/protocolRules'
 import { eventContext } from '#shared/utils/protocolEvents'
 import { localToday } from '#shared/utils/time'
 import { shiftDays } from '#shared/utils/dates'
 import { dailyDigestFacts, digestTrends, weeklyDigestFacts } from './digestFacts'
 import { dailyDigestPrompt, weeklyDigestPrompt } from './digestPrompts'
+import { loadProtocol } from './protocolLoader'
 
 // Personal-health digest generation: builds the period's fact sheet (digestFacts.ts), wraps it in
 // the prompt (digestPrompts.ts), has Claude write a short recap, and upserts it into the digests
@@ -88,11 +88,12 @@ export async function generateDigest(
   const end = endDate ?? shiftDays(localToday(), -1)
   const start = kind === 'weekly' ? shiftDays(end, -6) : end
 
-  // The effective dosing schedule — standing rules with any planned cycle merged in — and the
-  // home-timezone "today", so the schedule check knows whether the period is still under way
-  // (a same-day regenerate from the dashboard) or closed (the crons run for yesterday).
-  const cycles = await loadCycles(db)
-  const rules = mergeRules(PROTOCOL_RULES, cycles)
+  // The effective dosing schedule — the standing rules (the protocol tables, or the code
+  // constants until seeded) with any planned cycle merged in — and the home-timezone "today", so
+  // the schedule check knows whether the period is still under way (a same-day regenerate from
+  // the dashboard) or closed (the crons run for yesterday).
+  const [cycles, protocol] = await Promise.all([loadCycles(db), loadProtocol(db)])
+  const rules = mergeRules(protocol.rules, cycles)
   const today = localToday()
 
   const built = kind === 'weekly'
@@ -102,7 +103,7 @@ export async function generateDigest(
     return { ok: true, skipped: true, type: kind, period_start: start, period_end: end }
   }
 
-  const trends = await digestTrends(db, end)
+  const trends = await digestTrends(db, end, protocol.rules)
   if (trends.lines.length) {
     built.lines.push('', 'Sustained trends (multi-week context, precomputed):', ...trends.lines)
   }
@@ -120,7 +121,7 @@ export async function generateDigest(
   // timing frames every trend on it; a vaccine or a travel weekend explains a bad-looking few
   // days; a draw booked for Friday explains the biotin and iron going quiet on Tuesday).
   const [supplements, cyclesCtx, vaccines, plannedDraws] = await Promise.all([
-    supplementContext(db, end),
+    supplementContext(db, end, protocol),
     cycleContext(db, end, cycles),
     vaccineContext(db, end),
     plannedDrawContext(db, end)
@@ -128,7 +129,7 @@ export async function generateDigest(
   const regimen = [supplements, cyclesCtx, vaccines, plannedDraws, eventContext(end)].filter(Boolean).join('\n\n')
 
   const facts = built.lines.join('\n')
-  const prompt = kind === 'weekly' ? weeklyDigestPrompt(start, end, facts, regimen) : dailyDigestPrompt(end, facts, regimen)
+  const prompt = kind === 'weekly' ? weeklyDigestPrompt(start, end, facts, regimen, protocol) : dailyDigestPrompt(end, facts, regimen, protocol)
   const summary = await callClaude(prompt)
   await storeDigest(db, kind, start, end, summary, built.stats, prompt)
 

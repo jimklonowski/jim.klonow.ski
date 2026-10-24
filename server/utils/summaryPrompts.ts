@@ -1,4 +1,6 @@
+import { goalContext } from '#shared/utils/protocolEvents'
 import { protocolSchedule } from '#shared/utils/protocolProse'
+import type { ProtocolData } from '#shared/utils/protocolStore'
 
 // The two long-form summary prompts — the labs trend summary and the DEXA body-composition
 // summary — out of their handlers (audit #42 item 42), so the prompt text lives beside the
@@ -10,6 +12,8 @@ import { protocolSchedule } from '#shared/utils/protocolProse'
 export interface LabsSummaryInputs {
   date: string
   fasting: boolean
+  /** The request's standing schedule (protocolFor); rendered as of the draw date. */
+  protocol: ProtocolData
   /** The comparison window, oldest first, the new draw last. */
   draws: Array<{ date: string, fasting: boolean }>
   /** protocolContext's lines wrapped in newlines, or '' (the handler builds the block). */
@@ -28,10 +32,11 @@ export interface LabsSummaryInputs {
 }
 
 export function labsSummaryPrompt(i: LabsSummaryInputs): string {
+  const goals = goalContext(i.date)
   return `You are writing a trend summary for a personal bloodwork dashboard. The reader is the person whose labs these are — address them as "you". They track their own biomarkers closely and understand them well. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH, and hCG, with ancillary peptides rotating around that core (the schedule below says what was running as of this draw) — and they are weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals — so markers that gate that decision (lipids, especially HDL; liver enzymes; hematocrit/hemoglobin; iron/ferritin; blood pressure proxies) deserve extra attention when present. They are not currently taking an aromatase inhibitor but keep Anastrozole on hand from their TRT clinic for symptomatic use; estradiol has been climbing and may read over 100 pg/mL on new draws. Treat elevated estradiol as a known, watched issue: quantify the trend against prior draws, name the specific symptoms and risks worth monitoring at that level, and frame the on-hand Anastrozole as the discussion point for symptom-driven use — not something to start reflexively.
 
-${protocolSchedule(i.date)}
-${i.supplementBlock ? `\n${i.supplementBlock}\n` : ''}${i.cycleBlock ? `\n${i.cycleBlock}\n` : ''}${i.vaccineBlock ? `\n${i.vaccineBlock}\n` : ''}${i.eventBlock ? `\n${i.eventBlock}\n` : ''}${i.plannedBlock ? `\n${i.plannedBlock}\n` : ''}
+${protocolSchedule(i.date, i.protocol.rules, i.protocol.standing, i.protocol.asNeeded)}
+${goals ? `\n${goals}\n` : ''}${i.supplementBlock ? `\n${i.supplementBlock}\n` : ''}${i.cycleBlock ? `\n${i.cycleBlock}\n` : ''}${i.vaccineBlock ? `\n${i.vaccineBlock}\n` : ''}${i.eventBlock ? `\n${i.eventBlock}\n` : ''}${i.plannedBlock ? `\n${i.plannedBlock}\n` : ''}
 The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT and roughly halve PSA once 6–12 months in, so double an on-treatment PSA before comparing it with pre-treatment draws; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
 
 New draw: ${i.date} (${i.fasting ? 'fasting' : 'non-fasting'})
@@ -55,6 +60,8 @@ Be factual, specific, and concise, and keep the whole thing to roughly 500-600 w
 
 export interface DexaSummaryInputs {
   date: string
+  /** The request's standing schedule (protocolFor); rendered as of the scan date. */
+  protocol: ProtocolData
   /** protocolContext's lines wrapped in newlines, or '' (the handler builds the block). */
   protocolBlock: string
   supplementBlock: string
@@ -66,10 +73,11 @@ export interface DexaSummaryInputs {
 }
 
 export function dexaSummaryPrompt(i: DexaSummaryInputs): string {
+  const goals = goalContext(i.date)
   return `You are writing a body-composition summary for a personal health dashboard. The reader is the person who was scanned — address them as "you". They lift seriously, track their body closely and understand DEXA output. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH and hCG, with ancillary peptides rotating around that core (the schedule below is what was running as of this scan), and they are in a lean-mass phase: adding muscle — arms and chest especially — while holding body fat in the fit range. Treat regional lean changes and left/right symmetry as training signals worth a sentence each.
 
-${protocolSchedule(i.date)}
-${i.protocolBlock}${i.supplementBlock ? `\n${i.supplementBlock}\n` : ''}${i.cycleBlock ? `\n${i.cycleBlock}\n` : ''}${i.eventBlock ? `\n${i.eventBlock}\n` : ''}
+${protocolSchedule(i.date, i.protocol.rules, i.protocol.standing, i.protocol.asNeeded)}
+${goals ? `\n${goals}\n` : ''}${i.protocolBlock}${i.supplementBlock ? `\n${i.supplementBlock}\n` : ''}${i.cycleBlock ? `\n${i.cycleBlock}\n` : ''}${i.eventBlock ? `\n${i.eventBlock}\n` : ''}
 DEXA scans on file (oldest -> newest; "NEW" marks the new scan; masses in lbs). "Scale weight" is the clinic-typed figure from the report header and can lag — the DEXA total is the measured one:
 ${i.scanBlock.join('\n')}
 

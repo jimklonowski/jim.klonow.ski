@@ -28,7 +28,7 @@ const ALL_TABS = [
   { label: 'Entries', to: '/journal/entries' },
   { label: 'Calendar', to: '/journal/calendar' },
   { label: 'Photos', to: '/journal/photos' },
-  { label: 'Supps', to: '/journal/supplements' },
+  { label: 'Protocol', to: '/journal/protocol' },
   { label: 'Vaccines', to: '/journal/vaccines' }
 ]
 

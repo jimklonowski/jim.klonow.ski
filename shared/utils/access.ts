@@ -47,6 +47,9 @@ const DOCTOR_PAGES = [
   // the old path 301s to this one.
   /^\/tools\/calculator$/,
   /^\/journal\/compound\//,
+  // The protocol (what is taken, with its dated history) is clinical context; /journal/supplements
+  // is its old address and 301s to it.
+  /^\/journal\/protocol$/,
   /^\/journal\/supplements$/,
   // An immunization record is exactly what a clinician asks for.
   /^\/journal\/vaccines$/,

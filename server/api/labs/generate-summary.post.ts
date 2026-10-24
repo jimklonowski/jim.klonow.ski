@@ -97,9 +97,13 @@ export default defineEventHandler(async (event) => {
   // questions it was meant to answer, and the summary opens with them.
   const plannedBlock = await plannedDrawContext(db, date)
 
+  // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
+  // renders it as of the draw date.
+  const protocol = await protocolFor(event)
+
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, markerLines, readingNotes, qualitativeBlock
+    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()

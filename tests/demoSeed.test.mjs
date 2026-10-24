@@ -4,6 +4,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { materializeSeedRows, materializeSeedValue, zoneOffsetAt } from '../shared/utils/demoSeed.ts'
+import { shiftDays, weekdayOf } from '../shared/utils/dates.ts'
+import { protocolFromRows } from '../shared/utils/protocolStore.ts'
+import { tallySchedule } from '../shared/utils/protocolRules.ts'
 
 const chicagoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
 
@@ -48,6 +51,41 @@ test('@Z in a time field becomes the offset of the materialized day', () => {
   // Anchored just after the fall-back, the same relative workout a week earlier is still on CDT.
   assert.equal(materializeSeedValue('@D1 18:00:00 @Z', '2026-11-03'), '2026-11-02 18:00:00 -0600')
   assert.equal(materializeSeedValue('@D8 18:00:00 @Z', '2026-11-03'), '2026-10-26 18:00:00 -0500')
+})
+
+test('@W[offsets] is the weekday set of those offsets, following the anchor', () => {
+  // 2026-10-20 is a Tuesday.
+  assert.equal(materializeSeedValue('@W[0]', '2026-10-20'), JSON.stringify([weekdayOf('2026-10-20')]))
+  assert.equal(materializeSeedValue('@W[0]', '2026-10-20'), '[2]')
+  assert.equal(materializeSeedValue('@W[0,1]', '2026-10-20'), '[1,2]', 'sorted')
+  assert.equal(materializeSeedValue('@W[0, 7]', '2026-10-20'), '[2]', 'a week apart is one weekday')
+  assert.equal(materializeSeedValue('@W[1]', '2026-10-27'), '[1]', 'the same offset a week later: the same weekday')
+  assert.equal(materializeSeedValue('@W[1]', '2026-10-28'), '[2]', 'and the next day it has moved with the anchor')
+})
+
+test('the seeded protocol scores the persona as on schedule whatever day it is anchored to (the protocol plan, P9)', () => {
+  const seed = JSON.parse(readFileSync(new URL('../scripts/demo/demo-seed.json', import.meta.url), 'utf8'))
+  const objects = (table, anchor) => materializeSeedRows(table, anchor).map(r => Object.fromEntries(table.cols.map((c, i) => [c, r[i]])))
+  for (const anchor of ['2026-11-05', '2026-03-10', '2026-07-19']) {
+    const { rules } = protocolFromRows(objects(seed.tables.protocol_items, anchor), objects(seed.tables.protocol_versions, anchor))
+    assert.ok(rules.some(r => r.compound === 'Testosterone Cypionate' && r.to === undefined), 'the standing TRT rule is open')
+    const doseDates = new Map()
+    for (const e of objects(seed.tables.journal_entries, anchor)) {
+      for (const p of JSON.parse(e.peptides)) {
+        if (!doseDates.has(p.compound)) doseDates.set(p.compound, new Set())
+        doseDates.get(p.compound).add(e.date)
+      }
+    }
+    const tallies = tallySchedule(rules, shiftDays(anchor, -119), anchor, doseDates, shiftDays(anchor, 1))
+    for (const t of tallies) assert.deepEqual(t.offSchedule, [], `${t.rule.compound}: every dose on one of its days (anchor ${anchor})`)
+    const trt = tallies.find(t => t.rule.compound === 'Testosterone Cypionate')
+    assert.ok(trt.hit.length >= 28, `TRT hits ${trt.hit.length}`)
+    assert.ok(trt.missed.length <= 6, `TRT misses ${trt.missed.length} (3% skipped pins plus unlogged days)`)
+    // Retatrutide's three dose steps are one rule with steps, at 6 mg now.
+    const reta = rules.filter(r => r.compound === 'Retatrutide')
+    assert.equal(reta.length, 1)
+    assert.deepEqual(reta[0].doses.map(d => d.label), ['2 mg', '4 mg', '6 mg'])
+  }
 })
 
 test('the generated seed materializes with unique journal dates and seasonally correct workout offsets', () => {

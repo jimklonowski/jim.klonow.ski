@@ -28,5 +28,12 @@ export async function resolve(specifier, context, next) {
     }
     return next(pathToFileURL(file).href, context)
   }
+  // A relative import without an extension (`./db`, the way server/utils modules import each
+  // other and Nitro resolves them) — try the same extensions, so server code is testable too.
+  if ((specifier.startsWith('./') || specifier.startsWith('../')) && !path.extname(specifier) && context.parentURL?.startsWith('file:')) {
+    const file = path.join(path.dirname(fileURLToPath(context.parentURL)), specifier)
+    const found = EXTENSIONS.map(ext => file + ext).find(f => existsSync(f))
+    if (found) return next(pathToFileURL(found).href, context)
+  }
   return next(specifier, context)
 }

@@ -1,30 +1,19 @@
 // The protocol as AI-prompt prose: the intended schedule every digest, lab summary, and chat
 // prompt carries (protocolSchedule), and the digest's planned-vs-logged lines (scheduleContext).
-// Generated from the data in ./protocolRules.ts, so the prompts can't drift from the rules that
-// the adherence panel and calendar rings score against — they used to be a hand-kept prose twin.
+// Generated from the loaded rules (server/utils/protocolLoader.ts, the protocol tables), so the
+// prompts can't drift from what the adherence panel and calendar rings score against — they used
+// to be a hand-kept prose twin of a hand-kept constant.
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { diffDays, monthDay, weekdayOf } from './dates.ts'
-import type { ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
+import type { AsNeededCompound, ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
 import {
-  AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, doseLabelOn, doseStepOn, nextDueDay, ruleActiveOn,
-  tallySchedule
+  cadenceOf, doseLabelOn, doseStepOn, mondayFirst, nextDueDay, predecessorOf, ruleActiveOn, successorOf, tallySchedule
 } from './protocolRules.ts'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
-/** Monday-first, since that's how a week reads. */
-function mondayFirst(weekdays: number[]): number[] {
-  return [...weekdays].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
-}
-
-/** 'daily' or 'Mon+Thu'. */
-export function cadenceOf(weekdays: number[]): string {
-  if (weekdays.length === 7) return 'daily'
-  return mondayFirst(weekdays).map(d => DAY_NAMES[d]).join('+')
-}
 
 /** "Wed Sep 9" — every date the digest prompts show carries its weekday, because the schedule
  * is expressed in weekdays and the model should never have to derive one from a date. */
@@ -51,21 +40,32 @@ function weeklyTotal(rule: ProtocolRule, label: string): string | null {
   return `${Number(m[1]) * rule.weekdays.length} ${m[2]}/week`
 }
 
-// "raised from 250 IU on 2026-09-08" — the last change on or before asOf, from the dose steps.
-function lastChange(rule: ProtocolRule, asOf: string): string | null {
-  const { step, previous } = doseStepOn(rule, asOf)
-  if (!step || !previous) return null
-  const [a, b] = [AMOUNT.exec(previous.label), AMOUNT.exec(step.label)]
-  const verb = a && b && a[2] === b[2] ? (Number(b[1]) > Number(a[1]) ? 'raised' : 'reduced') : 'changed'
-  return `${verb} from ${previous.label} on ${step.from}`
+// "raised" / "reduced" when the unit matches and the amount moved; "changed" otherwise.
+function changeVerb(previous: string, next: string): string {
+  const [a, b] = [AMOUNT.exec(previous), AMOUNT.exec(next)]
+  if (!a || !b || a[2] !== b[2] || Number(a[1]) === Number(b[1])) return 'changed'
+  return Number(b[1]) > Number(a[1]) ? 'raised' : 'reduced'
 }
 
-function ruleLine(rule: ProtocolRule, asOf: string): string {
+// "raised from 250 IU on 2026-09-08" — the last change on or before asOf: a dose step within the
+// row, or else the row this one took over from (a cadence change — "reduced from 300 IU
+// Tue+Fri+Sun on 2026-10-24" — names the old cadence only when it differs).
+function lastChange(rule: ProtocolRule, asOf: string, rules: ProtocolRule[]): string | null {
+  const { step, previous } = doseStepOn(rule, asOf)
+  if (step && previous) return `${changeVerb(previous.label, step.label)} from ${previous.label} on ${step.from}`
+  const prev = predecessorOf(rule, rules)
+  if (!prev) return null
+  const label = doseLabelOn(prev, prev.to!)
+  const cadence = cadenceOf(prev.weekdays) === cadenceOf(rule.weekdays) ? '' : ` ${cadenceOf(prev.weekdays)}`
+  return `${changeVerb(label, doseLabelOn(rule, asOf))} from ${label}${cadence} on ${rule.from}`
+}
+
+function ruleLine(rule: ProtocolRule, asOf: string, rules: ProtocolRule[]): string {
   const days = rule.weekdays.length === 7 ? 'Every day' : mondayFirst(rule.weekdays).map(d => DAY_NAMES_LONG[d]).join(' + ')
   const label = doseLabelOn(rule, asOf)
   const perInjection = rule.injected && rule.weekdays.length < 7
   const weekly = perInjection ? weeklyTotal(rule, label) : null
-  const history = [lastChange(rule, asOf), rule.note].filter(Boolean).join('; ')
+  const history = [lastChange(rule, asOf, rules), rule.note].filter(Boolean).join('; ')
   const detail = [weekly, history].filter(Boolean).join(' — ')
   return `- ${days}: ${rule.compound} ${label}${perInjection ? ' per injection' : ''}${detail ? ` (${detail})` : ''}.`
 }
@@ -82,21 +82,26 @@ function standingLine(s: StandingCompound): string {
  */
 export function protocolSchedule(
   asOf: string,
-  rules: ProtocolRule[] = PROTOCOL_RULES,
-  standing: StandingCompound[] = STANDING_COMPOUNDS
+  rules: ProtocolRule[],
+  standing: StandingCompound[],
+  asNeeded: AsNeededCompound[]
 ): string {
   const active = rules.filter(r => ruleActiveOn(r, asOf))
-  const stopped = rules.filter(r => r.to != null && r.to < asOf && diffDays(r.to, asOf) <= DISCONTINUED_RELEVANCE_DAYS)
+  // A row another row of the same compound took over from (a cadence change) is not a stop: its
+  // successor's line says what changed, so it stays out of the discontinued list.
+  const stopped = rules.filter(r =>
+    r.to != null && r.to < asOf && diffDays(r.to, asOf) <= DISCONTINUED_RELEVANCE_DAYS && !successorOf(r, rules)
+  )
   const injectables = active.filter(r => r.injected).map(r => r.compound)
 
   const lines = [
-    ...active.map(r => ruleLine(r, asOf)),
+    ...active.map(r => ruleLine(r, asOf, rules)),
     ...standing.filter(s => s.from <= asOf && (s.to == null || s.to >= asOf)).map(standingLine)
   ]
   if (injectables.length) {
     lines.push(`- ${joinAnd(injectables)} ${injectables.length === 1 ? 'is the only injectable' : 'are the only injectables'} currently running.`)
   }
-  for (const a of AS_NEEDED_COMPOUNDS) {
+  for (const a of asNeeded) {
     lines.push(`- ${a.compound} is as-needed only (${a.note}), so sporadic logging is expected, not a lapse.`)
   }
   for (const r of stopped) {
@@ -147,16 +152,18 @@ function dailyScheduleLine(date: string, tallies: ScheduleTally[], today: string
   return parts.join(' ')
 }
 
-function weeklyScheduleLines(start: string, end: string, tallies: ScheduleTally[], today: string): string {
+function weeklyScheduleLines(start: string, end: string, tallies: ScheduleTally[], today: string, rules: ProtocolRule[]): string {
   const rows = tallies.filter(t => t.hit.length || t.missed.length || t.pending || t.offSchedule.length)
   if (!rows.length) return ''
   const open = end >= today
   const lines = rows.map((t) => {
     const dueDates = [...t.hit, ...t.missed].sort()
     const daily = t.rule.weekdays.length === 7
+    // A row that begins or ends inside the window says so — "cadence changed" rather than
+    // began/ended when another row of the same compound hands over to it or takes over.
     const window = t.rule.to != null && t.rule.to < end
-      ? `, schedule ended ${fmtDay(t.rule.to)}`
-      : t.rule.from > start ? `, schedule began ${fmtDay(t.rule.from)}` : ''
+      ? `, ${successorOf(t.rule, rules) ? 'cadence changed after' : 'schedule ended'} ${fmtDay(t.rule.to)}`
+      : t.rule.from > start ? `, ${predecessorOf(t.rule, rules) ? 'cadence changed' : 'schedule began'} ${fmtDay(t.rule.from)}` : ''
     let line = `- ${t.rule.compound} ${doseLabelOn(t.rule, end)} (${cadenceOf(t.rule.weekdays)}${window}): `
     line += dueDates.length
       ? `${daily ? `${dueDates.length} days due` : `due ${listDays(dueDates)}`} — ${t.hit.length} logged`
@@ -186,5 +193,5 @@ export function scheduleContext(
   if (!tallies.length) return ''
   return start === end
     ? dailyScheduleLine(start, tallies, today)
-    : weeklyScheduleLines(start, end, tallies, today)
+    : weeklyScheduleLines(start, end, tallies, today, rules)
 }

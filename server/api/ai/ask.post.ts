@@ -36,6 +36,8 @@ export default defineEventHandler(async (event) => {
   // The client sends its local date so "this week" means Jim's week, not UTC's.
   const today = body.today ?? localToday()
   const db = getDb(event)
+  // The standing schedule, read once for both the system prompt and the fact sheet.
+  const protocol = await protocolFor(event)
 
   // The thread this exchange lands in. An existing one is checked now; a NEW one gets its row
   // only once the model has started answering (below) — the fact sheet, the client and the
@@ -48,7 +50,7 @@ export default defineEventHandler(async (event) => {
     if (!exists) throw createError({ statusCode: 404, message: 'That conversation no longer exists — start a new one' })
   }
 
-  const context = await buildAskContext(db, today)
+  const context = await buildAskContext(db, today, protocol)
 
   const startedAt = Date.now()
   const stream = createAnthropic({ timeout: 120_000 }).messages.stream({
@@ -63,7 +65,7 @@ export default defineEventHandler(async (event) => {
     // sheet at ~10% of input price instead of re-paying for it (5-minute TTL, refreshed by each
     // hit — a question more than five minutes after the last answer re-warms it at 1.25×).
     // Usage is logged below; cache_read should be non-zero from the second turn on.
-    system: [{ type: 'text', text: `${askSystemPrompt(today)}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: `${askSystemPrompt(today, protocol)}\n\n--- FACT SHEET ---\n${context}`, cache_control: { type: 'ephemeral' } }],
     messages
   })
 

@@ -23,6 +23,10 @@ export const AUDIT_KEYS = {
   planned_draws: 'id',
   progress_photos: 'id',
   profile: 'key',
+  // The protocol (the protocol plan, P7). Deleting an item logs each of its versions too, so a
+  // restore is the item first, then its versions.
+  protocol_items: 'id',
+  protocol_versions: 'id',
   // A hand-entered figure for a meal (correct.post.ts): the one meal_estimates write a person
   // makes; model rows are regenerable and not logged.
   meal_estimates: 'key'

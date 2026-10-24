@@ -38,6 +38,7 @@ const MATRIX = {
   '/journal/compounds': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/workouts': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/calendar': ['owner', 'friend', 'doctor', 'demo'],
+  '/journal/protocol': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/supplements': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/vaccines': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/cycles': ['owner', 'friend', 'doctor', 'demo'],

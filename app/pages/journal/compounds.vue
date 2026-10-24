@@ -111,7 +111,7 @@
         </p>
       </section>
 
-      <!-- Planned vs logged, from the hand-maintained PROTOCOL_RULES cadence -->
+      <!-- Planned vs logged, from the protocol's cadence (useProtocol) -->
       <section v-if="adherence.length">
         <TuiHeader
           label="ADHERENCE ── planned vs logged"
@@ -131,6 +131,7 @@
           v-model:zoom="zoom"
           :label="timelineLabel"
           :entries="entries"
+          :standing="protocolStanding"
           :lab-dates="labDates"
           :from="historyStart"
           :today="today"
@@ -175,7 +176,8 @@ useSeoMeta({ title: 'Journal · Compounds' })
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: cyclesData } = await useCycles()
-const { canEdit, role } = await useAuth()
+const { rules: protocolRules, standing: protocolStanding } = await useProtocol()
+const { canEdit } = await useAuth()
 
 const entries = computed(() => data.value ?? [])
 // Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
@@ -188,11 +190,12 @@ const today = useToday()
  */
 const ACTIVE_WINDOW = 14
 
-// The standing schedule with planned cycles layered in (override semantics — see mergeRules):
-// the intent both the dose shorthand and the adherence panel read. Empty for the demo persona,
-// whose dose dates re-anchor nightly and drift across weekdays by design, so weekday-based
-// scoring would read as constant failure there.
-const scheduleRules = computed(() => role.value === 'demo' ? [] : effectiveRules(cyclesData.value ?? []))
+// The standing schedule (useProtocol — the protocol tables, or the code constants until seeded)
+// with planned cycles layered in (override semantics — see mergeRules): the intent both the dose
+// shorthand and the adherence panel read. The demo sandbox carries its own schedule since the
+// protocol plan's P9 (its weekdays re-anchor nightly with its doses), so nothing is gated by role
+// here any more — an unseeded sandbox simply has no rules.
+const scheduleRules = computed(() => effectiveRules(cyclesData.value ?? [], protocolRules.value))
 
 interface Usage {
   compound: string
@@ -233,7 +236,7 @@ function daysAgo(date: string) {
  *
  * Cadence: the schedule rule's intent when one is active, so a daily compound with a travel gap
  * still reads "qd" rather than the "6×/wk" its logged days round to. Observed cadence only for
- * compounds without a rule (as-needed BPC-157, the demo persona).
+ * compounds without a rule (as-needed BPC-157).
  */
 function doseShorthand(u: Usage): string {
   const key = (d: Usage['doses'][number]) => `${d.dose}${d.unit}`
@@ -362,7 +365,7 @@ const exposureMarks = computed(() => {
 // --- adherence ---
 const ADHERENCE_WEEKS = 8
 
-// scheduleRules is already empty for the demo persona, which makes this [] there.
+// Empty rules (an unseeded sandbox) make this [] and the panel stays away.
 const adherence = computed(() =>
   computeAdherence(entries.value, today.value, ADHERENCE_WEEKS, scheduleRules.value)
 )

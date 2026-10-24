@@ -6,7 +6,7 @@ import {
   zAsk, zAuditList, zAuditRestore, zCycleSave, zDateRange, zDigestGenerate, zHealthWebhook, zIdOnly, zInviteCreate, zInviteRevoke, zJournalMove, zJournalSave, zLabsSave,
   zMealCorrect, zMealEstimateRequest, zMealSet,
   zPasswordLogin, zPhotoThumbnailQuery, zPhotoUpdate, zPhotoUploadQuery, zPinLogin, zPlannedDrawSave, zProfileSave, zRedeem, zSodaAdd,
-  zSodaRemove, zSupplementSave, zTickerRun, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWaterAdd, zWaterRemove,
+  zProtocolDelete, zProtocolItemSave, zProtocolVersionSave, zSodaRemove, zTickerRun, zTickerStateSave, zVaccinationSave, zVialOpen, zVialParse, zVialSave, zWaterAdd, zWaterRemove,
   zWhoopCallbackQuery
 } from '../shared/utils/schemas.ts'
 
@@ -97,7 +97,7 @@ test('a cleared number input reads as absent, not as a type error', () => {
   assert.equal(out.peptides[0].dose, 0)
   assert.equal(zVialSave.parse({ compound: 'X', vial_amount: 5, cost: '', quantity: '', unit_count: '' }).cost, null)
   assert.equal(zVialSave.parse({ compound: 'X', vial_amount: 5, quantity: '' }).quantity, 1)
-  assert.equal(zSupplementSave.parse({ name: 'Mg', sort: '' }).sort, 100)
+  assert.equal(zProtocolItemSave.parse({ name: 'Mg', kind: 'standing', category: 'supplement', sort: '' }).sort, 100)
   // A required amount is still required — clearing it is a real error, as it always was.
   assert.ok(problem(zVialSave, { compound: 'X', vial_amount: '' }))
   // Genuine junk is still rejected.
@@ -204,15 +204,21 @@ test('vial open and the id-only deletes', () => {
   assert.ok(problem(zIdOnly, {}))
 })
 
-test('supplements normalize their enums instead of rejecting', () => {
-  const out = zSupplementSave.parse({ name: '  Magnesium ', status: 'bogus', category: 'nonsense' })
-  assert.equal(out.name, 'Magnesium')
-  assert.equal(out.status, 'active')
-  assert.equal(out.category, 'supplement')
-  assert.equal(out.schedule, 'daily')
-  assert.equal(out.sort, 100)
-  assert.ok(problem(zSupplementSave, { name: '' }))
-  assert.ok(problem(zSupplementSave, {}))
+test('protocol items and versions: trimmed names, strict kinds, ordered dates, exactly one delete target', () => {
+  const item = zProtocolItemSave.parse({ name: '  Magnesium ', kind: 'standing', category: 'supplement' })
+  assert.equal(item.name, 'Magnesium')
+  assert.equal(item.injected, false)
+  assert.equal(item.on_hand, false)
+  assert.equal(item.sort, 100)
+  assert.ok(problem(zProtocolItemSave, { name: '', kind: 'standing', category: 'supplement' }))
+  assert.ok(problem(zProtocolItemSave, { name: 'X', kind: 'bogus', category: 'supplement' }), 'kinds are not coerced — the loader keys on them')
+  const version = zProtocolVersionSave.parse({ item_id: 3, from_date: '2026-10-24', to_date: '', dose_label: ' 250 IU ', weekdays: [5, 2, 5], note: '' })
+  assert.deepEqual(version, { item_id: 3, from_date: '2026-10-24', to_date: null, dose_label: '250 IU', weekdays: [2, 5], note: null })
+  assert.ok(problem(zProtocolVersionSave, { item_id: 3, from_date: '2026-11-10', to_date: '2026-11-01' }), 'the last day cannot come first')
+  assert.ok(problem(zProtocolVersionSave, { item_id: 3, weekdays: [7] }))
+  assert.equal(zProtocolDelete.parse({ version_id: 4 }).version_id, 4)
+  assert.ok(problem(zProtocolDelete, {}))
+  assert.ok(problem(zProtocolDelete, { item_id: 1, version_id: 2 }))
 })
 
 test('share links: only guest roles, and out-of-range values clamp like the endpoint always did', () => {
