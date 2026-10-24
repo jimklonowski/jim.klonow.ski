@@ -10,7 +10,7 @@
 // the /ask fact sheet, and the lab summary's protocol-change lines.
 import type { HealthMetricsEntry, JournalRow } from '../types/journal'
 // Explicit .ts: runtime imports the test runner must resolve without Vite.
-import type { ProtocolRule } from './protocolRules.ts'
+import type { ProtocolRule, StandingCompound } from './protocolRules.ts'
 import { ruleActiveOn } from './protocolRules.ts'
 import { diffDays, monthDay, roundTo, shiftDays } from './dates.ts'
 import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
@@ -279,9 +279,21 @@ export function detectProtocolChanges(journal: TrendJournalRow[], endDate: strin
 }
 
 /** `rules` is the standing schedule the anchors are judged against (standing compounds may
- * anchor a trend for months; ancillaries age out). With none, every change is ancillary. */
-export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow[], endDate: string, rules: ProtocolRule[] = []): TrendsResult {
+ * anchor a trend for months; ancillaries age out). With none, every change is ancillary.
+ * `standing` are the meds taken daily but deliberately NOT logged: a compound that moves from the
+ * dose log to that list (finasteride, Oct 2026) goes silent in the log without stopping, so its
+ * detected "stop" is dropped — its start and dose changes stay real history. */
+export function computeTrends(
+  journal: TrendJournalRow[],
+  health: TrendHealthRow[],
+  endDate: string,
+  rules: ProtocolRule[] = [],
+  standing: StandingCompound[] = []
+): TrendsResult {
+  const unlogged = new Set(standing.filter(s => s.from <= endDate && (s.to == null || s.to >= endDate)).map(s => s.compound))
   const changes = detectProtocolChanges(journal, endDate)
+    .map(c => (c.kind === 'stop' ? { ...c, compounds: c.compounds.filter(name => !unlogged.has(baseCompound(name))) } : c))
+    .filter(c => c.compounds.length)
   const findings: TrendFinding[] = []
 
   for (const metric of METRICS) {

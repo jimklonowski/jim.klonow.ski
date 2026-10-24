@@ -121,7 +121,9 @@ export interface AsNeededCompound {
   note: string
 }
 
-export function ruleActiveOn(rule: ProtocolRule, date: string): boolean {
+/** In force on `date` — for a rule, or for anything else with a `from` and an inclusive `to`
+ * (a standing med, a caveat span). */
+export function ruleActiveOn(rule: Pick<ProtocolRule, 'from' | 'to'>, date: string): boolean {
   return date >= rule.from && (rule.to == null || date <= rule.to)
 }
 

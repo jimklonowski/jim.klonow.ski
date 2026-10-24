@@ -275,7 +275,8 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     journal.filter(e => e.date >= trendStart),
     health.filter(h => (h.date as string) >= trendStart) as never,
     today,
-    protocol.rules
+    protocol.rules,
+    protocol.standing
   )
   const trendLines = formatTrendLines(trends, today, protocol.rules)
 

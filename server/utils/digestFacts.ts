@@ -1,4 +1,5 @@
 import type { ProtocolRule } from '#shared/utils/protocolRules'
+import type { ProtocolData } from '#shared/utils/protocolStore'
 import { fmtDay, scheduleContext } from '#shared/utils/protocolProse'
 import { roundTo, shiftDays } from '#shared/utils/dates'
 import { mean } from '#shared/utils/stats'
@@ -464,14 +465,14 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
 
 // Protocol change-points and sustained metric shifts over the ~4 months ending `end`, so the
 // recap can connect a month of elevated RHR to the TRT start instead of only seeing the
-// period's own numbers. `rules` is the standing schedule (the protocol tables, or the code
-// constants until seeded) that decides which changes may anchor a trend for months.
-export async function digestTrends(db: D1Database, end: string, rules: ProtocolRule[]): Promise<{ lines: string[], findings: TrendFinding[] }> {
+// period's own numbers. `protocol` is the request's schedule: its rules decide which changes may
+// anchor a trend for months, its standing meds which log silences are not stops at all.
+export async function digestTrends(db: D1Database, end: string, protocol: ProtocolData): Promise<{ lines: string[], findings: TrendFinding[] }> {
   const windowStart = shiftDays(end, -119)
   const [journal, health] = await Promise.all([
     journalInRange(db, windowStart, end),
     healthInRange(db, windowStart, end)
   ])
-  const trends = computeTrends(journal, health, end, rules)
-  return { lines: formatTrendLines(trends, end, rules), findings: trends.findings }
+  const trends = computeTrends(journal, health, end, protocol.rules, protocol.standing)
+  return { lines: formatTrendLines(trends, end, protocol.rules), findings: trends.findings }
 }

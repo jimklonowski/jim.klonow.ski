@@ -175,6 +175,20 @@ test('the standing schedule is a parameter: the loaded rules decide who is exemp
   assert.ok(formatTrendLines(trends, END, stillRunning).some(l => l.startsWith('Protocol changes: GHK-Cu stopped')))
 })
 
+test('a med that moved from the dose log to the standing list goes silent without "stopping"', () => {
+  // Finasteride, Oct 2026: logged daily, then taken daily but no longer logged. The log silence is
+  // a stop to the detector — unless the schedule says the compound is standing as of the period.
+  const history = stopHistory('Finasteride')
+  assert.ok(computeTrends(history, [], END).changes.some(c => c.kind === 'stop' && c.compounds.includes('Finasteride')), 'a stop, read naively')
+  const standing = [{ compound: 'Finasteride', from: '2026-08-01', to: null, label: '1 mg' }]
+  const trends = computeTrends(history, [], END, [], standing)
+  assert.ok(!trends.changes.some(c => c.compounds.includes('Finasteride')), 'no stop once it is a standing med')
+  assert.ok(formatTrendLines(trends, END).every(l => !l.includes('stopped')))
+  // Standing only matters while it is in force: ended before the period, the silence is a stop again.
+  const ended = [{ compound: 'Finasteride', from: '2026-08-01', to: '2026-09-01', label: '1 mg' }]
+  assert.ok(computeTrends(history, [], END, [], ended).changes.some(c => c.kind === 'stop' && c.compounds.includes('Finasteride')))
+})
+
 test('a standing compound still anchors past six weeks', () => {
   const start = '2026-07-27' // a Monday, 55 days before END; testosterone's rule is active on END
   const journal = merge(dosing('Testosterone Cypionate', start, END, [1, 4]), rhrStep(start, 60, 68))
