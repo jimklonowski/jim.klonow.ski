@@ -217,6 +217,6 @@ test('achievements: the fixed list behind the wearables, and the three the demo 
   assert.equal(byId['clean-week'].progress, 1)
   assert.equal(reachableAchievements(all, false).length, 17)
   const demo = reachableAchievements(all, true)
-  assert.equal(demo.length, 14)
+  assert.equal(demo.length, 15, 'Clean Week is reachable since the sandbox has a schedule (P9)')
   assert.ok(demo.every(a => !DEMO_UNREACHABLE.has(a.id)))
 })

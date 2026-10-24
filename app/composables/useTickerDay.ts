@@ -34,7 +34,7 @@ export interface TickerDaySources {
   today: Ref<string>
   /** The standing schedule (useProtocol().rules): the protocol tables, or the code constants until seeded. */
   rules: Ref<ProtocolRule[]>
-  /** The schedule applies. Not for the demo persona, whose dose dates drift across weekdays by design. */
+  /** The schedule applies — false for a session with no rules at all (an unseeded sandbox). */
   rulesApply: boolean
   /** The stage has gone dark (useTickerClock) — due doses still unlogged then make it hungry. */
   night: Ref<boolean>

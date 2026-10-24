@@ -11,8 +11,8 @@
 //
 // As-needed compounds (BPC-157) deliberately have no rule — sporadic logging is the plan, not
 // a lapse. `from` dates come from the dose log's first day of each cadence. NOTE: this
-// describes the real protocol only; the demo persona's dose dates re-anchor nightly and drift
-// across weekdays, so adherence UI is hidden for demo sessions.
+// describes the real protocol only; the demo sandbox carries its own schedule in the protocol
+// tables (scripts/demo/generate-demo-data.mjs), with weekdays that re-anchor nightly with its doses.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping,
 // which can't resolve extension-less paths the way Vite does.

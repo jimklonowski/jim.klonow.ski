@@ -194,10 +194,10 @@ const canOpenDays = computed(() => isFullAccessRole(role.value))
 
 // Scheduled-dose rings come from the standing schedule (useProtocol — the protocol tables, or
 // the code constants until seeded) plus any planned cycles (effectiveRules) — so an upcoming
-// cycle previews its rings on future days before a single dose is logged. The demo persona's
-// dose dates re-anchor nightly and drift across weekdays by design, so the rings would flag
-// misses that aren't real — hidden for demo sessions.
-const showSchedule = computed(() => role.value !== 'demo')
+// cycle previews its rings on future days before a single dose is logged. Shown whenever the
+// session has a schedule: since the protocol plan's P9 the demo sandbox carries its own, with
+// weekdays that re-anchor nightly alongside its doses; an unseeded sandbox has none and no rings.
+const showSchedule = computed(() => protocolRules.value.length > 0)
 const scheduleRules = computed(() => effectiveRules(cyclesData.value ?? [], protocolRules.value))
 
 const entries = computed(() => data.value ?? [])

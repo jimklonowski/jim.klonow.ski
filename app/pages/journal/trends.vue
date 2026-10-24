@@ -219,16 +219,17 @@ const entries = computed(() => journalData.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
 
 // --- protocol notes (dose changes, dated events, cycles) ---
-// The schedule (useProtocol) and PROTOCOL_EVENTS are the owner's real protocol, so the demo
-// persona's charts never get them (its doses drift by design and would contradict the lines).
-const annotationsAvailable = computed(() => role.value != null && role.value !== 'demo')
+// The schedule comes from useProtocol, so the demo sandbox draws its own dose changes (P9).
+// PROTOCOL_EVENTS are the owner's real dated notes and stay off every other session's charts.
+const annotationsAvailable = computed(() => role.value != null)
 const annotations = computed(() => {
   if (!notes.value || !annotationsAvailable.value) return []
   const day = today.value
   const cycles = (cyclesData.value ?? [])
     .filter(c => !isTentative(c) && c.start_date <= day)
     .map(c => ({ name: c.name, from: c.start_date, to: cycleEnd(c) < day ? cycleEnd(c) : day }))
-  return [...ruleAnnotations(protocolRules.value), ...eventAnnotations(PROTOCOL_EVENTS), ...cycleAnnotations(cycles)]
+  const events = role.value === 'demo' ? [] : eventAnnotations(PROTOCOL_EVENTS)
+  return [...ruleAnnotations(protocolRules.value), ...events, ...cycleAnnotations(cycles)]
 })
 
 /** The key strip: every annotation that lands on the visible range, placed on all its days. */

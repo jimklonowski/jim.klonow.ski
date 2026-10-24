@@ -500,9 +500,10 @@ export const WEARABLE_META: Partial<Record<TickerProp, { id: string, name: strin
 }
 
 // Achievements the demo persona can never earn, so they are not shown to it (audit #42 item 29):
-// Clean Week needs schedule rules (the sandbox has none), Luscious ninety days of finasteride
-// (not in the seed), Open House visits from friends (the sandbox gets none).
-export const DEMO_UNREACHABLE: ReadonlySet<string> = new Set(['clean-week', 'luscious', 'open-house'])
+// Luscious needs ninety days of finasteride (not in the seed), Open House visits from friends
+// (the sandbox gets none). Clean Week left the set with the protocol plan's P9: the sandbox has
+// a schedule of its own now, and its persona keeps it.
+export const DEMO_UNREACHABLE: ReadonlySet<string> = new Set(['luscious', 'open-house'])
 
 export interface AchievementInputs {
   milestones: Milestone[]
