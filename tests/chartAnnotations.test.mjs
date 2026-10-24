@@ -14,6 +14,9 @@ test('dose steps become short "from→to" lines, plus a start per rule and a sto
   assert.ok(texts.includes('2026-07-21 hCG 500→250 IU'))
   assert.ok(texts.includes('2026-07-29 Finasteride start 1 mg'), 'a rule without steps starts at its doseLabel')
   assert.ok(texts.includes('2026-09-02 GHK stop'), 'the day after `to`')
+  // Two hCG rows hand over on 2026-10-24 (300 IU Tue/Fri/Sun → 250 IU Tue/Fri): one line, no stop/start pair.
+  assert.ok(texts.includes('2026-10-24 hCG 300→250 IU Tue+Fri'), 'a cadence change names the new cadence')
+  assert.ok(!texts.includes('2026-10-24 hCG stop') && !texts.includes('2026-10-24 hCG start 250 IU'), 'not a stop and a start')
 })
 
 test('only labelled events become bands; the rest stay prompt-only', () => {

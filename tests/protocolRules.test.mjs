@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  nextDueDay, PROTOCOL_RULES, ruleDueOn, scheduledFor, tallySchedule
+  nextDueDay, predecessorOf, PROTOCOL_RULES, ruleDueOn, scheduledFor, successorOf, tallySchedule
 } from '../shared/utils/protocolRules.ts'
 
 // 2026-09-09 is a Wednesday; 2026-09-06 (Sun) through 2026-09-12 (Sat) is one calendar week.
@@ -101,4 +101,18 @@ test('off-schedule only counts inside a rule\'s own window', () => {
   assert.deepEqual(seg.offSchedule, [])
   assert.deepEqual(cyc.offSchedule, ['2026-09-08'])
   assert.deepEqual(cyc.missed, ['2026-09-07', '2026-09-10'])
+})
+
+test('a cadence change hands over between two rows of the same compound', () => {
+  const [old, current] = PROTOCOL_RULES.filter(r => r.compound === 'hCG')
+  assert.equal(successorOf(old, PROTOCOL_RULES), current)
+  assert.equal(predecessorOf(current, PROTOCOL_RULES), old)
+  assert.equal(predecessorOf(old, PROTOCOL_RULES), null)
+  assert.equal(successorOf(current, PROTOCOL_RULES), null)
+  // The last Tue/Fri/Sun shot was Fri Oct 23; the Sunday after is not due, the Tuesday is, at 250 IU.
+  assert.deepEqual(scheduledFor('2026-10-23').filter(r => r.compound === 'hCG').map(r => r.doseLabel), ['300 IU'])
+  assert.equal(scheduledFor('2026-10-25').some(r => r.compound === 'hCG'), false)
+  assert.deepEqual(scheduledFor('2026-10-27').filter(r => r.compound === 'hCG').map(r => r.doseLabel), ['250 IU'])
+  assert.equal(nextDueDay(old, '2026-10-23'), null, 'the old row has no due day after its end')
+  assert.equal(nextDueDay(current, '2026-10-23'), '2026-10-27')
 })

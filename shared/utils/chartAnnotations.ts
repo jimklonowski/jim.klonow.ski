@@ -14,6 +14,7 @@
 import { shiftDays } from './dates.ts'
 import type { ProtocolEvent } from './protocolEvents.ts'
 import type { ProtocolRule } from './protocolRules.ts'
+import { cadenceOf, doseLabelOn, predecessorOf, successorOf } from './protocolRules.ts'
 
 export type AnnotationKind = 'dose' | 'event' | 'cycle'
 
@@ -51,17 +52,27 @@ function stepText(previous: string, next: string): string {
     : `${previous}→${next}`
 }
 
-/** Every dose change, start and stop in the standing rules. */
+/** Every dose change, start and stop in the standing rules. A cadence change — two rows of one
+ * compound handing over, see PROTOCOL_RULES — is one line, "hCG 300→250 IU Tue+Fri", not a stop
+ * and a start. */
 export function ruleAnnotations(rules: ProtocolRule[]): ChartAnnotation[] {
   const out: ChartAnnotation[] = []
   for (const rule of rules) {
     const name = shortName(rule.compound)
     const steps = rule.doses ?? []
-    out.push({ kind: 'dose', from: rule.from, text: `${name} start ${steps[0]?.label ?? rule.doseLabel}` })
+    const first = steps[0]?.label ?? rule.doseLabel
+    const prev = predecessorOf(rule, rules)
+    if (prev) {
+      const cadence = cadenceOf(prev.weekdays) === cadenceOf(rule.weekdays) ? '' : ` ${cadenceOf(rule.weekdays)}`
+      out.push({ kind: 'dose', from: rule.from, text: `${name} ${stepText(doseLabelOn(prev, prev.to!), first)}${cadence}` })
+    }
+    else {
+      out.push({ kind: 'dose', from: rule.from, text: `${name} start ${first}` })
+    }
     for (let i = 1; i < steps.length; i++) {
       out.push({ kind: 'dose', from: steps[i]!.from, text: `${name} ${stepText(steps[i - 1]!.label, steps[i]!.label)}` })
     }
-    if (rule.to) out.push({ kind: 'dose', from: shiftDays(rule.to, 1), text: `${name} stop` })
+    if (rule.to && !successorOf(rule, rules)) out.push({ kind: 'dose', from: shiftDays(rule.to, 1), text: `${name} stop` })
   }
   return out
 }

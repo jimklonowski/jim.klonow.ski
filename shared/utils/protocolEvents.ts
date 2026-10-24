@@ -54,6 +54,31 @@ export const PROTOCOL_EVENTS: ProtocolEvent[] = [
   }
 ]
 
+export interface ProtocolGoal {
+  /** The day the goal was stated, YYYY-MM-DD. It holds until a later entry supersedes it. */
+  from: string
+  /** Pronoun-free prose: the targets, the reasoning behind them, and how to read a draw against them. */
+  note: string
+}
+
+// What the protocol is currently FOR: the targets a new draw is read against and what gates the
+// next decision. Dated like the events, but a goal holds until the next one is stated rather than
+// aging out, so a summary regenerated for an old draw sees the goal of its day — or none, before
+// the first was written down. Append a new entry when the goals change; never edit history.
+export const PROTOCOL_GOALS: ProtocolGoal[] = [
+  {
+    from: '2026-10-23',
+    note: 'Bring estradiol down a little, bring total and free testosterone down with it, and see hematocrit fall. All three gate the Primobolan run pencilled in for spring 2027, hematocrit above all: that decision waits until hematocrit is seen falling, not merely holding. Background: the testosterone cut of 2026-08-24 (200 to 150 mg/week) was expected to lower estradiol, yet ultrasensitive LC/MS estradiol ROSE from 106 to 126 pg/mL between the 2026-08-15 and 2026-10-17 draws while total and free testosterone fell over the same span — so the likelier driver is the hCG raise of 2026-09-08 (250 to 300 IU, three times a week), and hCG was cut to 250 IU twice a week from 2026-10-24 in response. Hematocrit has plateaued at 51.7 on both 2026-09-09 and 2026-10-17, about eight weeks after the testosterone cut: flat, not yet falling, which is consistent with red cells turning over on a roughly 120-day cycle — the cut\'s full effect is not expected to show before about late December 2026. Read each new draw against these goals: say whether estradiol, total/free testosterone and hematocrit each moved toward or away from them, by how much, and whether enough time has passed since the relevant protocol change for the move to mean anything.'
+  }
+]
+
+/** The goal statement in force on `asOf`: the latest one stated by then, or '' before the first. */
+export function goalContext(asOf: string, goals: ProtocolGoal[] = PROTOCOL_GOALS): string {
+  const current = goals.filter(g => g.from <= asOf).at(-1)
+  if (!current) return ''
+  return `Current goals (stated ${current.from}) — the frame for reading lab draws, not something to restate in a day's recap: ${current.note}`
+}
+
 // The dated notes in force on `asOf`: begun by then and not yet past their relevance window.
 export function eventContext(asOf: string, events: ProtocolEvent[] = PROTOCOL_EVENTS): string {
   const active = events.filter((e) => {

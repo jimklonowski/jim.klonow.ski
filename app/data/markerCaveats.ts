@@ -73,7 +73,7 @@ export const READING_NOTES: Record<string, ReadingNote[]> = {
     },
     {
       date: '2026-10-17',
-      note: 'Two estradiol assays were run on this sample: the Whoop Advanced Labs panel\'s standard immunoassay (157) and a separate ultrasensitive LC/MS/MS add-on (127). The value on file is whichever report was uploaded last. The ultrasensitive 127 is the one to trend — against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20% — and the immunoassay 157 must never be set against the LC/MS/MS series. If 157 is the value shown, the add-on report has not been uploaded yet and any change computed from it is cross-assay; say so rather than quantify it.'
+      note: 'Two estradiol assays were run on this sample: the Whoop Advanced Labs panel\'s standard immunoassay (157) and a separate ultrasensitive LC/MS/MS add-on (126). The value on file is whichever report was uploaded last. The ultrasensitive 126 is the one to trend — against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20% — and the immunoassay 157 must never be set against the LC/MS/MS series. If 157 is the value shown, the add-on report has not been uploaded yet and any change computed from it is cross-assay; say so rather than quantify it.'
     }
   ]
 }

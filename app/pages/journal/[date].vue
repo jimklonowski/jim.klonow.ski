@@ -892,6 +892,11 @@ const FOOD_ROWS: Array<{ key: MealSlot, label: string, placeholder: string, snac
 // ones the day loaded with (seeded in buildForm) — a field must not unmount under the cursor the
 // moment its text is cleared, and the legacy Snack has no "+ snack" to bring it back.
 const openedSnacks = ref<MealSlot[]>([])
+// The date openedSnacks belongs to. buildForm keeps the list across a rebuild of the same day —
+// the mounted revalidation rebuilds a few hundred ms after render, and resetting the list there
+// closed a slot tapped in that window ("the input appears, then disappears") — and starts over
+// only when the page moves to another date.
+let openedSnacksFor: string | null = null
 function snackOpen(slot: MealSlot): boolean {
   return form.food[slot] !== '' || openedSnacks.value.includes(slot)
 }
@@ -1126,8 +1131,12 @@ function buildForm() {
     water: (entry?.water ?? []).map(w => ({ ...w })),
     food: { ...(entry?.food ?? {}) }
   }
-  // The snack fields this day loaded with stay mounted even once cleared (see openedSnacks).
-  openedSnacks.value = FOOD_ROWS.filter(row => row.snack && entry?.food?.[row.key]?.trim()).map(row => row.key)
+  // The snack fields this day loaded with stay mounted even once cleared (see openedSnacks), and
+  // so does one opened with "+ snack" before a same-day rebuild.
+  const loaded = FOOD_ROWS.filter(row => row.snack && entry?.food?.[row.key]?.trim()).map(row => row.key)
+  const kept = openedSnacksFor === dateParam.value ? openedSnacks.value : []
+  openedSnacksFor = dateParam.value
+  openedSnacks.value = [...new Set([...loaded, ...kept])]
   if (!entry) {
     const blank = blankEntry(dateParam.value)
     return {

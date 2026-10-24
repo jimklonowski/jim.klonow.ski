@@ -8,7 +8,8 @@ import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
 import { waterTotals } from '#shared/utils/water'
 import { bpAverageLabel, bpLabel } from '#shared/utils/bloodPressure'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
-import type { JournalRow, SodaEntry } from '#shared/types/journal'
+import type { JournalRow, SodaEntry, Vial } from '#shared/types/journal'
+import { calcConcentration } from '#shared/utils/peptideCalc'
 import { roundTo, shiftDays } from '#shared/utils/dates'
 import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
@@ -34,7 +35,7 @@ function waterText(entries: JournalRow[]): string | null {
 }
 
 async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]> {
-  const sql = `SELECT date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, food, notes
+  const sql = `SELECT date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, reconstitutions, sodas, water, food, notes
     FROM journal_entries ${since ? 'WHERE date >= ?1' : ''} ORDER BY date ASC`
   const stmt = since ? db.prepare(sql).bind(since) : db.prepare(sql)
   const { results } = await stmt.all()
@@ -100,6 +101,53 @@ async function dexaLines(db: D1Database): Promise<string[]> {
     ].filter(Boolean)
     return `${r.date}: ${parts.join(', ')}`
   })
+}
+
+/** Every vial mixed, from the journal — "when did I last reconstitute hCG?" lives here. */
+function reconstitutionLines(journal: JournalRow[]): string[] {
+  const lines: string[] = []
+  for (const e of journal) {
+    for (const r of e.reconstitutions ?? []) {
+      if (!r.compound) continue
+      const concentration = calcConcentration(r.vial_amount, r.bac_water_ml)
+      const parts = [
+        `${r.vial_amount}${r.vial_unit} vial`,
+        r.bac_water_ml ? `${r.bac_water_ml} mL BAC water` : null,
+        concentration != null ? `${roundTo(concentration, 2)}${r.vial_unit}/mL` : null,
+        r.supplier ? `from ${r.supplier}` : null
+      ].filter(Boolean)
+      lines.push(`${e.date}: ${r.compound} — ${parts.join(', ')}`)
+    }
+  }
+  return lines
+}
+
+/**
+ * The vial inventory (/tools/inventory): what is open and since when, what is sealed, what is
+ * finished. [] on a database without the table; any other failure propagates.
+ */
+async function vialLines(db: D1Database): Promise<string[]> {
+  try {
+    const { results } = await db.prepare(
+      `SELECT compound, vial_amount, vial_unit, form, unit_count, quantity, status, opened_date, bac_water_ml, supplier FROM vials
+       ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'sealed' THEN 1 ELSE 2 END, opened_date DESC, compound ASC`
+    ).all<Vial>()
+    return (results ?? []).map((v) => {
+      const content = `${v.vial_amount}${v.vial_unit}${v.form !== 'vial' ? ` ${v.form} bottle${v.unit_count ? ` of ${v.unit_count}` : ''}` : ''}`
+      const parts = [
+        v.status,
+        v.quantity > 1 ? `×${v.quantity}` : null,
+        v.opened_date ? `opened ${v.opened_date}` : null,
+        v.bac_water_ml ? `${v.bac_water_ml} mL BAC water` : null,
+        v.supplier ? `from ${v.supplier}` : null
+      ].filter(Boolean)
+      return `${v.compound} ${content}: ${parts.join(', ')}`
+    })
+  }
+  catch (err) {
+    if (isMissingTable(err)) return []
+    throw err
+  }
 }
 
 /** All-time per-compound usage: enough to answer "when did I run X and at what dose". */
@@ -198,10 +246,11 @@ const WEEKLY_WINDOW_WEEKS = 20
 
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone. */
 export async function buildAskContext(db: D1Database, today: string): Promise<string> {
-  const [journal, labs, dexa, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, estimates] = await Promise.all([
+  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, estimates] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
+    vialLines(db),
     db.prepare('SELECT date, recovery_score, strain, sleep_total_min FROM health_metrics ORDER BY date ASC').all(),
     // Full rows: parseWorkoutRow/mergeWorkouts need external_id and start_time for dedup.
     db.prepare('SELECT * FROM workouts ORDER BY date ASC').all(),
@@ -242,6 +291,8 @@ export async function buildAskContext(db: D1Database, today: string): Promise<st
     `Lab draws (every draw on file; marker keys are snake_case, standard US lab units):\n${labs.join('\n') || 'none'}`,
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,
     `Compound history (all-time, from the dose log):\n${compoundLines(journal).join('\n') || 'none'}`,
+    `Reconstitutions (every vial mixed, from the journal; concentration is vial content over BAC water):\n${reconstitutionLines(journal).join('\n') || 'none logged'}`,
+    vials.length ? `Vial inventory (/tools/inventory; "active" is open and being drawn from):\n${vials.join('\n')}` : '',
     trendLines.length ? `Sustained trends (precomputed multi-week shifts):\n${trendLines.join('\n')}` : '',
     'Meal figures: label figures for known meals, otherwise model estimates from the meal text (about ±25 % per meal). A day marked "floor" has a meal with no figures. Treat them as trend and protein adequacy, not measured intake.',
     `Weekly aggregates, last ${WEEKLY_WINDOW_WEEKS} weeks:\n${weeklyLines(journal, health, workouts, today, WEEKLY_WINDOW_WEEKS, estimates).join('\n') || 'none'}`,
