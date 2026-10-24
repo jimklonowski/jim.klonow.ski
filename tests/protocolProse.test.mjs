@@ -6,9 +6,9 @@
 //
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cadenceOf, fmtDay, protocolSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
-import { eventContext } from '../shared/utils/protocolEvents.ts'
-import { PROTOCOL_RULES, doseLabelOn } from '../shared/utils/protocolRules.ts'
+import { fmtDay, protocolSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
+import { PROTOCOL_GOALS, eventContext, goalContext } from '../shared/utils/protocolEvents.ts'
+import { PROTOCOL_RULES, cadenceOf, doseLabelOn } from '../shared/utils/protocolRules.ts'
 import { COMPOUND_INFO } from '../app/data/compoundInfo.ts'
 
 const lineFor = (text, needle) => text.split('\n').find(l => l.includes(needle))
@@ -38,6 +38,27 @@ test('the schedule is as of its date, so a historical lab summary sees that day\
   assert.doesNotMatch(may, /Testosterone|hCG|Finasteride|HGH/)
   assert.match(lineFor(may, 'Tadalafil'), /Tadalafil 7 mg gummy/)
   assert.match(lineFor(may, 'only injectable'), /GHK-Cu is the only injectable currently running/)
+})
+
+test('a cadence change reads as one compound changing, not a stop and a start', () => {
+  // hCG went from 300 IU Tue/Fri/Sun to 250 IU Tue/Fri after the Fri 2026-10-23 shot: two rows.
+  const before = protocolSchedule('2026-10-23')
+  assert.match(lineFor(before, 'hCG'), /^- Tuesday \+ Friday \+ Sunday: hCG 300 IU per injection \(900 IU\/week — raised from 250 IU on 2026-09-08\)\.$/)
+  const after = protocolSchedule('2026-10-27')
+  assert.equal(lineFor(after, 'hCG 250'), '- Tuesday + Friday: hCG 250 IU per injection (500 IU/week — reduced from 300 IU Tue+Fri+Sun on 2026-10-24).')
+  assert.doesNotMatch(after, /hCG .*discontinued/)
+  assert.equal(after.split('\n').filter(l => l.includes('hCG')).length, 2, 'the current line and the injectables line only')
+  assert.equal(lineFor(after, 'only injectables'), '- Testosterone Cypionate, hCG, and HGH are the only injectables currently running.')
+
+  // The week of the change: the old row scores its three days and says why it ends; the new row
+  // had nothing due yet, so it gets no line. The first Sunday after is simply not due.
+  const logged = new Map([['hCG', new Set(['2026-10-18', '2026-10-20', '2026-10-23'])]])
+  const week = scheduleContext(PROTOCOL_RULES, '2026-10-18', '2026-10-24', logged, '2026-10-26')
+  assert.match(week, /- hCG 300 IU \(Tue\+Fri\+Sun, cadence changed after Fri Oct 23\): due Sun Oct 18, Tue Oct 20 and Fri Oct 23 — 3 logged\./)
+  assert.doesNotMatch(week, /hCG 250/)
+  const sunday = scheduleContext(PROTOCOL_RULES, '2026-10-25', '2026-10-25', new Map(), '2026-10-26')
+  assert.match(sunday, /due today: HGH 2\.5 IU \(daily\), Finasteride 1 mg \(daily\)\./)
+  assert.match(sunday, /Not due today: Testosterone Cypionate \(Mon\+Thu; next Mon Oct 26\), hCG \(Tue\+Fri; next Tue Oct 27\)\./)
 })
 
 test('a stopped rule leaves the schedule once its ~4 months of relevance pass', () => {
@@ -72,6 +93,19 @@ test('dated notes appear from their first day through their relevance window onl
   assert.doesNotMatch(eventContext('2026-09-13'), /Bloodwork was drawn 2026-09-09/)
   // The iron protocol runs through 09-27 and stays 30 days, so the 10-17 draw still sees it.
   assert.match(eventContext('2026-10-17'), /iron-loading protocol/)
+})
+
+test('the goal in force is the latest stated by the as-of date, and none before the first', () => {
+  assert.equal(goalContext('2026-10-17'), '', 'the Oct 17 draw predates the first written goal')
+  const now = goalContext('2026-10-27')
+  assert.match(now, /^Current goals \(stated 2026-10-23\)/)
+  assert.match(now, /hCG was cut to 250 IU twice a week from 2026-10-24/)
+  assert.match(now, /hematocrit is seen falling/)
+  // A later statement replaces the earlier one outright.
+  const two = [...PROTOCOL_GOALS, { from: '2027-01-05', note: 'Hold everything steady.' }]
+  assert.match(goalContext('2027-01-05', two), /\(stated 2027-01-05\)/)
+  assert.match(goalContext('2027-01-04', two), /\(stated 2026-10-23\)/)
+  assert.deepEqual(PROTOCOL_GOALS.map(g => g.from), [...PROTOCOL_GOALS.map(g => g.from)].sort(), 'goals in date order')
 })
 
 test('typicalDaily is a positive per-day amount wherever it is set', () => {

@@ -62,11 +62,45 @@ export function doseLabelOn(rule: ProtocolRule, date: string): string {
   return doseStepOn(rule, date).step?.label ?? rule.doseLabel
 }
 
+/**
+ * The row this one took over from: same compound, ending the day before this one starts. A
+ * cadence change is two rows (see PROTOCOL_RULES), and mergeRules splits a standing rule around
+ * a cycle the same way, so a handover reads everywhere as one compound changing — the prose
+ * names the change, the chart draws one line, and the old row never reads as "discontinued".
+ */
+export function predecessorOf(rule: ProtocolRule, rules: ProtocolRule[]): ProtocolRule | null {
+  return rules.find(r => r !== rule && r.compound === rule.compound && r.to != null && shiftDays(r.to, 1) === rule.from) ?? null
+}
+
+/** The row that takes over the day after this one ends, if any. */
+export function successorOf(rule: ProtocolRule, rules: ProtocolRule[]): ProtocolRule | null {
+  if (rule.to == null) return null
+  const next = shiftDays(rule.to, 1)
+  return rules.find(r => r !== rule && r.compound === rule.compound && r.from === next) ?? null
+}
+
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Monday-first, since that's how a week reads. */
+export function mondayFirst(weekdays: number[]): number[] {
+  return [...weekdays].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+}
+
+/** 'daily' or 'Mon+Thu' — the cadence as the prompts and the chart labels spell it. */
+export function cadenceOf(weekdays: number[]): string {
+  if (weekdays.length === 7) return 'daily'
+  return mondayFirst(weekdays).map(d => DAY_SHORT[d]).join('+')
+}
+
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 
 // doseLabel is the current dose, which is what the app displays. A dose change appends a step to
 // `doses` and updates doseLabel to match; the row keeps its `from`. Steps come from the dose log
 // (a dose held four days or more; one-off doses and two-day dips are left out).
+//
+// A CADENCE change is a new row, because `weekdays` is per row: the old row gets `to` (its past
+// days stay due and scored) and a row for the same compound starts the next day. predecessorOf /
+// successorOf tie the pair together wherever it would otherwise read as a stop and a start.
 export const PROTOCOL_RULES: ProtocolRule[] = [
   {
     compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18', injected: true,
@@ -77,7 +111,7 @@ export const PROTOCOL_RULES: ProtocolRule[] = [
     ]
   },
   {
-    compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18', injected: true,
+    compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18', to: '2026-10-23', injected: true,
     doses: [
       { from: '2026-06-18', label: '250 IU' },
       { from: '2026-07-14', label: '500 IU' },
@@ -85,6 +119,8 @@ export const PROTOCOL_RULES: ProtocolRule[] = [
       { from: '2026-09-08', label: '300 IU' }
     ]
   },
+  // Sundays dropped and the dose cut together; the last 300 IU Tue/Fri/Sun shot was Fri 2026-10-23.
+  { compound: 'hCG', doseLabel: '250 IU', weekdays: [2, 5], from: '2026-10-24', injected: true },
   {
     compound: 'HGH', doseLabel: '2.5 IU', weekdays: EVERY_DAY, from: '2026-06-13', injected: true,
     doses: [
