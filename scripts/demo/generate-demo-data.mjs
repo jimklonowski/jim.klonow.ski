@@ -379,8 +379,10 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
   }
 }
 
-// --- supplements ---------------------------------------------------------------------------
+// --- the stack -----------------------------------------------------------------------------
 
+// The persona's standing supplement/skin rows, in the shape the retired `supplements` table had
+// (dropped by migration 0014); they become standing protocol items below.
 const supplementRows = [
   ['Creatine Monohydrate', '5 g', 'supplement', 'active', 'daily', D(560), null, 'In the morning shake.', 10],
   ['Vitamin D3 + K2', '5000 IU / 100 mcg', 'supplement', 'active', 'daily, with breakfast', D(555), null, 'Started after the first draw came back at 28 ng/mL.', 20],
@@ -716,11 +718,6 @@ const seed = {
       cols: ['external_id', 'date', 'workout_type', 'start_time', 'duration_min', 'calories', 'avg_hr', 'max_hr', 'distance_mi'],
       jsonCols: [],
       rows: workoutRows
-    },
-    supplements: {
-      cols: ['name', 'dose', 'category', 'status', 'schedule', 'started', 'stopped', 'notes', 'sort', 'created_at'],
-      jsonCols: [],
-      rows: supplementRows
     },
     // Explicit ids (the versions point at them); items before versions, since the reset wipes and
     // refills table by table and a parent deleted after its children re-cascades them away.

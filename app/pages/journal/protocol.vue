@@ -406,7 +406,6 @@ useSeoMeta({ title: 'Journal · Protocol' })
 
 const { canEdit } = await useAuth()
 const { data, refresh, error } = await useProtocolItems()
-const toast = useToast()
 
 const DAILY = [0, 1, 2, 3, 4, 5, 6]
 
@@ -701,10 +700,4 @@ async function confirmDeleteVersion(row: Row, v: ProtocolVersionRow) {
   if (!confirm(`Delete the ${row.item.name} version ${spanOf(v)}? The days it covered will have no schedule.`)) return
   await deleteVersion(v)
 }
-
-// Reads from a database before migration 0013 come back empty; say so once rather than render
-// an empty protocol as the truth.
-watch(data, (d) => {
-  if (import.meta.client && d && !d.items.length && canEdit.value) toast.add({ id: 'protocol-empty', title: 'The protocol tables are empty', description: 'Run the migration and `pnpm protocol:seed` to fill them from the code constants.', color: 'warning', icon: 'i-lucide-database' })
-}, { immediate: true })
 </script>

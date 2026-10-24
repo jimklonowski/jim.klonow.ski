@@ -13,6 +13,7 @@ Every schema change and data fix applied by hand before the migrations ledger ex
 | `add-cycle-planned-days-2026-09-21.sql` | `cycles.planned_days` | main |
 | `add-whoop-sync-state-2026-09-22.sql` | `whoop_tokens` revoked / sync-state columns | main |
 | `hash-invite-tokens.mjs` | Rehashed `invites.id` to sha256(token) in place. SQLite has no sha256(), so it's a script | main |
+| `seed-protocol-2026-10-24.sql` | The protocol plan (P3/P12): the code constants `PROTOCOL_RULES` / `STANDING_COMPOUNDS` / `AS_NEEDED_COMPOUNDS` as `protocol_items` / `protocol_versions` rows, the last output of the retired `scripts/protocol-seed.mjs` before the constants left the code. Applied 2026-10-24 after migration 0013. The same schedule lives on as the test fixture `tests/_fixtures/protocol.mjs` | main |
 
 Older ALTERs (`labs_entries.ai_summary`, the `progress_photos` thumbnail and framing columns, the Whoop `health_metrics` columns, `journal_entries.sodas`, the `workout` → `notes` fold, `cycles.start_precision`, `vials.form`/`unit_count`) were only ever written as commented notes at the foot of `schema.sql`. They're applied too.
 

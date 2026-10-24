@@ -1,18 +1,17 @@
 // The protocol plan, P10: the tables are a lossless home for the schedule. Migration 0013 plus the
-// generated seed are loaded into node:sqlite, read back the way the loader (P4) will read them and
-// mapped with shared/utils/protocolStore.ts; the result must equal the code constants it replaces —
-// as data, as the prose every prompt carries on every date, as chart annotations, and as the
-// day-by-day due list. The supplements copy is held to the same standard against the old table.
+// fixture seed (tests/_fixtures/protocol.mjs — the schedule the retired code constants described)
+// are loaded into node:sqlite, read back the way the loader (P4) reads them and mapped with
+// shared/utils/protocolStore.ts; the result must equal the fixture — as data, as the prose every
+// prompt carries on every date, as chart annotations, and as the day-by-day due list. The
+// supplements copy is held to the same standard against the retired table's rows.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { buildSeedSql } from '../scripts/protocol-seed.mjs'
+import { AS_NEEDED, RULES, STANDING, seedSql } from './_fixtures/protocol.mjs'
 import { BEFORE_RECORDS, parseWeekdays, protocolFromRows, scheduleText, versionOverlaps } from '../shared/utils/protocolStore.ts'
-import {
-  AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, doseLabelOn, scheduledFor, tallySchedule
-} from '../shared/utils/protocolRules.ts'
+import { doseLabelOn, scheduledFor, tallySchedule } from '../shared/utils/protocolRules.ts'
 import { protocolSchedule } from '../shared/utils/protocolProse.ts'
 import { ruleAnnotations } from '../shared/utils/chartAnnotations.ts'
 import { renderSupplementContext } from '../shared/utils/supplementProse.ts'
@@ -32,9 +31,11 @@ function migrated(names) {
 
 function seeded() {
   const db = migrated(files)
-  db.exec(buildSeedSql())
+  db.exec(seedSql())
   return db
 }
+
+const schedule = (asOf, p = { rules: RULES, standing: STANDING, asNeeded: AS_NEEDED }) => protocolSchedule(asOf, p.rules, p.standing, p.asNeeded)
 
 /** The loader's reads (P4): items by sort, versions by date. */
 function readProtocol(db) {
@@ -48,12 +49,12 @@ const version = (item_id, from_date, to_date, dose_label, weekdays, over = {}) =
   ({ id: 0, item_id, from_date, to_date, dose_label, weekdays: weekdays == null ? null : JSON.stringify(weekdays), note: null, ...over })
 const DAILY = [0, 1, 2, 3, 4, 5, 6]
 
-test('the seeded tables map back to the code constants exactly', () => {
+test('the seeded tables map back to the fixture schedule exactly', () => {
   const p = readProtocol(seeded())
-  assert.deepEqual(p.rules, PROTOCOL_RULES)
-  assert.deepEqual(p.standing, STANDING_COMPOUNDS)
-  assert.deepEqual(p.asNeeded, AS_NEEDED_COMPOUNDS)
-  assert.deepEqual(p.supplements, [], 'the constants carry no supplements, and the copy ran on an empty table')
+  assert.deepEqual(p.rules, RULES)
+  assert.deepEqual(p.standing, STANDING)
+  assert.deepEqual(p.asNeeded, AS_NEEDED)
+  assert.deepEqual(p.supplements, [], 'the fixture carries no stack, and the copy ran on an empty table')
 })
 
 test('the prose every prompt carries is identical from the tables, on every date that matters', () => {
@@ -62,18 +63,18 @@ test('the prose every prompt carries is identical from the tables, on every date
     '2026-01-15', '2026-05-01', '2026-06-13', '2026-06-19', '2026-07-14', '2026-08-15', '2026-09-01', '2026-09-02',
     '2026-09-09', '2026-09-24', '2026-10-17', '2026-10-23', '2026-10-24', '2026-10-27', '2026-12-30', '2027-01-15'
   ]
-  for (const asOf of dates) assert.equal(protocolSchedule(asOf, p.rules, p.standing), protocolSchedule(asOf), asOf)
+  for (const asOf of dates) assert.equal(schedule(asOf, p), schedule(asOf), asOf)
 })
 
-test('chart annotations, the due list day by day, and the schedule check agree with the constants', () => {
+test('chart annotations, the due list day by day, and the schedule check agree with the fixture', () => {
   const p = readProtocol(seeded())
-  assert.deepEqual(ruleAnnotations(p.rules), ruleAnnotations(PROTOCOL_RULES))
+  assert.deepEqual(ruleAnnotations(p.rules), ruleAnnotations(RULES))
   const dueLine = (rules, d) => scheduledFor(d, rules).map(r => `${r.compound} ${doseLabelOn(r, d)}`).join(', ')
-  for (let d = '2026-01-01'; d <= '2027-03-31'; d = shiftDays(d, 1)) assert.equal(dueLine(p.rules, d), dueLine(PROTOCOL_RULES, d), d)
+  for (let d = '2026-01-01'; d <= '2027-03-31'; d = shiftDays(d, 1)) assert.equal(dueLine(p.rules, d), dueLine(RULES, d), d)
   const logged = new Map([['hCG', new Set(['2026-10-18', '2026-10-20', '2026-10-23'])], ['HGH', new Set(['2026-10-20'])]])
   assert.deepEqual(
     tallySchedule(p.rules, '2026-10-18', '2026-10-24', logged, '2026-10-26'),
-    tallySchedule(PROTOCOL_RULES, '2026-10-18', '2026-10-24', logged, '2026-10-26')
+    tallySchedule(RULES, '2026-10-18', '2026-10-24', logged, '2026-10-26')
   )
 })
 

@@ -1,5 +1,5 @@
 // Cycle planning — a dated, finite protocol phase (a "blast"/"run") layered on top of the
-// standing schedule. Unlike PROTOCOL_RULES (hand-maintained code, changes rarely), cycles live
+// standing schedule. Unlike the standing rules (the protocol tables, changed rarely), cycles live
 // in the `cycles` D1 table because they're the thing that gets planned ahead, shifted, cut
 // short, and reviewed afterward.
 //
@@ -72,7 +72,7 @@ export interface Cycle {
 
 export type CycleStatus = 'upcoming' | 'active' | 'done'
 
-/** A cycle's cadence in the same shape as the standing PROTOCOL_RULES, so adherence scoring,
+/** A cycle's cadence in the same shape as the standing rules (ProtocolRule), so adherence scoring,
  * the calendar rings, and the digest's schedule check consume both without caring which is which. */
 export type CycleRule = ProtocolRule
 

@@ -198,38 +198,17 @@ CREATE TABLE IF NOT EXISTS progress_photos (
 CREATE INDEX IF NOT EXISTS idx_progress_photos_date ON progress_photos(date);
 CREATE INDEX IF NOT EXISTS idx_progress_photos_category ON progress_photos(category);
 
--- Standing vitamin/supplement/skin-routine stack. Unlike journal peptides these are not
--- dose-logged day by day — rows describe the ongoing regimen and feed the AI digest and
--- lab-summary prompts as protocol context (see server/utils/supplementContext.ts).
--- status 'on_hand' = owned but not being taken (support supplements staged for a future
--- cycle, a possible finasteride->dutasteride switch, etc.) — listed to the AI separately.
--- status 'stopped' rows are kept: recent stops are relevant context for lab trends.
--- dose and schedule are freeform text ("160 mg", "2 capsules", "~10 min each morning").
-CREATE TABLE IF NOT EXISTS supplements (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  dose TEXT,
-  category TEXT NOT NULL DEFAULT 'supplement', -- 'supplement' | 'skin'
-  status TEXT NOT NULL DEFAULT 'active',       -- 'active' | 'on_hand' | 'stopped'
-  schedule TEXT NOT NULL DEFAULT 'daily',
-  started TEXT,  -- YYYY-MM-DD; NULL = long-standing / unknown
-  stopped TEXT,  -- YYYY-MM-DD; set when status = 'stopped'
-  notes TEXT,    -- shown to the AI too, e.g. "raised from 25 mg on 2026-08-22"
-  sort INTEGER NOT NULL DEFAULT 100,
-  created_at TEXT NOT NULL
-);
-
--- The standing protocol as data (the protocol plan, P1–P2; migration 0013). protocol_items is
--- everything taken, and `kind` says how it is tracked: 'logged' rows are weekday-scheduled and
--- scored against journal_entries.peptides (today's PROTOCOL_RULES), 'standing' rows are taken
--- daily but deliberately not logged (STANDING_COMPOUNDS plus the whole supplements stack), and
--- 'as_needed' rows have no schedule at all. protocol_versions is each item's dated history: a
--- dose change, a cadence change, a start or a stop are all a new version, so "hCG 300 IU
--- Tue/Fri/Sun until 2026-10-23, then 250 IU Tue/Fri" is two rows and nothing is edited in place.
--- Whether an item is active is derived from its versions (an open to_date), never stored.
--- NOT YET READ by the app: the code constants and the supplements table stay the source of truth
--- until the loader (P4) and the cutover (P11/P12). 0013 copies the supplements table generically
--- (both databases); scripts/protocol-seed.mjs seeds the constants into the main database only.
+-- The standing protocol as data (the protocol plan; migration 0013, edited on /journal/protocol).
+-- protocol_items is everything taken, and `kind` says how it is tracked: 'logged' rows are
+-- weekday-scheduled and scored against journal_entries.peptides (the calendar rings, the adherence
+-- panel, the digests' schedule check), 'standing' rows are taken on a cadence but deliberately not
+-- logged (daily meds like tadalafil, and the whole supplement/skin stack — the retired
+-- `supplements` table, dropped by 0014, was copied in by 0013), and 'as_needed' rows have no
+-- schedule at all. protocol_versions is each item's dated history: a dose change, a cadence
+-- change, a start or a stop are all a new version, so "hCG 300 IU Tue/Fri/Sun until 2026-10-23,
+-- then 250 IU Tue/Fri" is two rows and nothing is edited in place. Whether an item is active is
+-- derived from its versions (an open to_date), never stored. shared/utils/protocolStore.ts maps
+-- the rows into the rule shapes everything reads; server/utils/protocolLoader.ts reads them.
 CREATE TABLE IF NOT EXISTS protocol_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,                        -- for 'logged' items, exactly the dose-log compound name

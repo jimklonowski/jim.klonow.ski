@@ -1,7 +1,8 @@
-// The supplement stack as AI-prompt prose, pure: given the rows — the supplements table today,
-// protocol_items/protocol_versions after the cutover, which shared/utils/protocolStore.ts maps
-// back to this row shape — the paragraphs every digest, summary and chat prompt carries. The D1
-// read is server/utils/supplementContext.ts. Pronoun-free, like the rest of the prompt prose.
+// The supplement stack as AI-prompt prose, pure: given the rows — standing items of category
+// supplement/skin in protocol_items/protocol_versions, which shared/utils/protocolStore.ts maps
+// to this row shape (the retired supplements table's) — the paragraphs every digest, summary and
+// chat prompt carries. The read is server/utils/supplementContext.ts. Pronoun-free, like the
+// rest of the prompt prose.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { shiftDays } from './dates.ts'

@@ -1,8 +1,8 @@
 // Protocol context drawn onto the time-series charts: when a dose changed, when a compound
-// started or stopped, and the spans of dated events and cycles. Built from the same hand-
-// maintained sources the AI prompts read (PROTOCOL_RULES' dose steps, PROTOCOL_EVENTS) plus the
-// user's cycles, so "did BP move after the T cut?" is answerable at a glance instead of by
-// remembering the date.
+// started or stopped, and the spans of dated events and cycles. Built from the same sources the
+// AI prompts read (the protocol's rules and their dose steps, PROTOCOL_EVENTS) plus the user's
+// cycles, so "did BP move after the T cut?" is answerable at a glance instead of by remembering
+// the date.
 //
 // Two steps, both pure: collect the annotations as dated facts, then place them on a chart's
 // category axis, whose points are only the days that have data. Placement snaps to the nearest
@@ -53,7 +53,7 @@ function stepText(previous: string, next: string): string {
 }
 
 /** Every dose change, start and stop in the standing rules. A cadence change — two rows of one
- * compound handing over, see PROTOCOL_RULES — is one line, "hCG 300→250 IU Tue+Fri", not a stop
+ * compound handing over, see protocolRules.ts — is one line, "hCG 300→250 IU Tue+Fri", not a stop
  * and a start. */
 export function ruleAnnotations(rules: ProtocolRule[]): ChartAnnotation[] {
   const out: ChartAnnotation[] = []

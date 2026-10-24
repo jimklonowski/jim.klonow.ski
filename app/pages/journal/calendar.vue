@@ -281,7 +281,7 @@ interface CalendarCell {
   isPlannedDraw: boolean
   hasEntry: boolean
   compounds: string[]
-  /** Scheduled by PROTOCOL_RULES but not logged — a miss in the past, the plan ahead. */
+  /** Scheduled by the protocol but not logged — a miss in the past, the plan ahead. */
   scheduled: string[]
   // (hasEntry = a hand-logged day, per isLoggedDay — never a vitals-only webhook row.)
   /** Compact glyph run: extra doses, reconstitutions, photos, workouts. */

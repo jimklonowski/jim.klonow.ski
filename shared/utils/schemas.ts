@@ -219,21 +219,6 @@ export const zVialOpen = z.object({
   bac_water_ml: zOptNum
 })
 
-// --- supplements ---
-
-export const zSupplementSave = z.object({
-  id: zId.optional(),
-  name: zText(120).min(1, 'name is required'),
-  dose: zOptText(120),
-  category: z.enum(['supplement', 'skin']).catch('supplement').default('supplement'),
-  status: z.enum(['active', 'on_hand', 'stopped']).catch('active').default('active'),
-  schedule: zText(120).default('daily').transform(v => v || 'daily'),
-  started: zOptDate,
-  stopped: zOptDate,
-  notes: zOptText(2000),
-  sort: zNumWithDefault(100, s => s.int())
-})
-
 // --- the protocol (protocol_items / protocol_versions — the protocol plan, P7) ---
 
 export const PROTOCOL_KINDS = ['logged', 'standing', 'as_needed'] as const

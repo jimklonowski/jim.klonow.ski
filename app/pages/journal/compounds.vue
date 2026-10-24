@@ -111,7 +111,7 @@
         </p>
       </section>
 
-      <!-- Planned vs logged, from the hand-maintained PROTOCOL_RULES cadence -->
+      <!-- Planned vs logged, from the protocol's cadence (useProtocol) -->
       <section v-if="adherence.length">
         <TuiHeader
           label="ADHERENCE ── planned vs logged"

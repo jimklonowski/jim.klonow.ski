@@ -1,15 +1,15 @@
 // The protocol as AI-prompt prose: the intended schedule every digest, lab summary, and chat
 // prompt carries (protocolSchedule), and the digest's planned-vs-logged lines (scheduleContext).
-// Generated from the data in ./protocolRules.ts, so the prompts can't drift from the rules that
-// the adherence panel and calendar rings score against — they used to be a hand-kept prose twin.
+// Generated from the loaded rules (server/utils/protocolLoader.ts, the protocol tables), so the
+// prompts can't drift from what the adherence panel and calendar rings score against — they used
+// to be a hand-kept prose twin of a hand-kept constant.
 // Written pronoun-free so it drops into prompts that refer to the reader as "he" or "they".
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { diffDays, monthDay, weekdayOf } from './dates.ts'
 import type { AsNeededCompound, ProtocolRule, ScheduleTally, StandingCompound } from './protocolRules.ts'
 import {
-  AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS, cadenceOf, doseLabelOn, doseStepOn, mondayFirst,
-  nextDueDay, predecessorOf, ruleActiveOn, successorOf, tallySchedule
+  cadenceOf, doseLabelOn, doseStepOn, mondayFirst, nextDueDay, predecessorOf, ruleActiveOn, successorOf, tallySchedule
 } from './protocolRules.ts'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -82,9 +82,9 @@ function standingLine(s: StandingCompound): string {
  */
 export function protocolSchedule(
   asOf: string,
-  rules: ProtocolRule[] = PROTOCOL_RULES,
-  standing: StandingCompound[] = STANDING_COMPOUNDS,
-  asNeeded: AsNeededCompound[] = AS_NEEDED_COMPOUNDS
+  rules: ProtocolRule[],
+  standing: StandingCompound[],
+  asNeeded: AsNeededCompound[]
 ): string {
   const active = rules.filter(r => ruleActiveOn(r, asOf))
   // A row another row of the same compound took over from (a cadence change) is not a stop: its

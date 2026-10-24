@@ -15,7 +15,6 @@ import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
 import { eventContext } from '#shared/utils/protocolEvents'
 import type { ProtocolData } from '#shared/utils/protocolStore'
-import { PROTOCOL_CONSTANTS } from './protocolLoader'
 
 const avg = mean
 
@@ -248,7 +247,7 @@ const WEEKLY_WINDOW_WEEKS = 20
 
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone; `protocol` the request's
  * schedule (protocolFor), which decides which compounds count as standing for the trend anchors. */
-export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData = PROTOCOL_CONSTANTS): Promise<string> {
+export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData): Promise<string> {
   const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, estimates] = await Promise.all([
     journalRows(db),
     labLines(db),

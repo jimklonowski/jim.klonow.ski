@@ -1,9 +1,10 @@
-// The protocol tables (protocol_items + protocol_versions, migration 0013) mapped back to the
-// shapes everything scores and narrates with: ProtocolRule rows for 'logged' items, StandingCompound
-// rows for standing meds, the as-needed list, and supplements-table rows for the stack paragraphs.
-// Pure — the D1 reads are the loader's job (the protocol plan, P4) — and proven lossless against the
-// code constants it replaces by tests/protocolStore.test.mjs (P10): same data, same prompt prose on
-// every date, same chart annotations, same due list day by day.
+// The protocol tables (protocol_items + protocol_versions, migration 0013) mapped to the shapes
+// everything scores and narrates with: ProtocolRule rows for 'logged' items, StandingCompound rows
+// for standing meds, the as-needed list, and stack rows (the retired supplements table's shape)
+// for the stack paragraphs. Pure — the D1 reads are the loader's job (the protocol plan, P4) — and
+// proven lossless against the schedule the code constants once described (tests/_fixtures/
+// protocol.mjs) by tests/protocolStore.test.mjs (P10): same data, same prompt prose on every date,
+// same chart annotations, same due list day by day.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { shiftDays } from './dates.ts'
@@ -38,18 +39,18 @@ export interface ProtocolVersionRow {
 }
 
 export interface ProtocolData {
-  /** Weekday-scheduled and scored against the dose log: PROTOCOL_RULES' shape, one row per cadence run. */
+  /** Weekday-scheduled and scored against the dose log: one ProtocolRule per cadence run. */
   rules: ProtocolRule[]
-  /** Standing meds of category oral/injectable, never logged: STANDING_COMPOUNDS' shape, one row per dated range. */
+  /** Standing meds of category oral/injectable, never logged: one StandingCompound per dated range. */
   standing: StandingCompound[]
   asNeeded: AsNeededCompound[]
   /** Standing items of category supplement/skin, as the supplements-table rows the stack prose reads. */
   supplements: Array<SupplementRow & { sort: number }>
 }
 
-/** Where a request's protocol came from: the tables; the code constants (a database before 0013,
- * or before `protocol:seed`); or nothing — the demo sandbox has no schedule of its own yet (P9),
- * and the owner's constants must never stand in for it. */
+/** Where a request's protocol came from: the tables, or nothing (a database without them, or
+ * with nothing in them). 'constants' was the code-constant fallback of the transition, retired
+ * with the protocol plan's P12; it stays in the union so stored payloads still type. */
 export type ProtocolSource = 'tables' | 'constants' | 'none'
 
 export interface LoadedProtocol extends ProtocolData {

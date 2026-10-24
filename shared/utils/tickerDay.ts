@@ -5,7 +5,7 @@
 // about these figures is tickerVoice.ts.
 import { diffDays, monthDay, shiftDays, trailingDays } from './dates.ts'
 import { isLoggedDay } from './journalLog.ts'
-import { PROTOCOL_RULES, tallySchedule } from './protocolRules.ts'
+import { tallySchedule } from './protocolRules.ts'
 import type { ProtocolRule } from './protocolRules.ts'
 import { RECOVERY_RED_MAX, isPeakRecovery } from './recovery.ts'
 import { sodaOunces } from './soda.ts'
@@ -300,7 +300,7 @@ export function moodWordOf(i: MoodInputs): string {
 export const ORAL_WORDS = /iron|ferr|vitamin|magnesium|zinc|omega|creatine|berberine|melatonin|caffeine|aspirin|nac\b|tablet|capsule|gummy/i
 
 /** A jab or a swallow: the standing rule says, else the oral words, else the catalogue's form (`defaultForm`). */
-export function isInjected(compound: string, defaultForm: (compound: string) => string, rules: ProtocolRule[] = PROTOCOL_RULES): boolean {
+export function isInjected(compound: string, defaultForm: (compound: string) => string, rules: ProtocolRule[]): boolean {
   if (rules.some(r => r.compound === compound && r.injected)) return true
   if (ORAL_WORDS.test(compound)) return false
   return defaultForm(compound) === 'vial'

@@ -53,9 +53,14 @@ test('replaying every migration yields exactly the schema.sql snapshot', () => {
 
 test('the baseline is a no-op on a database that already has the schema', () => {
   // The existing main/demo databases predate the ledger: the first `migrations apply` runs the
-  // baseline against them, so it must neither fail nor change anything.
+  // baseline against them, so it must neither fail nor change anything. A table the baseline
+  // created and a later migration dropped (supplements, 0014) is the one thing it may add back
+  // to today's snapshot, which never had it.
+  const dropped = new Set(files.flatMap(f => [...readFileSync(join(DIR, f), 'utf8').matchAll(/DROP TABLE IF EXISTS (\w+)/g)].map(m => m[1])))
   const db = load([readFileSync('server/database/schema.sql', 'utf8')])
   const before = shape(db)
   db.exec(readFileSync(join(DIR, files[0]), 'utf8'))
-  assert.deepEqual(shape(db), before)
+  const after = shape(db)
+  for (const name of dropped) delete after[name]
+  assert.deepEqual(after, before)
 })

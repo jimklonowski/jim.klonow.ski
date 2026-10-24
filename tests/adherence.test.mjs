@@ -3,7 +3,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { adherencePctClass, cadenceLabel, computeAdherence, cycleAdherence, effectiveRules } from '../app/utils/adherence.ts'
-import { PROTOCOL_RULES } from '../shared/utils/protocolRules.ts'
 
 // Friday 2026-10-23: the weeks in view start on Sundays Oct 11 and Oct 18.
 const TODAY = '2026-10-23'
@@ -68,9 +67,8 @@ test('inactive rules are filtered unless asked for, and a rule with nothing expe
   const kept = computeAdherence([], TODAY, 2, [over], { includeInactive: true })
   assert.equal(kept.length, 1)
   assert.equal(kept[0].pct, null, 'its window ended before the weeks in view')
-  assert.equal(effectiveRules([]), PROTOCOL_RULES, 'no cycles: the standing schedule itself')
   const loaded = [rule('L', [1])]
-  assert.equal(effectiveRules([], loaded), loaded, 'the loaded schedule when one is passed (useProtocol)')
+  assert.equal(effectiveRules([], loaded), loaded, 'no cycles: the loaded schedule itself (useProtocol)')
 })
 
 test('a cycle is scored from its first week through today, finished runs included', () => {

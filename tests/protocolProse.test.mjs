@@ -1,17 +1,22 @@
-// Unit tests for the protocol prose the AI prompts carry: the schedule generated from
-// PROTOCOL_RULES (it used to be a hand-kept twin that had to be edited alongside the rules),
+// Unit tests for the protocol prose the AI prompts carry: the schedule generated from the rules
+// (it used to be a hand-kept twin that had to be edited alongside a hand-kept constant),
 // the digest's planned-vs-logged lines, and the dated notes' relevance windows.
 //
 //   node --test tests/
 //
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fmtDay, protocolSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
+import { fmtDay, protocolSchedule as renderSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
 import { PROTOCOL_GOALS, eventContext, goalContext } from '../shared/utils/protocolEvents.ts'
-import { PROTOCOL_RULES, STANDING_COMPOUNDS, cadenceOf, doseLabelOn } from '../shared/utils/protocolRules.ts'
+import { cadenceOf, doseLabelOn } from '../shared/utils/protocolRules.ts'
 import { COMPOUND_INFO } from '../app/data/compoundInfo.ts'
+import { AS_NEEDED, RULES, STANDING } from './_fixtures/protocol.mjs'
 
 const lineFor = (text, needle) => text.split('\n').find(l => l.includes(needle))
+// The schedule the code constants described (tests/_fixtures/protocol.mjs), as every prompt renders it.
+const PROTOCOL_RULES = RULES
+const STANDING_COMPOUNDS = STANDING
+const protocolSchedule = (asOf, rules = RULES, standing = STANDING, asNeeded = AS_NEEDED) => renderSchedule(asOf, rules, standing, asNeeded)
 
 test('the schedule today: every running rule, with injectables and per-injection totals', () => {
   const s = protocolSchedule('2026-09-24')

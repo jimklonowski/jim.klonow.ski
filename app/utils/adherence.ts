@@ -1,4 +1,4 @@
-// Planned-vs-logged scoring for the PROTOCOL_RULES cadence — fully passive: everything is
+// Planned-vs-logged scoring for the protocol's cadence — fully passive: everything is
 // derived from the dose log at read time, nothing new to enter. Weekday intent drives the
 // calendar's rings, but the weekly score counts dose-DAYS against the week's expected count,
 // so a shot slid from Monday to Tuesday still scores — the plan is a cadence, not a contract
@@ -12,7 +12,7 @@ import type { JournalEntry } from '~/data/journal'
 import type { Cycle } from '#shared/utils/cycles'
 import { cycleRules, mergeRules } from '#shared/utils/cycles'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
-import { PROTOCOL_RULES, ruleActiveOn } from '#shared/utils/protocolRules'
+import { ruleActiveOn } from '#shared/utils/protocolRules'
 import { diffDays, shiftDays, weekStartOf, weekdayOf } from '#shared/utils/dates'
 
 // The rule set itself, plus scheduledFor() for the calendar rings, live in
@@ -98,7 +98,7 @@ export function computeAdherence(
   entries: JournalEntry[],
   today: string,
   weeksBack = 8,
-  rules: ProtocolRule[] = PROTOCOL_RULES,
+  rules: ProtocolRule[],
   // includeInactive keeps rules whose window is over (or hasn't started) — the cycle dossier
   // scores a finished run, where "active today" would filter every rule out.
   { includeInactive = false } = {}
@@ -147,10 +147,10 @@ export function computeAdherence(
     })
 }
 
-/** The standing schedule (useProtocol().rules — the protocol tables, or the code constants until
- * seeded) with every planned cycle layered in (override semantics — see mergeRules). What the
- * adherence panel and calendar rings should score against. */
-export function effectiveRules(cycles: Cycle[], rules: ProtocolRule[] = PROTOCOL_RULES): ProtocolRule[] {
+/** The standing schedule (useProtocol().rules — the protocol tables) with every planned cycle
+ * layered in (override semantics — see mergeRules). What the adherence panel and calendar rings
+ * should score against. */
+export function effectiveRules(cycles: Cycle[], rules: ProtocolRule[]): ProtocolRule[] {
   if (!cycles.length) return rules
   return mergeRules(rules, cycles)
 }

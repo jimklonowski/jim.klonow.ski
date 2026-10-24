@@ -1,14 +1,13 @@
-// The protocol loader (the protocol plan, P4): the tables when they are seeded, the code constants
-// otherwise, read once per request. A fake D1 over node:sqlite runs the real read against the
-// real migrations, so the missing-table and unseeded cases are the ones production will hit.
+// The protocol loader (the protocol plan, P4): the tables, read once per request; no tables or
+// empty tables mean no schedule. A fake D1 over node:sqlite runs the real read against the real
+// migrations, so the missing-table and empty cases are the ones a fresh database will hit.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { buildSeedSql } from '../scripts/protocol-seed.mjs'
-import { PROTOCOL_CONSTANTS, loadProtocol, protocolFor, protocolFrom, publicProtocol, readProtocolRows } from '../server/utils/protocolLoader.ts'
-import { AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS } from '../shared/utils/protocolRules.ts'
+import { AS_NEEDED, RULES, STANDING, seedSql } from './_fixtures/protocol.mjs'
+import { loadProtocol, protocolFor, protocolFrom, publicProtocol, readProtocolRows } from '../server/utils/protocolLoader.ts'
 import { EMPTY_PROTOCOL } from '../shared/utils/protocolStore.ts'
 import { protocolSchedule } from '../shared/utils/protocolProse.ts'
 
@@ -53,24 +52,24 @@ function sqlite({ upTo = files.length, supplements = false, seed = false } = {})
     }
     db.exec(readFileSync(join(DIR, f), 'utf8'))
   })
-  if (seed) db.exec(buildSeedSql())
+  if (seed) db.exec(seedSql())
   return db
 }
 
 const event = (d1, role = 'owner', demo = d1) => ({ context: { cloudflare: { env: { DB: d1, DEMO_DB: demo } }, auth: { role } } })
 
-test('before migration 0013 the tables are missing, and the constants are the protocol', async () => {
+test('before migration 0013 the tables are missing, and there is no schedule', async () => {
   const d1 = fakeD1(sqlite({ upTo: PROTOCOL_MIGRATION }))
   assert.equal(await readProtocolRows(d1), null)
   const p = await loadProtocol(d1)
-  assert.equal(p, PROTOCOL_CONSTANTS)
-  assert.equal(p.source, 'constants')
-  assert.equal(p.rules, PROTOCOL_RULES)
+  assert.equal(p, EMPTY_PROTOCOL)
+  assert.equal(p.source, 'none')
+  assert.deepEqual(p.rules, [])
 })
 
-test('migrated but empty tables are the constants; tables with rows are the protocol, logged items or not', async () => {
-  assert.equal(await loadProtocol(fakeD1(sqlite())), PROTOCOL_CONSTANTS, 'nobody seeded this database')
-  assert.equal(protocolFrom(null), PROTOCOL_CONSTANTS)
+test('migrated but empty tables are no schedule either; tables with rows are the protocol, logged items or not', async () => {
+  assert.equal(await loadProtocol(fakeD1(sqlite())), EMPTY_PROTOCOL, 'nobody filled this database')
+  assert.equal(protocolFrom(null), EMPTY_PROTOCOL)
   // Only the supplements copy ran (the demo sandbox until P9): that IS its protocol — no rules,
   // and the stack from the tables.
   const d1 = fakeD1(sqlite({ supplements: true }))
@@ -82,14 +81,16 @@ test('migrated but empty tables are the constants; tables with rows are the prot
   assert.deepEqual(p.supplements.map(s => s.name), ['Boron'])
 })
 
-test('seeded: the tables are the protocol, and they read exactly like the constants', async () => {
+test('seeded: the tables are the protocol, and they read exactly like the fixture schedule', async () => {
   const p = await loadProtocol(fakeD1(sqlite({ supplements: true, seed: true })))
   assert.equal(p.source, 'tables')
-  assert.deepEqual(p.rules, PROTOCOL_RULES)
-  assert.deepEqual(p.standing, STANDING_COMPOUNDS)
-  assert.deepEqual(p.asNeeded, AS_NEEDED_COMPOUNDS)
+  assert.deepEqual(p.rules, RULES)
+  assert.deepEqual(p.standing, STANDING)
+  assert.deepEqual(p.asNeeded, AS_NEEDED)
   assert.deepEqual(p.supplements.map(s => [s.name, s.dose, s.status]), [['Boron', '8 mg', 'active']])
-  for (const asOf of ['2026-08-15', '2026-10-27']) assert.equal(protocolSchedule(asOf, p.rules, p.standing), protocolSchedule(asOf))
+  for (const asOf of ['2026-08-15', '2026-10-27']) {
+    assert.equal(protocolSchedule(asOf, p.rules, p.standing, p.asNeeded), protocolSchedule(asOf, RULES, STANDING, AS_NEEDED))
+  }
 })
 
 test('any other database failure propagates instead of reading as "the constants, then"', async () => {
@@ -103,13 +104,14 @@ test('any other database failure propagates instead of reading as "the constants
   await assert.rejects(loadProtocol(broken), /locked/)
 })
 
-test('a demo session is never told the owner\'s constants: an unseeded sandbox reads as no schedule', async () => {
+test('every session is told its own database\'s protocol, the sandbox included', async () => {
   const fromTables = await loadProtocol(fakeD1(sqlite({ seed: true })))
-  assert.equal(publicProtocol(PROTOCOL_CONSTANTS, 'demo'), EMPTY_PROTOCOL)
   assert.equal(EMPTY_PROTOCOL.source, 'none')
   assert.deepEqual(EMPTY_PROTOCOL.rules, [])
-  assert.equal(publicProtocol(fromTables, 'demo'), fromTables, 'a seeded sandbox (P9) is its own schedule')
-  for (const role of ['owner', 'friend', 'doctor', null]) assert.equal(publicProtocol(PROTOCOL_CONSTANTS, role), PROTOCOL_CONSTANTS, String(role))
+  for (const role of ['owner', 'friend', 'doctor', 'demo', null]) {
+    assert.equal(publicProtocol(fromTables, role), fromTables, String(role))
+    assert.equal(publicProtocol(EMPTY_PROTOCOL, role), EMPTY_PROTOCOL, String(role))
+  }
 })
 
 test('protocolFor reads the role\'s database once per request, however often it is asked', async () => {

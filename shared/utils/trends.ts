@@ -11,7 +11,7 @@
 import type { HealthMetricsEntry, JournalRow } from '../types/journal'
 // Explicit .ts: runtime imports the test runner must resolve without Vite.
 import type { ProtocolRule } from './protocolRules.ts'
-import { PROTOCOL_RULES, ruleActiveOn } from './protocolRules.ts'
+import { ruleActiveOn } from './protocolRules.ts'
 import { diffDays, monthDay, roundTo, shiftDays } from './dates.ts'
 import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
 
@@ -93,8 +93,8 @@ function baseCompound(name: string): string {
 }
 
 // Standing means on the schedule AS OF the period being described — not merely listed in the
-// standing rules (`rules`: the request's schedule, PROTOCOL_RULES until the caller passes the
-// loaded one). Rules stay in that list after they end (their `to` keeps the history for the
+// standing rules (`rules`: the request's schedule from the protocol tables). Rules stay in that
+// list after they end (their `to` keeps the history for the
 // adherence rings), so GHK-Cu, stopped 2026-09-01, still counted as standing: its stop was
 // exempt from the age-out below and kept anchoring trends for months, the exact re-headlining
 // this exemption is meant to avoid for ancillaries.
@@ -279,8 +279,8 @@ export function detectProtocolChanges(journal: TrendJournalRow[], endDate: strin
 }
 
 /** `rules` is the standing schedule the anchors are judged against (standing compounds may
- * anchor a trend for months; ancillaries age out) — PROTOCOL_RULES unless the caller loaded one. */
-export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow[], endDate: string, rules: ProtocolRule[] = PROTOCOL_RULES): TrendsResult {
+ * anchor a trend for months; ancillaries age out). With none, every change is ancillary. */
+export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow[], endDate: string, rules: ProtocolRule[] = []): TrendsResult {
   const changes = detectProtocolChanges(journal, endDate)
   const findings: TrendFinding[] = []
 
@@ -393,7 +393,7 @@ const fmtDate = monthDay
 // Renders the trends as fact-sheet lines for the digest prompt. `endDate` lets each protocol
 // change carry its age, so the model can treat a weeks-old stop as background rather than news;
 // `rules` is the same standing schedule computeTrends judged the anchors against.
-export function formatTrendLines(trends: TrendsResult, endDate: string, rules: ProtocolRule[] = PROTOCOL_RULES): string[] {
+export function formatTrendLines(trends: TrendsResult, endDate: string, rules: ProtocolRule[] = []): string[] {
   const ago = (d: string) => {
     const n = diffDays(d, endDate)
     return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`

@@ -1,12 +1,10 @@
-// The standing protocol for a request: the protocol tables (migration 0013) when they are seeded,
-// the code constants otherwise. shared/utils/protocolStore.ts does the mapping and
-// tests/protocolStore.test.mjs proves it lossless; this is the D1 read, the fallback decision and
-// a per-request memo (the protocol plan, P4). Until the cutover (P11/P12) the constants stay in
-// code: a database before 0013, or one migrated but not yet given `pnpm protocol:seed:remote`
-// (the supplements copy alone makes no logged item), reads exactly as it does today.
+// The standing protocol for a request, from the protocol tables (migration 0013; edited on
+// /journal/protocol). shared/utils/protocolStore.ts does the mapping and
+// tests/protocolStore.test.mjs proves it lossless; this is the D1 read, the empty case and a
+// per-request memo (the protocol plan, P4). A database without the tables, or with nothing in
+// them, has no schedule — nothing is due, nothing is missed, the prompts carry no schedule line.
 import type { H3Event } from 'h3'
 import type { Role } from '#shared/utils/access'
-import { AS_NEEDED_COMPOUNDS, PROTOCOL_RULES, STANDING_COMPOUNDS } from '#shared/utils/protocolRules'
 import {
   EMPTY_PROTOCOL, protocolFromRows, type LoadedProtocol, type ProtocolItemRow, type ProtocolVersionRow
 } from '#shared/utils/protocolStore'
@@ -17,26 +15,15 @@ export interface ProtocolRows {
   versions: ProtocolVersionRow[]
 }
 
-/** The schedule as the code constants spell it. `supplements` is empty: until P8 the stack is
- * read from its own table by supplementContext. */
-export const PROTOCOL_CONSTANTS: LoadedProtocol = {
-  rules: PROTOCOL_RULES,
-  standing: STANDING_COMPOUNDS,
-  asNeeded: AS_NEEDED_COMPOUNDS,
-  supplements: [],
-  source: 'constants'
-}
-
-/** `rows` null = the tables don't exist; empty tables are a database nobody has seeded. Both
- * read as the constants. Tables with rows are the protocol, whatever they hold — the demo
- * sandbox has only the supplements copy (no logged item), and that IS its protocol until P9. */
+/** `rows` null = the tables don't exist; empty tables are a database nobody has filled. Both
+ * read as no schedule. */
 export function protocolFrom(rows: ProtocolRows | null): LoadedProtocol {
-  if (!rows || !rows.items.length) return PROTOCOL_CONSTANTS
+  if (!rows || !rows.items.length) return EMPTY_PROTOCOL
   return { ...protocolFromRows(rows.items, rows.versions), source: 'tables' }
 }
 
 /** Both tables in one round trip, or null before migration 0013. Any other failure propagates —
- * a D1 incident must not read as "the constants, then". */
+ * a D1 incident must not read as "no schedule, then". */
 export async function readProtocolRows(db: D1Database): Promise<ProtocolRows | null> {
   try {
     const [items, versions] = await db.batch<Record<string, unknown>>([
@@ -67,11 +54,11 @@ export function protocolFor(event: H3Event): Promise<LoadedProtocol> {
 }
 
 /**
- * What a session may be told. The demo sandbox has no schedule of its own yet (P9) and its
- * loader falls back to the owner's constants, which no demo session may see — so demo gets an
- * empty schedule instead, which is what the hidden adherence panel and rings already assume.
- * Every other role gets the request's protocol as loaded.
+ * What a session may be told: the request's protocol as loaded. The role parameter is the hook
+ * for a sandbox rule — there is none now that every database answers from its own tables (the
+ * demo seed carries the persona's schedule), but the endpoint keeps asking so a future rule has
+ * one place to live.
  */
-export function publicProtocol(protocol: LoadedProtocol, role: Role | null | undefined): LoadedProtocol {
-  return role === 'demo' && protocol.source !== 'tables' ? EMPTY_PROTOCOL : protocol
+export function publicProtocol(protocol: LoadedProtocol, _role: Role | null | undefined): LoadedProtocol {
+  return protocol
 }
