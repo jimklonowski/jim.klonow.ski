@@ -131,6 +131,7 @@ export function useOverview(role: Ref<Role | null>) {
     latestDexa,
     previousDexa,
     allWorkouts,
+    todayEntry,
     sodasToday,
     dosesToday,
     flagged,

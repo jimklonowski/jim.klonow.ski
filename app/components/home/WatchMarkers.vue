@@ -2,6 +2,7 @@
   <div v-if="tiles.length">
     <TuiHeader
       label="WATCH MARKERS · DRAW OVER DRAW"
+      fill
       class="mt-5"
     >
       <span class="text-label text-muted">{{ draws.length }} draws</span>

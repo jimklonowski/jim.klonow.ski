@@ -3,7 +3,7 @@
   <div v-if="next || isOwner">
     <TuiHeader
       label="NEXT DRAW"
-      :dashes="4"
+      fill
       class="mt-4.5"
     >
       <span

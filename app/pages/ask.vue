@@ -156,7 +156,9 @@
           @submit.prevent="send()"
         >
           <span class="text-accent text-prose leading-[2.2]">❯</span>
-          <!-- Grows with the question up to ~7 lines, then scrolls; Enter sends, Shift+Enter breaks. -->
+          <!-- Grows with the question up to ~7 lines, then scrolls; Enter sends, Shift+Enter breaks.
+               On touch screens the text is never under 16px: iOS Safari zooms the page into any
+               smaller field on focus, and on a phone that pushed the ASK button off the right edge. -->
           <UTextarea
             v-model="draft"
             :rows="1"
@@ -164,7 +166,7 @@
             autoresize
             placeholder="ask ticker about our data…"
             class="flex-1"
-            :ui="{ base: 'resize-none text-row placeholder:text-ghost' }"
+            :ui="{ base: 'resize-none text-row pointer-coarse:text-[max(16px,var(--text-row))] placeholder:text-ghost' }"
             :readonly="streaming"
             aria-label="Your question"
             @keydown.enter.exact.prevent="send()"
@@ -313,9 +315,36 @@ function markFailed(assistant: ChatMessage) {
   if (q?.role === 'user') q.failed = true
 }
 
-function scrollToBottom() {
-  nextTick(() => bottomAnchor.value?.scrollIntoView({ behavior: 'smooth', block: 'end' }))
+// --- transcript scrolling -------------------------------------------------------------------
+// The transcript never chases a streaming answer on its own. A follow-up question lands while
+// the previous answer is still being read, and following the new tokens dragged that answer off
+// the top of the screen. So: one programmatic scroll per question (to show the question and the
+// thinking line, and only when the reader was already at the bottom), after which the page
+// follows the stream only while the reader has scrolled themselves to the bottom — scrolling
+// back up stops it again. Programmatic scrolls fire scroll events too, so only scrolls that
+// began with a wheel, touch or pointer gesture count towards that decision.
+
+const FOLLOW_SLACK_PX = 48
+let follow = false
+let readerScrolled = false
+
+function nearBottom() {
+  return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - FOLLOW_SLACK_PX
 }
+
+function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
+  nextTick(() => bottomAnchor.value?.scrollIntoView({ behavior, block: 'end' }))
+}
+
+function onReaderGesture() {
+  readerScrolled = true
+}
+useEventListener('wheel', onReaderGesture, { passive: true })
+useEventListener('touchmove', onReaderGesture, { passive: true })
+useEventListener('pointerdown', onReaderGesture, { passive: true })
+useEventListener('scroll', () => {
+  if (readerScrolled) follow = nearBottom()
+}, { passive: true })
 
 // --- saved conversations --------------------------------------------------------------------
 
@@ -375,13 +404,18 @@ async function send(preset?: string) {
   // UTextarea's autoresize watches the model, so clearing the draft shrinks it back too.
   draft.value = ''
 
+  // Measured before the question lands: a reader at the bottom (the usual case, having just
+  // typed) is shown the question and the thinking line; one partway up an older answer stays put.
+  const wasNearBottom = nearBottom()
   messages.value.push({ role: 'user', content: question })
   const assistant = reactive<ChatMessage>({ role: 'assistant', content: '' })
   messages.value.push(assistant)
   streaming.value = true
   phase.value = 'thinking'
   startThinking()
-  scrollToBottom()
+  follow = false
+  readerScrolled = false
+  if (wasNearBottom) scrollToBottom()
   const controller = new AbortController()
   inFlight = controller
 
@@ -422,7 +456,7 @@ async function send(preset?: string) {
         stopThinking()
         phase.value = 'talking'
       }
-      scrollToBottom()
+      if (follow) scrollToBottom('auto')
     }
     let trailer: AskStreamTrailer | null = null
     const mark = full.indexOf(ASK_TRAILER_MARK)
@@ -481,7 +515,7 @@ async function send(preset?: string) {
     if (inFlight === controller) inFlight = null
     stopThinking()
     streaming.value = false
-    scrollToBottom()
+    if (follow) scrollToBottom('auto')
   }
 }
 

@@ -2,6 +2,7 @@
   <div v-if="latest">
     <TuiHeader
       :label="`BODY COMPOSITION · ${formatDate(latest.date, 'monthDay').toUpperCase()} SCAN`"
+      fill
       class="mt-5"
     >
       <span class="text-label text-muted">

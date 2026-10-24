@@ -25,6 +25,9 @@ export async function useQuickLog() {
   const lastSoda = computed(() => lastSodaOf(entries.value))
   /** "DR PEPPER 12oz can" — what + SODA will log. */
   const sodaLabel = computed(() => quickAddLabel(lastSoda.value))
+  /** The same split in two — "DR PEPPER" and "12oz can" — for a button that drops the size on a phone. */
+  const sodaDrink = computed(() => quickAddLabel({ drink: lastSoda.value?.drink }))
+  const sodaSize = computed(() => lastSoda.value?.size ?? '')
   const sodasToday = computed(() => (todayEntry.value?.sodas ?? []).length)
 
   // --- water: the profile's cup size ---
@@ -78,5 +81,5 @@ export async function useQuickLog() {
     }
   }
 
-  return { sodaLabel, sodasToday, cupOz, waterOzToday, addingSoda, addingWater, addSoda, addWater }
+  return { sodaLabel, sodaDrink, sodaSize, sodasToday, cupOz, waterOzToday, addingSoda, addingWater, addSoda, addWater }
 }

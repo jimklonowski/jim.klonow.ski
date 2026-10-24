@@ -1,6 +1,9 @@
 <template>
   <div>
-    <TuiHeader :label="headerLabel">
+    <TuiHeader
+      :label="headerLabel"
+      fill
+    >
       <span class="text-meta text-muted">
         <span class="text-danger">{{ flagCounts.high }} high</span>
         · <span class="text-warn">{{ flagCounts.low }} low</span>
