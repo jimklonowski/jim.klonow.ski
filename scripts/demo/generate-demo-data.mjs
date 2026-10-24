@@ -396,6 +396,46 @@ const supplementRows = [
   ['Ashwagandha', '600 mg', 'supplement', 'stopped', 'nightly', D(520), D(330), 'Six months, no measurable difference in HRV or sleep — dropped it.', 120]
 ].map(r => [...r, `${r[5] ?? D(560)}T14:00:00Z`])
 
+// --- protocol (protocol_items / protocol_versions) --------------------------------------------
+
+// The persona's standing schedule as data (the protocol plan, P9): the logged compounds exactly as
+// the dose loop above schedules them, so the rings and adherence score the sandbox as "on
+// protocol", plus the stack above as standing items. Weekdays are the "@W[offsets]" token: the
+// real weekday of an offset shifts with the nightly re-anchor, and the token follows it the way
+// the doses do (shared/utils/demoSeed.ts). Ids are explicit so the versions can point at them;
+// items go first in the seed so the reset inserts parents before children.
+// `wdOffset(k)` = the smallest offset whose wd() label is k, the token's spelling of label k.
+const wdOffset = k => ((TOTAL_DAYS - k) % 7 + 7) % 7
+const W = labels => `@W${JSON.stringify(labels.map(wdOffset))}`
+const DAILY_JSON = '[0,1,2,3,4,5,6]'
+const protocolCreated = `${D(400)}T14:00:00Z`
+
+const protocolItemRows = [
+  [1, 'Testosterone Cypionate', 'logged', 'injectable', 1, 0, 'Clinic TRT: 70 mg per pin, Mon/Thu-style twice a week.', null, 10, protocolCreated],
+  [2, 'Retatrutide', 'logged', 'injectable', 1, 0, 'Weekly GLP-1, titrated 2 → 4 → 6 mg over the first twelve weeks; appetite and the weight trend hang off it.', null, 20, protocolCreated],
+  [3, 'Tesamorelin', 'logged', 'injectable', 1, 0, 'Five nights on, two off, before bed.', null, 30, protocolCreated],
+  [4, 'NAD+', 'logged', 'injectable', 1, 0, 'Three mornings a week.', null, 40, protocolCreated],
+  [5, 'BPC-157', 'logged', 'injectable', 1, 0, null, 'a six-week run for a shoulder that settled down; not restarted', 50, protocolCreated]
+]
+const protocolVersionRows = [
+  [1, D(TRT_START), null, '70 mg', W([1, 4]), null, protocolCreated],
+  [2, D(RETA_START), D(273), '2 mg', W([0]), 'starting dose, four weeks', protocolCreated],
+  [2, D(272), D(217), '4 mg', W([0]), null, protocolCreated],
+  [2, D(216), null, '6 mg', W([0]), null, protocolCreated],
+  [3, D(TESA_NAD_START), null, '1 mg', W([1, 2, 3, 4, 5]), null, protocolCreated],
+  [4, D(TESA_NAD_START), null, '100 mg', W([1, 3, 5]), null, protocolCreated],
+  [5, D(BPC_START), D(BPC_END), '250 mcg', DAILY_JSON, null, protocolCreated]
+]
+// The stack as standing items — the same mapping migration 0013 applies to the supplements table:
+// a known spelling becomes a weekday set, anything else stays as the version's note.
+const STACK_SCHEDULES = { 'daily': DAILY_JSON, 'nightly': DAILY_JSON, 'every morning': DAILY_JSON }
+supplementRows.forEach(([name, dose, category, status, schedule, started, stopped, notes, sort, created], i) => {
+  const id = 100 + i
+  protocolItemRows.push([id, name, 'standing', category, 0, status === 'on_hand' ? 1 : 0, notes, null, 100 + sort, created])
+  const weekdays = STACK_SCHEDULES[schedule] ?? null
+  protocolVersionRows.push([id, started, stopped, dose, weekdays, weekdays ? null : schedule, created])
+})
+
 // --- vials ---------------------------------------------------------------------------------
 
 // Active-vial remaining mg derives from journal doses on/after opened_date, so the amounts
@@ -681,6 +721,18 @@ const seed = {
       cols: ['name', 'dose', 'category', 'status', 'schedule', 'started', 'stopped', 'notes', 'sort', 'created_at'],
       jsonCols: [],
       rows: supplementRows
+    },
+    // Explicit ids (the versions point at them); items before versions, since the reset wipes and
+    // refills table by table and a parent deleted after its children re-cascades them away.
+    protocol_items: {
+      cols: ['id', 'name', 'kind', 'category', 'injected', 'on_hand', 'notes', 'stop_note', 'sort', 'created_at'],
+      jsonCols: [],
+      rows: protocolItemRows
+    },
+    protocol_versions: {
+      cols: ['item_id', 'from_date', 'to_date', 'dose_label', 'weekdays', 'note', 'created_at'],
+      jsonCols: [],
+      rows: protocolVersionRows
     },
     vials: {
       cols: ['compound', 'supplier', 'vial_amount', 'vial_unit', 'quantity', 'status', 'opened_date', 'bac_water_ml', 'lot', 'expiry', 'cost', 'notes', 'created_at'],

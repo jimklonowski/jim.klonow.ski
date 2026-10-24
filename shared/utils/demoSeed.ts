@@ -1,4 +1,4 @@
-import { shiftDays } from './dates.ts'
+import { shiftDays, weekdayOf } from './dates.ts'
 import { HOME_TZ } from './time.ts'
 
 // The demo seed (scripts/demo/demo-seed.json) carries RELATIVE dates so the sandbox always reads
@@ -12,6 +12,10 @@ import { HOME_TZ } from './time.ts'
 
 export const OFFSET_RE = /^@D(-?\d+)(.*)$/
 export const ZONE_TOKEN = '@Z'
+// "@W[1,4]": the weekdays (0 = Sunday) of those day offsets, as a JSON array — the persona's
+// schedules are anchored to offset % 7, so a protocol version's weekdays must follow the anchor
+// the same way its doses do, or the rings would score every dose as a miss.
+export const WEEKDAYS_RE = /^@W(\[[\d,\s]*\])$/
 
 export interface SeedTable {
   cols: string[]
@@ -55,9 +59,15 @@ export function zoneOffsetAt(date: string, time: string, tz = HOME_TZ): string {
 
 const TIME_RE = /\b(\d{2}:\d{2}(?::\d{2})?)\b/
 
-/** "@D<n>rest" → (anchor − n days) + rest, "@Z" in rest becoming that day's offset; anything else as it is. */
+/** "@D<n>rest" → (anchor − n days) + rest, "@Z" in rest becoming that day's offset; "@W[…]" →
+ * the JSON weekday set of those offsets; anything else as it is. */
 export function materializeSeedValue(value: unknown, anchor: string): unknown {
   if (typeof value !== 'string') return value
+  const w = WEEKDAYS_RE.exec(value)
+  if (w) {
+    const offsets = JSON.parse(w[1]!) as number[]
+    return JSON.stringify([...new Set(offsets.map(o => weekdayOf(shiftDays(anchor, -o))))].sort((a, b) => a - b))
+  }
   const m = OFFSET_RE.exec(value)
   if (!m) return value
   const date = shiftDays(anchor, -Number(m[1]))
