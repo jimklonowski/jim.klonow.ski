@@ -79,6 +79,15 @@ test('the seed makes one item per compound with a gapless dated history, and re-
   const before = counts(db)
   db.exec(buildSeedSql())
   assert.deepEqual(counts(db), before)
+
+  // Re-running re-syncs: until P12 the constants own these items, so a change made to one of
+  // their versions any other way is put back, and an item's fields follow the constants.
+  db.exec('UPDATE protocol_versions SET dose_label = \'999 IU\' WHERE dose_label = \'250 IU\'')
+  db.exec('UPDATE protocol_items SET stop_note = \'edited\', sort = 777 WHERE name = \'GHK-Cu\'')
+  db.exec(buildSeedSql())
+  assert.equal(versionsOf(db, 'hCG').at(-1).dose_label, '250 IU')
+  assert.deepEqual(plain(db.prepare('SELECT stop_note, sort FROM protocol_items WHERE name = \'GHK-Cu\'').get()), { stop_note: items.find(i => i.name === 'GHK-Cu').stop_note, sort: 40 })
+  assert.deepEqual(counts(db), before)
 })
 
 test('0013 copies the supplements table into standing items, and the constants seed replaces the two it describes better', () => {
