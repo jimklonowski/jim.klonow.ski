@@ -165,7 +165,7 @@ export function countdownLabel(inDays: number): string {
 }
 
 // --- prep reminders ---
-// Hand-maintained, like PROTOCOL_RULES: what has to be true in the days before a draw for its
+// Hand-maintained: what has to be true in the days before a draw for its
 // numbers to compare with the earlier ones. Rendered relative to the plan's date, so each line
 // carries the day it starts to apply — a dated line reminds by itself, with nothing to tick off.
 

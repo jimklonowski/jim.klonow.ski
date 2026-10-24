@@ -126,8 +126,12 @@ export default defineEventHandler(async (event) => {
   const cycleBlock = await cycleContext(db, date)
   const eventBlock = eventContext(date)
 
+  // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
+  // renders it as of the scan date.
+  const protocol = await protocolFor(event)
+
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the labs'.
-  const prompt = dexaSummaryPrompt({ date, protocolBlock, supplementBlock, cycleBlock, eventBlock, scanBlock, trainingBlock })
+  const prompt = dexaSummaryPrompt({ date, protocol, protocolBlock, supplementBlock, cycleBlock, eventBlock, scanBlock, trainingBlock })
 
   const startedAt = Date.now()
   let response

@@ -4,10 +4,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { annotationsAt, cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '../shared/utils/chartAnnotations.ts'
 import { PROTOCOL_EVENTS } from '../shared/utils/protocolEvents.ts'
-import { PROTOCOL_RULES } from '../shared/utils/protocolRules.ts'
+import { RULES } from './_fixtures/protocol.mjs'
 
 test('dose steps become short "from→to" lines, plus a start per rule and a stop for ended ones', () => {
-  const texts = ruleAnnotations(PROTOCOL_RULES).map(a => `${a.from} ${a.text}`)
+  const texts = ruleAnnotations(RULES).map(a => `${a.from} ${a.text}`)
   assert.ok(texts.includes('2026-08-24 T 100→75 mg'), 'the T cut')
   assert.ok(texts.includes('2026-06-18 T start 50 mg'), 'T start uses the first step')
   assert.ok(texts.includes('2026-09-03 HGH 2→2.5 IU'))

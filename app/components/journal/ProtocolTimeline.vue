@@ -4,11 +4,13 @@
 // The compounds page shows it compact with a collapsed preview; the calendar shows it roomier
 // and in full. The slot math lives in shared/utils/timeline.ts.
 import { buildTimeline, type TimelineZoom } from '#shared/utils/timeline'
-import { STANDING_COMPOUNDS } from '#shared/utils/protocolRules'
+import type { StandingCompound } from '#shared/utils/protocolRules'
 
 const props = withDefaults(defineProps<{
   label: string
   entries: Array<{ date: string, peptides?: Array<{ compound: string }> | null }>
+  /** The standing meds that never enter the dose log (useProtocol().standing) — their rows come first. */
+  standing: StandingCompound[]
   labDates: string[]
   /** First day on the axis; null when there's nothing logged yet. */
   from: string | null
@@ -30,7 +32,7 @@ const md = computed(() => props.size === 'md')
 const timeline = computed(() => props.from
   ? buildTimeline({
       entries: props.entries,
-      standing: STANDING_COMPOUNDS,
+      standing: props.standing,
       labDates: props.labDates,
       from: props.from,
       today: props.today,

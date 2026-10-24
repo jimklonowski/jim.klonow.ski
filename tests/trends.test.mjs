@@ -8,6 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { computeTrends, detectProtocolChanges, formatTrendLines } from '../shared/utils/trends.ts'
 import { eachDay, shiftDays, weekdayOf } from '../shared/utils/dates.ts'
+import { RULES } from './_fixtures/protocol.mjs'
 
 const END = '2026-09-20' // a Sunday
 
@@ -157,18 +158,30 @@ test('past six weeks an ancillary stop stops anchoring and leaves the digest she
 })
 
 test('a compound whose rule has ended is ancillary too (the GHK-Cu regression)', () => {
-  // GHK-Cu is in PROTOCOL_RULES but its rule ended 2026-09-01. Before the fix it counted as
+  // GHK-Cu is in the schedule but its rule ended 2026-09-01. Before the fix it counted as
   // standing forever, so its stop kept anchoring trends for months.
-  const trends = computeTrends(stopHistory('GHK-Cu'), [], END)
+  const trends = computeTrends(stopHistory('GHK-Cu'), [], END, RULES)
   assert.ok(trends.findings.every(f => !f.since))
-  assert.ok(formatTrendLines(trends, END).every(l => !l.includes('GHK-Cu')))
+  assert.ok(formatTrendLines(trends, END, RULES).every(l => !l.includes('GHK-Cu')))
+})
+
+test('the standing schedule is a parameter: the loaded rules decide who is exempt from the age-out', () => {
+  // The same GHK-Cu history, judged against a schedule on which it is still running (the protocol
+  // tables could say so where the constants do not): standing, so its stop anchors past six weeks.
+  const stillRunning = [{ compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01' }]
+  const trends = computeTrends(stopHistory('GHK-Cu'), [], END, stillRunning)
+  assert.equal(trends.findings[0]?.since?.kind, 'stop')
+  assert.deepEqual(trends.findings[0].since.compounds, ['GHK-Cu'])
+  assert.ok(formatTrendLines(trends, END, stillRunning).some(l => l.startsWith('Protocol changes: GHK-Cu stopped')))
 })
 
 test('a standing compound still anchors past six weeks', () => {
   const start = '2026-07-27' // a Monday, 55 days before END; testosterone's rule is active on END
   const journal = merge(dosing('Testosterone Cypionate', start, END, [1, 4]), rhrStep(start, 60, 68))
-  const { findings } = computeTrends(journal, [], END)
+  const { findings } = computeTrends(journal, [], END, RULES)
   assert.equal(findings[0]?.since?.date, start)
+  // Without a schedule to say so, the same history is ancillary and ages out.
+  assert.ok(computeTrends(journal, [], END).findings.every(f => !f.since))
 })
 
 // --- rendering ---

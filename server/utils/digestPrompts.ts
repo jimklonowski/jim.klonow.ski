@@ -1,5 +1,6 @@
 import { goalContext } from '#shared/utils/protocolEvents'
 import { protocolSchedule } from '#shared/utils/protocolProse'
+import type { ProtocolData } from '#shared/utils/protocolStore'
 
 // The digest prompts: who the reader is, TICKER's voice, the ground rules, and the daily/weekly
 // framing around the fact sheet digestFacts.ts builds.
@@ -15,12 +16,13 @@ function fmtDateFull(d: string): string {
 // priorities and tone. Edit to taste as goals change. (Also reused by the ask-the-data chat,
 // so it answers with the same priorities the digests are written with.) What is running and
 // since when comes from the generated schedule, as of `asOf`, and what the protocol is currently
-// aiming at from the dated goals (PROTOCOL_GOALS); this text is only the framing.
-export function readerContext(asOf: string): string {
+// aiming at from the dated goals (PROTOCOL_GOALS); this text is only the framing. `protocol` is
+// the request's schedule (protocolFor / loadProtocol, from the protocol tables).
+export function readerContext(asOf: string, protocol: ProtocolData): string {
   const goals = goalContext(asOf)
   return `About the reader: an adult man running a self-directed hormone protocol alongside regular training. The core of the protocol is testosterone (TRT), HGH, and hCG — these are the compounds that matter when connecting protocol to outcomes, and they are ongoing. Ancillary peptides (BPC-157, TB-500, MOTS-C, NAD+, GHK-Cu, and the like) come and go around that core; treat their starts and stops as secondary context, not headlines — the schedule below says which are running. He is also weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals, so anything bearing on that decision — blood pressure, resting HR, recovery, and (when labs appear) lipids, hematocrit, and iron/ferritin — deserves attention. He is not currently taking an aromatase inhibitor, but keeps Anastrozole on hand from his TRT clinic for symptomatic use; his estradiol is running high (recently over 100 pg/mL), so when the data hints at estrogen-related effects (water retention, blood-pressure drift, mood/sleep changes), connect that dot explicitly. His priorities: body recomposition (adding lean mass to arms/chest without adding fat), sleep and recovery quality, and keeping cardiovascular markers — blood pressure and resting HR — in a healthy range while on protocol. He tracks soda intake because he is trying to keep it low. He wants honest signal over encouragement: if something looks off or is trending the wrong way, say so directly.
 
-${protocolSchedule(asOf)}${goals ? `\n\n${goals}` : ''}`
+${protocolSchedule(asOf, protocol.rules, protocol.standing, protocol.asNeeded)}${goals ? `\n\n${goals}` : ''}`
 }
 
 // TICKER persona (design_handoff_ticker): the digest is delivered on the dashboard by a
@@ -59,8 +61,8 @@ const STYLE_RULES = `Ground rules:
 - No greeting, no closing, no medical-advice disclaimers.`
 
 // `regimen` is the per-request context block (supplements, cycles, shots, dated notes).
-export function dailyDigestPrompt(date: string, facts: string, regimen: string): string {
-  return `You are writing a short daily recap for a personal health dashboard. The reader is the person these metrics belong to. ${readerContext(date)}${regimen ? `\n\n${regimen}` : ''}
+export function dailyDigestPrompt(date: string, facts: string, regimen: string, protocol: ProtocolData): string {
+  return `You are writing a short daily recap for a personal health dashboard. The reader is the person these metrics belong to. ${readerContext(date, protocol)}${regimen ? `\n\n${regimen}` : ''}
 
 ${TICKER_VOICE}
 
@@ -72,8 +74,8 @@ Write 2-4 sentences highlighting what stands out about the day — an active pla
 ${STYLE_RULES}`
 }
 
-export function weeklyDigestPrompt(start: string, end: string, facts: string, regimen: string): string {
-  return `You are writing a weekly summary for a personal health dashboard. The reader is the person these metrics belong to. ${readerContext(end)}${regimen ? `\n\n${regimen}` : ''}
+export function weeklyDigestPrompt(start: string, end: string, facts: string, regimen: string, protocol: ProtocolData): string {
+  return `You are writing a weekly summary for a personal health dashboard. The reader is the person these metrics belong to. ${readerContext(end, protocol)}${regimen ? `\n\n${regimen}` : ''}
 
 ${TICKER_VOICE}
 

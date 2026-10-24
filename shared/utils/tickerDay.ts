@@ -5,7 +5,7 @@
 // about these figures is tickerVoice.ts.
 import { diffDays, monthDay, shiftDays, trailingDays } from './dates.ts'
 import { isLoggedDay } from './journalLog.ts'
-import { PROTOCOL_RULES, tallySchedule } from './protocolRules.ts'
+import { tallySchedule } from './protocolRules.ts'
 import type { ProtocolRule } from './protocolRules.ts'
 import { RECOVERY_RED_MAX, isPeakRecovery } from './recovery.ts'
 import { sodaOunces } from './soda.ts'
@@ -300,8 +300,8 @@ export function moodWordOf(i: MoodInputs): string {
 export const ORAL_WORDS = /iron|ferr|vitamin|magnesium|zinc|omega|creatine|berberine|melatonin|caffeine|aspirin|nac\b|tablet|capsule|gummy/i
 
 /** A jab or a swallow: the standing rule says, else the oral words, else the catalogue's form (`defaultForm`). */
-export function isInjected(compound: string, defaultForm: (compound: string) => string): boolean {
-  if (PROTOCOL_RULES.some(r => r.compound === compound && r.injected)) return true
+export function isInjected(compound: string, defaultForm: (compound: string) => string, rules: ProtocolRule[]): boolean {
+  if (rules.some(r => r.compound === compound && r.injected)) return true
   if (ORAL_WORDS.test(compound)) return false
   return defaultForm(compound) === 'vial'
 }
@@ -500,9 +500,10 @@ export const WEARABLE_META: Partial<Record<TickerProp, { id: string, name: strin
 }
 
 // Achievements the demo persona can never earn, so they are not shown to it (audit #42 item 29):
-// Clean Week needs schedule rules (the sandbox has none), Luscious ninety days of finasteride
-// (not in the seed), Open House visits from friends (the sandbox gets none).
-export const DEMO_UNREACHABLE: ReadonlySet<string> = new Set(['clean-week', 'luscious', 'open-house'])
+// Luscious needs ninety days of finasteride (not in the seed), Open House visits from friends
+// (the sandbox gets none). Clean Week left the set with the protocol plan's P9: the sandbox has
+// a schedule of its own now, and its persona keeps it.
+export const DEMO_UNREACHABLE: ReadonlySet<string> = new Set(['luscious', 'open-house'])
 
 export interface AchievementInputs {
   milestones: Milestone[]

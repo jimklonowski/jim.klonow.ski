@@ -391,6 +391,7 @@ const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: plannedData } = await usePlannedDraws()
 const { data: cyclesData } = await useCycles()
+const { rules: protocolRules } = await useProtocol()
 const { data: dexaData } = await useDexaEntries()
 // The vial list is owner/demo only (the API says so); a friend's TICKER has no pantry to mention.
 const vialsData = canEdit.value ? await useVials() : null
@@ -406,9 +407,10 @@ const { keeper, remote, visits, visitorLabel, recall, remember } = await useTick
 const { night, asleep, sky, clock } = useTickerClock()
 
 // --- the day, as the pet experiences it (app/composables/useTickerDay.ts) ----------------------
-// Not for demo: the persona's dose dates drift across weekdays by design (see protocolRules.ts),
-// so its TICKER is fed when anything is logged and never hungry.
-const rulesApply = role.value !== 'demo'
+// Whether a schedule applies: it does whenever the session has rules — the demo sandbox has its
+// own since the protocol plan's P9 — and an unseeded sandbox's TICKER is fed when anything is
+// logged and never hungry.
+const rulesApply = protocolRules.value.length > 0
 const {
   sodasToday, sodasThisWeek, mealDay, mealIsYesterday, dosesToday, mixesToday, walkIsYesterday, workoutMinutes, workoutHr, walkProp,
   recovery, sleepMin, sluggish, streak, weight, latestHrv, firstDate, ageDays, birthday, drawDates, nextDraw, oldestOpen, fever,
@@ -426,6 +428,7 @@ const {
   scans: dexaData,
   vials: vialsData?.data ?? null,
   today,
+  rules: protocolRules,
   rulesApply,
   night
 })

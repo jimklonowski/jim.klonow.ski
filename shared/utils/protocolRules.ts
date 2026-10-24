@@ -1,18 +1,21 @@
-// The standing protocol, as data — the one place to edit when it changes. Three lists:
-// PROTOCOL_RULES (logged, weekday-scheduled compounds), STANDING_COMPOUNDS (daily meds that are
-// deliberately not in the dose log), and AS_NEEDED_COMPOUNDS. The AI prompts' schedule prose is
-// generated from all three (protocolSchedule in ./protocolProse.ts), so the notes on each entry
-// are prompt text: pronoun-free, and written to say how to read the data, not just what changed.
+// The shape of the standing protocol and the math over it: ProtocolRule (a logged, weekday-
+// scheduled compound — one row per cadence run, with its dose steps), StandingCompound (a daily
+// med deliberately not in the dose log) and AsNeededCompound, plus due-day resolution and the
+// planned-vs-logged tally. The rows themselves live in the protocol tables (protocol_items /
+// protocol_versions, edited on /journal/protocol — the protocol plan) and are mapped into these
+// shapes by ./protocolStore.ts; server/utils/protocolLoader.ts reads them per request and the
+// app gets them through useProtocol(). The AI prompts' schedule prose is generated from the same
+// shapes (protocolSchedule in ./protocolProse.ts), so a rule's notes are prompt text:
+// pronoun-free, written to say how to read the data, not just what changed.
 //
 // Shared because both sides score against the rules: the adherence panel and calendar rings in
 // the app (app/utils/adherence.ts), and the digest prompts on the server, which precompute "what
 // was due today / this week, what was logged" (tallySchedule) so the model never has to work
 // out weekdays from dates itself — it was guessing at them before.
 //
-// As-needed compounds (BPC-157) deliberately have no rule — sporadic logging is the plan, not
-// a lapse. `from` dates come from the dose log's first day of each cadence. NOTE: this
-// describes the real protocol only; the demo persona's dose dates re-anchor nightly and drift
-// across weekdays, so adherence UI is hidden for demo sessions.
+// As-needed compounds deliberately have no rule — sporadic logging is the plan, not a lapse. The
+// demo sandbox carries its own schedule (scripts/demo/generate-demo-data.mjs), with weekdays that
+// re-anchor nightly alongside its doses.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping,
 // which can't resolve extension-less paths the way Vite does.
@@ -92,54 +95,12 @@ export function cadenceOf(weekdays: number[]): string {
   return mondayFirst(weekdays).map(d => DAY_SHORT[d]).join('+')
 }
 
-const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
-
-// doseLabel is the current dose, which is what the app displays. A dose change appends a step to
-// `doses` and updates doseLabel to match; the row keeps its `from`. Steps come from the dose log
-// (a dose held four days or more; one-off doses and two-day dips are left out).
-//
-// A CADENCE change is a new row, because `weekdays` is per row: the old row gets `to` (its past
-// days stay due and scored) and a row for the same compound starts the next day. predecessorOf /
-// successorOf tie the pair together wherever it would otherwise read as a stop and a start.
-export const PROTOCOL_RULES: ProtocolRule[] = [
-  {
-    compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-06-18', injected: true,
-    doses: [
-      { from: '2026-06-18', label: '50 mg' },
-      { from: '2026-06-22', label: '100 mg' },
-      { from: '2026-08-24', label: '75 mg' }
-    ]
-  },
-  {
-    compound: 'hCG', doseLabel: '300 IU', weekdays: [0, 2, 5], from: '2026-06-18', to: '2026-10-23', injected: true,
-    doses: [
-      { from: '2026-06-18', label: '250 IU' },
-      { from: '2026-07-14', label: '500 IU' },
-      { from: '2026-07-21', label: '250 IU' },
-      { from: '2026-09-08', label: '300 IU' }
-    ]
-  },
-  // Sundays dropped and the dose cut together; the last 300 IU Tue/Fri/Sun shot was Fri 2026-10-23.
-  { compound: 'hCG', doseLabel: '250 IU', weekdays: [2, 5], from: '2026-10-24', injected: true },
-  {
-    compound: 'HGH', doseLabel: '2.5 IU', weekdays: EVERY_DAY, from: '2026-06-13', injected: true,
-    doses: [
-      { from: '2026-06-13', label: '1 IU' },
-      { from: '2026-06-20', label: '1.5 IU' },
-      { from: '2026-07-02', label: '2 IU' },
-      { from: '2026-07-17', label: '2.25 IU' },
-      { from: '2026-07-22', label: '1.5 IU' },
-      { from: '2026-08-11', label: '2 IU' },
-      { from: '2026-09-03', label: '2.5 IU' }
-    ]
-  },
-  // `to` is inclusive, so the rings stop expecting a dose from 2026-09-02 on.
-  {
-    compound: 'GHK-Cu', doseLabel: '2 mg', weekdays: EVERY_DAY, from: '2026-02-01', to: '2026-09-01', injected: true,
-    stopNote: 'the vial finished and another is not being reconstituted for the time being'
-  },
-  { compound: 'Finasteride', doseLabel: '1 mg', weekdays: EVERY_DAY, from: '2026-07-29' }
-]
+// doseLabel is the current dose, which is what the app displays. A dose change is a new version
+// of the item in protocol_versions; the mapper (./protocolStore.ts) folds consecutive versions on
+// the same weekdays into one rule and its `doses` steps. A CADENCE change is a new rule, because
+// `weekdays` is per rule: the old row gets `to` (its past days stay due and scored) and a row for
+// the same compound starts the next day. predecessorOf / successorOf tie the pair together
+// wherever it would otherwise read as a stop and a start.
 
 export interface StandingCompound {
   compound: string
@@ -153,21 +114,12 @@ export interface StandingCompound {
   note?: string
 }
 
-const TADALAFIL_SINCE = 'daily-protocol Cialis, taken each morning for endothelial/BP support since about June 2025'
-const TADALAFIL_BP = 'Its mild BP-lowering effect is standing context when interpreting blood-pressure trends'
-
-// Daily meds running since before the dose log existed — too routine to log per-day, but real
-// protocol. Rendered as extra rows on the calendar's protocol timeline (not stored in D1), and
-// named in the prompts' schedule so their absence from the dose log never reads as a miss.
-export const STANDING_COMPOUNDS: StandingCompound[] = [
-  { compound: 'Tadalafil', from: '2025-06-01', to: '2026-06-01', label: '7 mg gummy', note: `${TADALAFIL_SINCE}. ${TADALAFIL_BP}` },
-  { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet', note: `${TADALAFIL_SINCE}; 7 mg gummies until 2026-06-01, 5 mg tablets since. ${TADALAFIL_BP}` }
-]
-
 /** Taken when something calls for it, so gaps in the log are the plan. No rule, no rings. */
-export const AS_NEEDED_COMPOUNDS: Array<{ compound: string, note: string }> = [
-  { compound: 'BPC-157', note: 'for soreness/tightness' }
-]
+export interface AsNeededCompound {
+  compound: string
+  /** Prompt clause: what it is taken for. */
+  note: string
+}
 
 export function ruleActiveOn(rule: ProtocolRule, date: string): boolean {
   return date >= rule.from && (rule.to == null || date <= rule.to)
@@ -179,7 +131,7 @@ export function ruleDueOn(rule: ProtocolRule, date: string): boolean {
 }
 
 /** Rules whose cadence calls for a dose on this date. */
-export function scheduledFor(date: string, rules: ProtocolRule[] = PROTOCOL_RULES): ProtocolRule[] {
+export function scheduledFor(date: string, rules: ProtocolRule[]): ProtocolRule[] {
   return rules.filter(r => ruleDueOn(r, date))
 }
 

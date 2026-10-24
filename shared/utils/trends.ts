@@ -10,7 +10,8 @@
 // the /ask fact sheet, and the lab summary's protocol-change lines.
 import type { HealthMetricsEntry, JournalRow } from '../types/journal'
 // Explicit .ts: runtime imports the test runner must resolve without Vite.
-import { PROTOCOL_RULES, ruleActiveOn } from './protocolRules.ts'
+import type { ProtocolRule } from './protocolRules.ts'
+import { ruleActiveOn } from './protocolRules.ts'
 import { diffDays, monthDay, roundTo, shiftDays } from './dates.ts'
 import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
 
@@ -91,21 +92,22 @@ function baseCompound(name: string): string {
   return name.replace(/\s*\([^)]*\)\s*$/, '')
 }
 
-// Standing means on the schedule AS OF the period being described — not merely listed in
-// PROTOCOL_RULES. Rules stay in that list after they end (their `to` keeps the history for the
+// Standing means on the schedule AS OF the period being described — not merely listed in the
+// standing rules (`rules`: the request's schedule from the protocol tables). Rules stay in that
+// list after they end (their `to` keeps the history for the
 // adherence rings), so GHK-Cu, stopped 2026-09-01, still counted as standing: its stop was
 // exempt from the age-out below and kept anchoring trends for months, the exact re-headlining
 // this exemption is meant to avoid for ancillaries.
-function isStandingChange(change: ProtocolChange, endDate: string): boolean {
+function isStandingChange(change: ProtocolChange, endDate: string, rules: ProtocolRule[]): boolean {
   return change.compounds.some(c =>
-    PROTOCOL_RULES.some(r => r.compound === baseCompound(c) && ruleActiveOn(r, endDate))
+    rules.some(r => r.compound === baseCompound(c) && ruleActiveOn(r, endDate))
   )
 }
 
 // Too old to anchor a trend or to be listed on a digest fact sheet. The labs summary keeps the
 // full `changes` list — a months-old stop is still relevant across a four-month lab window.
-function isStaleAncillary(change: ProtocolChange, endDate: string): boolean {
-  return !isStandingChange(change, endDate) && diffDays(change.date, endDate) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
+function isStaleAncillary(change: ProtocolChange, endDate: string, rules: ProtocolRule[]): boolean {
+  return !isStandingChange(change, endDate, rules) && diffDays(change.date, endDate) > ANCILLARY_ANCHOR_MAX_AGE_DAYS
 }
 
 interface MetricDef {
@@ -276,7 +278,9 @@ export function detectProtocolChanges(journal: TrendJournalRow[], endDate: strin
   return changes.sort((a, b) => a.date.localeCompare(b.date))
 }
 
-export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow[], endDate: string): TrendsResult {
+/** `rules` is the standing schedule the anchors are judged against (standing compounds may
+ * anchor a trend for months; ancillaries age out). With none, every change is ancillary. */
+export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow[], endDate: string, rules: ProtocolRule[] = []): TrendsResult {
   const changes = detectProtocolChanges(journal, endDate)
   const findings: TrendFinding[] = []
 
@@ -304,7 +308,7 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
     let reversalAnchor: TrendFinding | null = null
     for (const change of changes) {
       if (diffDays(change.date, endDate) < MIN_DAYS_SINCE_CHANGE) continue
-      if (isStaleAncillary(change, endDate)) continue
+      if (isStaleAncillary(change, endDate, rules)) continue
 
       const baseline = avgInWindow(points, shiftDays(change.date, -28), shiftDays(change.date, -1))
       const recentStart = shiftDays(endDate, -13) > change.date ? shiftDays(endDate, -13) : change.date
@@ -387,8 +391,9 @@ export function computeTrends(journal: TrendJournalRow[], health: TrendHealthRow
 const fmtDate = monthDay
 
 // Renders the trends as fact-sheet lines for the digest prompt. `endDate` lets each protocol
-// change carry its age, so the model can treat a weeks-old stop as background rather than news.
-export function formatTrendLines(trends: TrendsResult, endDate: string): string[] {
+// change carry its age, so the model can treat a weeks-old stop as background rather than news;
+// `rules` is the same standing schedule computeTrends judged the anchors against.
+export function formatTrendLines(trends: TrendsResult, endDate: string, rules: ProtocolRule[] = []): string[] {
   const ago = (d: string) => {
     const n = diffDays(d, endDate)
     return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`
@@ -396,7 +401,7 @@ export function formatTrendLines(trends: TrendsResult, endDate: string): string[
   const lines: string[] = []
   // Stale ancillary changes are left off the digest sheet entirely: listed, they get mentioned,
   // and a quarter-old peptide stop has nothing to say about this week.
-  const listed = trends.changes.filter(c => !isStaleAncillary(c, endDate))
+  const listed = trends.changes.filter(c => !isStaleAncillary(c, endDate, rules))
   if (listed.length) {
     lines.push(`Protocol changes: ${listed
       .map(c => c.kind === 'stop'

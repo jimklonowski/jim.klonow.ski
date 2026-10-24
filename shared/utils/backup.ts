@@ -67,7 +67,8 @@ const IDENT = /^\w+$/
  * the migrations and fails if a new foreign key is missing from this map.
  */
 export const RESTORE_PARENTS: Record<string, string[]> = {
-  ask_messages: ['ask_threads']
+  ask_messages: ['ask_threads'],
+  protocol_versions: ['protocol_items']
 }
 
 /** Table order for the INSERT phase: alphabetical, then every parent hoisted before its children. */

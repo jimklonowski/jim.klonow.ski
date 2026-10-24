@@ -7,6 +7,7 @@ import {
   weekTallyOf, workoutHrOf, worldDaysOf
 } from '../shared/utils/tickerDay.ts'
 import { MANE_TIERS } from '../shared/utils/tickerWardrobe.ts'
+import { RULES } from './_fixtures/protocol.mjs'
 
 const TODAY = '2026-10-23'
 const day = (date, over = {}) => ({ date, ...over })
@@ -89,11 +90,11 @@ test('the mood ladder: one order, read as a pose and as a word', () => {
 
 test('a jab or a swallow: the standing rule, then the oral words, then the catalogue', () => {
   const vialByDefault = () => 'vial'
-  assert.equal(isInjected('Testosterone Cypionate', () => 'tablet'), true, 'the rule says injected whatever the catalogue thinks')
-  assert.equal(isInjected('Iron Bisglycinate', vialByDefault), false)
-  assert.equal(isInjected('Vitamin D3', vialByDefault), false)
-  assert.equal(isInjected('Something New', vialByDefault), true)
-  assert.equal(isInjected('Something New', () => 'capsule'), false)
+  assert.equal(isInjected('Testosterone Cypionate', () => 'tablet', RULES), true, 'the rule says injected whatever the catalogue thinks')
+  assert.equal(isInjected('Iron Bisglycinate', vialByDefault, RULES), false)
+  assert.equal(isInjected('Vitamin D3', vialByDefault, RULES), false)
+  assert.equal(isInjected('Something New', vialByDefault, RULES), true)
+  assert.equal(isInjected('Something New', () => 'capsule', RULES), false)
   const injected = c => /x/i.test(c)
   assert.equal(bowlFor('waiting', [{ compound: 'X' }], injected), 'bowl-empty')
   assert.equal(bowlFor('fed', [{ compound: 'X' }], injected), 'bowl-shots')
@@ -217,6 +218,6 @@ test('achievements: the fixed list behind the wearables, and the three the demo 
   assert.equal(byId['clean-week'].progress, 1)
   assert.equal(reachableAchievements(all, false).length, 17)
   const demo = reachableAchievements(all, true)
-  assert.equal(demo.length, 14)
+  assert.equal(demo.length, 15, 'Clean Week is reachable since the sandbox has a schedule (P9)')
   assert.ok(demo.every(a => !DEMO_UNREACHABLE.has(a.id)))
 })
