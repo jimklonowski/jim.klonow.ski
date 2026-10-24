@@ -2,11 +2,13 @@
   <div v-if="cycle">
     <TuiHeader
       :label="`CYCLE · ${cycle.name.toUpperCase()}`"
-      :dashes="4"
+      fill
       class="mt-4.5"
     />
 
-    <!-- ACTIVE: progress, dosing status, what's next -->
+    <!-- ACTIVE: progress, dosing status, what's next. The figure after the bar is the bar's own
+         number (time through the cycle); adherence sits on the dose row as "taken", where it
+         belongs — "100%" next to a five-sevenths bar read as a contradiction. -->
     <template v-if="state === 'active'">
       <div class="flex items-baseline gap-2.5 mt-2.5 text-small">
         <NuxtLink
@@ -20,11 +22,7 @@
             :style="{ width: `${progress.pct}%` }"
           />
         </span>
-        <span
-          v-if="pct != null"
-          class="text-meta"
-          :class="pctClass"
-        >{{ pct }}%</span>
+        <span class="text-meta text-muted">{{ progress.pct }}%</span>
       </div>
 
       <div class="flex flex-col gap-1 mt-2 text-small">
@@ -41,7 +39,10 @@
           <span
             class="ml-auto shrink-0 text-label tracking-[0.06em]"
             :class="STATUS_CLASSES[row.status.kind]"
-          >{{ row.status.label }}</span>
+          >{{ row.status.label }}<span
+            v-if="row.taken"
+            class="text-muted"
+          > · {{ row.taken.hit }}/{{ row.taken.exp }} taken</span></span>
         </div>
         <div
           v-if="nextPhase"
@@ -130,7 +131,7 @@
             :to="dossier"
             class="text-hi hover:text-accent"
           >ended {{ formatDate(end, 'monthDay') }}</NuxtLink>
-          <span class="ml-auto shrink-0 text-muted">{{ progress.totalWeeks }} wks{{ pct != null ? ` · ${pct}%` : '' }}</span>
+          <span class="ml-auto shrink-0 text-muted">{{ progress.totalWeeks }} wks{{ pct != null ? ` · ${pct}% taken` : '' }}</span>
         </div>
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">└</span>
@@ -209,15 +210,21 @@ const adherence = computed(() =>
     : { rows: [], pct: null }
 )
 const pct = computed(() => adherence.value.pct)
-const pctClass = computed(() => {
-  if (pct.value == null) return 'text-muted'
-  if (pct.value >= 90) return 'text-accent'
-  return pct.value >= 70 ? 'text-dim' : 'text-warn'
-})
 
-/** Per-compound due/done status, only for plan items whose window covers today. */
+/** Per-compound due/done status, only for plan items whose window covers today, with the
+ * item's own taken/expected count across the cycle so far (hits capped per week, as the
+ * dossier scores them). */
 const doseRows = computed(() =>
-  adherence.value.rows.filter(r => r.status.label !== '—').slice(0, 3)
+  adherence.value.rows
+    .filter(r => r.status.label !== '—')
+    .slice(0, 3)
+    .map((r) => {
+      const t = r.weeks.reduce(
+        (acc, w) => ({ exp: acc.exp + w.expected, hit: acc.hit + Math.min(w.actual, w.expected) }),
+        { exp: 0, hit: 0 }
+      )
+      return { ...r, taken: t.exp ? t : null }
+    })
 )
 
 /** "Oxandrolone 25 mg starts wk 12 (in 7 wks)" for the nearest not-yet-started item. */

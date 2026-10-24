@@ -78,29 +78,52 @@
         id="tour-vitals"
         :entries="entries"
         :metrics="healthMetrics"
+        :protein="protein"
       />
 
       <div>
         <TuiHeader
           label="PROTOCOL · LOGGED TODAY"
-          :dashes="4"
+          fill
           class="mt-4.5 md:mt-0 lg:mt-4.5"
         />
+        <!-- Identical doses fold into one row (shared/utils/doseGroups.ts): three iron tablets
+             read "×3 · 3 × 75 mg" with their times underneath, not three rows. The IU→mass
+             equivalent is desktop-only; on a phone it ate half the row for a conversion the
+             reader knows. -->
         <div
-          v-if="dosesToday.length"
+          v-if="doseRows.length"
           class="flex flex-col gap-1.5 mt-2.5 text-small"
         >
           <div
-            v-for="(dose, i) in dosesToday"
-            :key="`${dose.time}-${dose.compound}-${i}`"
-            class="flex gap-2.5"
+            v-for="(row, i) in doseRows"
+            :key="`${row.first.time}-${row.first.compound}-${i}`"
+            class="flex flex-col gap-0.5"
           >
-            <span class="text-ghost shrink-0">{{ dose.time }}</span>
-            <NuxtLink
-              :to="`/journal/compound/${encodeURIComponent(dose.compound)}`"
-              class="text-body hover:text-accent truncate"
-            >{{ dose.compound }}</NuxtLink>
-            <span class="ml-auto shrink-0 text-muted">{{ doseLabel(dose) }}</span>
+            <div class="flex gap-2.5">
+              <span class="text-ghost shrink-0">{{ row.first.time }}</span>
+              <NuxtLink
+                :to="`/journal/compound/${encodeURIComponent(row.first.compound)}`"
+                class="text-body hover:text-accent truncate"
+              >{{ row.first.compound }}<span
+                v-if="row.count > 1"
+                class="text-muted"
+              > ×{{ row.count }}</span></NuxtLink>
+              <span
+                class="ml-auto shrink-0 text-muted"
+                :title="row.count > 1 ? `${row.total} ${unitLabel(row.first.unit)} today` : undefined"
+              >{{ row.count > 1 ? `${row.count} × ` : '' }}{{ row.first.dose }} {{ unitLabel(row.first.unit) }}<span
+                v-if="equivalent(row.first)"
+                class="hidden lg:inline"
+              > ({{ equivalent(row.first) }})</span>{{ row.first.site ? ` · ${shortSite(row.first.site)}` : '' }}</span>
+            </div>
+            <div
+              v-if="row.times.length > 1"
+              class="flex gap-2.5 text-meta"
+            >
+              <span class="text-ghost shrink-0 invisible">{{ row.first.time }}</span>
+              <span class="text-ghost">{{ row.times.join(' · ') }}</span>
+            </div>
           </div>
         </div>
         <p
@@ -109,6 +132,16 @@
         >
           No doses logged today.
         </p>
+
+        <!-- Today's meals and the week's protein, from the same figures as the hub's food card. -->
+        <HomeFood
+          v-if="isFullAccess"
+          :day="todayNutrition"
+          :entries="entries"
+          :index="estimateIndex"
+          :target="proteinTarget"
+          :can-edit="canEdit"
+        />
 
         <!-- Mirrors the dose rows above: label left, value right-aligned, stats on their own
            line so nothing has to wrap mid-metric in this 390px column. Lists every session
@@ -182,7 +215,9 @@
             :title="`Log a soda: ${sodaLabel}`"
             @click="addSoda()"
           >
-            <span class="truncate">{{ addingSoda ? 'LOGGING…' : `+ SODA · ${sodaLabel}` }}</span>
+            <!-- The drink's size is desktop-only: "+ SODA · DR PEPPER 12oz can" truncated to
+                 "12OZ…" in a phone-width button. -->
+            <span class="truncate">{{ addingSoda ? 'LOGGING…' : `+ SODA · ${sodaDrink}` }}<span class="hidden lg:inline">{{ addingSoda ? '' : sodaSize }}</span></span>
           </button>
           <button
             type="button"
@@ -256,6 +291,7 @@
 
       <TuiHeader
         label="90-DAY TRENDS"
+        fill
         class="mt-5"
       />
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-2.5">
@@ -324,24 +360,55 @@ import { WATER_DEFAULT_CUP_OZ } from '#shared/utils/water'
 import { isSluggish, latestRecovery as petRecovery } from '#shared/utils/petState'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
+import { groupDoses } from '#shared/utils/doseGroups'
+import { dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
+import { profileNumber } from '#shared/utils/profile'
+import { iuEquivalentLabel } from '#shared/utils/peptideCalc'
 import type { PeptideEntry } from '~/data/journal'
 
 const { role, isOwner, canEdit } = await useAuth()
+
+// The doctor role gets a curated clinical view: no daily entries, photos, food, or AI digests
+// (the digest endpoint would 403), so those panels and links are hidden rather than
+// rendered broken. See shared/utils/access.ts.
+const isFullAccess = computed(() => isFullAccessRole(role.value))
+
 // Same conditional-composable rule as the cycles/planned-draws fetches below: only the roles
 // that get the + SODA / + CUP buttons load their defaults. Unconditional, this ran for guests
 // too — two rejected list fetches on every landing, server-rendered and again on mount.
 const quickLog = canEdit.value ? await useQuickLog() : null
 const sodaLabel = computed(() => quickLog?.sodaLabel.value ?? 'SODA')
+const sodaDrink = computed(() => quickLog?.sodaDrink.value ?? 'SODA')
+const sodaSize = computed(() => quickLog?.sodaSize.value ? ` ${quickLog.sodaSize.value}` : '')
 const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
 const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
 const addSoda = () => quickLog?.addSoda()
 const addWater = () => quickLog?.addWater()
+// The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
+// estimates endpoint returns nothing for the doctor and the profile is a full-access read, so
+// both are skipped for roles that don't get food (and for guests, who have no session).
+const estimates = isFullAccess.value ? await useMealEstimates() : null
+const profile = isFullAccess.value ? await useProfile() : null
+const estimateIndex = computed<EstimateIndex>(() => estimates?.index.value ?? new Map())
+const proteinTarget = computed(() => profile ? profileNumber(profile.data.value, 'protein_target_g', 0) || null : null)
 const {
   hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
-  allWorkouts, dosesToday, sodasToday, flagged, flagCounts,
+  allWorkouts, todayEntry, dosesToday, sodasToday, flagged, flagCounts,
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)
+
+/** Today's meals summed from their figures — the vitals' PROTEIN row and the food line share it. */
+const todayNutrition = computed(() => dayNutrition(todayEntry.value, estimateIndex.value))
+/** Null (no row) for roles without food; `grams` null until a meal with figures is logged. */
+const protein = computed(() => {
+  if (!isFullAccess.value) return null
+  const n = todayNutrition.value
+  return { grams: n.estimated > 0 ? n.protein_g : null, target: proteinTarget.value, floor: n.missing.length > 0 }
+})
+
+/** Today's doses with identical ones folded (×N), in time order. */
+const doseRows = computed(() => groupDoses(dosesToday.value))
 
 // Same conditional-composable rule as useOverview: the role is stable for the component's
 // lifetime (login is a hard navigation), so guests skip the fetch instead of 401ing.
@@ -349,18 +416,17 @@ const cyclesData = hasSession ? useCycles() : null
 const cycles = computed(() => cyclesData?.data.value ?? [])
 const plannedData = hasSession ? usePlannedDraws() : null
 const plannedDraws = computed(() => plannedData?.data.value ?? [])
+// The standing meds: the mane's streak counts them once finasteride is no longer logged.
+const protocolData = hasSession ? useProtocol() : null
 const drawDates = computed(() => draws.value.map(d => d.date))
 
 // Reactive: the overnight PWA used to keep yesterday as today until a reload.
 const today = useToday()
 
 // What TICKER has earned and how it is built, so the digest's companion is the same pet as /ticker.
-const wardrobe = computed(() => wardrobeOf({ entries: entries.value, workouts: allWorkouts.value, scans: dexaScans.value, today: today.value }))
-
-// The doctor role gets a curated clinical view: no daily entries, photos, or AI digests
-// (the digest endpoint would 403), so those panels and links are hidden rather than
-// rendered broken. See shared/utils/access.ts.
-const isFullAccess = computed(() => isFullAccessRole(role.value))
+const wardrobe = computed(() => wardrobeOf({
+  entries: entries.value, workouts: allWorkouts.value, scans: dexaScans.value, standing: protocolData?.standing.value ?? [], today: today.value
+}))
 
 // The digest composable is lazy (the slideover owns it); the home column needs it up front.
 const { data: digestData, execute: loadDigests, refresh: refreshDigests } = useDigests()
@@ -377,10 +443,13 @@ const latestWorkouts = computed(() => {
     .sort((a, b) => (workoutStartMs(b.start_time) ?? 0) - (workoutStartMs(a.start_time) ?? 0))
 })
 
-function doseLabel(dose: PeptideEntry) {
-  const unit = dose.unit === 'iu' ? 'IU' : dose.unit
-  const equiv = dose.unit === 'iu' ? iuEquivalentLabel(dose.compound, dose.dose) : null
-  return `${dose.dose} ${unit}${equiv ? ` (${equiv})` : ''}${dose.site ? ` · ${shortSite(dose.site)}` : ''}`
+function unitLabel(unit: PeptideEntry['unit']) {
+  return unit === 'iu' ? 'IU' : unit
+}
+
+/** "≈ 0.83 mg" for an IU dose of a compound with a known potency, else null. */
+function equivalent(dose: PeptideEntry) {
+  return dose.unit === 'iu' ? iuEquivalentLabel(dose.compound, dose.dose) : null
 }
 
 // Sessions from an earlier day get a "last workout" label so they can't read as today's.
@@ -430,7 +499,8 @@ function workoutParts(w: typeof allWorkouts.value[number]) {
   return [
     workoutAge(w),
     time,
-    w.duration_min != null ? `${w.duration_min.toFixed(1)} min` : null,
+    // Whole minutes: "45.6 min" is precision nobody reads.
+    w.duration_min != null ? `${Math.round(w.duration_min)} min` : null,
     w.calories != null ? `${w.calories} kcal` : null,
     hr
   ].filter((v): v is string => v != null)

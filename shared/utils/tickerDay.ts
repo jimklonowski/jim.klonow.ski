@@ -500,16 +500,25 @@ export const WEARABLE_META: Partial<Record<TickerProp, { id: string, name: strin
 }
 
 // Achievements the demo persona can never earn, so they are not shown to it (audit #42 item 29):
-// Luscious needs ninety days of finasteride (not in the seed), Open House visits from friends
-// (the sandbox gets none). Clean Week left the set with the protocol plan's P9: the sandbox has
-// a schedule of its own now, and its persona keeps it.
-export const DEMO_UNREACHABLE: ReadonlySet<string> = new Set(['luscious', 'open-house'])
+// Luscious needs ninety days of finasteride and Full Flow ninety of tadalafil (neither is in the
+// seed), Open House visits from friends (the sandbox gets none). Clean Week left the set with
+// the protocol plan's P9: the sandbox has a schedule of its own now, and its persona keeps it.
+export const DEMO_UNREACHABLE: ReadonlySet<string> = new Set(['luscious', 'full-flow', 'open-house'])
+
+/** The standing meds on the day's plate (useProtocol().standing in force that day): taken daily,
+ * never logged, fed to it all the same. */
+export function standingPlateOf(standing: StandingCompound[], date: string): Array<{ compound: string, label: string }> {
+  return standing
+    .filter(s => s.from <= date && (s.to == null || s.to >= date))
+    .map(s => ({ compound: s.compound, label: s.label }))
+}
 
 export interface AchievementInputs {
   milestones: Milestone[]
   loggedDays: number
   cleanWeek: boolean
   finasterideStreak: number
+  tadalafilStreak: number
   hiScores: Record<TickerGame, TickerRecord | null>
   /** Pats, all time. */
   pets: number
@@ -529,6 +538,7 @@ export function achievementsOf(i: AchievementInputs): Achievement[] {
     { id: 'elder', name: 'Elder', desc: 'five hundred logged days — the cane', icon: 'i-lucide-hourglass', goal: TIER_DAYS.elder, progress: i.loggedDays, unit: 'logged days' },
     { id: 'clean-week', name: 'Clean Week', desc: 'seven days with every due dose logged', icon: 'i-lucide-star', goal: 1, progress: i.cleanWeek ? 1 : 0, unit: 'clean week' },
     { id: 'luscious', name: 'Luscious', desc: 'ninety days of finasteride — the full mane', icon: 'i-lucide-sparkles', goal: 90, progress: i.finasterideStreak, unit: 'days of finasteride' },
+    { id: 'full-flow', name: 'Full Flow', desc: 'ninety days of tadalafil — every vessel wide open', icon: 'i-lucide-waves', goal: 90, progress: i.tadalafilStreak, unit: 'days of tadalafil' },
     { id: 'runner-500', name: 'Runner', desc: 'five hundred points on the runner', icon: 'i-lucide-footprints', goal: 500, progress: runner?.score ?? 0, unit: 'points' },
     { id: 'runner-1000', name: 'Marathon', desc: 'a thousand points on the runner', icon: 'i-lucide-trophy', goal: 1000, progress: runner?.score ?? 0, unit: 'points' },
     { id: 'crusher-300', name: 'Can Crusher', desc: 'three hundred points on the can crusher', icon: 'i-lucide-cup-soda', goal: 300, progress: crusher?.score ?? 0, unit: 'points' },

@@ -103,7 +103,7 @@ export async function generateDigest(
     return { ok: true, skipped: true, type: kind, period_start: start, period_end: end }
   }
 
-  const trends = await digestTrends(db, end, protocol.rules)
+  const trends = await digestTrends(db, end, protocol)
   if (trends.lines.length) {
     built.lines.push('', 'Sustained trends (multi-week context, precomputed):', ...trends.lines)
   }

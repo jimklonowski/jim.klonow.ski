@@ -182,6 +182,7 @@ test('the one-shots\' lines', () => {
   assert.equal(doseDoneLine('HGH 2 IU', 'HGH', true, false), 'HGH 2 IU — in. the small one. barely a pinch.')
   assert.equal(doseDoneLine('X 1 mg', 'X', true, true), 'X 1 mg — in. still didn\'t flinch.')
   assert.equal(doseDoneLine('Iron 25 mg', 'Iron', false, false), 'Iron 25 mg — swallowed. with water, like a grown-up.')
+  assert.equal(doseDoneLine('Tadalafil 5 mg tablet', 'Tadalafil', false, false), 'Tadalafil 5 mg tablet — swallowed. the little yellow one. for the pipes.')
   assert.equal(walkStartLine(48, 112, true), 'walking off 48 min of workouts at 112 bpm (yesterday\'s)…')
   assert.equal(walkEndLine(48), '48 minutes — a proper outing. ♥')
   assert.equal(walkEndLine(20), '20 minutes walked together.')

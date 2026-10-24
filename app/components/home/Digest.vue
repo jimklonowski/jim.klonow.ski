@@ -18,6 +18,7 @@
           ref="dailyPanel"
           label="AI DIGEST · DAILY"
           :meta="daily ? formatDate(daily.period_end, 'monthDay').toUpperCase() : '—'"
+          fill
         >
           <Markdown
             v-if="daily"
@@ -35,6 +36,7 @@
           ref="weeklyPanel"
           label="AI DIGEST · WEEKLY"
           :meta="weekly ? weeklyPeriod : '—'"
+          fill
           class="mt-4.5 md:mt-0 xl:mt-4.5"
         >
           <Markdown

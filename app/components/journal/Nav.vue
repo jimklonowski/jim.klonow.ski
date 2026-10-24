@@ -23,12 +23,12 @@ const ALL_TABS = [
   { label: 'Overview', to: '/journal' },
   { label: 'Trends', to: '/journal/trends' },
   { label: 'Compounds', to: '/journal/compounds' },
+  { label: 'Protocol', to: '/journal/protocol' },
   { label: 'Cycles', to: '/journal/cycles' },
   { label: 'Workouts', to: '/journal/workouts' },
   { label: 'Entries', to: '/journal/entries' },
   { label: 'Calendar', to: '/journal/calendar' },
   { label: 'Photos', to: '/journal/photos' },
-  { label: 'Protocol', to: '/journal/protocol' },
   { label: 'Vaccines', to: '/journal/vaccines' }
 ]
 

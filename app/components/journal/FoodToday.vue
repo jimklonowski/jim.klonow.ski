@@ -1,5 +1,8 @@
 <template>
-  <section class="bg-raised border border-line-soft px-4 py-3.5">
+  <section
+    id="food"
+    class="bg-raised border border-line-soft px-4 py-3.5 scroll-mt-28"
+  >
     <div class="flex items-baseline gap-3 text-meta">
       <span class="tui-label">Today · food</span>
       <span
@@ -186,11 +189,12 @@ import {
 } from '#shared/utils/nutrition'
 import { profileNumber } from '#shared/utils/profile'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   readonly?: boolean
 }>(), { readonly: false })
 
 const toast = useToast()
+const route = useRoute()
 const { isOwner } = await useAuth()
 const { data } = await useJournalEntries()
 const { data: profileData } = await useProfile()
@@ -237,6 +241,15 @@ onMounted(() => {
   onUnmounted(() => clearInterval(id))
 })
 const suggestedSlot = computed(() => slotForTime(clock.value))
+
+// `/journal?meal=dinner#food` (the home page's "+ add dinner →") lands with that slot's input
+// open. Only for write roles; a reload keeps the query, which just reopens the input.
+onMounted(() => {
+  const slot = route.query.meal
+  if (!props.readonly && typeof slot === 'string' && (MEAL_SLOTS as readonly string[]).includes(slot)) {
+    startEdit(slot as MealSlot)
+  }
+})
 
 // Slot-ranked history: what was logged for lunch floats first on the lunch input, and every
 // spelling of a meal is one entry (shared/utils/nutrition.ts mealHistory).

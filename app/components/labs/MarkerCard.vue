@@ -226,11 +226,13 @@ const hasRange = computed(() => meta.value.refMin !== undefined || meta.value.re
 
 // Medication caveat (PSA on finasteride): decided per reading off the protocol dates, so the
 // badge follows the reading actually on screen and pre-treatment history stays unstarred. The
-// schedule comes from useProtocol (the protocol tables, or the code constants until seeded).
-const { rules: protocolRules } = useProtocol()
+// schedule comes from useProtocol: the scored rules AND the standing meds, since a 5-ARI taken
+// daily without being logged (finasteride since Oct 2026) skews PSA just the same.
+const { rules: protocolRules, standing: protocolStanding } = useProtocol()
+const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value])
 const caveat = computed(() => MARKER_CAVEATS[props.biomarkerKey])
 const caveatCompound = computed(() =>
-  carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value, protocolRules.value) : null
+  carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value, caveatSpans.value) : null
 )
 
 // Assay caveat (the censored 2026-09-09 immunoassay testosterone): belongs to one draw rather
@@ -313,7 +315,7 @@ const history = computed(() =>
       value: num(value),
       color: STATUS_COLORS[s],
       label: STATUS_LABELS[s],
-      flagged: caveatCompoundOn(props.biomarkerKey, e.date, protocolRules.value) != null,
+      flagged: caveatCompoundOn(props.biomarkerKey, e.date, caveatSpans.value) != null,
       noted: readingNoteOn(props.biomarkerKey, e.date) != null
     }
   })

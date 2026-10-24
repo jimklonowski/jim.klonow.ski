@@ -72,6 +72,13 @@
                 class="text-meta text-accent border border-line-accent px-1.5 py-0.5"
               >{{ row.cadence }}</span>
 
+              <!-- A logged pill sits among the standing ones: say which it is -->
+              <span
+                v-if="row.item.kind === 'logged' && row.item.category !== 'injectable'"
+                class="text-meta text-faint border border-line-soft px-1.5 py-0.5"
+                title="Logged in the journal and scored against the schedule"
+              >logged</span>
+
               <span
                 v-if="row.since"
                 class="text-small text-faint"
@@ -451,12 +458,14 @@ const rows = computed<Row[]>(() => {
 
 const runningCount = computed(() => rows.value.filter(r => r.current && !r.item.on_hand).length)
 
-const isMed = (item: ProtocolItemRow) => item.category === 'oral' || item.category === 'injectable'
 const live = (r: Row) => !r.item.on_hand && !r.stopped
 
+// Grouped by what a thing IS, not by how it is tracked: the injectables, then every pill
+// together — finasteride (logged daily and scored) beside tadalafil (standing, never logged),
+// with a "logged" chip telling the two apart.
 const groups = computed(() => [
-  { key: 'logged', title: 'LOGGED COMPOUNDS', dashes: 8, hint: 'weekday-scheduled, scored against the dose log', rows: rows.value.filter(r => r.item.kind === 'logged' && live(r)) },
-  { key: 'standing', title: 'DAILY MEDS', dashes: 12, hint: 'taken daily, deliberately not logged', rows: rows.value.filter(r => r.item.kind === 'standing' && isMed(r.item) && live(r)) },
+  { key: 'injectables', title: 'INJECTABLES', dashes: 13, hint: 'weekday-scheduled, scored against the dose log', rows: rows.value.filter(r => r.item.kind !== 'as_needed' && r.item.category === 'injectable' && live(r)) },
+  { key: 'meds', title: 'DAILY MEDS', dashes: 12, hint: 'pills — logged ones are scored, the rest are standing', rows: rows.value.filter(r => r.item.kind !== 'as_needed' && r.item.category === 'oral' && live(r)) },
   { key: 'supplements', title: 'DAILY STACK', dashes: 11, hint: 'taken consistently, not dose-logged', rows: rows.value.filter(r => r.item.kind === 'standing' && r.item.category === 'supplement' && live(r)) },
   { key: 'skin', title: 'SKIN & HAIR', dashes: 12, hint: 'topicals and routine', rows: rows.value.filter(r => r.item.kind === 'standing' && r.item.category === 'skin' && live(r)) },
   { key: 'asneeded', title: 'AS NEEDED', dashes: 13, hint: 'no schedule — gaps in the log are the plan', rows: rows.value.filter(r => r.item.kind === 'as_needed') },

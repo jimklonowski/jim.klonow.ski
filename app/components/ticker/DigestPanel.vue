@@ -3,6 +3,7 @@
     <TuiHeader
       :label="label"
       :dashes="dashes"
+      :fill="fill"
     >
       <span
         v-if="meta"
@@ -32,9 +33,12 @@ withDefaults(defineProps<{
   /** Right-aligned header meta, e.g. the period range. */
   meta?: string
   dashes?: number
+  /** Rule to the meta instead of a fixed dash count (the home page's headers all fill). */
+  fill?: boolean
 }>(), {
   meta: '',
-  dashes: 9
+  dashes: 9,
+  fill: false
 })
 
 // --- Digest-arrival typing wipe -------------------------------------------

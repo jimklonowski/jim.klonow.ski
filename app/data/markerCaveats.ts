@@ -20,15 +20,20 @@ export const MARKER_CAVEATS: Record<string, MarkerCaveat> = {
   }
 }
 
+/** What the caveat needs of a protocol row: the compound and the dates it ran — a scored rule or a
+ * standing med (finasteride moved from the dose log to the standing list in Oct 2026). */
+export type CaveatSpan = Pick<ProtocolRule, 'compound' | 'from' | 'to'>
+
 /**
- * The caveat compound in force on `date` for this marker, or null. PSA stays suppressed for months
- * after a 5-ARI stops, so a rule's `to` date ends the flag a little early — acceptable for a badge,
- * and the note stays one click away.
+ * The caveat compound in force on `date` for this marker, or null. `spans` is the protocol's
+ * rules plus its standing meds (useProtocol: `[...rules, ...standing]`). PSA stays suppressed for
+ * months after a 5-ARI stops, so a span's `to` date ends the flag a little early — acceptable for
+ * a badge, and the note stays one click away.
  */
-export function caveatCompoundOn(key: string, date: string, rules: ProtocolRule[]): string | null {
+export function caveatCompoundOn(key: string, date: string, spans: CaveatSpan[]): string | null {
   const caveat = MARKER_CAVEATS[key]
   if (!caveat) return null
-  return rules.find(r => caveat.compounds.includes(r.compound) && ruleActiveOn(r, date))?.compound ?? null
+  return spans.find(r => caveat.compounds.includes(r.compound) && ruleActiveOn(r, date))?.compound ?? null
 }
 
 // --- per-reading assay notes ---

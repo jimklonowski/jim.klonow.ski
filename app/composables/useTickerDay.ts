@@ -4,18 +4,18 @@ import { isSluggish, latestRecovery, latestSleepMin } from '#shared/utils/petSta
 import { nextPlannedDraw } from '#shared/utils/plannedDraws'
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
 import { scheduledFor } from '#shared/utils/protocolRules'
-import type { ProtocolRule } from '#shared/utils/protocolRules'
+import type { ProtocolRule, StandingCompound } from '#shared/utils/protocolRules'
 import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycles'
 import type { Cycle } from '#shared/utils/cycles'
 import {
   birthdayOf, bowlFor, cobwebsFor, crusherWallOf, daySeedOf, doseDatesOf, doseKeysOf, entryOn, feverOf, hungerOf, isCleanWeek, isInjected,
-  latestVital, mealDayOf, minutesOn as minutesOnDay, oldestOpenVial, paddleScaleFor, sodasInWeek, unloggedInWeek, walkDayOf, walkPropFor,
-  weekTallyOf, workoutHrOf, workoutsOn as workoutsOnDay, worldDaysOf
+  latestVital, mealDayOf, minutesOn as minutesOnDay, oldestOpenVial, paddleScaleFor, sodasInWeek, standingPlateOf, unloggedInWeek, walkDayOf,
+  walkPropFor, weekTallyOf, workoutHrOf, workoutsOn as workoutsOnDay, worldDaysOf
 } from '#shared/utils/tickerDay'
 import type { DayDraw, DayVial } from '#shared/utils/tickerDay'
 import {
   ageDays as ageDaysOf, buildOf, finasterideStreak as finasterideStreakOf, firstLoggedDay, leanGain as leanGainOf, loggedDayCount,
-  maneTier as maneTierOf, nextManeTier, sortedScans, wearableMilestones
+  maneTier as maneTierOf, nextManeTier, sortedScans, tadalafilStreak as tadalafilStreakOf, wearableMilestones
 } from '#shared/utils/tickerWardrobe'
 import type { WardrobeInputs, WardrobeScan } from '#shared/utils/tickerWardrobe'
 import type { TickerBuild } from '#shared/utils/tickerSprite'
@@ -32,8 +32,10 @@ export interface TickerDaySources {
   /** Null for a role without a pantry to mention (the vial list is owner/demo only). */
   vials: Ref<DayVial[] | null | undefined> | null
   today: Ref<string>
-  /** The standing schedule (useProtocol().rules): the protocol tables, or the code constants until seeded. */
+  /** The standing schedule (useProtocol().rules). */
   rules: Ref<ProtocolRule[]>
+  /** The daily meds taken but never logged (useProtocol().standing): on the plate too, and the streaks count them. */
+  standing: Ref<StandingCompound[]>
   /** The schedule applies — false for a session with no rules at all (an unseeded sandbox). */
   rulesApply: boolean
   /** The stage has gone dark (useTickerClock) — due doses still unlogged then make it hungry. */
@@ -59,6 +61,8 @@ export function useTickerDay(s: TickerDaySources) {
   const mealDay = computed(() => mealDayOf(entries.value, today.value))
   const mealIsYesterday = computed(() => mealDay.value !== today.value)
   const dosesToday = computed(() => entryOn(entries.value, mealDay.value)?.peptides ?? [])
+  /** The standing meds of the meal day: taken daily, never logged, on the plate after the doses. */
+  const standingToday = computed(() => standingPlateOf(s.standing.value, mealDay.value))
   /** The vials reconstituted on the meal day — mixed before anything is eaten. */
   const mixesToday = computed(() => entryOn(entries.value, mealDay.value)?.reconstitutions ?? [])
 
@@ -121,6 +125,7 @@ export function useTickerDay(s: TickerDaySources) {
     entries: entries.value,
     workouts: workouts.value,
     scans: s.scans.value ?? [],
+    standing: s.standing.value,
     today: today.value
   }))
   const loggedDays = computed(() => loggedDayCount(entries.value))
@@ -151,14 +156,16 @@ export function useTickerDay(s: TickerDaySources) {
   })
 
   // --- what the compounds leave on it ---------------------------------------------------------
-  const finasterideStreak = computed(() => finasterideStreakOf(entries.value, today.value))
+  // The daily-med streaks count the dose log OR the standing schedule (tickerWardrobe.ts medStreak).
+  const finasterideStreak = computed(() => finasterideStreakOf(entries.value, today.value, s.standing.value))
+  const tadalafilStreak = computed(() => tadalafilStreakOf(entries.value, today.value, s.standing.value))
   /** 0–3: how many mane tiers the streak has reached. */
-  const maneTier = computed(() => maneTierOf(entries.value, today.value))
-  const nextMane = computed(() => nextManeTier(entries.value, today.value))
+  const maneTier = computed(() => maneTierOf(entries.value, today.value, s.standing.value))
+  const nextMane = computed(() => nextManeTier(entries.value, today.value, s.standing.value))
   const bandaged = computed(() => dosesToday.value.some(d => /bpc/i.test(d.compound)))
   /** A jab or a swallow, by the standing rule, the oral words, then the compound catalogue (app/utils/vialInventory.ts). */
   const injected = (compound: string) => isInjected(compound, defaultVialForm, s.rules.value)
-  const bowl = computed(() => bowlFor(hunger.value, dosesToday.value, injected))
+  const bowl = computed(() => bowlFor(hunger.value, [...dosesToday.value, ...standingToday.value], injected))
   const doseKeys = computed(() => doseKeysOf(dosesToday.value))
 
   // --- the games' boards ----------------------------------------------------------------------
@@ -179,13 +186,13 @@ export function useTickerDay(s: TickerDaySources) {
   }))
 
   return {
-    todayEntry, sodasToday, sodasThisWeek, yesterday: computed(() => shiftDays(today.value, -1)), mealDay, mealIsYesterday, dosesToday, mixesToday,
+    todayEntry, sodasToday, sodasThisWeek, yesterday: computed(() => shiftDays(today.value, -1)), mealDay, mealIsYesterday, dosesToday, standingToday, mixesToday,
     workoutsOn, minutesOn, walkDay, walkIsYesterday, workoutMinutes, workoutHr, walkProp,
     recovery, sleepMin, sluggish, streak, weight, latestHrv, firstDate, ageDays, birthday, drawDates, nextDraw, oldestOpen, fever,
     rules, dueToday, loggedCompounds, eaten, missing, missingNames, hunger, unloggedThisWeek, cobwebs,
     loggedDays, milestones, earned, build, tier, arms, bellyRead, scans, latestScan, leanGain,
     doseDates, weekTally, cleanWeek, activeCycle, cycleClause,
-    finasterideStreak, maneTier, nextMane, bandaged, injected, bowl, doseKeys,
+    finasterideStreak, tadalafilStreak, maneTier, nextMane, bandaged, injected, bowl, doseKeys,
     crusherWall, paddleScale, crusherLives, daySeed, worldDays
   }
 }
