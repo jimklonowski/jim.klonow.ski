@@ -16,12 +16,18 @@ export interface WardrobeWorkout { duration_min?: number | null }
 /** A DEXA scan's two figures the build reads; either can be missing from an older report format. */
 export interface WardrobeScan { date: string, total: { body_fat_pct?: number, lean_mass_lbs?: number } }
 
+/** A standing med from the protocol (useProtocol().standing): taken daily, never logged, with the
+ * dates it ran. The streaks below count its open run as days taken. */
+export interface StandingMed { compound: string, from: string, to: string | null }
+
 export interface WardrobeInputs {
   /** Journal days, oldest first. */
   entries: WardrobeEntry[]
   workouts: WardrobeWorkout[]
   /** DEXA scans, any order. */
   scans: WardrobeScan[]
+  /** The protocol's standing meds; absent where the protocol isn't loaded (the public card). */
+  standing?: StandingMed[]
   today: string
 }
 
@@ -69,9 +75,10 @@ export function earnedWearables(inputs: WardrobeInputs): TickerProp[] {
   return wearableMilestones(inputs).filter(m => m.progress >= m.goal).map(m => m.prop)
 }
 
-// --- the mane: by the finasteride streak -------------------------------------------------------
+// --- the daily meds: streaks from the dose log OR the standing schedule -----------------------
 
 export const FINASTERIDE = 'Finasteride'
+export const TADALAFIL = 'Tadalafil'
 
 export const MANE_TIERS: ReadonlyArray<{ days: number, prop: TickerProp, name: string }> = [
   { days: 7, prop: 'mane-1', name: 'stubble' },
@@ -79,18 +86,36 @@ export const MANE_TIERS: ReadonlyArray<{ days: number, prop: TickerProp, name: s
   { days: 90, prop: 'mane-3', name: 'luscious' }
 ]
 
-export function finasterideStreak(entries: WardrobeEntry[], today: string): number {
-  return doseStreak(entries, FINASTERIDE, today)
+/**
+ * Days in a row on a daily med: the dose log's streak, or — once the med is a standing one and
+ * no longer logged (finasteride from Oct 2026, tadalafil always) — its open run on the protocol,
+ * since standing means taken every day. A run that predates the journal counts from the first
+ * logged day: the pet was born with the journal and cannot vouch for earlier.
+ */
+export function medStreak(compound: string, entries: WardrobeEntry[], today: string, standing: StandingMed[] = []): number {
+  const logged = doseStreak(entries, compound, today)
+  const first = firstLoggedDay(entries)
+  const open = standing.filter(s => s.compound === compound && s.from <= today && (s.to == null || s.to >= today))
+  const onProtocol = open.length ? Math.max(...open.map(s => diffDays(first && s.from < first ? first : s.from, today) + 1)) : 0
+  return Math.max(logged, onProtocol)
+}
+
+export function finasterideStreak(entries: WardrobeEntry[], today: string, standing: StandingMed[] = []): number {
+  return medStreak(FINASTERIDE, entries, today, standing)
+}
+
+export function tadalafilStreak(entries: WardrobeEntry[], today: string, standing: StandingMed[] = []): number {
+  return medStreak(TADALAFIL, entries, today, standing)
 }
 
 /** 0–3: how many mane tiers the streak has reached. */
-export function maneTier(entries: WardrobeEntry[], today: string): number {
-  const days = finasterideStreak(entries, today)
+export function maneTier(entries: WardrobeEntry[], today: string, standing: StandingMed[] = []): number {
+  const days = finasterideStreak(entries, today, standing)
   return MANE_TIERS.filter(t => days >= t.days).length
 }
 
-export function nextManeTier(entries: WardrobeEntry[], today: string) {
-  const days = finasterideStreak(entries, today)
+export function nextManeTier(entries: WardrobeEntry[], today: string, standing: StandingMed[] = []) {
+  const days = finasterideStreak(entries, today, standing)
   return MANE_TIERS.find(t => days < t.days) ?? null
 }
 
@@ -146,7 +171,7 @@ export function buildOf(inputs: WardrobeInputs): TickerBuild {
 export function wardrobeOf(inputs: WardrobeInputs): { accessories: TickerProp[], build: TickerBuild } {
   const worn = new Set(earnedWearables(inputs))
   const accessories: TickerProp[] = []
-  const mane = maneTier(inputs.entries, inputs.today)
+  const mane = maneTier(inputs.entries, inputs.today, inputs.standing ?? [])
   if (mane) accessories.push(MANE_TIERS[mane - 1]!.prop)
   if (worn.has('crown')) accessories.push('crown')
   for (const p of ['sweatband', 'shades', 'medal'] as const) if (worn.has(p)) accessories.push(p)

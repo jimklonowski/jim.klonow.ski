@@ -11,9 +11,10 @@
 // doses), and the feed's own frames: jab1/jab2 (an injectable — syringe raised, then in, with a
 // wince and then the brave face) and gulp (a pill going down with a glass of water; 'eating' is
 // the lift that comes before it), mixing (a reconstitution day: a vial in one hand, the bac
-// water in the other, swirled — the page rocks it) and flex (the beat after a testosterone jab:
-// both biceps up).
-export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute', 'jab1', 'jab2', 'gulp', 'mixing', 'flex'] as const
+// water in the other, swirled — the page rocks it), flex (the beat after a testosterone jab:
+// both biceps up) and pumped (the beat after the daily tadalafil: chest out, hands on hips, rays
+// off the shoulders — full flow; the page swells it twice).
+export const TICKER_POSES = ['idle', 'thinking', 'talking', 'happy', 'worried', 'sleepy', 'flatline', 'eating', 'walk1', 'walk2', 'petted', 'sit', 'asleep', 'feverish', 'hungry', 'nervous', 'impatient', 'salute', 'jab1', 'jab2', 'gulp', 'mixing', 'flex', 'pumped'] as const
 export type TickerPose = typeof TICKER_POSES[number]
 
 /**
@@ -250,6 +251,12 @@ function face(grid: Grid, pose: TickerPose, figure: TickerFigure) {
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, [[8, 5], [9, 6], [9, 7], [9, 8], [9, 9], [9, 10], [8, 11]], 'eye')
       break
+    case 'pumped': // brows up, the wide grin and a good flush — pleased with itself
+      eyes(grid, 4, 11, 4, 3, 0)
+      paint(grid, [[2, 4], [2, 5], [2, 11], [2, 12]], 'rim')
+      paint(grid, BLUSH, 'blush')
+      paint(grid, [[8, 5], [9, 6], [9, 7], [9, 8], [9, 9], [9, 10], [8, 11]], 'eye')
+      break
     default:
       eyes(grid, 4, 11, 4, 3, 0)
       paint(grid, BLUSH, 'blush')
@@ -456,6 +463,14 @@ function limbs(grid: Grid, pose: TickerPose) {
       paint(grid, [[4, -2], [4, -1]], 'glove')
       paint(grid, [[7, 16], [6, 17], [5, 17], [5, 18]], 'limb')
       paint(grid, [[4, 17], [4, 18]], 'glove')
+      legs(grid, true)
+      break
+    case 'pumped': // both hands on its hips, feet planted wide, rays flickering off both shoulders
+      paint(grid, [[7, 0], [8, -1], [9, 0]], 'limb')
+      paint(grid, [[9, 1], [9, 2]], 'glove')
+      paint(grid, [[7, 16], [8, 17], [9, 16]], 'limb')
+      paint(grid, [[9, 14], [9, 15]], 'glove')
+      paint(grid, [[0, -2], [2, -3], [0, 18], [2, 19]], 'line', 'flicker')
       legs(grid, true)
       break
     case 'mixing': // both hands up: the powder vial on the left (amber at the bottom), the bac water on the right

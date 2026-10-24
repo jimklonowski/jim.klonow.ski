@@ -349,13 +349,17 @@ const cyclesData = hasSession ? useCycles() : null
 const cycles = computed(() => cyclesData?.data.value ?? [])
 const plannedData = hasSession ? usePlannedDraws() : null
 const plannedDraws = computed(() => plannedData?.data.value ?? [])
+// The standing meds: the mane's streak counts them once finasteride is no longer logged.
+const protocolData = hasSession ? useProtocol() : null
 const drawDates = computed(() => draws.value.map(d => d.date))
 
 // Reactive: the overnight PWA used to keep yesterday as today until a reload.
 const today = useToday()
 
 // What TICKER has earned and how it is built, so the digest's companion is the same pet as /ticker.
-const wardrobe = computed(() => wardrobeOf({ entries: entries.value, workouts: allWorkouts.value, scans: dexaScans.value, today: today.value }))
+const wardrobe = computed(() => wardrobeOf({
+  entries: entries.value, workouts: allWorkouts.value, scans: dexaScans.value, standing: protocolData?.standing.value ?? [], today: today.value
+}))
 
 // The doctor role gets a curated clinical view: no daily entries, photos, or AI digests
 // (the digest endpoint would 403), so those panels and links are hidden rather than

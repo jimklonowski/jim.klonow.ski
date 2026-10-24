@@ -204,11 +204,11 @@ test('the world\'s month: thirty days ending today, pits for unlogged days, a bl
 test('achievements: the fixed list behind the wearables, and the three the demo can never reach', () => {
   const all = achievementsOf({
     milestones: [{ prop: 'crown', name: 'the crown', goal: 100, progress: 12, unit: 'days in a row' }],
-    loggedDays: 40, cleanWeek: true, finasterideStreak: 10,
+    loggedDays: 40, cleanWeek: true, finasterideStreak: 10, tadalafilStreak: 130,
     hiScores: { runner: { score: 600, date: TODAY }, crusher: { score: 100, date: TODAY, cleared: true }, world: { score: 50, date: TODAY, cleared: false, feats: ['chain-3'] } },
     pets: 5, visits: 2, draws: 14, scans: 2
   })
-  assert.equal(all.length, 17, 'sixteen fixed ones plus a card per wearable milestone')
+  assert.equal(all.length, 18, 'seventeen fixed ones plus a card per wearable milestone')
   assert.deepEqual(all[0], { id: 'crown', name: 'Hundred Days', desc: 'a hundred logged days in a row — the crown', icon: 'i-lucide-crown', goal: 100, progress: 12, unit: 'days in a row', reward: 'crown' })
   const byId = Object.fromEntries(all.map(a => [a.id, a]))
   assert.equal(byId['runner-500'].progress, 600)
@@ -216,8 +216,9 @@ test('achievements: the fixed list behind the wearables, and the three the demo 
   assert.equal(byId['chain-3'].progress, 1)
   assert.equal(byId['clean-month'].progress, 0)
   assert.equal(byId['clean-week'].progress, 1)
-  assert.equal(reachableAchievements(all, false).length, 17)
+  assert.equal(byId['full-flow'].progress, 130)
+  assert.equal(reachableAchievements(all, false).length, 18)
   const demo = reachableAchievements(all, true)
-  assert.equal(demo.length, 15, 'Clean Week is reachable since the sandbox has a schedule (P9)')
+  assert.equal(demo.length, 15, 'Clean Week is reachable since the sandbox has a schedule (P9); Luscious, Full Flow and Open House are not')
   assert.ok(demo.every(a => !DEMO_UNREACHABLE.has(a.id)))
 })

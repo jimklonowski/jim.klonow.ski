@@ -387,7 +387,8 @@ export const FEED_QUIPS: ReadonlyArray<{ match: RegExp, jab?: string, swallow?: 
   { match: /hgh|growth/i, jab: 'the small one. barely a pinch.' },
   { match: /hcg/i, jab: 'quick one. it didn\'t look.' },
   { match: /bpc/i, jab: 'right where it was sore.' },
-  { match: /finasteride/i, swallow: 'the little one. for the mane, someday.' }
+  { match: /finasteride/i, swallow: 'the little one. for the mane, someday.' },
+  { match: /tadalafil|cialis/i, swallow: 'the little yellow one. for the pipes.' }
 ]
 
 export function doseLabel(d: { compound: string, dose: number | string, unit: string }): string {
@@ -415,10 +416,11 @@ export function mixDoneLine(m: ReconstitutionEntry): string {
 }
 
 /** What a compound does to it once it's in: a beat of theatre per family, nothing for the rest. */
-export type AfterEffect = 'flex' | 'stretch' | 'proud' | 'bandage' | 'glow' | 'mane'
+export type AfterEffect = 'flex' | 'stretch' | 'proud' | 'bandage' | 'glow' | 'mane' | 'pump'
 
 export function afterEffectOf(compound: string): { kind: AfterEffect, line: string } | null {
   if (/testosterone/i.test(compound)) return { kind: 'flex', line: 'testosterone. (flex)' }
+  if (/tadalafil|cialis/i.test(compound)) return { kind: 'pump', line: 'tadalafil. every vessel wide open — full flow. (it stood a little taller.)' }
   if (/hgh|growth/i.test(compound)) return { kind: 'stretch', line: 'growth hormone. it felt taller for a second.' }
   if (/hcg/i.test(compound)) return { kind: 'proud', line: 'hCG. the heart beats a little prouder.' }
   if (/bpc/i.test(compound)) return { kind: 'bandage', line: 'BPC-157 — bandage on, right where it was sore.' }

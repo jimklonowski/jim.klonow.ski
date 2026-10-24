@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   MANE_TIERS, TIER_DAYS, ageDays, bellyOf, armsOf, buildOf, earnedWearables, firstLoggedDay, leanGain,
-  maneTier, nextManeTier, publicWardrobeOf, wardrobeOf, wearableMilestones
+  maneTier, medStreak, nextManeTier, publicWardrobeOf, tadalafilStreak, wardrobeOf, wearableMilestones
 } from '../shared/utils/tickerWardrobe.ts'
 import { shiftDays } from '../shared/utils/dates.ts'
 
@@ -49,6 +49,21 @@ test('the mane climbs its tiers with the finasteride streak and only that compou
   assert.equal(nextManeTier(days(40, 30), TODAY)?.name, 'luscious')
   assert.equal(nextManeTier(days(100, 90), TODAY), null)
   assert.equal(MANE_TIERS.length, 3)
+})
+
+test('a standing med counts its open run as days taken, so an unlogged daily pill still grows the mane', () => {
+  const fin = (from, to = null) => [{ compound: 'Finasteride', from, to }]
+  // Logged 7 days, standing for 30: the longer of the two.
+  assert.equal(medStreak('Finasteride', days(100, 7), TODAY, fin(shiftDays(TODAY, -29))), 30)
+  assert.equal(maneTier(days(100, 0), TODAY, fin(shiftDays(TODAY, -89))), 3, 'ninety days on the protocol, none logged: luscious')
+  assert.equal(maneTier(days(100, 0), TODAY, fin(shiftDays(TODAY, -89), shiftDays(TODAY, -1))), 0, 'a run that ended counts for nothing today')
+  assert.equal(maneTier(days(100, 0), TODAY, [{ compound: 'Tadalafil', from: shiftDays(TODAY, -89), to: null }]), 0, 'only that compound')
+  // A run older than the journal counts from the first logged day — the pet cannot vouch for earlier.
+  assert.equal(tadalafilStreak(days(10, 0), TODAY, [{ compound: 'Tadalafil', from: '2025-06-01', to: null }]), 10)
+  assert.equal(tadalafilStreak(days(10, 0), TODAY), 0)
+  // The outfit reads the standing list too.
+  assert.ok(wardrobeOf(inputs({ entries: days(100, 0), standing: fin(shiftDays(TODAY, -89)) })).accessories.includes('mane-3'))
+  assert.ok(!wardrobeOf(inputs({ entries: days(100, 0) })).accessories.some(p => p.startsWith('mane')))
 })
 
 test('the build: tier by logged days, arms by lean gain on the first scan, belly by the latest body fat', () => {

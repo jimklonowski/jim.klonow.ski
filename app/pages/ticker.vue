@@ -180,21 +180,22 @@
       >
         ⊳ TALK
       </button>
-      <!-- FEED opens the plate: one row per dose (and per vial to mix), each fed on its own, or
-           all of them in order. Rows fed this visit carry a check. -->
+      <!-- FEED opens the plate: one row per dose (and per vial to mix, and per daily med that is
+           taken but never logged), each fed on its own, or all of them in order. Rows fed this
+           visit carry a check. -->
       <UDropdownMenu
         :items="feedItems"
         :content="{ align: 'start' }"
-        :disabled="busy || !dosesToday.length"
+        :disabled="busy || !plateCount"
         :ui="{ content: 'min-w-60 font-mono', itemLabel: 'text-small' }"
       >
         <button
           type="button"
           class="tui-btn disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="busy || !dosesToday.length"
-          :title="dosesToday.length ? 'Pick a dose to feed, or feed the whole plate' : 'Nothing logged today yet — TICKER only eats what the journal says'"
+          :disabled="busy || !plateCount"
+          :title="plateCount ? 'Pick a dose to feed, or feed the whole plate' : 'Nothing on the plate yet — TICKER eats what the journal says, plus the daily meds'"
         >
-          ⊳ FEED{{ dosesToday.length ? ` · ${fedThisVisit.size ? `${fedThisVisit.size}/` : ''}${dosesToday.length}` : '' }}
+          ⊳ FEED{{ plateCount ? ` · ${fedCount ? `${fedCount}/` : ''}${plateCount}` : '' }}
         </button>
       </UDropdownMenu>
       <button
@@ -391,7 +392,7 @@ const { data: workoutsData } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: plannedData } = await usePlannedDraws()
 const { data: cyclesData } = await useCycles()
-const { rules: protocolRules } = await useProtocol()
+const { rules: protocolRules, standing: protocolStanding } = await useProtocol()
 const { data: dexaData } = await useDexaEntries()
 // The vial list is owner/demo only (the API says so); a friend's TICKER has no pantry to mention.
 const vialsData = canEdit.value ? await useVials() : null
@@ -412,11 +413,11 @@ const { night, asleep, sky, clock } = useTickerClock()
 // logged and never hungry.
 const rulesApply = protocolRules.value.length > 0
 const {
-  sodasToday, sodasThisWeek, mealDay, mealIsYesterday, dosesToday, mixesToday, walkIsYesterday, workoutMinutes, workoutHr, walkProp,
+  sodasToday, sodasThisWeek, mealDay, mealIsYesterday, dosesToday, standingToday, mixesToday, walkIsYesterday, workoutMinutes, workoutHr, walkProp,
   recovery, sleepMin, sluggish, streak, weight, latestHrv, firstDate, ageDays, birthday, drawDates, nextDraw, oldestOpen, fever,
   dueToday, loggedCompounds, eaten, missing, missingNames, hunger, unloggedThisWeek, cobwebs,
   loggedDays, milestones, earned, build, tier, arms, bellyRead, scans, latestScan, leanGain,
-  weekTally, cleanWeek, activeCycle, cycleClause, finasterideStreak, maneTier, nextMane, bandaged, injected, bowl, doseKeys,
+  weekTally, cleanWeek, activeCycle, cycleClause, finasterideStreak, tadalafilStreak, maneTier, nextMane, bandaged, injected, bowl, doseKeys,
   crusherWall, paddleScale, crusherLives, daySeed, worldDays
 } = useTickerDay({
   entries,
@@ -429,6 +430,7 @@ const {
   vials: vialsData?.data ?? null,
   today,
   rules: protocolRules,
+  standing: protocolStanding,
   rulesApply,
   night
 })
@@ -455,6 +457,7 @@ const allAchievements = computed<Achievement[]>(() => achievementsOf({
   loggedDays: loggedDays.value,
   cleanWeek: cleanWeek.value,
   finasterideStreak: finasterideStreak.value,
+  tadalafilStreak: tadalafilStreak.value,
   hiScores: hiScores.value,
   pets: pets.value.total,
   visits: visits.value?.total ?? 0,
@@ -647,6 +650,21 @@ async function afterEffect(compound: string) {
       await wait(1100)
       if (actionPose.value === 'flex') actionPose.value = null
       break
+    case 'pump':
+      // Hands on hips, chest out, then two swells with a beat each — the plumbing, wide open.
+      actionPose.value = 'pumped'
+      stretching.value = true
+      for (let i = 0; i < 2; i++) {
+        stretch.value = 1.12
+        pet.value?.trigger('bigbeat')
+        await wait(450)
+        stretch.value = 1
+        await wait(300)
+      }
+      stretching.value = false
+      await wait(400)
+      if (actionPose.value === 'pumped') actionPose.value = null
+      break
     case 'stretch':
       stretching.value = true
       stretch.value = 1.15
@@ -731,8 +749,16 @@ watch(mealDay, () => {
 })
 /** Plate indices fed today. */
 const fedThisVisit = computed(() => new Set(doseKeys.value.map((k, i) => fedKeys.value.has(k) ? i : -1).filter(i => i >= 0)))
+/** The standing meds' checks, keyed by name — there is one of each a day. */
+const standingKey = (compound: string) => `standing:${compound}`
+const fedStanding = computed(() => new Set(standingToday.value.map((m, i) => fedKeys.value.has(standingKey(m.compound)) ? i : -1).filter(i => i >= 0)))
+/** The whole plate: the day's logged doses plus the daily meds that are never logged. */
+const plateCount = computed(() => dosesToday.value.length + standingToday.value.length)
+const fedCount = computed(() => fedThisVisit.value.size + fedStanding.value.size)
 function markFed(i: number) {
-  const key = doseKeys.value[i]!
+  markFedKey(doseKeys.value[i]!)
+}
+function markFedKey(key: string) {
   fedKeys.value = new Set([...fedKeys.value, key])
   // The same day merges one check in, so a check made on another device isn't erased; a new
   // day (or a row from before the map) replaces the plate outright.
@@ -785,10 +811,27 @@ async function doseOne(i: number, note = '') {
   markFed(i)
 }
 
+/** A daily med off the plate — taken every day, never logged: the swallow, then whatever it does to it (the mane, the pump). */
+async function standingOne(i: number, note = '') {
+  const m = standingToday.value[i]
+  if (!m) return
+  const label = `${m.compound} ${m.label}`
+  const again = fedCount.value > 0
+  line.value = doseStartLine(label, false, note)
+  actionPose.value = 'eating'
+  await wait(700)
+  actionPose.value = 'gulp'
+  await wait(650)
+  line.value = doseDoneLine(label, m.compound, false, again)
+  await wait(500)
+  await afterEffect(m.compound)
+  markFedKey(standingKey(m.compound))
+}
+
 /** What to say once the plate is (or isn't) clear. */
 const plateRemark = () => plateLine({
-  doses: dosesToday.value.length,
-  fed: fedThisVisit.value.size,
+  doses: plateCount.value,
+  fed: fedCount.value,
   rulesApply,
   missing: missing.value.length,
   missingNames: missingNames.value
@@ -796,28 +839,30 @@ const plateRemark = () => plateLine({
 
 const servedNote = () => mealIsYesterday.value && !fedThisVisit.value.size ? ' (yesterday\'s plate)' : ''
 
-/** The menu's "feed all": every mix, then every dose, in order. */
+/** The menu's "feed all": every mix, then every dose, then the daily meds, in order. */
 async function feed() {
-  if (busy.value || !dosesToday.value.length) return
+  if (busy.value || !plateCount.value) return
   busy.value = true
   wake()
   const note = servedNote()
   for (let i = 0; i < mixesToday.value.length; i++) await mixOne(i, i === 0 ? note : '')
   for (let i = 0; i < dosesToday.value.length; i++) await doseOne(i, i === 0 && !mixesToday.value.length ? note : '')
+  for (let i = 0; i < standingToday.value.length; i++) await standingOne(i, i === 0 && !mixesToday.value.length && !dosesToday.value.length ? note : '')
   actionPose.value = null
   line.value = plateRemark()
   busy.value = false
 }
 
-/** A single row from the menu: one dose, or one vial to mix. */
-async function feedOne(kind: 'dose' | 'mix', i: number) {
+/** A single row from the menu: one dose, one daily med, or one vial to mix. */
+async function feedOne(kind: 'dose' | 'standing' | 'mix', i: number) {
   if (busy.value) return
   busy.value = true
   wake()
   if (kind === 'mix') await mixOne(i, servedNote())
+  else if (kind === 'standing') await standingOne(i, servedNote())
   else await doseOne(i, servedNote())
   actionPose.value = null
-  if (kind === 'dose') line.value = plateRemark()
+  if (kind !== 'mix') line.value = plateRemark()
   busy.value = false
 }
 
@@ -838,12 +883,18 @@ const feedItems = computed<DropdownMenuItem[][]>(() => {
       onSelect: () => feedOne('dose', i)
     }
   })
+  // The daily meds: taken every day, never logged — on the plate after the doses.
+  const daily: DropdownMenuItem[] = standingToday.value.map((m, i) => ({
+    label: `${m.compound} ${m.label}${fedStanding.value.has(i) ? ' ✓' : ''}`,
+    icon: 'i-lucide-pill',
+    onSelect: () => feedOne('standing', i)
+  }))
   const all: DropdownMenuItem[] = [{
-    label: `feed all · ${dosesToday.value.length}${mealIsYesterday.value ? ' (yesterday\'s plate)' : ''}`,
+    label: `feed all · ${plateCount.value}${mealIsYesterday.value ? ' (yesterday\'s plate)' : ''}`,
     icon: 'i-lucide-utensils',
     onSelect: feed
   }]
-  return [...(mixes.length ? [mixes] : []), doses, all]
+  return [...(mixes.length ? [mixes] : []), ...(doses.length ? [doses] : []), ...(daily.length ? [daily] : []), all]
 })
 
 async function walk() {
