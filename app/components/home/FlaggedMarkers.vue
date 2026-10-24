@@ -70,16 +70,18 @@ function color(f: FlaggedMarker) {
   return STATUS_COLORS[f.status]
 }
 
+/** The value as the lab reported it — 51.7, 1.28, 2070 — trimmed to two decimals only where a
+ * computed marker carries more. It used to round anything from 10 up to a whole number, so a
+ * hematocrit of 51.7 read "52" against a 51.1 limit. */
 function format(v: number) {
-  return Number.isInteger(v) ? v.toString() : v.toFixed(v < 10 ? 1 : 0)
+  return Number.isInteger(v) ? v.toString() : String(Math.round(v * 100) / 100)
 }
 
-/** e.g. "HIGH ▲ 1782", or "LOW · first" on a first-ever reading. */
+/** e.g. "HIGH ▲ 1782", "HIGH ▼ 172.9", or "LOW · first" on a first-ever reading. */
 function tag(f: FlaggedMarker) {
   const label = f.status.toUpperCase()
   if (f.delta == null) return `${label} · first`
   const arrow = f.delta >= 0 ? '▲' : '▼'
-  const magnitude = Math.abs(f.delta)
-  return `${label} ${arrow} ${magnitude >= 10 ? Math.round(magnitude) : magnitude.toFixed(1)}`
+  return `${label} ${arrow} ${format(Math.abs(f.delta))}`
 }
 </script>

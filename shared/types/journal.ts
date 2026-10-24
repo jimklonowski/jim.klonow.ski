@@ -45,11 +45,13 @@ export interface JournalEntry {
 
 /**
  * A journal_entries row as the server's prompt builders read it: JSON columns decoded to
- * arrays, SQL NULLs kept as null, and nothing absent. Reconstitutions are left out — no prompt
- * reads them. Food joined in Oct 2026 with the meal estimates (shared/utils/nutrition.ts).
+ * arrays, SQL NULLs kept as null, and nothing absent. Food joined in Oct 2026 with the meal
+ * estimates (shared/utils/nutrition.ts); reconstitutions the same month, for the /ask fact
+ * sheet ("when did I last mix hCG?") — parseJournalRow defaults them to [] on a SELECT that
+ * leaves the column out, as the digest's does.
  */
 export interface JournalRow extends Pick<
-  Required<JournalEntry>, 'date' | 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv' | 'peptides' | 'sodas' | 'water' | 'food'
+  Required<JournalEntry>, 'date' | 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv' | 'peptides' | 'reconstitutions' | 'sodas' | 'water' | 'food'
 > {
   notes: string | null
 }
