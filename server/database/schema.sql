@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS protocol_items (
   kind TEXT NOT NULL,                        -- 'logged' | 'standing' | 'as_needed'
   category TEXT NOT NULL,                    -- 'injectable' | 'oral' | 'supplement' | 'skin'
   injected INTEGER NOT NULL DEFAULT 0,
-  on_hand INTEGER NOT NULL DEFAULT 0,        -- owned but not being taken; such an item has no versions
+  on_hand INTEGER NOT NULL DEFAULT 0,        -- owned but not being taken: its open version holds the dose on hand, and this flag wins over it
   notes TEXT,                                -- prompt clause while it runs: how to READ the data, pronoun-free
   stop_note TEXT,                            -- prompt clause once its last version has ended: why it stopped
   sort INTEGER NOT NULL DEFAULT 100,

@@ -105,7 +105,7 @@ test('0013 copies the supplements table into standing items, and the constants s
   assert.deepEqual(versionsOf(db, 'Turmeric').map(v => [v.from_date, v.to_date]), [[null, '2026-08-22']])
   assert.deepEqual(versionsOf(db, 'Old thing').map(v => v.to_date), ['2026-08-24'], 'a stopped row without a date closes on its creation day')
   assert.equal(item('Anavar (oxandrolone)').on_hand, 1)
-  assert.deepEqual(versionsOf(db, 'Anavar (oxandrolone)'), [], 'owned, not taken: nothing to date')
+  assert.deepEqual(versionsOf(db, 'Anavar (oxandrolone)').map(v => [v.from_date, v.to_date, v.dose_label]), [[null, null, '10 mg + 25 mg tablets']], 'owned, not taken: the dose on hand, undated')
   assert.deepEqual(versionsOf(db, 'Xyzal (levocetirizine)').map(v => v.from_date), ['2026-09-01'])
 
   // Re-running the copy adds nothing.

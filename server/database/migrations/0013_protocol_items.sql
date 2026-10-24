@@ -30,10 +30,11 @@ CREATE TABLE IF NOT EXISTS protocol_versions (
 );
 CREATE INDEX IF NOT EXISTS idx_protocol_versions_item ON protocol_versions(item_id, from_date);
 
--- Every supplements row becomes a standing item: on_hand rows (owned, not taken) get no version;
--- stopped rows close on their stopped date or, lacking one, the day the row was created; the
--- three schedule spellings in use map to weekday sets and anything else is kept as the version's
--- note. Guarded so a re-run, or a database seeded before this migration, adds nothing.
+-- Every supplements row becomes a standing item with one version: on_hand rows (owned, not
+-- taken) keep theirs open-ended too, since it carries the dose on hand and on_hand decides the
+-- status; stopped rows close on their stopped date or, lacking one, the day the row was created;
+-- the three schedule spellings in use map to weekday sets and anything else is kept as the
+-- version's note. Guarded so a re-run, or a database seeded before this migration, adds nothing.
 INSERT INTO protocol_items (name, kind, category, injected, on_hand, notes, stop_note, sort, created_at)
 SELECT s.name, 'standing', CASE s.category WHEN 'skin' THEN 'skin' ELSE 'supplement' END, 0,
        CASE s.status WHEN 'on_hand' THEN 1 ELSE 0 END, s.notes, NULL, s.sort, s.created_at
@@ -54,5 +55,4 @@ SELECT p.id, s.started,
        s.created_at
 FROM supplements s
 JOIN protocol_items p ON p.name = s.name AND p.kind = 'standing'
-WHERE s.status != 'on_hand'
-  AND NOT EXISTS (SELECT 1 FROM protocol_versions v WHERE v.item_id = p.id);
+WHERE NOT EXISTS (SELECT 1 FROM protocol_versions v WHERE v.item_id = p.id);

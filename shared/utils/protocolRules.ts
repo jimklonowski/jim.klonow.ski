@@ -164,8 +164,14 @@ export const STANDING_COMPOUNDS: StandingCompound[] = [
   { compound: 'Tadalafil', from: '2026-06-02', to: null, label: '5 mg tablet', note: `${TADALAFIL_SINCE}; 7 mg gummies until 2026-06-01, 5 mg tablets since. ${TADALAFIL_BP}` }
 ]
 
+export interface AsNeededCompound {
+  compound: string
+  /** Prompt clause: what it is taken for. */
+  note: string
+}
+
 /** Taken when something calls for it, so gaps in the log are the plan. No rule, no rings. */
-export const AS_NEEDED_COMPOUNDS: Array<{ compound: string, note: string }> = [
+export const AS_NEEDED_COMPOUNDS: AsNeededCompound[] = [
   { compound: 'BPC-157', note: 'for soreness/tightness' }
 ]
 
