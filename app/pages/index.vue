@@ -76,6 +76,7 @@
            as the popover anchor pushes the tour popover to the viewport edge. -->
       <HomeVitals
         id="tour-vitals"
+        v-model:date="vitalsDate"
         :entries="entries"
         :metrics="healthMetrics"
         :protein="protein"
@@ -398,12 +399,19 @@ const {
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)
 
-/** Today's meals summed from their figures — the vitals' PROTEIN row and the food line share it. */
+/** Today's meals summed from their figures — the food line reads it (and the PROTEIN row while the vitals card shows today). */
 const todayNutrition = computed(() => dayNutrition(todayEntry.value, estimateIndex.value))
+// The day the vitals card is scrubbed to (null = today, HomeVitals owns the ‹ ›). The PROTEIN
+// row is a day total, not a "latest as of" reading, so it's summed for that day here.
+const vitalsDate = ref<string | null>(null)
+const vitalsNutrition = computed(() => {
+  if (vitalsDate.value == null) return todayNutrition.value
+  return dayNutrition(entries.value.find(e => e.date === vitalsDate.value) ?? null, estimateIndex.value)
+})
 /** Null (no row) for roles without food; `grams` null until a meal with figures is logged. */
 const protein = computed(() => {
   if (!isFullAccess.value) return null
-  const n = todayNutrition.value
+  const n = vitalsNutrition.value
   return { grams: n.estimated > 0 ? n.protein_g : null, target: proteinTarget.value, floor: n.missing.length > 0 }
 })
 

@@ -15,6 +15,9 @@ export function mealKey(text: string | null | undefined): string {
   if (!text) return ''
   const tokens = text
     .toLowerCase()
+    // Fraction glyphs are a quantity, not punctuation: "½ costco pizza" must not key as the
+    // half-pizza serving itself (the count grammar in nutrition.ts reads it).
+    .replace(/½/g, '1/2 ').replace(/⅓/g, '1/3 ').replace(/¼/g, '1/4 ').replace(/¾/g, '3/4 ')
     // "2 x" / "2x" / "2 ×" → "2x" — only where the x IS the multiplier: a letter after it ("2 xl
     // pizza") is a word, not a quantity (audit #42 item 38).
     .replace(/(\d+)\s*[x×](?![a-z])\s*/g, '$1x ')

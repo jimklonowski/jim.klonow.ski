@@ -13,7 +13,7 @@
         class="text-left cursor-pointer hover:text-accent"
         :class="chipClass"
         :title="chipTitle"
-        @click="openForm"
+        @click="openForm()"
       >{{ chipText }}</button>
       <span
         v-else
@@ -32,6 +32,47 @@
       v-else-if="pending"
       class="text-faint"
     >estimating…</span>
+
+    <!-- A plus-joined text with a part nobody knows: the known parts read as figures, each
+         unknown one gets its own "enter macros", and the model is asked about the unknown
+         parts only — never about the combo, so a priced part is never re-estimated. -->
+    <template v-else-if="parts">
+      <template
+        v-for="(part, i) in parts"
+        :key="part.text"
+      >
+        <span
+          v-if="i"
+          class="text-ghost"
+        >+</span>
+        <span
+          v-if="part.estimate"
+          class="text-muted"
+          :title="`${part.text}: ${fmtMacros(part.estimate)}`"
+        >{{ part.text }} {{ isLabelFigure(part.estimate) ? '' : '≈ ' }}{{ fmtKcal(part.estimate.kcal) }}</span>
+        <template v-else>
+          <span class="text-faint">{{ part.text }}</span>
+          <button
+            v-if="isOwner"
+            type="button"
+            class="text-faint hover:text-accent cursor-pointer"
+            :title="`Enter the figures for ${part.text}`"
+            @click="openForm(part.text)"
+          >enter →</button>
+        </template>
+      </template>
+      <template v-if="isOwner">
+        <span class="text-ghost">·</span>
+        <button
+          type="button"
+          class="text-faint hover:text-accent cursor-pointer"
+          :title="`Sends ${unknownParts.join(', ')} to Claude for an estimate`"
+          @click="ask"
+        >
+          estimate {{ unknownParts.length === 1 ? 'it' : 'them' }} with AI →
+        </button>
+      </template>
+    </template>
 
     <template v-else>
       <!-- A close match that already has figures: one tap replaces the typed text with it. -->
@@ -53,7 +94,7 @@
         <button
           type="button"
           class="text-faint hover:text-accent cursor-pointer"
-          @click="openForm"
+          @click="openForm()"
         >
           enter macros →
         </button>
@@ -74,20 +115,27 @@
     <UModal
       v-if="isOwner"
       v-model:open="formOpen"
-      :title="estimate ? 'Correct the figures' : 'Enter the figures'"
-      :description="text"
+      :title="estimate && formText === text ? 'Correct the figures' : 'Enter the figures'"
+      :description="formText"
       :ui="{ content: 'sm:max-w-2xl' }"
     >
       <template #body>
         <div class="space-y-3">
           <p
-            v-if="estimate?.assumptions"
+            v-if="estimate?.assumptions && formText === text"
             class="text-small text-muted"
           >
-            {{ estimate.source === 'ai' ? 'Model assumed' : 'Portion' }}: {{ estimate.assumptions }}<span
-              v-if="estimate.source === 'ai'"
+            {{ estimate.parts ? 'Summed from' : estimate.source === 'ai' ? 'Model assumed' : 'Portion' }}: {{ estimate.assumptions }}<span
+              v-if="estimate.source === 'ai' && !estimate.parts"
               class="text-faint"
             > · {{ estimate.confidence }} confidence</span>
+          </p>
+          <p
+            v-if="estimate?.parts && formText === text"
+            class="text-small text-warn"
+          >
+            This is a sum of parts. Figures saved here are kept for the whole combo and will shadow
+            the parts' own — to fix one part, enter its figures on its own instead.
           </p>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <UFormField
@@ -174,7 +222,7 @@
 // close match that has them ("did you mean …?", emitting `replace` with that spelling), and for
 // the owner the two ways in: enter the figures by hand (the preferred path), or ask the model
 // for this one meal.
-import { fmtKcal, fmtMacros, isLabelFigure, knownMeals, suggestMeal } from '#shared/utils/nutrition'
+import { fmtKcal, fmtMacros, isLabelFigure, knownMeals, mealParts, suggestMeal } from '#shared/utils/nutrition'
 
 const props = defineProps<{
   text: string | null | undefined
@@ -190,7 +238,12 @@ const { data: entries } = await useJournalEntries()
 const { index, lookup, isPending, estimate: requestEstimate, correct } = await useMealEstimates()
 
 const estimate = computed(() => lookup(props.text))
-const pending = computed(() => isPending(props.text))
+// A plus-joined text whose parts don't all have figures: shown part by part (shared/utils/
+// nutrition.ts mealParts). Null for a single meal, and once every part is known the composed
+// `estimate` takes over above.
+const parts = computed(() => (estimate.value ? null : mealParts(index.value, props.text)))
+const unknownParts = computed(() => parts.value?.filter(p => !p.estimate).map(p => p.text) ?? [])
+const pending = computed(() => isPending(props.text) || unknownParts.value.some(p => isPending(p)))
 
 const known = computed(() => knownMeals(entries.value ?? [], index.value))
 const suggestion = computed(() => (estimate.value ? null : suggestMeal(props.text, known.value)))
@@ -216,6 +269,7 @@ const chipClass = computed(() => (estimate.value?.source === 'ai' && estimate.va
 const chipTitle = computed(() => {
   const e = estimate.value
   if (!e) return undefined
+  if (e.parts) return `summed from ${e.assumptions}`
   if (e.source === 'library') return `meal library${e.assumptions ? ` — ${e.assumptions}` : ''}`
   if (e.source === 'manual') return `entered by hand${e.assumptions && e.assumptions !== 'corrected by hand' ? ` — ${e.assumptions}` : ''}`
   return [e.assumptions ? `model assumed: ${e.assumptions}` : null, `${e.confidence} confidence`].filter(Boolean).join(' · ')
@@ -223,10 +277,12 @@ const chipTitle = computed(() => {
 
 async function ask() {
   if (!props.text) return
+  // For a combo, only the parts nothing knows — a priced part is never sent again.
+  const texts = unknownParts.value.length ? unknownParts.value : [props.text]
   try {
-    const unmatched = await requestEstimate([props.text])
+    const unmatched = await requestEstimate(texts)
     if (unmatched.length) {
-      toast.add({ title: 'No figures came back for that meal', description: 'The answer could not be pinned to it, so nothing was saved — try again or enter the figures.', color: 'warning' })
+      toast.add({ title: `No figures came back for ${unmatched.length === 1 && texts.length === 1 ? 'that meal' : unmatched.join(', ')}`, description: 'The answer could not be pinned to it, so nothing was saved — try again or enter the figures.', color: 'warning' })
     }
   }
   catch (err) {
@@ -236,13 +292,16 @@ async function ask() {
 
 // --- the figures form (enter or correct) ---
 const formOpen = ref(false)
+/** What the form is for: the meal itself, or one unknown part of a combo. */
+const formText = ref('')
 /** A figure label never wraps onto a second line — the four inputs must share one baseline. */
 const FIELD_UI = { label: 'whitespace-nowrap' }
 const saving = ref(false)
 const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: number | '', fat_g: number | '' }>({ kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
 
-function openForm() {
-  const e = estimate.value
+function openForm(text: string | null = null) {
+  formText.value = text ?? props.text ?? ''
+  const e = text ? lookup(text) : estimate.value
   draft.kcal = e?.kcal ?? ''
   draft.protein_g = e?.protein_g ?? ''
   draft.carbs_g = e?.carbs_g ?? ''
@@ -255,11 +314,11 @@ const draftValid = computed(() =>
 )
 
 async function saveFigures() {
-  if (!props.text || !draftValid.value) return
+  if (!formText.value || !draftValid.value) return
   saving.value = true
   try {
     await correct({
-      text: props.text,
+      text: formText.value,
       kcal: Math.round(draft.kcal as number),
       protein_g: draft.protein_g as number,
       carbs_g: draft.carbs_g as number,

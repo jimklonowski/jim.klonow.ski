@@ -98,6 +98,17 @@ export interface MealEstimate {
   model: string | null
   created_at: string
   updated_at: string
+  /** Set on a composed figure only ("beef sticks + apple"): the parts it was summed from. Never a row. */
+  parts?: MealPart[]
+  /** Set on a library figure whose serving is counted in a unit (2 sticks, 4 slices of 8) — see splitCount. */
+  portion?: MealPortion
+}
+
+/** How a library serving counts in its own unit; `whole` is the unit count of the whole thing (a pizza's 8 slices). */
+export interface MealPortion {
+  count: number
+  unit: string
+  whole?: number
 }
 
 export type EstimateIndex = Map<string, MealEstimate>
@@ -115,18 +126,88 @@ function labelLookup(index: EstimateIndex, text: string, key: string): MealEstim
 
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-/** `e` times `n`, re-keyed to the "N x" text that asked for it. */
-export function scaleEstimate(e: MealEstimate, n: number, text: string): MealEstimate {
+/**
+ * `e` times `n`, re-keyed to the text that asked for it ("2 x <meal>", "1 beef stick"). `label`
+ * replaces the "N ×" wording when the scale came from a count in the serving's own unit.
+ */
+export function scaleEstimate(e: MealEstimate, n: number, text: string, label?: string): MealEstimate {
+  const { portion: _portion, ...rest } = e
   return {
-    ...e,
+    ...rest,
     key: mealKey(text),
     text,
     kcal: Math.round(e.kcal * n),
     protein_g: round1(e.protein_g * n),
     carbs_g: round1(e.carbs_g * n),
     fat_g: round1(e.fat_g * n),
-    assumptions: `${n} × ${e.text}${e.assumptions ? ` (${e.assumptions})` : ''}`
+    assumptions: `${label ?? `${n} ×`} ${e.text}${e.assumptions ? ` (${e.assumptions})` : ''}`
   }
+}
+
+// --- "1 beef stick", "4 slices costco pizza", "whole costco pizza", "½ costco pizza", "2 kiwi" ---
+// A count, fraction or "whole"/"half" before a known meal, read in the meal's own unit when the
+// library declares one (shared/utils/mealLibrary.ts `portion`): "1 beef stick" is half the
+// two-stick serving, "whole costco pizza" is 8 of the 4-slice serving's slices. A meal with no
+// declared portion is simply multiplied ("2 kiwi"). Distinct from "N x", which always multiplies
+// the whole serving. The text keeps its count, so the figures stay derivable from text + library.
+
+const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
+const FRACTION_GLYPHS: Record<string, number> = { '½': 0.5, '⅓': 1 / 3, '¼': 0.25, '¾': 0.75 }
+const UNIT_WORDS = /^(slices?|sticks?|pieces?|strips?|cups?|containers?|bowls?|fillets?|filets?|servings?|oz|ounces?)$/i
+
+export interface MealCount {
+  /** The number typed; for 'fraction' and 'half' a fraction of the whole, for 'whole' unused. */
+  n: number
+  kind: 'count' | 'fraction' | 'whole'
+  /** The unit word typed after the count, singular and lowercase, if any. */
+  unit?: string
+  rest: string
+}
+
+/** The leading count or fraction of a meal text, or null. "N x" is not a count (splitQuantity). */
+export function splitCount(text: string): MealCount | null {
+  const m = /^\s*(?:an?\s+)?(\d+(?:\.\d+)?|\d+\s*\/\s*\d+|[½⅓¼¾]|one|two|three|four|five|six|seven|eight|nine|ten|half|whole)\s+(?:(\S+)\s+)?(?:of\s+)?(.*)$/i.exec(text)
+  if (!m) return null
+  const [, raw, maybeUnit, tail] = m
+  const token = raw!.toLowerCase()
+  // The unit word is optional: when the word after the count is not one, it is part of the meal.
+  const unit = maybeUnit && UNIT_WORDS.test(maybeUnit) ? maybeUnit.toLowerCase().replace(/s$/, '').replace(/^ounce$/, 'oz') : undefined
+  const rest = (unit ? tail! : [maybeUnit, tail].filter(Boolean).join(' ')).trim()
+  if (!rest) return null
+  if (token === 'whole') return { n: 1, kind: 'whole', unit, rest }
+  if (token === 'half') return { n: 0.5, kind: 'fraction', unit, rest }
+  if (token in FRACTION_GLYPHS) return { n: FRACTION_GLYPHS[token]!, kind: 'fraction', unit, rest }
+  if (token in COUNT_WORDS) return { n: COUNT_WORDS[token]!, kind: 'count', unit, rest }
+  const frac = /^(\d+)\s*\/\s*(\d+)$/.exec(token)
+  if (frac) {
+    const n = Number(frac[1]) / Number(frac[2])
+    return Number.isFinite(n) && n > 0 && n < 1 ? { n, kind: 'fraction', unit, rest } : null
+  }
+  const n = Number(token)
+  return n > 0 && n <= 50 ? { n, kind: 'count', unit, rest } : null
+}
+
+/** The figures for "<count> <meal>", or null when the rest is unknown or the unit doesn't fit. */
+function countedEstimate(index: EstimateIndex, text: string): MealEstimate | null {
+  const c = splitCount(text)
+  if (!c) return null
+  const base = lookupEstimate(index, c.rest)
+  if (!base) return null
+  const p = base.portion
+  const unitName = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
+  if (c.kind === 'whole') {
+    if (!p?.whole) return scaleEstimate(base, 1, text, 'the whole')
+    return scaleEstimate(base, p.whole / p.count, text, `${unitName(p.whole, p.unit)} (whole) of`)
+  }
+  if (c.kind === 'fraction') {
+    if (!p?.whole) return scaleEstimate(base, c.n, text, `${Math.round(c.n * 100) / 100} ×`)
+    const units = c.n * p.whole
+    return scaleEstimate(base, units / p.count, text, `${Math.round(units * 10) / 10} of ${p.whole} ${p.unit}s of`)
+  }
+  // A typed unit must be the serving's own; "3 cups watermelon" against a stick-counted meal is unknown.
+  if (c.unit && (!p || c.unit !== p.unit)) return null
+  if (!p) return scaleEstimate(base, c.n, text)
+  return scaleEstimate(base, c.n / p.count, text, `${unitName(c.n, p.unit)} (a serving is ${p.count}) of`)
 }
 
 /**
@@ -157,7 +238,77 @@ export function lookupEstimate(index: EstimateIndex, text: string | null | undef
     const rowBase = index.get(base.key)
     if (rowBase) return scaleEstimate(rowBase, qty!.n, trimmed)
   }
-  return null
+  // Then a count in the meal's own unit ("1 beef stick", "whole costco pizza", "2 kiwi").
+  // Last: a joined text is the sum of its parts when every part is known on its own ("beef
+  // sticks, apple" in one snack slot — two snacks, one slot, no second slot needed). After the
+  // whole-text paths, so a combo the library or a hand entry prices as one meal ("grilled cheese
+  // + guac") keeps those figures. With a leading "N x" the WHOLE is composed and then multiplied
+  // — composing the text as typed would hand the "2 x" to the first part alone.
+  if (base) {
+    const compositeBase = countedEstimate(index, base.text) ?? composeEstimate(index, base.text)
+    return compositeBase ? scaleEstimate(compositeBase, qty!.n, trimmed) : null
+  }
+  return countedEstimate(index, trimmed) ?? composeEstimate(index, trimmed)
+}
+
+/**
+ * The parts of a joined meal text — "beef sticks + apple" or "beef sticks, apple, 2 kiwi" →
+ * ['beef sticks', 'apple', '2 kiwi'] — or null when it is one meal. Only " + " with space on both
+ * sides and a comma split: "and" and a bare "+" inside a word do not, so a single-meal text
+ * reads as it always did (and a whole-text figure is looked up before any split).
+ */
+export function splitParts(text: string | null | undefined): string[] | null {
+  const parts = (text ?? '').split(/\s+\+\s+|\s*,\s*/).map(p => p.trim()).filter(Boolean)
+  return parts.length >= 2 ? parts : null
+}
+
+export interface MealPart {
+  text: string
+  /** The part's own figures (every source, "N x" included), or null when nothing knows it. */
+  estimate: MealEstimate | null
+}
+
+/**
+ * Each part of a plus-joined text with its own lookup, or null for a single meal. The chip
+ * reads this to show which parts are known and to send ONLY the unknown ones for an estimate.
+ */
+export function mealParts(index: EstimateIndex, text: string | null | undefined): MealPart[] | null {
+  const parts = splitParts(text)
+  if (!parts) return null
+  return parts.map(p => ({ text: p, estimate: lookupEstimate(index, p) }))
+}
+
+const CONFIDENCE_RANK: Record<EstimateConfidence, number> = { low: 0, medium: 1, high: 2 }
+
+/** The summed figures of a plus-joined text, or null when it is one meal or any part is unknown. */
+function composeEstimate(index: EstimateIndex, text: string): MealEstimate | null {
+  const parts = mealParts(index, text)
+  if (!parts || parts.some(p => !p.estimate)) return null
+  const estimates = parts.map(p => p.estimate!)
+  const totals = estimates.reduce(
+    (t, e) => ({ kcal: t.kcal + e.kcal, protein_g: t.protein_g + e.protein_g, carbs_g: t.carbs_g + e.carbs_g, fat_g: t.fat_g + e.fat_g }),
+    { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }
+  )
+  // One model part makes the sum a model figure (it reads "≈ … est."); otherwise the weaker of
+  // the label sources, so a hand-entered part never dresses the whole as library figures.
+  const source: EstimateSource = estimates.some(e => e.source === 'ai') ? 'ai' : estimates.some(e => e.source === 'manual') ? 'manual' : 'library'
+  const confidence = estimates.reduce<EstimateConfidence>((c, e) => (CONFIDENCE_RANK[e.confidence] < CONFIDENCE_RANK[c] ? e.confidence : c), 'high')
+  const latest = (pick: (e: MealEstimate) => string) => estimates.map(pick).sort().at(-1)!
+  return {
+    key: mealKey(text),
+    text,
+    kcal: Math.round(totals.kcal),
+    protein_g: round1(totals.protein_g),
+    carbs_g: round1(totals.carbs_g),
+    fat_g: round1(totals.fat_g),
+    confidence,
+    assumptions: estimates.map(e => `${e.text} ${fmtKcal(e.kcal)}`).join(' + '),
+    source,
+    model: estimates.find(e => e.model)?.model ?? null,
+    created_at: latest(e => e.created_at),
+    updated_at: latest(e => e.updated_at),
+    parts
+  }
 }
 
 /** Label figures (library or hand-entered) read as numbers; a model estimate reads as "≈ … est.". */
@@ -310,9 +461,23 @@ export function mealHistory(entries: FoodEntry[], slot?: MealSlot): MealHistoryI
     .sort((a, b) => b.slotCount - a.slotCount || b.count - a.count || a.text.localeCompare(b.text))
 }
 
-/** The canonical spellings of every meal in the log with no figures from any source — what's left to enter or estimate. */
+/**
+ * The canonical spellings of every meal in the log with no figures from any source — what's
+ * left to enter or estimate. A plus-joined text contributes its unknown PARTS, not itself: the
+ * model is asked about "mystery bar", never about "beef sticks + mystery bar" when beef sticks
+ * are already priced, and the answer then serves every combo the part appears in.
+ */
 export function unestimatedMeals(entries: FoodEntry[], index: EstimateIndex): string[] {
-  return mealHistory(entries).filter(h => !lookupEstimate(index, h.text)).map(h => h.text)
+  const out = new Map<string, string>()
+  for (const h of mealHistory(entries)) {
+    if (lookupEstimate(index, h.text)) continue
+    const parts = mealParts(index, h.text)
+    for (const text of parts ? parts.filter(p => !p.estimate).map(p => p.text) : [h.text]) {
+      const key = mealKey(text)
+      if (key && !out.has(key)) out.set(key, text)
+    }
+  }
+  return [...out.values()]
 }
 
 // --- "did you mean …?" ---
