@@ -424,12 +424,25 @@
                     :placeholder="row.placeholder"
                     class="w-full"
                     :ui="SELECT_UI"
+                    :data-food-slot="row.key"
                   />
                   <template #help>
-                    <JournalMealEstimate
-                      :text="form.food[row.key]"
-                      @replace="form.food[row.key] = $event"
-                    />
+                    <span class="inline-flex flex-wrap items-baseline gap-x-2.5">
+                      <JournalMealEstimate
+                        :text="form.food[row.key]"
+                        @replace="form.food[row.key] = $event"
+                      />
+                      <!-- A second snack in the same gap: "beef sticks + apple" is one text whose
+                           figures are the parts' sum (shared/utils/nutrition.ts splitParts). -->
+                      <button
+                        v-if="canEdit && row.snack && form.food[row.key].trim() && !/\+\s*$/.test(form.food[row.key])"
+                        type="button"
+                        class="text-meta text-ghost hover:text-accent cursor-pointer"
+                        :title="`Log another ${row.label.toLowerCase()} in this slot`"
+                        @mousedown.prevent
+                        @click="addAnother(row.key)"
+                      >+ another</button>
+                    </span>
                   </template>
                 </UFormField>
                 <button
@@ -915,6 +928,26 @@ function snackOpen(slot: MealSlot): boolean {
 }
 function openSnack(slot: MealSlot) {
   if (!openedSnacks.value.includes(slot)) openedSnacks.value = [...openedSnacks.value, slot]
+}
+
+/**
+ * "+ another" under a snack: appends " + " to the slot's text and leaves the caret after it.
+ * Written through the input itself (focus, native value setter, an `input` event) rather than
+ * the model: in autocomplete mode the combobox shows its own search text, and setting the model
+ * alone left the field reading the old text, which the next blur wrote back over the model.
+ * UInputMenu forwards attrs to its <input>, so the marker sits on the input.
+ */
+function addAnother(slot: MealSlot) {
+  const text = `${form.food[slot].trim()} + `
+  const input = document.querySelector<HTMLInputElement>(`input[data-food-slot="${slot}"]`)
+  if (!input) {
+    form.food[slot] = text
+    return
+  }
+  input.focus()
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, text)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.setSelectionRange(text.length, text.length)
 }
 
 /** Every slot as '' or its text — the form always holds all keys, the row only the logged ones. */

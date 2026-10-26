@@ -98,6 +98,8 @@ export interface MealEstimate {
   model: string | null
   created_at: string
   updated_at: string
+  /** Set on a composed figure only ("beef sticks + apple"): the parts it was summed from. Never a row. */
+  parts?: MealPart[]
 }
 
 export type EstimateIndex = Map<string, MealEstimate>
@@ -157,7 +159,76 @@ export function lookupEstimate(index: EstimateIndex, text: string | null | undef
     const rowBase = index.get(base.key)
     if (rowBase) return scaleEstimate(rowBase, qty!.n, trimmed)
   }
-  return null
+  // Last: a plus-joined text is the sum of its parts when every part is known on its own
+  // ("beef sticks + apple" in one snack slot — two snacks, one slot, no second slot needed).
+  // After the whole-text paths, so a combo the library or a hand entry prices as one meal
+  // ("grilled cheese + guac") keeps those figures. A leading "N x" still multiplies the whole.
+  // With a leading quantity the WHOLE is composed and then multiplied — composing the text as
+  // typed would hand the "2 x" to the first part alone.
+  if (base) {
+    const compositeBase = composeEstimate(index, base.text)
+    return compositeBase ? scaleEstimate(compositeBase, qty!.n, trimmed) : null
+  }
+  return composeEstimate(index, trimmed)
+}
+
+/**
+ * The parts of a plus-joined meal text — "beef sticks + apple" → ['beef sticks', 'apple'] — or
+ * null when it is one meal. Only " + " with space on both sides splits: "and", commas and a
+ * bare "+" inside a word do not, so every existing single-meal text reads as it always did.
+ */
+export function splitParts(text: string | null | undefined): string[] | null {
+  const parts = (text ?? '').split(/\s+\+\s+/).map(p => p.trim()).filter(Boolean)
+  return parts.length >= 2 ? parts : null
+}
+
+export interface MealPart {
+  text: string
+  /** The part's own figures (every source, "N x" included), or null when nothing knows it. */
+  estimate: MealEstimate | null
+}
+
+/**
+ * Each part of a plus-joined text with its own lookup, or null for a single meal. The chip
+ * reads this to show which parts are known and to send ONLY the unknown ones for an estimate.
+ */
+export function mealParts(index: EstimateIndex, text: string | null | undefined): MealPart[] | null {
+  const parts = splitParts(text)
+  if (!parts) return null
+  return parts.map(p => ({ text: p, estimate: lookupEstimate(index, p) }))
+}
+
+const CONFIDENCE_RANK: Record<EstimateConfidence, number> = { low: 0, medium: 1, high: 2 }
+
+/** The summed figures of a plus-joined text, or null when it is one meal or any part is unknown. */
+function composeEstimate(index: EstimateIndex, text: string): MealEstimate | null {
+  const parts = mealParts(index, text)
+  if (!parts || parts.some(p => !p.estimate)) return null
+  const estimates = parts.map(p => p.estimate!)
+  const totals = estimates.reduce(
+    (t, e) => ({ kcal: t.kcal + e.kcal, protein_g: t.protein_g + e.protein_g, carbs_g: t.carbs_g + e.carbs_g, fat_g: t.fat_g + e.fat_g }),
+    { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }
+  )
+  // One model part makes the sum a model figure (it reads "≈ … est."); otherwise the weaker of
+  // the label sources, so a hand-entered part never dresses the whole as library figures.
+  const source: EstimateSource = estimates.some(e => e.source === 'ai') ? 'ai' : estimates.some(e => e.source === 'manual') ? 'manual' : 'library'
+  const confidence = estimates.reduce<EstimateConfidence>((c, e) => (CONFIDENCE_RANK[e.confidence] < CONFIDENCE_RANK[c] ? e.confidence : c), 'high')
+  const latest = (pick: (e: MealEstimate) => string) => estimates.map(pick).sort().at(-1)!
+  return {
+    key: mealKey(text),
+    text,
+    kcal: Math.round(totals.kcal),
+    protein_g: round1(totals.protein_g),
+    carbs_g: round1(totals.carbs_g),
+    fat_g: round1(totals.fat_g),
+    confidence,
+    assumptions: estimates.map(e => `${e.text} ${fmtKcal(e.kcal)}`).join(' + '),
+    source,
+    model: estimates.find(e => e.model)?.model ?? null,
+    created_at: latest(e => e.created_at),
+    updated_at: latest(e => e.updated_at),
+    parts
+  }
 }
 
 /** Label figures (library or hand-entered) read as numbers; a model estimate reads as "≈ … est.". */
@@ -310,9 +381,23 @@ export function mealHistory(entries: FoodEntry[], slot?: MealSlot): MealHistoryI
     .sort((a, b) => b.slotCount - a.slotCount || b.count - a.count || a.text.localeCompare(b.text))
 }
 
-/** The canonical spellings of every meal in the log with no figures from any source — what's left to enter or estimate. */
+/**
+ * The canonical spellings of every meal in the log with no figures from any source — what's
+ * left to enter or estimate. A plus-joined text contributes its unknown PARTS, not itself: the
+ * model is asked about "mystery bar", never about "beef sticks + mystery bar" when beef sticks
+ * are already priced, and the answer then serves every combo the part appears in.
+ */
 export function unestimatedMeals(entries: FoodEntry[], index: EstimateIndex): string[] {
-  return mealHistory(entries).filter(h => !lookupEstimate(index, h.text)).map(h => h.text)
+  const out = new Map<string, string>()
+  for (const h of mealHistory(entries)) {
+    if (lookupEstimate(index, h.text)) continue
+    const parts = mealParts(index, h.text)
+    for (const text of parts ? parts.filter(p => !p.estimate).map(p => p.text) : [h.text]) {
+      const key = mealKey(text)
+      if (key && !out.has(key)) out.set(key, text)
+    }
+  }
+  return [...out.values()]
 }
 
 // --- "did you mean …?" ---

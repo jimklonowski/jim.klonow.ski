@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   dayNutrition, fmtEstimate, fmtKcal, fmtMacros, indexEstimates, isDayDone, knownMeals, lookupEstimate, mealHistory,
-  nutritionAverage, nutritionWindow, resolveMealText, slotForTime, suggestMeal, unestimatedMeals
+  mealParts, nutritionAverage, nutritionWindow, resolveMealText, slotForTime, splitParts, suggestMeal, unestimatedMeals
 } from '../shared/utils/nutrition.ts'
 import { mealKey, splitQuantity } from '../shared/utils/mealKey.ts'
 import { LIBRARY_TEXTS, MEAL_LIBRARY, libraryLookup } from '../shared/utils/mealLibrary.ts'
@@ -349,4 +349,61 @@ test('soda calories: label figures per 12 oz, zero for diet, a regular default f
   assert.equal(sodaKcal('Coke', 'Fountain'), null)
   assert.equal(sodaKcal(undefined, undefined), null)
   assert.deepEqual(sodaKcalTotals([{ drink: 'Coke', size: '12oz can' }, { drink: 'Sprite', size: 'Fountain' }]), { kcal: 140, unsized: 1 })
+})
+
+// --- plus-joined texts: several snacks in one slot (2026-10-26) ---
+
+test('a plus-joined text is the sum of its parts when every part is known', () => {
+  const sticks = libraryLookup('beef sticks')
+  const index = indexEstimates([est('apple', 100, 0, 25, 0)])
+  const both = lookupEstimate(index, 'beef sticks + apple')
+  assert.ok(both)
+  assert.equal(both.kcal, sticks.kcal + 100)
+  assert.equal(both.carbs_g, Math.round((sticks.carbs_g + 25) * 10) / 10)
+  assert.equal(both.source, 'ai', 'one model part makes the sum a model figure')
+  assert.equal(both.parts.length, 2)
+  assert.equal(both.parts[1].estimate.kcal, 100)
+  assert.match(both.assumptions, /^beef sticks \d+ \+ apple 100$/)
+  // Order and spacing don't matter; "and" and a bare + do not split.
+  assert.equal(lookupEstimate(index, 'apple  +  beef sticks').kcal, both.kcal)
+  assert.equal(lookupEstimate(index, 'apple and beef sticks'), null)
+  assert.equal(splitParts('beef sticks+apple'), null)
+  assert.deepEqual(splitParts('a + b + c'), ['a', 'b', 'c'])
+  assert.equal(splitParts('just one'), null)
+})
+
+test('a part nobody knows leaves the whole without figures, and names itself as the gap', () => {
+  const index = indexEstimates([])
+  assert.equal(lookupEstimate(index, 'beef sticks + mystery bar'), null)
+  const parts = mealParts(index, 'beef sticks + mystery bar')
+  assert.equal(parts[0].estimate.source, 'library')
+  assert.equal(parts[1].estimate, null)
+  assert.equal(mealParts(index, 'beef sticks'), null, 'a single meal has no parts')
+  // The backfill list asks about the unknown part only, once, however many combos it is in.
+  const entries = [
+    { food: { snack_pm: 'beef sticks + mystery bar' } },
+    { food: { snack_eve: 'mystery bar + watermelon' } },
+    { food: { lunch: 'veggie lasagna' } }
+  ]
+  assert.deepEqual(unestimatedMeals(entries, index), ['mystery bar', 'veggie lasagna'])
+})
+
+test('whole-text figures beat composition, and "N x" multiplies the composed sum', () => {
+  // The library prices this combo as one meal; its parts would not be looked up separately.
+  const combo = libraryLookup('grilled cheese + guac')
+  assert.equal(lookupEstimate(new Map(), 'grilled cheese + guac').kcal, combo.kcal)
+  assert.equal(lookupEstimate(new Map(), 'grilled cheese + guac').parts, undefined)
+  // A hand entry for the whole wins over the parts' sum.
+  const manual = indexEstimates([est('beef sticks + apple', 999, 1, 1, 1, { source: 'manual' }), est('apple', 100, 0, 25, 0)])
+  assert.equal(lookupEstimate(manual, 'beef sticks + apple').kcal, 999)
+  // "2 x beef sticks + apple" = two of everything, per Jim's convention.
+  const index = indexEstimates([est('apple', 100, 0, 25, 0)])
+  const one = lookupEstimate(index, 'beef sticks + apple')
+  const two = lookupEstimate(index, '2 x beef sticks + apple')
+  assert.equal(two.kcal, one.kcal * 2)
+  assert.equal(two.key, mealKey('2 x beef sticks + apple'))
+  // The day total and the home floor marker follow the composed figure.
+  const day = dayNutrition({ food: { snack_pm: 'beef sticks + apple' } }, index)
+  assert.equal(day.kcal, one.kcal)
+  assert.equal(day.missing.length, 0)
 })

@@ -101,6 +101,16 @@
             :text="row.text"
             @replace="pairSlot(row.slot, $event)"
           />
+          <!-- A second snack in the same gap, logged as "<text> + …" (figures = the parts' sum). -->
+          <button
+            v-if="!readonly && row.snack"
+            type="button"
+            class="text-meta text-ghost hover:text-accent cursor-pointer"
+            :title="`Log another ${row.fullLabel.toLowerCase()} in this slot`"
+            @click="startEdit(row.slot, true)"
+          >
+            + another
+          </button>
         </div>
 
         <!-- Each opener names its slot for assistive tech: six "+ add" buttons read the same otherwise. -->
@@ -347,11 +357,13 @@ const saving = ref(false)
 const liveDraft = refDebounced(draft, 350)
 const known = computed(() => knownMeals(entries.value, index.value))
 
-function startEdit(slot: MealSlot) {
+/** Opens the slot's input; `another` seeds it with the saved text plus " + " for a second item. */
+function startEdit(slot: MealSlot, another = false) {
   // Not while a save is in flight: switching slots mid-save let the finishing save close the new
   // edit under the cursor (audit #42 item 38).
   if (saving.value) return
-  draft.value = todayEntry.value?.food?.[slot] ?? ''
+  const text = todayEntry.value?.food?.[slot] ?? ''
+  draft.value = another && text.trim() ? `${text.trim()} + ` : text
   editing.value = slot
 }
 
