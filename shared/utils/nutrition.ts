@@ -187,11 +187,30 @@ export function splitCount(text: string): MealCount | null {
   return n > 0 && n <= 50 ? { n, kind: 'count', unit, rest } : null
 }
 
+/** A lookup at some trust level; `plain` skips the singular-word rule (a typed count already says how many). */
+type Lookup = (text: string, plain?: boolean) => MealEstimate | null
+
+/**
+ * "beef stick", "mozzarella stick", "chicken strip": a singular unit word ending a meal whose
+ * serving is more than one of that unit means ONE of them. Plural folding keys "beef stick" and
+ * "beef sticks" the same, so this is the only place the singular can be heard (Jim, 2026-10-26:
+ * "apple + beef stick" meant one stick, not the two-stick serving).
+ */
+function singularServing(e: MealEstimate, text: string): MealEstimate {
+  const p = e.portion
+  if (!p || p.count === 1) return e
+  const last = text.trim().toLowerCase().split(/\s+/).at(-1)
+  if (last !== p.unit) return e
+  return scaleEstimate(e, 1 / p.count, text, `1 ${p.unit} (a serving is ${p.count}) of`)
+}
+
 /** The figures for "<count> <meal>", or null when the rest is unknown or the unit doesn't fit. */
-function countedEstimate(index: EstimateIndex, text: string): MealEstimate | null {
+function countedEstimate(text: string, lookup: Lookup): MealEstimate | null {
   const c = splitCount(text)
   if (!c) return null
-  const base = lookupEstimate(index, c.rest)
+  // The serving as declared: "1 beef stick" counts against the two-stick serving, not against
+  // the singular rule's one stick (which would then be multiplied by one and read twice over).
+  const base = lookup(c.rest, true)
   if (!base) return null
   const p = base.portion
   const unitName = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
@@ -213,42 +232,51 @@ function countedEstimate(index: EstimateIndex, text: string): MealEstimate | nul
 /**
  * The figures for a meal text, or null. Trust in the SOURCE comes first, the path second: label
  * figures — a hand entry (the most recent intent), then the code library — beat a model estimate
- * whether they answer the text itself or, for "N x <meal>", the meal it multiplies (two sandwiches
- * AND two guac cups, per Jim's convention). Only when no label source knows the meal at either
- * level does a model row answer, again the exact text before the multiplied one. So a regular
- * joining the library takes over every quantity of itself even where an older model guess for
- * the "2 x" text is still cached (audit #42 item 8).
+ * whether they answer the text itself, or, for "N x <meal>", the meal it multiplies (two
+ * sandwiches AND two guac cups, per Jim's convention), or a typed count in the serving's unit
+ * ("1 beef stick"), or every part of a joined text ("apple + beef stick"). Only when no label
+ * source knows the meal by any of those paths does a model row answer, by the same paths in the
+ * same order. So a regular joining the library takes over every quantity and every combo of
+ * itself even where an older model guess for the "2 x" text or the combo is still cached
+ * (audit #42 item 8; the combo case bit Jim on 2026-10-26: a cached guess of "2 sticks and 2
+ * apples" shadowed the parts' own label figures).
  */
-export function lookupEstimate(index: EstimateIndex, text: string | null | undefined): MealEstimate | null {
-  const key = mealKey(text)
-  if (!key) return null
-  const trimmed = text!.trim()
+export function lookupEstimate(index: EstimateIndex, text: string | null | undefined, plain = false): MealEstimate | null {
+  if (!mealKey(text)) return null
+  return resolve(index, text!.trim(), true, plain) ?? resolve(index, text!.trim(), false, plain)
+}
+
+/**
+ * One trust level of the lookup. `labelOnly` reads hand entries and the library only — and, for
+ * a count or a joined text, resolves the meal or the parts at that same level, so a label-grade
+ * answer is label-grade all the way down. The model level resolves parts through the full
+ * lookup (a known part is still label-grade; only the whole is a model figure).
+ */
+function resolve(index: EstimateIndex, trimmed: string, labelOnly: boolean, plain = false): MealEstimate | null {
+  const key = mealKey(trimmed)
   const qty = splitQuantity(trimmed)
   const base = qty ? { text: qty.rest, key: mealKey(qty.rest) } : null
+  const whole = (text: string, k: string) => (labelOnly ? labelLookup(index, text, k) : index.get(k) ?? null)
+  const lookup: Lookup = labelOnly ? (t, p) => (mealKey(t) ? resolve(index, t.trim(), true, p) : null) : (t, p) => lookupEstimate(index, t, p)
+  const singular = (e: MealEstimate, text: string) => (labelOnly && !plain ? singularServing(e, text) : e)
 
-  const label = labelLookup(index, trimmed, key)
-  if (label) return label
+  // The text itself, then the meal an "N x" multiplies. A singular unit word is one of them.
+  const direct = whole(trimmed, key)
+  if (direct) return singular(direct, trimmed)
   if (base) {
-    const labelBase = labelLookup(index, base.text, base.key)
-    if (labelBase) return scaleEstimate(labelBase, qty!.n, trimmed)
+    const directBase = whole(base.text, base.key)
+    if (directBase) return scaleEstimate(singular(directBase, base.text), qty!.n, trimmed)
   }
-  const row = index.get(key)
-  if (row) return row
+  // Then a count in the meal's own unit ("1 beef stick", "whole costco pizza", "2 kiwi"), then
+  // a joined text as the sum of its parts when every part is known ("beef sticks, apple" in one
+  // snack slot). Both after the whole-text paths, so a combo priced as one meal ("grilled cheese
+  // + guac") keeps those figures. With a leading "N x" the WHOLE is resolved and then multiplied
+  // — reading the text as typed would hand the "2 x" to the first part alone.
   if (base) {
-    const rowBase = index.get(base.key)
-    if (rowBase) return scaleEstimate(rowBase, qty!.n, trimmed)
-  }
-  // Then a count in the meal's own unit ("1 beef stick", "whole costco pizza", "2 kiwi").
-  // Last: a joined text is the sum of its parts when every part is known on its own ("beef
-  // sticks, apple" in one snack slot — two snacks, one slot, no second slot needed). After the
-  // whole-text paths, so a combo the library or a hand entry prices as one meal ("grilled cheese
-  // + guac") keeps those figures. With a leading "N x" the WHOLE is composed and then multiplied
-  // — composing the text as typed would hand the "2 x" to the first part alone.
-  if (base) {
-    const compositeBase = countedEstimate(index, base.text) ?? composeEstimate(index, base.text)
+    const compositeBase = countedEstimate(base.text, lookup) ?? composeEstimate(base.text, lookup)
     return compositeBase ? scaleEstimate(compositeBase, qty!.n, trimmed) : null
   }
-  return countedEstimate(index, trimmed) ?? composeEstimate(index, trimmed)
+  return countedEstimate(trimmed, lookup) ?? composeEstimate(trimmed, lookup)
 }
 
 /**
@@ -280,10 +308,12 @@ export function mealParts(index: EstimateIndex, text: string | null | undefined)
 
 const CONFIDENCE_RANK: Record<EstimateConfidence, number> = { low: 0, medium: 1, high: 2 }
 
-/** The summed figures of a plus-joined text, or null when it is one meal or any part is unknown. */
-function composeEstimate(index: EstimateIndex, text: string): MealEstimate | null {
-  const parts = mealParts(index, text)
-  if (!parts || parts.some(p => !p.estimate)) return null
+/** The summed figures of a joined text, or null when it is one meal or any part is unknown (to `lookup`). */
+function composeEstimate(text: string, lookup: Lookup): MealEstimate | null {
+  const split = splitParts(text)
+  if (!split) return null
+  const parts: MealPart[] = split.map(p => ({ text: p, estimate: lookup(p) }))
+  if (parts.some(p => !p.estimate)) return null
   const estimates = parts.map(p => p.estimate!)
   const totals = estimates.reduce(
     (t, e) => ({ kcal: t.kcal + e.kcal, protein_g: t.protein_g + e.protein_g, carbs_g: t.carbs_g + e.carbs_g, fat_g: t.fat_g + e.fat_g }),

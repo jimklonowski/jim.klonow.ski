@@ -477,3 +477,35 @@ test('the rice bowls count the whole cup of uncooked rice, and "rice + <known>" 
   assert.equal(plate.kcal, libraryLookup('chicken strips').kcal + libraryLookup('roasted veggies').kcal + rice.kcal)
   assert.equal(lookupEstimate(new Map(), 'leftover rice').kcal, 205)
 })
+
+// --- label parts beat a cached model guess for the combo; a singular unit word is one (2026-10-26) ---
+
+test('a sum of label parts outranks a cached model row for the whole combo', () => {
+  // The backfill once guessed "2 sticks and 2 apples" for this exact text; the parts know better.
+  const stale = indexEstimates([est('apple + beef stick', 390, 13, 52, 16)])
+  const e = lookupEstimate(stale, 'apple + beef stick')
+  assert.equal(e.source, 'library')
+  assert.equal(e.kcal, libraryLookup('apple').kcal + libraryLookup('beef sticks').kcal / 2)
+  // A model row still answers when a part has no label figures — but as the whole-text row, not a part sum.
+  const onlyAi = indexEstimates([est('apple + mystery bar', 300, 5, 40, 10)])
+  assert.equal(lookupEstimate(onlyAi, 'apple + mystery bar').kcal, 300)
+  // And a model row for a PART still composes at the model level when nothing better exists.
+  const aiPart = indexEstimates([est('mystery bar', 200, 5, 30, 8)])
+  const composed = lookupEstimate(aiPart, 'apple + mystery bar')
+  assert.equal(composed.kcal, libraryLookup('apple').kcal + 200)
+  assert.equal(composed.source, 'ai')
+  // A hand entry for the whole still beats everything.
+  const manual = indexEstimates([est('apple + beef stick', 999, 1, 1, 1, { source: 'manual' })])
+  assert.equal(lookupEstimate(manual, 'apple + beef stick').kcal, 999)
+})
+
+test('a singular unit word ending a counted meal means one of them', () => {
+  const two = libraryLookup('beef sticks')
+  assert.equal(lookupEstimate(new Map(), 'beef stick').kcal, two.kcal / 2)
+  assert.equal(lookupEstimate(new Map(), 'Beef Stick').kcal, two.kcal / 2)
+  assert.equal(lookupEstimate(new Map(), 'beef sticks').kcal, two.kcal, 'plural is still the serving')
+  assert.equal(lookupEstimate(new Map(), 'mozzarella stick').kcal, libraryLookup('mozzarella sticks').kcal / 10)
+  assert.equal(lookupEstimate(new Map(), '2 x beef stick').kcal, two.kcal, 'two of one stick')
+  assert.equal(lookupEstimate(new Map(), 'chomps').kcal, two.kcal, 'an alias that is not the unit word is the serving')
+  assert.match(lookupEstimate(new Map(), 'beef stick').assumptions, /^1 stick \(a serving is 2\) of beef sticks/)
+})
