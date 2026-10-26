@@ -23,8 +23,9 @@ export interface ProfileField {
   /** Shown after a 'number' value ("100 oz"). */
   unit?: string
   /**
-   * A setting of the owner's own trackers (water cup, protein target), not a clinical fact: the
-   * doctor's curated view neither receives it from the API nor lists it on the card.
+   * A setting of the owner's own trackers (water cup, protein target), not a clinical fact: set
+   * from the tracker's own ▾ panel on the hub, never listed on the /journal/vaccines card, and
+   * withheld from the doctor's curated view by the API.
    */
   tracker?: boolean
 }
@@ -34,11 +35,12 @@ export const BLOOD_TYPES = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 
 export const PROFILE_FIELDS: ProfileField[] = [
   { key: 'blood_type', label: 'Blood type', kind: 'select', options: BLOOD_TYPES, hint: 'ABO + Rh' },
-  // The water tracker's two settings (shared/utils/water.ts reads them, with defaults when unset).
-  // The tracker's own ▾ panel edits these too; the card is where they're listed with everything else.
+  // The water tracker's two settings (shared/utils/water.ts reads them, with defaults when unset),
+  // edited from JournalWaterTracker's ▾ panel.
   { key: 'water_goal_oz', label: 'Water goal', kind: 'number', min: 8, max: 400, unit: 'oz', hint: 'per day', tracker: true },
   { key: 'cup_oz', label: 'Water cup', kind: 'number', min: 1, max: 128, unit: 'oz', hint: 'what one + CUP tap logs — less than the cup\'s size once it\'s full of ice', tracker: true },
-  // The hub's food card reads the 7-day protein average against this (shared/utils/nutrition.ts).
+  // The hub's food card reads the 7-day protein average against this (shared/utils/nutrition.ts)
+  // and the home page's PROTEIN row today's grams; set from JournalFoodToday's ▾ panel.
   { key: 'protein_target_g', label: 'Protein target', kind: 'number', min: 20, max: 500, unit: 'g', hint: 'per day, for the food card', tracker: true }
 ]
 

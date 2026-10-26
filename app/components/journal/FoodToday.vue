@@ -159,18 +159,72 @@
         v-else
         class="text-faint"
       >No fully estimated days in the last week.</span>
-      <!-- Meals with no figures from any source. The AI pass is explicit and confirmed: it
-           spends tokens, and hand-entered label figures are the preferred path. -->
-      <button
-        v-if="isOwner && unestimated.length"
-        type="button"
-        class="ml-auto text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
-        :disabled="backfilling"
-        :title="`Meals without figures: ${unestimated.slice(0, 8).join(', ')}${unestimated.length > 8 ? ', …' : ''}`"
-        @click="backfill"
+      <!-- The owner's two controls stay together at the right edge, so the ▾ is the last thing
+           on the row whether or not the backfill button is there (and wraps with it). -->
+      <span
+        v-if="isOwner"
+        class="ml-auto flex items-baseline gap-3"
       >
-        {{ backfilling ? `estimating ${done}/${total}…` : `${unestimated.length} meal${unestimated.length === 1 ? '' : 's'} without figures · ESTIMATE WITH AI` }}
-      </button>
+        <!-- Meals with no figures from any source. The AI pass is explicit and confirmed: it
+             spends tokens, and hand-entered label figures are the preferred path. -->
+        <button
+          v-if="unestimated.length"
+          type="button"
+          class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
+          :disabled="backfilling"
+          :title="`Meals without figures: ${unestimated.slice(0, 8).join(', ')}${unestimated.length > 8 ? ', …' : ''}`"
+          @click="backfill"
+        >
+          {{ backfilling ? `estimating ${done}/${total}…` : `${unestimated.length} meal${unestimated.length === 1 ? '' : 's'} without figures · ESTIMATE WITH AI` }}
+        </button>
+        <!-- The protein target is set here, where it's compared, the way the water tracker's ▾
+             sets its goal and cup — it used to live only on the Vaccines card (Jim, 2026-10-26).
+             Owner-only like every profile write; the demo sandbox has no profile to save to. -->
+        <button
+          type="button"
+          class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer"
+          :aria-label="targetOpen ? 'Hide the protein target' : 'Set the daily protein target'"
+          :aria-expanded="targetOpen"
+          @click="targetOpen = !targetOpen"
+        >
+          {{ targetOpen ? '▴' : '▾' }}
+        </button>
+      </span>
+    </div>
+
+    <div
+      v-if="targetOpen && isOwner"
+      class="mt-3 pt-3 border-t border-line-soft"
+    >
+      <div class="flex items-end gap-2.5">
+        <!-- "TARGET", not "PROTEIN TARGET": the long label wrapped at phone width. -->
+        <UFormField
+          label="TARGET (g / day)"
+          class="flex-1"
+        >
+          <UInput
+            v-model.number="targetDraft"
+            type="number"
+            inputmode="numeric"
+            :min="PROTEIN_TARGET.min"
+            :max="PROTEIN_TARGET.max"
+            step="1"
+            placeholder="150"
+            class="w-full"
+          />
+        </UFormField>
+        <button
+          type="button"
+          class="tui-btn"
+          :disabled="savingTarget || !targetDirty || !targetValid"
+          @click="saveTarget"
+        >
+          {{ savingTarget ? 'SAVING…' : proteinTarget && targetDraft === '' ? 'CLEAR TARGET' : 'SAVE TARGET' }}
+        </button>
+      </div>
+      <p class="mt-1 text-micro text-faint">
+        The 7-day average above and the home page's PROTEIN row read against it. Clear it to turn the comparison off.
+      </p>
     </div>
   </section>
 </template>
@@ -187,7 +241,7 @@ import {
   MEAL_SLOTS, MEAL_SLOT_LABELS, MEAL_SLOT_PLACEHOLDERS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals, mealHistoryBySlot,
   nutritionAverage, nutritionIsEstimated, nutritionWindow, resolveMealText, slotForTime, unestimatedMeals, type MealSlot
 } from '#shared/utils/nutrition'
-import { profileNumber } from '#shared/utils/profile'
+import { PROFILE_FIELDS, profileNumber } from '#shared/utils/profile'
 
 const props = withDefaults(defineProps<{
   readonly?: boolean
@@ -197,7 +251,7 @@ const toast = useToast()
 const route = useRoute()
 const { isOwner } = await useAuth()
 const { data } = await useJournalEntries()
-const { data: profileData } = await useProfile()
+const { data: profileData, refresh: refreshProfile } = await useProfile()
 const { index, estimate } = await useMealEstimates()
 
 const today = useToday()
@@ -343,6 +397,42 @@ async function writeSlot(slot: MealSlot, text: string, matched: boolean) {
   }
   finally {
     saving.value = false
+  }
+}
+
+// --- protein target (owner) ---
+// The profile row the average is compared against, edited from the ▾ beside it. Bounds come from
+// the field definition so the input refuses what the server would. The draft follows the saved
+// value until edited, as the water settings do, so a refresh elsewhere doesn't wipe typing.
+const PROTEIN_TARGET = PROFILE_FIELDS.find(f => f.key === 'protein_target_g')!
+const targetOpen = ref(false)
+const targetDraft = ref<number | ''>(proteinTarget.value ?? '')
+watch(proteinTarget, (v) => {
+  if (!targetDirty.value) targetDraft.value = v ?? ''
+})
+const targetDirty = computed(() => targetDraft.value !== (proteinTarget.value ?? ''))
+// '' is valid as a clear; a number must sit within the field's bounds.
+const targetValid = computed(() =>
+  targetDraft.value === ''
+  || (typeof targetDraft.value === 'number' && targetDraft.value >= (PROTEIN_TARGET.min ?? 1) && targetDraft.value <= (PROTEIN_TARGET.max ?? Infinity))
+)
+const savingTarget = ref(false)
+
+async function saveTarget() {
+  if (!targetDirty.value || !targetValid.value) return
+  savingTarget.value = true
+  const cleared = targetDraft.value === ''
+  try {
+    await $fetch('/api/journal/profile', { method: 'POST', body: { key: PROTEIN_TARGET.key, value: cleared ? '' : String(targetDraft.value) } })
+    await refreshProfile()
+    targetOpen.value = false
+    toast.add({ title: cleared ? 'Protein target cleared' : `Protein target set to ${targetDraft.value} g`, color: 'success', icon: 'i-lucide-check' })
+  }
+  catch (err) {
+    toast.add({ title: 'Could not save the protein target', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
+  }
+  finally {
+    savingTarget.value = false
   }
 }
 
