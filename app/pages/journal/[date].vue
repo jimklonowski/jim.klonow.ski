@@ -87,9 +87,13 @@
                 class="w-full"
               />
             </UFormField>
+            <!-- Each vital's hint is its change from the last prior entry that logged that
+                 field ("▲ +0.4 vs Oct 25"), live as the value is typed — the same slot the
+                 Dose field uses for its IU→mg equivalent. -->
             <UFormField
               label="Weight (lbs)"
               :ui="FIELD_UI"
+              :hint="vitalHint('weight_lbs', 1)"
             >
               <UInput
                 v-model.number="form.weight_lbs"
@@ -102,6 +106,7 @@
             <UFormField
               label="BP Sys"
               :ui="FIELD_UI"
+              :hint="vitalHint('bp_systolic')"
             >
               <UInput
                 v-model.number="form.bp_systolic"
@@ -113,6 +118,7 @@
             <UFormField
               label="BP Dia"
               :ui="FIELD_UI"
+              :hint="vitalHint('bp_diastolic')"
             >
               <UInput
                 v-model.number="form.bp_diastolic"
@@ -124,6 +130,7 @@
             <UFormField
               label="RHR (bpm)"
               :ui="FIELD_UI"
+              :hint="vitalHint('rhr')"
             >
               <UInput
                 v-model.number="form.rhr"
@@ -135,6 +142,7 @@
             <UFormField
               label="HRV (ms)"
               :ui="FIELD_UI"
+              :hint="vitalHint('hrv')"
             >
               <UInput
                 v-model.number="form.hrv"
@@ -1055,6 +1063,29 @@ const prevEntry = computed(() => {
   if (!allEntries.value?.length) return null
   return allEntries.value.filter(e => e.date < dateParam.value).at(-1) ?? null
 })
+
+type VitalKey = 'weight_lbs' | 'bp_systolic' | 'bp_diastolic' | 'rhr' | 'hrv'
+
+/**
+ * "▲ +0.4 vs Oct 25" / "▼ -3 vs Oct 24" / "● even vs Oct 25" beside a vital's label, live as
+ * the value is typed. Compared against the most recent *prior* entry that logged that field —
+ * not simply prevEntry, since a passively-imported row (Apple Health writes weight alone) or a
+ * food-only day would otherwise blank the hint for every other vital. The date is named so a
+ * gap reads as one: "vs Oct 19" says the comparison is a week old, not yesterday's. Same
+ * glyphs as the hub's vital tiles; no good/bad colouring here — the hint slot is one tone.
+ */
+function vitalHint(key: VitalKey, decimals = 0): string | undefined {
+  const current = form[key]
+  if (typeof current !== 'number' || !Number.isFinite(current)) return undefined
+  const prior = allEntries.value?.findLast(e => e.date < dateParam.value && e[key] != null)
+  const before = prior?.[key]
+  if (prior == null || before == null) return undefined
+  const when = new Date(prior.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const diff = current - before
+  if (Math.abs(diff) < 10 ** -decimals / 2) return `● even vs ${when}`
+  const magnitude = decimals ? Math.abs(diff).toFixed(decimals) : Math.round(Math.abs(diff)).toString()
+  return `${diff > 0 ? '▲ +' : '▼ -'}${magnitude} vs ${when}`
+}
 
 const nextEntry = computed(() => {
   if (!allEntries.value?.length) return null
