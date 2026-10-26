@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   dayNutrition, fmtEstimate, fmtKcal, fmtMacros, indexEstimates, isDayDone, knownMeals, lookupEstimate, mealHistory,
-  mealParts, nutritionAverage, nutritionWindow, resolveMealText, slotForTime, splitParts, suggestMeal, unestimatedMeals
+  mealParts, nutritionAverage, nutritionWindow, resolveMealText, slotForTime, splitCount, splitParts, suggestMeal, unestimatedMeals
 } from '../shared/utils/nutrition.ts'
 import { mealKey, splitQuantity } from '../shared/utils/mealKey.ts'
 import { LIBRARY_TEXTS, MEAL_LIBRARY, libraryLookup } from '../shared/utils/mealLibrary.ts'
@@ -355,18 +355,18 @@ test('soda calories: label figures per 12 oz, zero for diet, a regular default f
 
 test('a plus-joined text is the sum of its parts when every part is known', () => {
   const sticks = libraryLookup('beef sticks')
-  const index = indexEstimates([est('apple', 100, 0, 25, 0)])
-  const both = lookupEstimate(index, 'beef sticks + apple')
+  const index = indexEstimates([est('veggie lasagna', 100, 0, 25, 0)])
+  const both = lookupEstimate(index, 'beef sticks + veggie lasagna')
   assert.ok(both)
   assert.equal(both.kcal, sticks.kcal + 100)
   assert.equal(both.carbs_g, Math.round((sticks.carbs_g + 25) * 10) / 10)
   assert.equal(both.source, 'ai', 'one model part makes the sum a model figure')
   assert.equal(both.parts.length, 2)
   assert.equal(both.parts[1].estimate.kcal, 100)
-  assert.match(both.assumptions, /^beef sticks \d+ \+ apple 100$/)
+  assert.match(both.assumptions, /^beef sticks \d+ \+ veggie lasagna 100$/)
   // Order and spacing don't matter; "and" and a bare + do not split.
-  assert.equal(lookupEstimate(index, 'apple  +  beef sticks').kcal, both.kcal)
-  assert.equal(lookupEstimate(index, 'apple and beef sticks'), null)
+  assert.equal(lookupEstimate(index, 'veggie lasagna  +  beef sticks').kcal, both.kcal)
+  assert.equal(lookupEstimate(index, 'veggie lasagna and beef sticks'), null)
   assert.equal(splitParts('beef sticks+apple'), null)
   assert.deepEqual(splitParts('a + b + c'), ['a', 'b', 'c'])
   assert.equal(splitParts('just one'), null)
@@ -394,16 +394,86 @@ test('whole-text figures beat composition, and "N x" multiplies the composed sum
   assert.equal(lookupEstimate(new Map(), 'grilled cheese + guac').kcal, combo.kcal)
   assert.equal(lookupEstimate(new Map(), 'grilled cheese + guac').parts, undefined)
   // A hand entry for the whole wins over the parts' sum.
-  const manual = indexEstimates([est('beef sticks + apple', 999, 1, 1, 1, { source: 'manual' }), est('apple', 100, 0, 25, 0)])
-  assert.equal(lookupEstimate(manual, 'beef sticks + apple').kcal, 999)
+  const manual = indexEstimates([est('beef sticks + veggie lasagna', 999, 1, 1, 1, { source: 'manual' }), est('veggie lasagna', 100, 0, 25, 0)])
+  assert.equal(lookupEstimate(manual, 'beef sticks + veggie lasagna').kcal, 999)
   // "2 x beef sticks + apple" = two of everything, per Jim's convention.
-  const index = indexEstimates([est('apple', 100, 0, 25, 0)])
-  const one = lookupEstimate(index, 'beef sticks + apple')
-  const two = lookupEstimate(index, '2 x beef sticks + apple')
+  const index = indexEstimates([est('veggie lasagna', 100, 0, 25, 0)])
+  const one = lookupEstimate(index, 'beef sticks + veggie lasagna')
+  const two = lookupEstimate(index, '2 x beef sticks + veggie lasagna')
   assert.equal(two.kcal, one.kcal * 2)
-  assert.equal(two.key, mealKey('2 x beef sticks + apple'))
+  assert.equal(two.key, mealKey('2 x beef sticks + veggie lasagna'))
   // The day total and the home floor marker follow the composed figure.
-  const day = dayNutrition({ food: { snack_pm: 'beef sticks + apple' } }, index)
+  const day = dayNutrition({ food: { snack_pm: 'beef sticks + veggie lasagna' } }, index)
   assert.equal(day.kcal, one.kcal)
   assert.equal(day.missing.length, 0)
+})
+
+// --- counts in the serving's own unit, and comma-joined snacks (2026-10-26) ---
+
+test('a count before a meal is read in the serving\'s own unit when the library declares one', () => {
+  const two = libraryLookup('beef sticks')
+  const one = lookupEstimate(new Map(), '1 beef stick')
+  assert.equal(one.kcal, two.kcal / 2)
+  assert.equal(one.key, mealKey('1 beef stick'), 'the count stays in the key — history re-reads correctly')
+  assert.match(one.assumptions, /^1 stick \(a serving is 2\) of beef sticks/)
+  assert.equal(lookupEstimate(new Map(), '3 beef sticks').kcal, two.kcal * 1.5)
+  assert.equal(lookupEstimate(new Map(), 'three beef sticks').kcal, two.kcal * 1.5)
+  // "N x" still multiplies the whole serving.
+  assert.equal(lookupEstimate(new Map(), '2 x beef sticks').kcal, two.kcal * 2)
+  // Slices of a pizza, with the whole declared: 4 of 8 is the serving, 8 is two, "whole" is two.
+  const half = libraryLookup('costco cheese pizza')
+  assert.equal(lookupEstimate(new Map(), '4 slices costco pizza').kcal, half.kcal)
+  assert.equal(lookupEstimate(new Map(), '8 slices of costco pizza').kcal, half.kcal * 2)
+  assert.equal(lookupEstimate(new Map(), 'whole costco pizza').kcal, half.kcal * 2)
+  assert.equal(lookupEstimate(new Map(), 'half costco pizza').kcal, half.kcal)
+  assert.equal(lookupEstimate(new Map(), '1/2 costco pizza').kcal, half.kcal)
+  assert.equal(lookupEstimate(new Map(), '½ costco pizza').kcal, half.kcal)
+  assert.equal(lookupEstimate(new Map(), '¼ costco pizza').kcal, half.kcal / 2)
+  assert.equal(lookupEstimate(new Map(), '2 slices costco pizza').kcal, half.kcal / 2)
+  // A meal with no declared portion is simply multiplied.
+  assert.equal(lookupEstimate(new Map(), '2 kiwi').kcal, libraryLookup('kiwi').kcal * 2)
+  // A typed unit that is not the serving's own is unknown rather than wrong.
+  assert.equal(lookupEstimate(new Map(), '3 cups beef sticks'), null)
+  assert.equal(lookupEstimate(new Map(), '10 mozzarella sticks').kcal, libraryLookup('mozzarella sticks').kcal)
+  assert.equal(lookupEstimate(new Map(), '6 mozzarella sticks').kcal, Math.round(libraryLookup('mozzarella sticks').kcal * 0.6))
+  // A number that is part of a name, not a count of a known meal, stays unknown.
+  assert.equal(lookupEstimate(new Map(), '7/11 slurpee'), null)
+  assert.equal(lookupEstimate(new Map(), '2 eggs'), null)
+})
+
+test('splitCount reads the forms Jim types', () => {
+  assert.deepEqual(splitCount('1 beef stick'), { n: 1, kind: 'count', unit: undefined, rest: 'beef stick' })
+  assert.deepEqual(splitCount('4 slices costco pizza'), { n: 4, kind: 'count', unit: 'slice', rest: 'costco pizza' })
+  assert.deepEqual(splitCount('8 slices of costco pizza'), { n: 8, kind: 'count', unit: 'slice', rest: 'costco pizza' })
+  assert.deepEqual(splitCount('whole costco pizza'), { n: 1, kind: 'whole', unit: undefined, rest: 'costco pizza' })
+  assert.deepEqual(splitCount('a whole costco pizza'), { n: 1, kind: 'whole', unit: undefined, rest: 'costco pizza' })
+  assert.deepEqual(splitCount('half costco pizza'), { n: 0.5, kind: 'fraction', unit: undefined, rest: 'costco pizza' })
+  assert.deepEqual(splitCount('2 oz jerky'), { n: 2, kind: 'count', unit: 'oz', rest: 'jerky' })
+  assert.equal(splitCount('beef sticks'), null)
+  assert.equal(splitCount('2 x beef sticks').rest, 'x beef sticks', 'the N x form is splitQuantity\'s, and never resolves here')
+})
+
+test('commas join snacks the same way a plus does', () => {
+  const sticks = libraryLookup('beef sticks')
+  const apple = libraryLookup('apple')
+  const kiwi = libraryLookup('kiwi')
+  const combo = lookupEstimate(new Map(), 'beef sticks, apple, 2 kiwi')
+  assert.ok(combo)
+  assert.equal(combo.kcal, sticks.kcal + apple.kcal + kiwi.kcal * 2)
+  assert.equal(combo.source, 'library')
+  assert.deepEqual(splitParts('jerky, beef sticks'), ['jerky', 'beef sticks'])
+  assert.deepEqual(splitParts('Beef sticks , apples'), ['Beef sticks', 'apples'])
+  assert.equal(lookupEstimate(new Map(), 'jerky, beef sticks').kcal, libraryLookup('jerky').kcal + sticks.kcal)
+})
+
+test('the rice bowls count the whole cup of uncooked rice, and "rice + <known>" composes', () => {
+  const rice = libraryLookup('rice')
+  assert.equal(rice.kcal, 675)
+  assert.equal(lookupEstimate(new Map(), 'rice + tilapia').kcal, rice.kcal + libraryLookup('tilapia').kcal)
+  const sirloin = libraryLookup('costco grass fed beef sirloin slices')
+  assert.equal(sirloin.kcal, 320)
+  assert.equal(lookupEstimate(new Map(), 'Rice + Costco grass fed beef sirloin slices').kcal, rice.kcal + sirloin.kcal)
+  const plate = lookupEstimate(new Map(), 'Chicken + roasted veggies + rice')
+  assert.equal(plate.kcal, libraryLookup('chicken strips').kcal + libraryLookup('roasted veggies').kcal + rice.kcal)
+  assert.equal(lookupEstimate(new Map(), 'leftover rice').kcal, 205)
 })
