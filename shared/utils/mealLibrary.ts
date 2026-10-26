@@ -302,6 +302,13 @@ export const ITEMS = {
     portion: '1 oz Kirkland Signature steak strips',
     source: 'bag label — per 1 oz (28 g) serving, 12 per bag'
   },
+  // Cloud 9 Mango Sticky Rice rice crispies (180 Snacks, Costco 21-ct bag), bag label (Jim,
+  // 2026-10-26): 190 kcal / 7 g fat / 31 g carbs / 1 g protein per 1 bar (43 g).
+  cloud9_mango_sticky_rice_bar: {
+    kcal: 190, protein_g: 1, carbs_g: 31, fat_g: 7,
+    portion: '1 Cloud 9 Mango Sticky Rice crispy bar (43 g)',
+    source: 'bag label — per bar, 21 per bag'
+  },
   // Tattooed Chef Sheet Pan Vegetables (Costco 4 lb bag; brussels, sweet potato, broccoli, red
   // onion, zucchini): 120 kcal / 9 g fat / 11 g carbs / 2 g protein per 1 cup (125 g), bag label
   // (Jim, 2026-10-26).
@@ -492,6 +499,14 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
     parts: [['tattooed_chef_veggies_cup', 1.5]],
     note: '1½ cups of Tattooed Chef sheet pan vegetables (assumed — confirm the share)',
     portion: { count: 1.5, unit: 'cup' }
+  },
+  // The mango sticky rice crispy bar, one a snack; "2 mango sticky rice bars" for two.
+  {
+    text: 'mango sticky rice bar',
+    aliases: ['mango sticky rice rice crispies', 'mango sticky rice crispies', 'mango sticky rice', 'mango rice crispies', 'cloud 9 mango sticky rice', 'cloud9 mango sticky rice', 'mango sticky rice crispy bar'],
+    parts: [['cloud9_mango_sticky_rice_bar', 1]],
+    note: 'one Cloud 9 Mango Sticky Rice crispy bar',
+    portion: { count: 1, unit: 'bar' }
   },
   // Kirkland steak strips; a snack is read as 2 oz — ESTIMATED, confirm.
   {
