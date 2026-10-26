@@ -326,7 +326,10 @@ useSeoMeta({ title: 'Journal · Vaccines' })
 const { role, isOwner } = await useAuth()
 // The card lists what the API returns for this role: the doctor's view has no water or food
 // tracking, so their cup size and protein target are neither sent nor shown as "not recorded".
-const profileFields = computed(() => profileFieldsFor(role.value))
+// Facts only. The tracker settings (water goal and cup, protein target) are set on their own
+// widgets on the hub, where they're compared; listing them here too put the protein target on a
+// page with no reason to visit it (Jim, 2026-10-26).
+const profileFields = computed(() => profileFieldsFor(role.value).filter(f => !f.tracker))
 
 const [{ data, refresh, error }, { data: profileData, refresh: refreshProfile }] = await Promise.all([
   useVaccinations(),

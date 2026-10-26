@@ -9,7 +9,7 @@
 // under. A one-off that doesn't deserve code is entered by hand on its chip instead
 // (source 'manual'); a hand entry wins over this file when both exist.
 import { mealKey } from './mealKey.ts'
-import type { MealEstimate } from './nutrition.ts'
+import type { MealEstimate, MealPortion } from './nutrition.ts'
 
 export interface LibraryItem {
   kcal: number
@@ -73,8 +73,14 @@ export const ITEMS = {
   },
 
   // --- the rice-cooker bowls ---
-  // One cup of uncooked long-grain rice makes about three cups cooked and feeds several meals;
-  // a bowl is read as ONE cup cooked — CONFIRM the share per bowl.
+  // Jim starts a bowl with ONE CUP of uncooked long-grain white rice in the cooker and eats the
+  // lot (2026-10-26) — about three cups cooked. The bowls below count the whole cup; the cooked
+  // cup stays for leftovers.
+  rice_uncooked_cup: {
+    kcal: 675, protein_g: 13.2, carbs_g: 148, fat_g: 1.2,
+    portion: '1 cup uncooked long-grain white rice (185 g, ≈ 3 cups cooked)',
+    source: 'USDA FoodData Central — rice, white, long-grain, regular, raw, enriched; the whole pot (Jim, 2026-10-26)'
+  },
   rice_cooked_cup: {
     kcal: 205, protein_g: 4.3, carbs_g: 44.5, fat_g: 0.4,
     portion: '1 cup cooked long-grain white rice (158 g)',
@@ -101,12 +107,20 @@ export const ITEMS = {
     portion: 'the soy–mirin–chili-oil pan sauce, one bowl\'s share',
     source: 'estimated from the recipe (1 tbsp soy, 1 tbsp mirin, 1 tsp sugar, 1 tsp chili oil) — confirm'
   },
-  // Costco's 2 lb bag; the label is per 4 oz fillet. (A 10 oz retail pack of the same name reads
-  // 280–290 kcal per 147 g fillet — a bigger, crustier fillet; confirm against the Costco bag.)
+  // Costco's 2 lb bag, box label (Jim, 2026-10-26): 210 kcal / 9 g fat / 13 g carbs / 17 g
+  // protein per 4 oz (112 g) serving, which the box calls "about 1⅓ fillet" — so ONE fillet is
+  // 3 oz, three-quarters of a serving.
   sea_cuisine_tilapia_fillet: {
-    kcal: 180, protein_g: 17, carbs_g: 9, fat_g: 8,
-    portion: '1 Sea Cuisine tortilla-crusted tilapia fillet (4 oz)',
-    source: 'https://www.costco.com/p/-/sea-cuisine-tortilla-crusted-tilapia-2-lbs/100443807 — 4 oz serving label'
+    kcal: 158, protein_g: 12.8, carbs_g: 9.8, fat_g: 6.8,
+    portion: '1 Sea Cuisine tortilla-crusted tilapia fillet (3 oz / 84 g)',
+    source: 'Costco 2 lb box label — 210 kcal per 4 oz serving (about 1⅓ fillet) × ¾'
+  },
+  // Cuisine Solutions sous-vide sliced grass-fed beef sirloin (Costco, two ~1 lb packs), label
+  // (Jim, 2026-10-26): 120 kcal / 5 g fat / 1 g carbs / 19 g protein per 3 oz (84 g).
+  cuisine_solutions_sirloin_3oz: {
+    kcal: 120, protein_g: 19, carbs_g: 1, fat_g: 5,
+    portion: '3 oz Cuisine Solutions sliced grass-fed beef sirloin',
+    source: 'package label — 3 oz (84 g) serving'
   },
   // Chomps Original Beef, mild (Costco 12-pack), per 1.15 oz stick.
   chomps_beef_stick: {
@@ -193,14 +207,15 @@ export const ITEMS = {
     source: 'estimated (small fries-sized portion) — confirm'
   },
   // Petite Cuisine mozzarella sticks (Costco 5 lb bag): 210 kcal / 10 g protein / 19 g carbs /
-  // 10 g fat per 3 sticks (76 g) on the bag; per stick below.
+  // 10 g fat per 3 sticks (76 g) — bag label confirmed by Jim 2026-10-26; per stick below.
   petite_cuisine_mozzarella_stick: {
     kcal: 70, protein_g: 3.3, carbs_g: 6.3, fat_g: 3.3,
     portion: '1 Petite Cuisine mozzarella stick (25 g)',
     source: 'https://sameday.costco.com/store/costco/products/58252-petite-cuisine-mozzarella-sticks-5-lb — 210 kcal per 3-stick serving ÷ 3'
   },
   // Daphne's beef & lamb gyro slices (Costco): 190 kcal / 16 g fat / 5 g carbs / 7 g protein per
-  // 2 oz (57 g) serving on the bag. A plate is read as 4 oz of meat — CONFIRM.
+  // 2 oz (57 g) serving — bag label confirmed by Jim 2026-10-26. A gyro takes about four slices;
+  // a slice is read as ~1 oz, so four ≈ two servings.
   daphnes_gyro_slices_2oz: {
     kcal: 190, protein_g: 7, carbs_g: 5, fat_g: 16,
     portion: '2 oz Daphne\'s beef & lamb gyro slices',
@@ -245,11 +260,55 @@ export const ITEMS = {
     portion: '1 medium banana (118 g)',
     source: 'USDA FoodData Central — banana, raw, medium'
   },
-  // "A bunch" of sliced chunks is a variable amount; a cup of diced watermelon is 46 kcal.
   watermelon_cup: {
     kcal: 46, protein_g: 0.9, carbs_g: 11.5, fat_g: 0.2,
     portion: '1 cup diced watermelon (152 g)',
     source: 'USDA FoodData Central — watermelon, raw'
+  },
+  // Jim's serving (2026-10-26): a Costco mini seedless watermelon cut into two glass containers,
+  // one container a sitting = half the melon. A mini is ~3–4 lb whole and ~60 % flesh, so a half
+  // is read as ~475 g ≈ 3.1 cups — ESTIMATED; one weigh-in of a full container would pin it.
+  mini_watermelon_half: {
+    kcal: 143, protein_g: 2.9, carbs_g: 35.9, fat_g: 0.7,
+    portion: '½ mini seedless watermelon (~475 g flesh, one container)',
+    source: 'USDA FoodData Central — watermelon, raw, per 100 g × 4.75 (half a mini, estimated)'
+  },
+  // More fruit, USDA per cup / per piece.
+  strawberries_cup: {
+    kcal: 53, protein_g: 1.1, carbs_g: 12.7, fat_g: 0.5,
+    portion: '1 cup sliced strawberries (166 g)',
+    source: 'USDA FoodData Central — strawberries, raw'
+  },
+  cherries_cup: {
+    kcal: 87, protein_g: 1.5, carbs_g: 22, fat_g: 0.3,
+    portion: '1 cup sweet cherries with pits (138 g)',
+    source: 'USDA FoodData Central — cherries, sweet, raw'
+  },
+  apple_medium: {
+    kcal: 95, protein_g: 0.5, carbs_g: 25, fat_g: 0.3,
+    portion: '1 medium apple (182 g)',
+    source: 'USDA FoodData Central — apples, raw, with skin, medium'
+  },
+  // Canned whipped cream (Reddi-wip original): 15 kcal / 1 g fat / 1 g carbs per 2 tbsp.
+  whipped_cream_can_2tbsp: {
+    kcal: 15, protein_g: 0, carbs_g: 1, fat_g: 1,
+    portion: '2 tbsp canned whipped cream',
+    source: 'Reddi-wip Original label — per 2 tbsp (5 g)'
+  },
+  // Kirkland Signature Steak Strips (the jerky): 60 kcal / 0.5 g fat / 5 g carbs / 9 g protein
+  // per 1 oz (28 g), bag label (Jim, 2026-10-26).
+  kirkland_steak_strips_oz: {
+    kcal: 60, protein_g: 9, carbs_g: 5, fat_g: 0.5,
+    portion: '1 oz Kirkland Signature steak strips',
+    source: 'bag label — per 1 oz (28 g) serving, 12 per bag'
+  },
+  // Tattooed Chef Sheet Pan Vegetables (Costco 4 lb bag; brussels, sweet potato, broccoli, red
+  // onion, zucchini): 120 kcal / 9 g fat / 11 g carbs / 2 g protein per 1 cup (125 g), bag label
+  // (Jim, 2026-10-26).
+  tattooed_chef_veggies_cup: {
+    kcal: 120, protein_g: 2, carbs_g: 11, fat_g: 9,
+    portion: '1 cup Tattooed Chef sheet pan vegetables (125 g)',
+    source: 'bag label — per 1 cup (125 g) serving, Costco item 1684687'
   },
   // Portillo's (figures Jim pulled from Portillo's nutrition, Oct 2026): Big Beef 1,040 kcal /
   // 51 g fat / 88 g carbs / 50 g protein; regular Italian Beef 690 / 34 / 59 / 33. He orders
@@ -308,10 +367,13 @@ export const ITEMS = {
   // "Good quality" frozen breaded chicken strips from the air fryer — brand not named; a lightly
   // breaded breast strip (~1.5 oz) is about 80 kcal / 8 g protein / 6 g carbs / 3 g fat. CONFIRM
   // the brand and the count (2–4 → read as 3).
+  // Realgood Foods lightly breaded chicken strips (Costco 3 lb bag), bag label (Jim, 2026-10-26):
+  // 120 kcal / 5 g fat / 4 g carbs / 21 g protein per 4 oz (112 g). A strip is read as ~1.5 oz
+  // (⅜ of a serving) — the bag gives no count per serving.
   breaded_chicken_strip: {
-    kcal: 80, protein_g: 8, carbs_g: 6, fat_g: 3,
-    portion: '1 lightly breaded chicken breast strip (~1.5 oz), air-fried',
-    source: 'generic lightly breaded breast strip — confirm the brand\'s label'
+    kcal: 45, protein_g: 7.9, carbs_g: 1.5, fat_g: 1.9,
+    portion: '1 Realgood lightly breaded chicken strip (~1.5 oz), air-fried',
+    source: 'Realgood bag label — 120 kcal per 4 oz serving × ⅜ (strip weight estimated)'
   }
 } as const satisfies Record<string, LibraryItem>
 
@@ -326,6 +388,13 @@ export interface LibraryMeal {
   parts: Array<[ItemKey, number]>
   /** What the meal is, for the chip's tooltip. */
   note?: string
+  /**
+   * How the serving counts in its own unit, for a typed count or fraction (nutrition.ts
+   * splitCount): "1 beef stick" against { count: 2, unit: 'stick' } is half a serving; "whole
+   * costco pizza" against { count: 4, unit: 'slice', whole: 8 } is two. Only meals whose serving
+   * is more than one of something need it — a bare count on a meal without one just multiplies.
+   */
+  portion?: MealPortion
 }
 
 export const MEAL_LIBRARY: LibraryMeal[] = [
@@ -364,7 +433,7 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
     text: '2 x mcdonalds double cheeseburger + fries',
     aliases: ['2 x mcdonalds double cheeseburger + small fries'],
     parts: [['mcd_double_cheeseburger_plain', 2], ['mcd_fries_small', 1]],
-    note: 'two plain double cheeseburgers, one small fries (assumed — confirm)'
+    note: 'the usual order: two plain double cheeseburgers, one small fries (confirmed 2026-10-26)'
   },
   // The rice-cooker bowls: a cup of rice, eight seared hot-pot beef rolls, the pan sauce, and
   // steamed broccoli when the text says so. (Word order doesn't matter to the key, so "beef +
@@ -372,21 +441,65 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
   {
     text: 'rice + beef + broccoli bowl',
     aliases: ['rice + beef + broccoli', 'beef + broccoli + rice'],
-    parts: [['rice_cooked_cup', 1], ['costco_hot_pot_beef_rolls_8', 1], ['broccoli_steamed_cup', 1], ['wok_sauce_bowl', 1]],
-    note: 'rice-cooker rice, 8 hot-pot beef rolls seared in the wok, steamed broccoli, the soy–mirin sauce'
+    parts: [['rice_uncooked_cup', 1], ['costco_hot_pot_beef_rolls_8', 1], ['broccoli_steamed_cup', 1], ['wok_sauce_bowl', 1]],
+    note: 'the whole cup of rice-cooker rice, 8 hot-pot beef rolls seared in the wok (confirmed), steamed broccoli, the soy–mirin sauce'
   },
   {
     text: 'rice + beef bowl',
     aliases: ['rice + beef'],
-    parts: [['rice_cooked_cup', 1], ['costco_hot_pot_beef_rolls_8', 1], ['wok_sauce_bowl', 1]],
+    parts: [['rice_uncooked_cup', 1], ['costco_hot_pot_beef_rolls_8', 1], ['wok_sauce_bowl', 1]],
     note: 'the beef bowl without broccoli'
   },
-  // Rice with 2–4 air-fried breaded strips, read as THREE — CONFIRM.
+  // Rice with 2–4 air-fried Realgood strips, read as THREE — confirm the count.
   {
     text: 'rice + chicken',
     aliases: ['chicken + rice', 'rice + chicken strips', 'rice + chicken bowl'],
-    parts: [['rice_cooked_cup', 1], ['breaded_chicken_strip', 3]],
-    note: 'rice-cooker rice with three air-fried breaded strips (assumed three — confirm)'
+    parts: [['rice_uncooked_cup', 1], ['breaded_chicken_strip', 3]],
+    note: 'the whole cup of rice-cooker rice with three air-fried Realgood strips (assumed three — confirm)'
+  },
+  // Rice on its own, so "rice + <anything known>" composes (nutrition.ts splitParts): the pot is
+  // always one cup uncooked, eaten in one sitting (Jim, 2026-10-26).
+  {
+    text: 'rice',
+    aliases: ['white rice', 'rice cooker rice', 'long grain rice'],
+    parts: [['rice_uncooked_cup', 1]],
+    note: 'one cup uncooked long-grain white rice from the cooker, the whole pot'
+  },
+  {
+    text: 'leftover rice',
+    parts: [['rice_cooked_cup', 1]],
+    note: 'a cup of cooked rice from the fridge'
+  },
+  // The sous-vide sirloin: two ~1 lb packs, half a pack (~8 oz) a meal (Jim, 2026-10-26).
+  {
+    text: 'costco grass fed beef sirloin slices',
+    aliases: ['grass fed beef sirloin slices', 'grass fed sirloin slices', 'sirloin slices', 'beef sirloin slices', 'costco sirloin slices', 'grass fed sirloin', 'sliced sirloin'],
+    parts: [['cuisine_solutions_sirloin_3oz', 8 / 3]],
+    note: 'half a ~1 lb pack (~8 oz) of Cuisine Solutions sliced grass-fed sirloin'
+  },
+  // The air-fried Realgood strips on their own ("chicken + roasted veggies + rice" composes).
+  {
+    text: 'chicken strips',
+    aliases: ['chicken', 'realgood chicken strips', 'breaded chicken strips', 'chicken tenders', 'air fried chicken'],
+    parts: [['breaded_chicken_strip', 3]],
+    note: 'three air-fried Realgood lightly breaded strips (assumed three — type a count to change it)',
+    portion: { count: 3, unit: 'strip' }
+  },
+  // Tattooed Chef sheet pan vegetables; a plate is read as 1.5 cups — ESTIMATED, confirm.
+  {
+    text: 'roasted veggies',
+    aliases: ['veggies', 'roasted vegetables', 'sheet pan veggies', 'sheet pan vegetables', 'tattooed chef veggies'],
+    parts: [['tattooed_chef_veggies_cup', 1.5]],
+    note: '1½ cups of Tattooed Chef sheet pan vegetables (assumed — confirm the share)',
+    portion: { count: 1.5, unit: 'cup' }
+  },
+  // Kirkland steak strips; a snack is read as 2 oz — ESTIMATED, confirm.
+  {
+    text: 'jerky',
+    aliases: ['beef jerky', 'kirkland steak strips', 'steak strips', 'kirkland jerky', 'steak strips jerky'],
+    parts: [['kirkland_steak_strips_oz', 2]],
+    note: '2 oz of Kirkland Signature steak strips (assumed two servings — confirm)',
+    portion: { count: 2, unit: 'oz' }
   },
   // "Costco pizza" in any wording is the frozen Kirkland cheese box (Jim, 2026-10-20), half a
   // pizza a sitting — CONFIRM the share. Leftovers are 2–4 slices of eight, read as three.
@@ -394,39 +507,52 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
     text: 'costco cheese pizza',
     aliases: ['costco pizza', 'kirkland cheese pizza', 'kirkland pizza', 'costco frozen cheese pizza', 'costco frozen pizza'],
     parts: [['kirkland_cheese_pizza_quarter', 2]],
-    note: 'half a Kirkland frozen cheese pizza (assumed half — confirm)'
+    note: 'half a Kirkland frozen cheese pizza, 4 of 8 slices — "whole costco pizza" or "8 slices costco pizza" for the whole one (Jim, 2026-10-26)',
+    portion: { count: 4, unit: 'slice', whole: 8 }
   },
   {
     text: 'leftover costco pizza',
     aliases: ['leftover pizza', 'leftover costco cheese pizza', 'cold costco pizza'],
     parts: [['kirkland_cheese_pizza_quarter', 1.5]],
-    note: '2–4 slices (of 8) of leftover Kirkland cheese pizza, read as 3 — confirm'
+    note: '2–4 slices (of 8) of leftover Kirkland cheese pizza, read as 3 — type a count to change it',
+    portion: { count: 3, unit: 'slice', whole: 8 }
   },
   {
     text: 'costco pepperoni pizza',
     aliases: ['kirkland pepperoni pizza'],
     parts: [['kirkland_pepperoni_pizza_quarter', 2]],
-    note: 'half a Kirkland frozen pepperoni pizza (assumed half — confirm)'
+    note: 'half a Kirkland frozen pepperoni pizza, 4 of 8 slices',
+    portion: { count: 4, unit: 'slice', whole: 8 }
   },
   {
     text: 'leftover costco pepperoni pizza',
     aliases: ['leftover pepperoni pizza'],
     parts: [['kirkland_pepperoni_pizza_quarter', 1.5]],
-    note: '2–4 slices (of 8) of leftover Kirkland pepperoni pizza, read as 3 — confirm'
+    note: '2–4 slices (of 8) of leftover Kirkland pepperoni pizza, read as 3 — type a count to change it',
+    portion: { count: 3, unit: 'slice', whole: 8 }
   },
   // Read as ONE fillet on a cup of rice — CONFIRM (two fillets would be a second entry or "2 x").
   {
     text: 'rice + tilapia',
-    aliases: ['tilapia + rice', 'rice + tilapia filet', 'tilapia'],
-    parts: [['rice_cooked_cup', 1], ['sea_cuisine_tilapia_fillet', 1]],
-    note: 'rice-cooker rice with one Sea Cuisine tortilla-crusted fillet (assumed one — confirm)'
+    aliases: ['tilapia + rice', 'rice + tilapia filet'],
+    parts: [['rice_uncooked_cup', 1], ['sea_cuisine_tilapia_fillet', 1]],
+    note: 'the whole cup of rice-cooker rice with one Sea Cuisine tortilla-crusted fillet (assumed one — type a count to change it)'
   },
-  // "Beef sticks", plural: read as TWO Chomps — CONFIRM.
+  {
+    text: 'tilapia',
+    aliases: ['tilapia filet', 'tilapia fillet', 'sea cuisine tilapia'],
+    parts: [['sea_cuisine_tilapia_fillet', 1]],
+    note: 'one Sea Cuisine tortilla-crusted fillet',
+    portion: { count: 1, unit: 'fillet' }
+  },
+  // "Beef sticks": two Chomps unless a count is typed — "1 beef stick", "3 beef sticks" (Jim,
+  // 2026-10-26: usually two, sometimes one).
   {
     text: 'beef sticks',
     aliases: ['beef stick', 'chomps', 'chomps beef sticks'],
     parts: [['chomps_beef_stick', 2]],
-    note: 'two Chomps original beef sticks (assumed two — confirm)'
+    note: 'two Chomps original beef sticks — type "1 beef stick" for one',
+    portion: { count: 2, unit: 'stick' }
   },
   // Every spelling of the shake in the log (four as of Oct 2026) is one Fairlife bottle; the
   // creatine adds nothing. Aliases cover the wordings the key doesn't already fold.
@@ -462,7 +588,8 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
     text: 'sourdough snack',
     aliases: ['sourdough', 'sourdough + butter', 'sourdough toast'],
     parts: [['sourdough_slice_buttered', 1.5]],
-    note: 'a coworker\'s fresh sourdough with butter, 1–2 slices (read as 1.5 — confirm)'
+    note: 'homemade sourdough with butter, 1–2 slices (read as 1.5 — "2 slices sourdough" to say which)',
+    portion: { count: 1.5, unit: 'slice' }
   },
   // Half a Tombstone thin-crust, pepperoni or cheese (same share, Jim 2026-10-20) — CONFIRM the share.
   {
@@ -488,26 +615,38 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
   {
     text: 'gyros',
     aliases: ['gyro', 'gyro plate', 'daphnes gyros', 'gyros bowl'],
-    parts: [['daphnes_gyro_slices_2oz', 2.25], ['gyro_fixings', 1], ['pita_bread', 1]],
-    note: '4.5 oz Daphne\'s beef & lamb slices in a pita with tzatziki, onion, tomato, cucumber, feta'
+    parts: [['daphnes_gyro_slices_2oz', 2], ['gyro_fixings', 1], ['pita_bread', 1]],
+    note: 'about four Daphne\'s beef & lamb slices (~4 oz) in a pita with tzatziki, onion, tomato, cucumber, feta',
+    portion: { count: 4, unit: 'slice' }
   },
-  // About ten sticks a sitting.
+  // About ten sticks a sitting (Jim, 2026-10-26) — "6 mozzarella sticks" for fewer.
   {
     text: 'mozzarella sticks',
     aliases: ['mozzarella stick', 'mozz sticks', 'cheese sticks'],
     parts: [['petite_cuisine_mozzarella_stick', 10]],
-    note: 'about 10 Petite Cuisine sticks from the air fryer'
+    note: 'about 10 Petite Cuisine sticks from the air fryer',
+    portion: { count: 10, unit: 'stick' }
   },
-  // Fruit as logged.
-  { text: 'kiwi', aliases: ['kiwi fruit'], parts: [['kiwi_whole', 1]] },
+  // Fruit as logged; a bare count multiplies ("2 kiwi").
+  { text: 'kiwi', aliases: ['kiwi fruit', 'golden kiwi', 'green kiwi'], parts: [['kiwi_whole', 1]] },
   { text: 'banana', parts: [['banana_medium', 1]] },
-  // "A bunch of watermelon chunks": read as THREE cups — variable by Jim's own account; confirm or
-  // log "2 x watermelon" on a big day.
+  { text: 'apple', parts: [['apple_medium', 1]] },
+  { text: 'strawberries', parts: [['strawberries_cup', 1]], portion: { count: 1, unit: 'cup' } },
+  { text: 'cherries', parts: [['cherries_cup', 1]], portion: { count: 1, unit: 'cup' } },
+  // Strawberries with a little canned whipped cream on each (Jim, 2026-10-26) — read as 4 tbsp.
+  {
+    text: 'strawberries + cream',
+    aliases: ['strawberries and cream', 'strawberries with whipped cream', 'strawberries + whipped cream'],
+    parts: [['strawberries_cup', 1], ['whipped_cream_can_2tbsp', 2]],
+    note: 'a cup of strawberries with a little canned whipped cream (read as 4 tbsp)'
+  },
+  // One glass container = half a mini watermelon (Jim, 2026-10-26); "2 x watermelon" is both.
   {
     text: 'watermelon',
-    aliases: ['watermelon chunks'],
-    parts: [['watermelon_cup', 3]],
-    note: 'sliced chunks, a variable amount (read as 3 cups — confirm)'
+    aliases: ['watermelon chunks', 'half mini watermelon', 'mini watermelon half'],
+    parts: [['mini_watermelon_half', 1]],
+    note: 'one container, half a Costco mini watermelon (~3 cups; weight estimated)',
+    portion: { count: 3.1, unit: 'cup' }
   },
   // Portillo's: either beef, always with sweet peppers and mozzarella.
   {
@@ -577,7 +716,7 @@ function toEstimate(meal: LibraryMeal): Omit<MealEstimate, 'key'> {
     protein += it.protein_g * n
     carbs += it.carbs_g * n
     fat += it.fat_g * n
-    portions.push(`${n > 1 ? `${n} × ` : ''}${it.portion}`)
+    portions.push(`${n !== 1 ? `${Math.round(n * 100) / 100} × ` : ''}${it.portion}`)
   }
   return {
     text: meal.text,
@@ -590,7 +729,8 @@ function toEstimate(meal: LibraryMeal): Omit<MealEstimate, 'key'> {
     source: 'library',
     model: null,
     created_at: 'library',
-    updated_at: 'library'
+    updated_at: 'library',
+    ...(meal.portion ? { portion: meal.portion } : {})
   }
 }
 

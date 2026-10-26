@@ -1,9 +1,37 @@
 <template>
   <div>
+    <!-- ‹ › scrub the card back a day at a time (Whoop's day picker, Jim 2026-10-26): the label
+         names the shown day, the rows read "latest as of" it, and the deltas are that day's.
+         Tapping TODAY returns; the state is the component's own and never reaches the URL. -->
     <TuiHeader
-      label="TODAY · VITALS"
+      :label="`${isToday ? 'TODAY' : shownLabel} · VITALS`"
       fill
-    />
+    >
+      <span class="flex items-center gap-1.5 text-meta">
+        <button
+          v-if="!isToday"
+          type="button"
+          class="text-accent hover:text-accent-hover cursor-pointer"
+          @click="shownDate = null"
+        >today</button>
+        <button
+          type="button"
+          class="inline-flex w-4 justify-center text-prose cursor-pointer disabled:cursor-default"
+          :class="canBack ? 'text-faint hover:text-accent' : 'text-ghost'"
+          :disabled="!canBack"
+          :aria-label="`Show ${formatDate(shiftDays(asOf, -1), 'monthDay')}`"
+          @click="step(-1)"
+        >‹</button>
+        <button
+          type="button"
+          class="inline-flex w-4 justify-center text-prose cursor-pointer disabled:cursor-default"
+          :class="isToday ? 'text-ghost' : 'text-faint hover:text-accent'"
+          :disabled="isToday"
+          :aria-label="`Show ${formatDate(shiftDays(asOf, 1), 'monthDay')}`"
+          @click="step(1)"
+        >›</button>
+      </span>
+    </TuiHeader>
 
     <!-- Two-up tiles until lg: on a phone these rows used to fill the whole first screen on
          their own, pushing LOG TODAY and the quick-log buttons below the fold. From lg the block
@@ -55,7 +83,7 @@
       v-if="!rows.length"
       class="mt-3 text-small text-muted"
     >
-      No vitals logged yet.
+      {{ isToday ? 'No vitals logged yet.' : `Nothing logged by ${formatDate(asOf, 'monthDay')}.` }}
     </p>
   </div>
 </template>
@@ -64,6 +92,14 @@
 import type { JournalEntry } from '~/data/journal'
 import type { HealthMetricsEntry } from '#shared/types/journal'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
+import { shiftDays } from '#shared/utils/dates'
+
+/**
+ * The shown day, or null for today. A model so the page can follow it (the PROTEIN row's
+ * figures are the day's meals, summed on the page); null rather than today's date so the card
+ * keeps reading TODAY across midnight without the page having to notice.
+ */
+const shownDate = defineModel<string | null>('date', { default: null })
 
 const props = defineProps<{
   /** Journal entries, oldest first. */
@@ -91,10 +127,43 @@ interface Row {
   bar?: { pct: number, class: string }
 }
 
-/** Latest non-null reading and the one before it, for a field on a dated series. */
-function pair<T>(list: T[], pick: (row: T) => number | null | undefined) {
-  const values = list.map(pick).filter((v): v is number => v != null)
-  return { current: values.at(-1) ?? null, prev: values.length >= 2 ? values.at(-2)! : null }
+// --- the shown day ---
+const today = useToday()
+const asOf = computed(() => shownDate.value ?? today.value)
+const isToday = computed(() => shownDate.value == null || shownDate.value >= today.value)
+/** The first day either series has, so ‹ stops where the record starts. */
+const firstDate = computed(() => {
+  const first = [props.entries[0]?.date, props.metrics[0]?.date].filter((d): d is string => !!d).sort()[0]
+  return first ?? null
+})
+const canBack = computed(() => firstDate.value != null && asOf.value > firstDate.value)
+/** "OCT 25", or "SEP 21 2020" once the scrub leaves this year — the record starts at a 2020 weigh-in. */
+const shownLabel = computed(() => {
+  const terse = formatDateTerse(asOf.value)
+  return asOf.value.slice(0, 4) === today.value.slice(0, 4) ? terse.replace(/ \d{4}$/, '') : terse
+})
+function step(n: 1 | -1) {
+  const next = shiftDays(asOf.value, n)
+  if (n < 0 && !canBack.value) return
+  shownDate.value = next >= today.value ? null : next
+}
+
+// "Latest as of" the shown day (Jim's call over strict per-day values, which blank most days):
+// each row is the newest reading on or before it, so a skipped weigh-in still shows the last
+// weight, with the reading's date in the title when it isn't the shown day.
+const entriesAsOf = computed(() => props.entries.filter(e => e.date <= asOf.value))
+const metricsAsOf = computed(() => props.metrics.filter(m => m.date <= asOf.value))
+
+/** Latest non-null reading (and its date) and the one before it, for a field on a dated series. */
+function pair<T extends { date: string }>(list: T[], pick: (row: T) => number | null | undefined) {
+  const rows = list.filter(r => pick(r) != null)
+  const current = rows.at(-1)
+  const prev = rows.length >= 2 ? rows.at(-2)! : null
+  return {
+    current: current ? pick(current)! : null,
+    prev: prev ? pick(prev)! : null,
+    title: current && current.date < asOf.value ? `last reading ${formatDate(current.date, 'monthDay')}` : undefined
+  }
 }
 
 function fmtSleep(min: number) {
@@ -140,29 +209,32 @@ function proteinRow(p: NonNullable<typeof props.protein>): Row {
 const rows = computed(() => {
   const out: Row[] = []
 
-  const weight = pair(props.entries, e => e.weight_lbs)
+  const weight = pair(entriesAsOf.value, e => e.weight_lbs)
   if (weight.current != null) {
     out.push({
       label: 'WEIGHT',
       value: weight.current.toFixed(1),
       unit: 'lbs',
+      title: weight.title,
       delta: weight.prev != null ? delta(weight.current, weight.prev, 'up-bad') : undefined
     })
   }
 
   // Second, so the phone's first pair is weight | protein — the two the lean-mass goal is about.
-  if (props.protein) out.push(proteinRow(props.protein))
+  // Today's "—" is the morning state and stays; a past day with no meal figures just has no row.
+  if (props.protein && (isToday.value || props.protein.grams != null)) out.push(proteinRow(props.protein))
 
-  const bp = [...props.entries].reverse().find(e => e.bp_systolic != null && e.bp_diastolic != null)
-  if (bp) {
-    const sys = bp.bp_systolic!
-    const dia = bp.bp_diastolic!
+  const bpRow = entriesAsOf.value.findLast(e => e.bp_systolic != null && e.bp_diastolic != null)
+  if (bpRow) {
+    const sys = bpRow.bp_systolic!
+    const dia = bpRow.bp_diastolic!
     const high = sys >= 130 || dia >= 85
     const elevated = sys >= 120 || dia >= 80
     out.push({
       label: 'BP',
       value: `${sys}/${dia}`,
       unit: 'mmHg',
+      title: bpRow.date < asOf.value ? `last reading ${formatDate(bpRow.date, 'monthDay')}` : undefined,
       delta: {
         text: high ? '● high' : elevated ? '● watch' : '● ok',
         class: high ? 'text-danger' : elevated ? 'text-warn' : 'text-accent'
@@ -170,52 +242,57 @@ const rows = computed(() => {
     })
   }
 
-  const rhr = pair(props.entries, e => e.rhr)
+  const rhr = pair(entriesAsOf.value, e => e.rhr)
   if (rhr.current != null) {
     out.push({
       label: 'RHR',
       value: Math.round(rhr.current).toString(),
       unit: 'bpm',
+      title: rhr.title,
       delta: rhr.prev != null ? delta(rhr.current, rhr.prev, 'up-bad', '', 0) : undefined
     })
   }
 
-  const hrv = pair(props.entries, e => e.hrv)
+  const hrv = pair(entriesAsOf.value, e => e.hrv)
   if (hrv.current != null) {
     out.push({
       label: 'HRV',
       value: Math.round(hrv.current).toString(),
       unit: 'ms',
+      title: hrv.title,
       delta: hrv.prev != null ? delta(hrv.current, hrv.prev, 'up-good', '', 0) : undefined
     })
   }
 
-  const sleep = pair(props.metrics, m => m.sleep_total_min)
+  const sleep = pair(metricsAsOf.value, m => m.sleep_total_min)
   if (sleep.current != null) {
     out.push({
       label: 'SLEEP',
       value: fmtSleep(sleep.current),
+      title: sleep.title,
       delta: sleep.prev != null
         ? delta(sleep.current, sleep.prev, 'up-good', 'm', 0)
         : undefined
     })
   }
 
-  const recovery = pair(props.metrics, m => m.recovery_score)
+  const recovery = pair(metricsAsOf.value, m => m.recovery_score)
   if (recovery.current != null) {
     out.push({
       label: 'RECOVERY',
       value: `${Math.round(recovery.current)}%`,
       tone: recovery.current >= RECOVERY_GREEN_MIN ? 'accent' : undefined,
+      title: recovery.title,
       delta: recovery.prev != null ? delta(recovery.current, recovery.prev, 'up-good', '', 0) : undefined
     })
   }
 
-  const strain = pair(props.metrics, m => m.strain)
+  const strain = pair(metricsAsOf.value, m => m.strain)
   if (strain.current != null) {
     out.push({
       label: 'STRAIN',
       value: strain.current.toFixed(1),
+      title: strain.title,
       delta: strain.prev != null ? delta(strain.current, strain.prev, 'neutral') : undefined
     })
   }
