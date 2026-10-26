@@ -87,13 +87,15 @@
                 class="w-full"
               />
             </UFormField>
-            <!-- Each vital's hint is its change from the last prior entry that logged that
-                 field ("▲ +0.4 vs Oct 25"), live as the value is typed — the same slot the
-                 Dose field uses for its IU→mg equivalent. -->
+            <!-- Each vital's caption is its change from the last prior entry that logged that
+                 field ("▲ +0.4 vs Oct 25"), live as the value is typed. It sits under the
+                 input (the help slot), not beside the label like the Dose field's IU→mg hint:
+                 beside a two-word label it wrapped at mid widths and pushed that one input a
+                 line below its neighbours (Jim, 2026-10-26). -->
             <UFormField
               label="Weight (lbs)"
-              :ui="FIELD_UI"
-              :hint="vitalHint('weight_lbs', 1)"
+              :ui="VITAL_UI"
+              :help="vitalHint('weight_lbs', 1)"
             >
               <UInput
                 v-model.number="form.weight_lbs"
@@ -105,8 +107,8 @@
             </UFormField>
             <UFormField
               label="BP Sys"
-              :ui="FIELD_UI"
-              :hint="vitalHint('bp_systolic')"
+              :ui="VITAL_UI"
+              :help="vitalHint('bp_systolic')"
             >
               <UInput
                 v-model.number="form.bp_systolic"
@@ -117,8 +119,8 @@
             </UFormField>
             <UFormField
               label="BP Dia"
-              :ui="FIELD_UI"
-              :hint="vitalHint('bp_diastolic')"
+              :ui="VITAL_UI"
+              :help="vitalHint('bp_diastolic')"
             >
               <UInput
                 v-model.number="form.bp_diastolic"
@@ -129,8 +131,8 @@
             </UFormField>
             <UFormField
               label="RHR (bpm)"
-              :ui="FIELD_UI"
-              :hint="vitalHint('rhr')"
+              :ui="VITAL_UI"
+              :help="vitalHint('rhr')"
             >
               <UInput
                 v-model.number="form.rhr"
@@ -141,8 +143,8 @@
             </UFormField>
             <UFormField
               label="HRV (ms)"
-              :ui="FIELD_UI"
-              :hint="vitalHint('hrv')"
+              :ui="VITAL_UI"
+              :help="vitalHint('hrv')"
             >
               <UInput
                 v-model.number="form.hrv"
@@ -874,6 +876,9 @@ import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategor
 
 // Shared :ui overrides so every field on this long form reads the same.
 const FIELD_UI = { hint: 'text-micro text-faint' }
+// The vitals' delta caption under the input, in the hint's tone. The Date field keeps the
+// default help style: its "already has an entry — saving replaces it" is a warning, not a caption.
+const VITAL_UI = { ...FIELD_UI, help: 'text-micro text-faint whitespace-nowrap' }
 // Shared by the USelects and the autocomplete UInputMenus (compound / food / soda) so every
 // popover on the form matches. Autocomplete mode keeps whatever is typed as the value and only
 // suggests from `items`, so off-list compounds and freeform meals still work.
