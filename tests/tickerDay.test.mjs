@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   BARE_EYED, DEMO_UNREACHABLE, FEVER_BPM, WORLD_DAYS, accessoriesFor, achievementsOf, best, birthdayOf, bowlFor, clockLabel, cobwebsFor,
-  crusherWallOf, doseDatesOf, doseKeysOf, feverOf, heldPoseOf, hourOf, hungerOf, isAsleep, isCleanWeek, isInjected, isNight, mealDayOf,
+  crusherWallOf, doseDatesOf, doseKeysOf, feverOf, heldPoseOf, hourOf, hungerOf, isAsleep, isCleanWeek, isInjected, isNight, mazeGhostsOf, mealDayOf,
   moodWordOf, oldestOpenVial, paddleScaleFor, reachableAchievements, skyFor, sodasInWeek, unloggedInWeek, walkDayOf, walkPropFor,
   weekTallyOf, workoutHrOf, worldDaysOf
 } from '../shared/utils/tickerDay.ts'
@@ -179,6 +179,25 @@ test('the can crusher: one can per soda in the trailing month; a clean month off
   assert.equal(paddleScaleFor(0), 0.7)
 })
 
+test('the capsule maze: the month\'s most-logged sodas are the cans, in order, and the empty slots are germs', () => {
+  const soda = (drink, size = '12oz can') => ({ time: '12:00', drink, size })
+  const entries = [
+    day('2026-10-20', { sodas: [soda('Coke'), soda('Dr Pepper'), soda('coke ')] }),
+    day('2026-10-01', { sodas: [soda('Dr Pepper'), soda('Sprite'), soda(null)] }),
+    day('2026-09-20', { sodas: [soda('Mountain Dew'), soda('Mountain Dew'), soda('Mountain Dew')] }) // out of the window
+  ]
+  const m = mazeGhostsOf(entries, TODAY)
+  assert.deepEqual(m.ghosts, [
+    { kind: 'can', label: 'COKE' }, { kind: 'can', label: 'DR PEPPER' }, { kind: 'can', label: 'SODA' }, { kind: 'can', label: 'SPRITE' }
+  ], 'ties by name; an unnamed soda is SODA; Mountain Dew is out of the window')
+  assert.equal(m.cans, 4)
+  assert.equal(m.title, 'vs coke, dr pepper, soda, sprite')
+  const one = mazeGhostsOf([day('2026-10-20', { sodas: [soda('Coke')] })], TODAY)
+  assert.deepEqual(one.ghosts.map(g => g.kind), ['can', 'germ', 'germ', 'germ'])
+  assert.equal(one.title, 'vs coke + 3 germs')
+  assert.deepEqual(mazeGhostsOf([], TODAY), { ghosts: Array(4).fill({ kind: 'germ', label: null }), cans: 0, title: 'vs 4 germs' })
+})
+
 test('the world\'s month: thirty days ending today, pits for unlogged days, a block on a draw day, cardio by family', () => {
   const entries = [day('2026-10-22', { peptides: [{ compound: 'X' }], sodas: [{ size: '12oz can' }] })]
   const days = worldDaysOf({
@@ -205,10 +224,10 @@ test('achievements: the fixed list behind the wearables, and the three the demo 
   const all = achievementsOf({
     milestones: [{ prop: 'crown', name: 'the crown', goal: 100, progress: 12, unit: 'days in a row' }],
     loggedDays: 40, cleanWeek: true, finasterideStreak: 10, tadalafilStreak: 130,
-    hiScores: { runner: { score: 600, date: TODAY }, crusher: { score: 100, date: TODAY, cleared: true }, world: { score: 50, date: TODAY, cleared: false, feats: ['chain-3'] } },
+    hiScores: { runner: { score: 600, date: TODAY }, crusher: { score: 100, date: TODAY, cleared: true }, world: { score: 50, date: TODAY, cleared: false, feats: ['chain-3'] }, maze: { score: 1810, date: TODAY, cleared: false } },
     pets: 5, visits: 2, draws: 14, scans: 2
   })
-  assert.equal(all.length, 18, 'seventeen fixed ones plus a card per wearable milestone')
+  assert.equal(all.length, 20, 'nineteen fixed ones plus a card per wearable milestone')
   assert.deepEqual(all[0], { id: 'crown', name: 'Hundred Days', desc: 'a hundred logged days in a row — the crown', icon: 'i-lucide-crown', goal: 100, progress: 12, unit: 'days in a row', reward: 'crown' })
   const byId = Object.fromEntries(all.map(a => [a.id, a]))
   assert.equal(byId['runner-500'].progress, 600)
@@ -217,8 +236,10 @@ test('achievements: the fixed list behind the wearables, and the three the demo 
   assert.equal(byId['clean-month'].progress, 0)
   assert.equal(byId['clean-week'].progress, 1)
   assert.equal(byId['full-flow'].progress, 130)
-  assert.equal(reachableAchievements(all, false).length, 18)
+  assert.equal(byId['maze-1000'].progress, 1810)
+  assert.equal(byId['clean-plate'].progress, 0)
+  assert.equal(reachableAchievements(all, false).length, 20)
   const demo = reachableAchievements(all, true)
-  assert.equal(demo.length, 15, 'Clean Week is reachable since the sandbox has a schedule (P9); Luscious, Full Flow and Open House are not')
+  assert.equal(demo.length, 17, 'Clean Week is reachable since the sandbox has a schedule (P9); Luscious, Full Flow and Open House are not')
   assert.ok(demo.every(a => !DEMO_UNREACHABLE.has(a.id)))
 })
