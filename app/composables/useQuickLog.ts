@@ -1,5 +1,5 @@
 import type { SodaEntry, WaterEntry } from '#shared/types/journal'
-import { WATER_DEFAULT_CUP_OZ, waterSetting, waterTotals } from '#shared/utils/water'
+import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, waterSetting, waterTotals } from '#shared/utils/water'
 import { lastSoda as lastSodaOf, quickAddLabel } from '#shared/utils/soda'
 import { patchJournalDay } from '~/utils/journalPatch'
 
@@ -30,9 +30,11 @@ export async function useQuickLog() {
   const sodaSize = computed(() => lastSoda.value?.size ?? '')
   const sodasToday = computed(() => (todayEntry.value?.sodas ?? []).length)
 
-  // --- water: the profile's cup size ---
+  // --- water: the profile's cup size and daily goal (the home page's WATER bar reads the goal) ---
   const cupOz = computed(() => waterSetting(profileData.value, 'cup_oz', WATER_DEFAULT_CUP_OZ))
+  const goalOz = computed(() => waterSetting(profileData.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ))
   const waterOzToday = computed(() => waterTotals(todayEntry.value?.water).oz)
+  const watersToday = computed(() => waterTotals(todayEntry.value?.water).count)
 
   // The shared local mirror (app/utils/journalPatch.ts) — the same one the widgets use.
   const patchToday = (patch: Partial<{ sodas: SodaEntry[], water: WaterEntry[] }>) => patchJournalDay(data, today.value, patch)
@@ -81,5 +83,5 @@ export async function useQuickLog() {
     }
   }
 
-  return { sodaLabel, sodaDrink, sodaSize, sodasToday, cupOz, waterOzToday, addingSoda, addingWater, addSoda, addWater }
+  return { sodaLabel, sodaDrink, sodaSize, sodasToday, cupOz, goalOz, waterOzToday, watersToday, addingSoda, addingWater, addSoda, addWater }
 }

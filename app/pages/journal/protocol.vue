@@ -30,17 +30,25 @@
       Nothing on the protocol yet.{{ canEdit ? ' Use + ADD to put the first compound or supplement on it.' : '' }}
     </p>
 
-    <div class="px-4 sm:px-6 py-4 space-y-5">
+    <!-- Capped at 5xl: full-width, a desktop row put the dose 1,800px from its name. The hint
+         drops to its own line under the header on a phone, where it ate the rule and wrapped. -->
+    <div class="px-4 sm:px-6 py-4 space-y-5 max-w-5xl">
       <section
         v-for="group in groups"
         :key="group.key"
       >
         <TuiHeader
           :label="`${group.title} · ${group.rows.length}`"
-          :dashes="group.dashes"
+          fill
         >
-          <span class="text-label text-muted normal-case">{{ group.hint }}</span>
+          <span class="hidden sm:inline text-label text-muted normal-case">{{ group.hint }}</span>
         </TuiHeader>
+        <p
+          v-if="group.hint"
+          class="sm:hidden mt-0.5 text-meta text-faint"
+        >
+          {{ group.hint }}
+        </p>
 
         <!-- Collapsed groups keep their rows behind a link, like the old supplements page -->
         <button
@@ -61,83 +69,101 @@
             :key="row.item.id"
             class="py-2 border-b border-line-row last:border-0"
           >
-            <div class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap group">
+            <!-- One shape for every row. On a phone it is two lines: the name, chips and dose
+                 on the first, the dates, notes, version count and actions on the second — a
+                 free-wrapping flex row used to put the dose beside a short name and under a long
+                 one, so the column of doses jumped about. From sm the second line's wrapper is
+                 `contents`, its children join the one flex line, and `order` puts them where the
+                 one-line read wants them: name · chips · since · notes ······ dose · versions ·
+                 actions. -->
+            <div class="flex flex-wrap items-baseline gap-x-2.5 group sm:flex-nowrap">
               <span
-                class="text-prose"
+                class="text-prose min-w-0 sm:shrink-0"
                 :class="row.stopped ? 'line-through text-muted' : 'text-hi'"
               >{{ row.item.name }}</span>
 
               <span
                 v-if="row.cadence"
-                class="text-meta text-accent border border-line-accent px-1.5 py-0.5"
+                class="shrink-0 text-meta text-accent border border-line-accent px-1.5 py-0.5"
               >{{ row.cadence }}</span>
 
               <!-- A logged pill sits among the standing ones: say which it is -->
               <span
                 v-if="row.item.kind === 'logged' && row.item.category !== 'injectable'"
-                class="text-meta text-faint border border-line-soft px-1.5 py-0.5"
+                class="shrink-0 text-meta text-faint border border-line-soft px-1.5 py-0.5"
                 title="Logged in the journal and scored against the schedule"
               >logged</span>
 
               <span
-                v-if="row.since"
-                class="text-small text-faint"
-              >{{ row.since }}</span>
+                v-if="row.dose"
+                class="ml-auto shrink-0 text-row text-muted sm:order-2"
+              >{{ row.dose }}</span>
 
-              <span
-                v-if="row.item.notes"
-                class="text-small text-faint truncate max-w-md"
-                :title="row.item.notes"
-              >{{ row.item.notes }}</span>
-
-              <span class="ml-auto flex items-baseline gap-2 shrink-0">
+              <div
+                v-if="row.since || row.item.notes || row.versions.length || canEdit"
+                class="basis-full mt-0.5 flex items-baseline gap-x-2.5 min-w-0 sm:contents"
+              >
                 <span
-                  v-if="row.dose"
-                  class="text-row text-muted"
-                >{{ row.dose }}</span>
-                <button
-                  v-if="row.versions.length"
-                  type="button"
-                  class="text-meta text-faint hover:text-accent cursor-pointer"
-                  :aria-expanded="!!history[row.item.id]"
-                  @click="history[row.item.id] = !history[row.item.id]"
-                >{{ history[row.item.id] ? 'hide' : `${row.versions.length} version${row.versions.length === 1 ? '' : 's'}` }}</button>
-                <template v-if="canEdit">
+                  v-if="row.since"
+                  class="shrink-0 text-small text-faint sm:order-1"
+                >{{ row.since }}</span>
+
+                <span
+                  v-if="row.item.notes"
+                  class="min-w-0 truncate text-small text-faint sm:order-1 sm:max-w-md"
+                  :title="row.item.notes"
+                >{{ row.item.notes }}</span>
+
+                <span
+                  class="ml-auto flex items-baseline gap-2 shrink-0 sm:order-3"
+                  :class="row.dose ? 'sm:ml-0' : ''"
+                >
+                  <!-- A fixed 10ch from sm so "1 version" and "5 versions" don't shift the dose
+                       column by a character from row to row. -->
                   <button
-                    v-if="row.item.kind !== 'as_needed' && !row.stopped"
+                    v-if="row.versions.length"
                     type="button"
-                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
-                    :aria-label="`Change ${row.item.name}`"
-                    @click="openChange(row)"
-                  >change</button>
-                  <button
-                    v-if="row.current && !row.item.on_hand"
-                    type="button"
-                    class="text-meta text-faint hover:text-warn cursor-pointer tui-row-action"
-                    :aria-label="`Stop ${row.item.name}`"
-                    @click="openStop(row)"
-                  >stop</button>
-                  <button
-                    v-else-if="row.stopped"
-                    type="button"
-                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
-                    :aria-label="`Resume ${row.item.name}`"
-                    @click="openResume(row)"
-                  >resume</button>
-                  <button
-                    type="button"
-                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
-                    :aria-label="`Edit ${row.item.name}`"
-                    @click="openEditItem(row.item)"
-                  >edit</button>
-                  <button
-                    type="button"
-                    class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
-                    :aria-label="`Delete ${row.item.name}`"
-                    @click="confirmDeleteItem(row)"
-                  >✕</button>
-                </template>
-              </span>
+                    class="text-meta text-faint hover:text-accent cursor-pointer sm:inline-block sm:w-[10ch] sm:text-left"
+                    :aria-expanded="!!history[row.item.id]"
+                    @click="history[row.item.id] = !history[row.item.id]"
+                  >{{ history[row.item.id] ? 'hide' : `${row.versions.length} version${row.versions.length === 1 ? '' : 's'}` }}</button>
+                  <template v-if="canEdit">
+                    <button
+                      v-if="row.item.kind !== 'as_needed' && !row.stopped"
+                      type="button"
+                      class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
+                      :aria-label="`Change ${row.item.name}`"
+                      @click="openChange(row)"
+                    >change</button>
+                    <button
+                      v-if="row.current && !row.item.on_hand"
+                      type="button"
+                      class="text-meta text-faint hover:text-warn cursor-pointer tui-row-action"
+                      :aria-label="`Stop ${row.item.name}`"
+                      @click="openStop(row)"
+                    >stop</button>
+                    <button
+                      v-else-if="row.stopped"
+                      type="button"
+                      class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
+                      :aria-label="`Resume ${row.item.name}`"
+                      @click="openResume(row)"
+                    >resume</button>
+                    <button
+                      type="button"
+                      class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
+                      :aria-label="`Edit ${row.item.name}`"
+                      @click="openEditItem(row.item)"
+                    >edit</button>
+                    <button
+                      type="button"
+                      class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
+                      :aria-label="`Delete ${row.item.name}`"
+                      @click="confirmDeleteItem(row)"
+                    >✕</button>
+                  </template>
+                </span>
+              </div>
             </div>
 
             <!-- The dated history: one line per version, newest first -->
@@ -464,13 +490,13 @@ const live = (r: Row) => !r.item.on_hand && !r.stopped
 // together — finasteride (logged daily and scored) beside tadalafil (standing, never logged),
 // with a "logged" chip telling the two apart.
 const groups = computed(() => [
-  { key: 'injectables', title: 'INJECTABLES', dashes: 13, hint: 'weekday-scheduled, scored against the dose log', rows: rows.value.filter(r => r.item.kind !== 'as_needed' && r.item.category === 'injectable' && live(r)) },
-  { key: 'meds', title: 'DAILY MEDS', dashes: 12, hint: 'pills — logged ones are scored, the rest are standing', rows: rows.value.filter(r => r.item.kind !== 'as_needed' && r.item.category === 'oral' && live(r)) },
-  { key: 'supplements', title: 'DAILY STACK', dashes: 11, hint: 'taken consistently, not dose-logged', rows: rows.value.filter(r => r.item.kind === 'standing' && r.item.category === 'supplement' && live(r)) },
-  { key: 'skin', title: 'SKIN & HAIR', dashes: 12, hint: 'topicals and routine', rows: rows.value.filter(r => r.item.kind === 'standing' && r.item.category === 'skin' && live(r)) },
-  { key: 'asneeded', title: 'AS NEEDED', dashes: 13, hint: 'no schedule — gaps in the log are the plan', rows: rows.value.filter(r => r.item.kind === 'as_needed') },
-  { key: 'onhand', title: 'ON HAND · NOT TAKING', dashes: 7, hint: '', collapsible: true, rows: rows.value.filter(r => r.item.on_hand) },
-  { key: 'stopped', title: 'DISCONTINUED', dashes: 9, hint: 'recent stops stay relevant to lab trends', collapsible: true, rows: rows.value.filter(r => r.stopped && !r.item.on_hand) }
+  { key: 'injectables', title: 'INJECTABLES', hint: 'weekday-scheduled, scored against the dose log', rows: rows.value.filter(r => r.item.kind !== 'as_needed' && r.item.category === 'injectable' && live(r)) },
+  { key: 'meds', title: 'DAILY MEDS', hint: 'pills — logged ones are scored, the rest are standing', rows: rows.value.filter(r => r.item.kind !== 'as_needed' && r.item.category === 'oral' && live(r)) },
+  { key: 'supplements', title: 'DAILY STACK', hint: 'taken consistently, not dose-logged', rows: rows.value.filter(r => r.item.kind === 'standing' && r.item.category === 'supplement' && live(r)) },
+  { key: 'skin', title: 'SKIN & HAIR', hint: 'topicals and routine', rows: rows.value.filter(r => r.item.kind === 'standing' && r.item.category === 'skin' && live(r)) },
+  { key: 'asneeded', title: 'AS NEEDED', hint: 'no schedule — gaps in the log are the plan', rows: rows.value.filter(r => r.item.kind === 'as_needed') },
+  { key: 'onhand', title: 'ON HAND · NOT TAKING', hint: '', collapsible: true, rows: rows.value.filter(r => r.item.on_hand) },
+  { key: 'stopped', title: 'DISCONTINUED', hint: 'recent stops stay relevant to lab trends', collapsible: true, rows: rows.value.filter(r => r.stopped && !r.item.on_hand) }
 ].filter(g => g.rows.length))
 
 const expanded = reactive<Record<string, boolean>>({})

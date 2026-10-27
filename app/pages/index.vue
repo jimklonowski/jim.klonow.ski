@@ -230,6 +230,37 @@
             <span class="truncate">{{ addingWater ? 'LOGGING…' : `+ CUP ${cupOz}oz` }}</span>
           </button>
         </div>
+
+        <!-- Today's water against the profile's goal, right under the tap that moves it — the
+             same bar the PROTEIN tile draws (shared/utils/water.ts has the goal and the maths).
+             The local mirror useQuickLog patches after a tap is what this reads, so the bar
+             fills on the spot. -->
+        <div
+          v-if="water"
+          class="flex items-center gap-2 mt-2.5 text-meta"
+          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} today`"
+        >
+          <span class="text-muted">WATER</span>
+          <span
+            class="num text-row leading-none"
+            :class="water.met ? 'text-accent' : 'text-hi'"
+          >{{ water.oz }}</span>
+          <span class="text-muted whitespace-nowrap">/ {{ water.goal }} oz</span>
+          <span
+            class="relative flex-1 h-1.25 bg-line-soft overflow-hidden"
+            role="progressbar"
+            :aria-valuenow="Math.round(water.ozRaw)"
+            aria-valuemin="0"
+            :aria-valuemax="water.goal"
+            aria-label="Water today against the daily goal"
+          >
+            <span
+              class="absolute inset-y-0 left-0 bg-accent opacity-70 transition-[width] duration-300"
+              :style="{ width: `${Math.min(100, water.pct)}%` }"
+            />
+          </span>
+          <span :class="water.met ? 'text-accent' : 'text-muted'">{{ water.pct }}%</span>
+        </div>
       </div>
 
       <HomeCycle
@@ -325,30 +356,45 @@
     <!--
       The digest is the one panel with no length ceiling — a wordy weekly recap used to set the
       row height and leave the other two columns sitting above a screen of dead space. As the
-      third column (xl) it is capped to the viewport (chrome is 7.1875rem: 53px header + 31px
-      status + 31px footer) as a flex column: HomeDigest scrolls its prose region internally and
-      keeps its action bar in flow at the bottom. Stays stretched rather than self-start so the
-      grid's gap background doesn't show through below it. At lg it spans both tracks under the
-      other two sections and flows at its natural height, daily and weekly side by side.
+      third column (xl) the inner box is capped to the viewport (chrome is 7.1875rem: 53px header
+      + 31px status + 31px footer) as a flex column: HomeDigest scrolls its prose region internally
+      and keeps its action bar in flow at the bottom.
+
+      The cap lives on an inner box, not the section, because the section stays stretched to the
+      row: when the middle column runs taller than the cap, a capped section left the rest of its
+      cell showing the grid's line-coloured background — an empty block under the TICKER bar once
+      you scrolled to the page bottom. The inner box is also sticky: nothing in the page chrome is
+      sticky, so as the header and status line scroll off the top the box pins to the viewport and
+      the cap grows by the same amount (--chrome-scrolled, tracked in the script, 0 → 84px), which
+      keeps the bar pinned just above the footer for the whole scroll. h-full means it never
+      outgrows the row when the row is the shorter of the two.
+
+      At lg it spans both tracks under the other two sections and flows at its natural height,
+      daily and weekly side by side.
     -->
     <section
       v-if="isFullAccess"
-      class="bg-bg px-6 pt-4 pb-5 min-w-0 lg:col-span-2 xl:col-span-1 xl:max-h-[calc(100dvh-7.25rem)] xl:flex xl:flex-col xl:min-h-0"
+      class="bg-bg min-w-0 lg:col-span-2 xl:col-span-1 xl:min-h-0"
     >
-      <HomeDigest
-        id="tour-digest"
-        :digests="digests"
-        :is-owner="isOwner"
-        :rhr="latestRhr"
-        :sluggish="sluggish"
-        :recovery="latestRecovery"
-        :sodas-today="sodasToday"
-        :latest-draw-date="latestDraw?.date ?? null"
-        :flag-count="flagCounts.high + flagCounts.low"
-        :accessories="wardrobe.accessories"
-        :build="wardrobe.build"
-        @refresh="refreshDigests"
-      />
+      <div
+        class="px-6 pt-4 pb-5 xl:sticky xl:top-0 xl:h-full xl:max-h-[calc(100dvh-7.25rem+var(--chrome-scrolled,0px))] xl:flex xl:flex-col xl:min-h-0"
+        :style="{ '--chrome-scrolled': `${chromeScrolled}px` }"
+      >
+        <HomeDigest
+          id="tour-digest"
+          :digests="digests"
+          :is-owner="isOwner"
+          :rhr="latestRhr"
+          :sluggish="sluggish"
+          :recovery="latestRecovery"
+          :sodas-today="sodasToday"
+          :latest-draw-date="latestDraw?.date ?? null"
+          :flag-count="flagCounts.high + flagCounts.low"
+          :accessories="wardrobe.accessories"
+          :build="wardrobe.build"
+          @refresh="refreshDigests"
+        />
+      </div>
     </section>
   </div>
 </template>
@@ -357,7 +403,7 @@
 import { diffDays } from '#shared/utils/dates'
 import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
-import { WATER_DEFAULT_CUP_OZ } from '#shared/utils/water'
+import { WATER_DEFAULT_CUP_OZ, fmtOzValue } from '#shared/utils/water'
 import { isSluggish, latestRecovery as petRecovery } from '#shared/utils/petState'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
@@ -374,6 +420,19 @@ const { role, isOwner, canEdit } = await useAuth()
 // rendered broken. See shared/utils/access.ts.
 const isFullAccess = computed(() => isFullAccessRole(role.value))
 
+// How much of the chrome above the grid (53px header + 31px status line) has scrolled off the
+// top of the viewport. The digest column's sticky box (template above) adds this to its height
+// cap so it grows into the room the header vacates. Clamped, so once past the chrome the value
+// — and the inline style it feeds — stops changing on every scroll event. Read once on mount
+// too: a reload restores the old scroll position without firing a scroll event.
+const CHROME_ABOVE_PX = 84
+const chromeScrolled = ref(0)
+function trackChromeScrolled() {
+  chromeScrolled.value = Math.min(Math.max(window.scrollY, 0), CHROME_ABOVE_PX)
+}
+onMounted(trackChromeScrolled)
+useEventListener('scroll', trackChromeScrolled, { passive: true })
+
 // Same conditional-composable rule as the cycles/planned-draws fetches below: only the roles
 // that get the + SODA / + CUP buttons load their defaults. Unconditional, this ran for guests
 // too — two rejected list fetches on every landing, server-rendered and again on mount.
@@ -386,6 +445,14 @@ const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
 const addSoda = () => quickLog?.addSoda()
 const addWater = () => quickLog?.addWater()
+/** The WATER bar under the quick-log buttons: null for roles without the buttons. */
+const water = computed(() => {
+  if (!quickLog) return null
+  const ozRaw = quickLog.waterOzToday.value
+  const goal = quickLog.goalOz.value
+  const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
+  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours: quickLog.watersToday.value }
+})
 // The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
 // estimates endpoint returns nothing for the doctor and the profile is a full-access read, so
 // both are skipped for roles that don't get food (and for guests, who have no session).
