@@ -230,6 +230,37 @@
             <span class="truncate">{{ addingWater ? 'LOGGING…' : `+ CUP ${cupOz}oz` }}</span>
           </button>
         </div>
+
+        <!-- Today's water against the profile's goal, right under the tap that moves it — the
+             same bar the PROTEIN tile draws (shared/utils/water.ts has the goal and the maths).
+             The local mirror useQuickLog patches after a tap is what this reads, so the bar
+             fills on the spot. -->
+        <div
+          v-if="water"
+          class="flex items-center gap-2 mt-2.5 text-meta"
+          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} today`"
+        >
+          <span class="text-muted">WATER</span>
+          <span
+            class="num text-row leading-none"
+            :class="water.met ? 'text-accent' : 'text-hi'"
+          >{{ water.oz }}</span>
+          <span class="text-muted whitespace-nowrap">/ {{ water.goal }} oz</span>
+          <span
+            class="relative flex-1 h-1.25 bg-line-soft overflow-hidden"
+            role="progressbar"
+            :aria-valuenow="Math.round(water.ozRaw)"
+            aria-valuemin="0"
+            :aria-valuemax="water.goal"
+            aria-label="Water today against the daily goal"
+          >
+            <span
+              class="absolute inset-y-0 left-0 bg-accent opacity-70 transition-[width] duration-300"
+              :style="{ width: `${Math.min(100, water.pct)}%` }"
+            />
+          </span>
+          <span :class="water.met ? 'text-accent' : 'text-muted'">{{ water.pct }}%</span>
+        </div>
       </div>
 
       <HomeCycle
@@ -357,7 +388,7 @@
 import { diffDays } from '#shared/utils/dates'
 import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
-import { WATER_DEFAULT_CUP_OZ } from '#shared/utils/water'
+import { WATER_DEFAULT_CUP_OZ, fmtOzValue } from '#shared/utils/water'
 import { isSluggish, latestRecovery as petRecovery } from '#shared/utils/petState'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
@@ -386,6 +417,14 @@ const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
 const addSoda = () => quickLog?.addSoda()
 const addWater = () => quickLog?.addWater()
+/** The WATER bar under the quick-log buttons: null for roles without the buttons. */
+const water = computed(() => {
+  if (!quickLog) return null
+  const ozRaw = quickLog.waterOzToday.value
+  const goal = quickLog.goalOz.value
+  const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
+  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours: quickLog.watersToday.value }
+})
 // The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
 // estimates endpoint returns nothing for the doctor and the profile is a full-access read, so
 // both are skipped for roles that don't get food (and for guests, who have no session).
