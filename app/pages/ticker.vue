@@ -121,6 +121,21 @@
         @over="(score, cleared, feats, summary) => onGameOver('world', score, cleared, feats, summary)"
         @quit="onGameQuit"
       />
+      <TickerMaze
+        v-else-if="playing === 'maze'"
+        ref="runner"
+        :build="build"
+        :accessories="worn"
+        :night="night"
+        :hi="houseBestOf('maze')"
+        :ghosts="mazeGhosts.ghosts"
+        :title="mazeGhosts.title"
+        :seed="daySeed"
+        :lives="crusherLives"
+        @fit="h => gameHeight = h"
+        @over="(score, cleared) => onGameOver('maze', score, cleared)"
+        @quit="onGameQuit"
+      />
 
       <div
         v-else
@@ -418,7 +433,7 @@ const {
   dueToday, loggedCompounds, eaten, missing, missingNames, hunger, unloggedThisWeek, cobwebs,
   loggedDays, milestones, earned, build, tier, arms, bellyRead, scans, latestScan, leanGain,
   weekTally, cleanWeek, activeCycle, cycleClause, finasterideStreak, tadalafilStreak, maneTier, nextMane, bandaged, injected, bowl, doseKeys,
-  crusherWall, paddleScale, crusherLives, daySeed, worldDays
+  crusherWall, paddleScale, crusherLives, daySeed, worldDays, mazeGhosts
 } = useTickerDay({
   entries,
   health: healthData,
@@ -1032,8 +1047,8 @@ async function talk() {
 }
 
 // --- play: the games -------------------------------------------------------------------------
-// The one thing on the page that is not read from the data — though the can crusher's wall and
-// the world's month are (useTickerDay). A game takes the stage over and the pet counts as busy
+// The one thing on the page that is not read from the data — though the can crusher's wall, the
+// world's month and the maze's ghosts are (useTickerDay). A game takes the stage over and the pet counts as busy
 // for the duration (no fidgets, the other buttons wait). Each game keeps a house record under
 // its own memory key; a guest's best goes to their footprint, which is that game's visitors'
 // leaderboard, and the HUD shows them the house record to chase.
@@ -1045,7 +1060,8 @@ const playing = ref<TickerGame | null>(null)
 const readHiScores = (): Record<TickerGame, TickerRecord | null> => ({
   runner: recall<TickerRecord>('runner'),
   crusher: recall<TickerRecord>('crusher'),
-  world: recall<TickerRecord>('world')
+  world: recall<TickerRecord>('world'),
+  maze: recall<TickerRecord>('maze')
 })
 const hiScores = ref<Record<TickerGame, TickerRecord | null>>(readHiScores())
 /** The last world game's figures, for the remark that names the day that got you. */
@@ -1086,6 +1102,11 @@ const playItems = computed<DropdownMenuItem[][]>(() => [[
     label: `ticker world${houseBestOf('world') ? ` · HI ${houseBestOf('world')}` : ''} · the month`,
     icon: 'i-lucide-castle',
     onSelect: () => play('world')
+  },
+  {
+    label: `capsule maze${houseBestOf('maze') ? ` · HI ${houseBestOf('maze')}` : ''} · ${mazeGhosts.value.title}`,
+    icon: 'i-lucide-ghost',
+    onSelect: () => play('maze')
   }
 ]])
 
@@ -1097,7 +1118,7 @@ function play(game: TickerGame) {
   runBeatHouse = false
   lastCleared = false
   playing.value = game
-  line.value = playIntroLine(game, crusherWall.value)
+  line.value = playIntroLine(game, crusherWall.value, mazeGhosts.value)
 }
 
 function onGameOver(game: TickerGame, score: number, cleared: boolean, feats: WorldFeat[] = [], summary: WorldSummary | null = null) {

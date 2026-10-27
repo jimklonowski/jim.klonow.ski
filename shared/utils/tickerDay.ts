@@ -13,6 +13,7 @@ import { MANE_TIERS, TIER_DAYS } from './tickerWardrobe.ts'
 import type { Milestone } from './tickerWardrobe.ts'
 import type { TickerPose, TickerProp } from './tickerSprite.ts'
 import type { CanInput } from './tickerBreakout.ts'
+import type { MazeGhostInput } from './tickerMaze.ts'
 import type { DayInput } from './tickerWorld.ts'
 import type { PlannedDrawStatus } from './plannedDraws.ts'
 import type { HealthMetricsEntry, JournalEntry, WorkoutEntry } from '../types/journal.ts'
@@ -428,6 +429,41 @@ export function daySeedOf(today: string): number {
   return Number(today.replace(/-/g, ''))
 }
 
+// --- the capsule maze's ghosts ------------------------------------------------------------------
+// The four ghosts are the trailing month's most-logged sodas, as cans wearing their names; a slot
+// the month didn't fill is a germ, slower and dumber — so a clean month gets the kinder maze.
+
+export const MAZE_GHOST_SLOTS = 4
+
+export interface MazeGhosts {
+  ghosts: MazeGhostInput[]
+  /** How many are cans. */
+  cans: number
+  /** "vs coke, dr pepper + 2 germs" / "vs 4 germs" */
+  title: string
+}
+
+export function mazeGhostsOf(entries: JournalEntry[], today: string): MazeGhosts {
+  const from = shiftDays(today, -(CRUSHER_WINDOW_DAYS - 1))
+  const counts = new Map<string, number>()
+  for (const e of entries) {
+    if (e.date < from || e.date > today) continue
+    for (const s of e.sodas ?? []) {
+      const name = (s.drink ?? '').trim().toLowerCase() || 'soda'
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+  }
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, MAZE_GHOST_SLOTS)
+  const ghosts: MazeGhostInput[] = top.map(([name]) => ({ kind: 'can', label: name.toUpperCase() }))
+  while (ghosts.length < MAZE_GHOST_SLOTS) ghosts.push({ kind: 'germ', label: null })
+  const germs = MAZE_GHOST_SLOTS - top.length
+  const names = top.map(([name]) => name).join(', ')
+  const title = top.length
+    ? `vs ${names}${germs ? ` + ${germs} germ${germs === 1 ? '' : 's'}` : ''}`
+    : `vs ${germs} germs`
+  return { ghosts, cans: top.length, title }
+}
+
 // --- ticker world's month ---------------------------------------------------------------------
 // The trailing thirty days as the level's days (tickerWorld.ts): logged or not, the doses and
 // the sodas, the workout minutes, the recovery, a draw on file. The castle is today.
@@ -530,7 +566,7 @@ export interface AchievementInputs {
 
 /** Every achievement there is, with its progress. */
 export function achievementsOf(i: AchievementInputs): Achievement[] {
-  const { runner, crusher, world } = i.hiScores
+  const { runner, crusher, world, maze } = i.hiScores
   const worldFeat = (feat: string) => (world?.feats?.includes(feat) ? 1 : 0)
   return [
     ...i.milestones.map(m => ({ ...WEARABLE_META[m.prop]!, goal: m.goal, progress: m.progress, unit: m.unit, reward: m.prop })),
@@ -547,6 +583,8 @@ export function achievementsOf(i: AchievementInputs): Achievement[] {
     { id: 'clean-month', name: 'Clean Month', desc: 'every soda can in the month, crushed', icon: 'i-lucide-cup-soda', goal: 1, progress: worldFeat('clean-month'), unit: 'month' },
     { id: 'no-hit-week', name: 'No-Hit Week', desc: 'a whole week of the month without a scratch', icon: 'i-lucide-shield', goal: 1, progress: worldFeat('no-hit-week'), unit: 'week' },
     { id: 'chain-3', name: 'Chain of Three', desc: 'a kicked can that crushed three in a row', icon: 'i-lucide-link', goal: 1, progress: worldFeat('chain-3'), unit: 'chain' },
+    { id: 'maze-1000', name: 'Capsule Maze', desc: 'a thousand points in the maze', icon: 'i-lucide-ghost', goal: 1000, progress: maze?.score ?? 0, unit: 'points' },
+    { id: 'clean-plate', name: 'Clean Plate', desc: 'every capsule in the maze, eaten', icon: 'i-lucide-utensils', goal: 1, progress: maze?.cleared ? 1 : 0, unit: 'maze' },
     { id: 'petted', name: 'Well Petted', desc: 'a hundred pats, all time', icon: 'i-lucide-hand-heart', goal: 100, progress: i.pets, unit: 'pets' },
     { id: 'open-house', name: 'Open House', desc: 'five visits from friends', icon: 'i-lucide-door-open', goal: 5, progress: i.visits, unit: 'visits' },
     { id: 'pincushion', name: 'Pincushion', desc: 'ten blood draws on file', icon: 'i-lucide-test-tube', goal: 10, progress: i.draws, unit: 'draws' },
