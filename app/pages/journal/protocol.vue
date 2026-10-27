@@ -30,12 +30,15 @@
       Nothing on the protocol yet.{{ canEdit ? ' Use + ADD to put the first compound or supplement on it.' : '' }}
     </p>
 
-    <!-- Capped at 5xl: full-width, a desktop row put the dose 1,800px from its name. The hint
-         drops to its own line under the header on a phone, where it ate the rule and wrapped. -->
-    <div class="px-4 sm:px-6 py-4 space-y-5 max-w-5xl">
+    <!-- The groups flow into columns from lg (two, three from 2xl — Jim's 2040px screen), each
+         group kept whole: one full-width column put the dose 1,800px from its name and the 28
+         rows two screens tall, and a 5xl cap just left the right half of the page empty. The
+         hint drops to its own line under the header on a phone, where it ate the rule. -->
+    <div class="px-4 sm:px-6 py-4 lg:columns-2 2xl:columns-3 lg:gap-x-10">
       <section
         v-for="group in groups"
         :key="group.key"
+        class="break-inside-avoid mb-5"
       >
         <TuiHeader
           :label="`${group.title} · ${group.rows.length}`"
@@ -70,15 +73,17 @@
             class="py-2 border-b border-line-row last:border-0"
           >
             <!-- One shape for every row. On a phone it is two lines: the name, chips and dose
-                 on the first, the dates, notes, version count and actions on the second — a
+                 on the first, the date, version count and actions on the second — a
                  free-wrapping flex row used to put the dose beside a short name and under a long
                  one, so the column of doses jumped about. From sm the second line's wrapper is
                  `contents`, its children join the one flex line, and `order` puts them where the
-                 one-line read wants them: name · chips · since · notes ······ dose · versions ·
-                 actions. -->
+                 one-line read wants them: name · chips · since ······ dose · versions · actions.
+                 The name is the one thing allowed to shrink (and wrap) in a narrow column; the
+                 notes get a line of their own below, where they can be read instead of
+                 truncated to a fragment. -->
             <div class="flex flex-wrap items-baseline gap-x-2.5 group sm:flex-nowrap">
               <span
-                class="text-prose min-w-0 sm:shrink-0"
+                class="text-prose min-w-0"
                 :class="row.stopped ? 'line-through text-muted' : 'text-hi'"
               >{{ row.item.name }}</span>
 
@@ -100,19 +105,13 @@
               >{{ row.dose }}</span>
 
               <div
-                v-if="row.since || row.item.notes || row.versions.length || canEdit"
+                v-if="row.since || row.versions.length || canEdit"
                 class="basis-full mt-0.5 flex items-baseline gap-x-2.5 min-w-0 sm:contents"
               >
                 <span
                   v-if="row.since"
                   class="shrink-0 text-small text-faint sm:order-1"
                 >{{ row.since }}</span>
-
-                <span
-                  v-if="row.item.notes"
-                  class="min-w-0 truncate text-small text-faint sm:order-1 sm:max-w-md"
-                  :title="row.item.notes"
-                >{{ row.item.notes }}</span>
 
                 <span
                   class="ml-auto flex items-baseline gap-2 shrink-0 sm:order-3"
@@ -165,6 +164,14 @@
                 </span>
               </div>
             </div>
+
+            <p
+              v-if="row.item.notes"
+              class="mt-0.5 text-small text-faint truncate"
+              :title="row.item.notes"
+            >
+              {{ row.item.notes }}
+            </p>
 
             <!-- The dated history: one line per version, newest first -->
             <ul
