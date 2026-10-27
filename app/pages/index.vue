@@ -232,7 +232,8 @@
         </div>
 
         <!-- Today's water against the profile's goal, right under the tap that moves it — the
-             same bar the PROTEIN tile draws (shared/utils/water.ts has the goal and the maths).
+             same bar the PROTEIN tile draws, filled with the hub tracker's water blue (Jim's
+             call 2026-10-27; shared/utils/water.ts has the goal and the maths).
              The local mirror useQuickLog patches after a tap is what this reads, so the bar
              fills on the spot. -->
         <div
@@ -255,7 +256,7 @@
             aria-label="Water today against the daily goal"
           >
             <span
-              class="absolute inset-y-0 left-0 bg-accent opacity-70 transition-[width] duration-300"
+              class="absolute inset-y-0 left-0 bg-water transition-[width] duration-300"
               :style="{ width: `${Math.min(100, water.pct)}%` }"
             />
           </span>
