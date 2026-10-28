@@ -53,9 +53,12 @@
             :value="tile.value"
             :series="tile.series"
             :rows="vitalRows"
+            :raw-rows="vitalRaw"
             :mark-lines="tile.markLines"
             :annotations="annotations"
             :connect="tile.connect"
+            :show-notes="annotationsAvailable"
+            expandable
           />
         </div>
       </section>
@@ -78,7 +81,10 @@
             :value="tile.value"
             :series="tile.series"
             :rows="foodRows"
+            :raw-rows="foodRaw"
             :annotations="annotations"
+            :show-notes="annotationsAvailable"
+            expandable
           />
         </div>
       </section>
@@ -112,7 +118,11 @@
             :accent="tile.accent"
             :series="tile.series"
             :rows="healthRows"
+            :raw-rows="healthRaw"
             :annotations="annotations"
+            :show-notes="annotationsAvailable"
+            :format="tile.format"
+            expandable
           />
         </div>
         <p
@@ -266,20 +276,20 @@ const drawMarkLines = computed(() =>
 // --- vitals group ---
 const VITAL_FIELDS = ['weight_lbs', 'bp_systolic', 'bp_diastolic', 'rhr', 'hrv']
 
-const vitalRows = computed(() =>
-  smoothRows(
-    inRange(entries.value).map(e => ({
-      date: formatDate(e.date, 'monthDay'),
-      day: e.date,
-      weight_lbs: e.weight_lbs ?? null,
-      bp_systolic: e.bp_systolic ?? null,
-      bp_diastolic: e.bp_diastolic ?? null,
-      rhr: e.rhr ?? null,
-      hrv: e.hrv ?? null
-    })),
-    VITAL_FIELDS
-  )
+// Each group keeps its raw rows beside the (maybe) smoothed ones: the tiles chart the smoothed
+// line, their expanded view takes the stats from what was actually measured.
+const vitalRaw = computed(() =>
+  inRange(entries.value).map(e => ({
+    date: formatDate(e.date, 'monthDay'),
+    day: e.date,
+    weight_lbs: e.weight_lbs ?? null,
+    bp_systolic: e.bp_systolic ?? null,
+    bp_diastolic: e.bp_diastolic ?? null,
+    rhr: e.rhr ?? null,
+    hrv: e.hrv ?? null
+  }))
 )
+const vitalRows = computed(() => smoothRows(vitalRaw.value, VITAL_FIELDS))
 
 /** Latest non-null value of a field across the visible range. */
 function latest(rows: Array<Record<string, unknown>>, field: string): number | null {
@@ -347,21 +357,19 @@ const FOOD_FIELDS = ['kcal', 'protein_g']
 // "est." on the tiles only when a charted day leans on a model figure — label figures aren't estimates.
 const foodEstimated = computed(() => inRange(entries.value).some(e => nutritionIsEstimated(dayNutrition(e, estimateIndex.value))))
 
-const foodRows = computed(() =>
-  smoothRows(
-    inRange(entries.value).map((e) => {
-      const n = dayNutrition(e, estimateIndex.value)
-      const full = hasFullFigures(n) && isDayDone(e, today.value)
-      return {
-        date: formatDate(e.date, 'monthDay'),
-        day: e.date,
-        kcal: full ? Math.round(n.kcal) : null,
-        protein_g: full ? Math.round(n.protein_g) : null
-      }
-    }),
-    FOOD_FIELDS
-  )
+const foodRaw = computed(() =>
+  inRange(entries.value).map((e) => {
+    const n = dayNutrition(e, estimateIndex.value)
+    const full = hasFullFigures(n) && isDayDone(e, today.value)
+    return {
+      date: formatDate(e.date, 'monthDay'),
+      day: e.date,
+      kcal: full ? Math.round(n.kcal) : null,
+      protein_g: full ? Math.round(n.protein_g) : null
+    }
+  })
 )
+const foodRows = computed(() => smoothRows(foodRaw.value, FOOD_FIELDS))
 
 const foodTiles = computed(() => {
   const rows = foodRows.value
@@ -421,18 +429,16 @@ const healthKeys = computed(() =>
   Object.keys(HEALTH_METRICS_META).filter(k => selectedHealthKeys.value.includes(k))
 )
 
-const healthRows = computed(() =>
-  smoothRows(
-    inRange(healthEntries.value).map(e => ({
-      date: formatDate(e.date, 'monthDay'),
-      day: e.date,
-      ...Object.fromEntries(
-        Object.keys(HEALTH_METRICS_META).map(k => [k, (e as unknown as Record<string, number | null>)[k] ?? null])
-      )
-    })),
-    Object.keys(HEALTH_METRICS_META)
-  )
+const healthRaw = computed(() =>
+  inRange(healthEntries.value).map(e => ({
+    date: formatDate(e.date, 'monthDay'),
+    day: e.date,
+    ...Object.fromEntries(
+      Object.keys(HEALTH_METRICS_META).map(k => [k, (e as unknown as Record<string, number | null>)[k] ?? null])
+    )
+  }))
 )
+const healthRows = computed(() => smoothRows(healthRaw.value, Object.keys(HEALTH_METRICS_META)))
 
 const healthTiles = computed(() =>
   healthKeys.value.map((key) => {
@@ -445,7 +451,9 @@ const healthTiles = computed(() =>
       value: v == null ? '—' : key === 'sleep_total_min' ? formatDuration(v) : fmt(v, Number.isInteger(v) ? 0 : 1),
       // Recovery is the one metric the mock tints when it's in a good place.
       accent: key === 'recovery_score' && v != null && v >= RECOVERY_GREEN_MIN,
-      series: [{ key, name: meta.label, color: HEALTH_COLORS[key] ?? CHART_ACCENT }]
+      series: [{ key, name: meta.label, color: HEALTH_COLORS[key] ?? CHART_ACCENT }],
+      // Sleep prints as a duration in the expanded view's stats; the rest take the default.
+      format: key === 'sleep_total_min' ? formatDuration : undefined
     }
   })
 )
