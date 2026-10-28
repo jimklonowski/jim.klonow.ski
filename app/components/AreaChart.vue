@@ -7,6 +7,7 @@
        (var(--color-…) tokens pass straight through) and the axis text is the root's currentColor
        and font, so a preset, face or size switch reaches every chart with no re-render. -->
   <UChart
+    ref="chart"
     type="line"
     :data="data"
     :index="xAxisKey"
@@ -14,7 +15,7 @@
     :definition="definition"
     :height="chartHeight"
     :aria-label="ariaLabel ?? describedChart"
-    :tooltip="{ content: { side: 'top', sideOffset: 10 } }"
+    :tooltip="tooltip"
     :ui="{ root: bare ? 'overflow-visible' : undefined }"
   >
     <template #tooltip="{ points }">
@@ -307,6 +308,23 @@ const definition = computed(() => {
 })
 
 // --- tooltip ---------------------------------------------------------------------------------
+/**
+ * Nuxt UI keeps the chart tooltip inside the chart's own DOM (no portal, so the series color
+ * variables reach it) but positions it `fixed`, and floating-ui's clipping-ancestor search
+ * drops a fixed element's scrolling ancestors — so inside a modal the tooltip never learned the
+ * modal's edge was there and the modal's overflow sliced off the value. An explicit boundary,
+ * the chart's own root, makes it slide left or right to stay on the plot. Bare tiles keep the
+ * default: against a 46px root the flip would never settle on a side.
+ */
+const chart = useTemplateRef<{ $el: HTMLElement }>('chart')
+const tooltip = computed(() => ({
+  content: {
+    side: 'top' as const,
+    sideOffset: 10,
+    collisionBoundary: props.bare ? undefined : chart.value?.$el
+  }
+}))
+
 type Focused = readonly { datum: unknown, color?: string }[]
 const rowsOf = (points: Focused) => points.map(p => p.datum as Partial<Row>).filter((d): d is Row => typeof d?.category === 'string' && typeof d.value === 'number')
 
