@@ -22,7 +22,7 @@ test('the record book: one dated sentence per best, the games included', () => {
     health: [{ date: '2026-09-01', recovery_score: 91, sleep_total_min: 455.6 }, { date: '2026-09-02', recovery_score: 40, sleep_total_min: null }],
     workouts: [{ date: '2025-12-24', duration_min: 95.4, workout_type: 'Disc Golf', avg_hr: null }],
     streak: 3,
-    hiScores: { runner: { score: 812, date: '2026-10-01' }, crusher: { score: 300, date: '2026-10-02', cleared: true }, world: null, maze: { score: 2140, date: '2026-10-03', cleared: true } },
+    hiScores: { runner: { score: 812, date: '2026-10-01' }, crusher: { score: 300, date: '2026-10-02', cleared: true }, world: null, maze: { score: 2140, date: '2026-10-03', cleared: true }, drop: { score: 1720, date: '2026-10-04' } },
     today: TODAY
   })
   assert.deepEqual(lines, [
@@ -34,7 +34,8 @@ test('the record book: one dated sentence per best, the games included', () => {
     'lowest resting HR: 49 bpm on Sep 2.',
     'best run: 812 points on Oct 1.',
     'best crush: 300 points on Oct 2 — and a whole wall cleared, once.',
-    'best maze: 2140 points on Oct 3 — and every capsule eaten, once.'
+    'best maze: 2140 points on Oct 3 — and every capsule eaten, once.',
+    'best drop: 1720 points on Oct 4.'
   ])
 })
 
@@ -195,6 +196,7 @@ test('the games: the intro by game, the quit remark by what the run earned', () 
   assert.equal(playIntroLine('crusher', wall), '1 cans on the wall (last month\'s — this one is clean). space or tap to launch; arrows or the pointer move. esc quits.')
   assert.equal(playIntroLine('crusher', { ...wall, count: 0 }), 'nothing to shoot. good. (esc quits)')
   assert.equal(playIntroLine('maze', wall, { ghosts: [], cans: 2, title: 'vs coke, dr pepper + 2 germs' }), 'every capsule in the maze, vs coke, dr pepper + 2 germs. arrows, wasd or a swipe steer; space or tap starts. esc quits.')
+  assert.equal(playIntroLine('drop', wall, undefined, { germs: 7, sodas: 7, title: '7 germs · 7 sodas this month' }), '7 germs · 7 sodas this month. ← → move, ↑ turns, ↓ drops; space or tap starts. esc quits.')
   const base = { game: 'runner', score: 120, best: { score: 300, date: '2026-10-01' }, house: 300, keeper: true, setRecord: false, beatHouse: false, cleared: false, wallEmpty: false }
   assert.deepEqual(quitRemark(base), { line: '120 points. best 300 on Oct 1 — it\'s still catching its breath.', event: null, hearts: false })
   assert.deepEqual(quitRemark({ ...base, setRecord: true, best: { score: 120, date: TODAY } }), { line: 'new best: 120 points. ♥', event: 'celebrate', hearts: true })
@@ -202,6 +204,7 @@ test('the games: the intro by game, the quit remark by what the run earned', () 
   assert.deepEqual(quitRemark({ ...base, keeper: false, setRecord: true }), { line: '120 points — your best yet. the house record is 300.', event: 'bigbeat', hearts: false })
   assert.deepEqual(quitRemark({ ...base, game: 'crusher', cleared: true }), { line: 'wall cleared. 120 points. ♥', event: 'celebrate', hearts: false })
   assert.deepEqual(quitRemark({ ...base, game: 'maze', cleared: true }), { line: 'a maze eaten clean. 120 points. ♥', event: 'celebrate', hearts: false })
+  assert.deepEqual(quitRemark({ ...base, game: 'drop', cleared: true }), { line: 'bottle scrubbed. 120 points. ♥', event: 'celebrate', hearts: false })
   assert.deepEqual(quitRemark({ ...base, keeper: false, best: null }), { line: '120 points. the house record is 300.', event: null, hearts: false })
   assert.deepEqual(quitRemark({ ...base, score: 0, game: 'crusher', wallEmpty: true }), { line: 'nothing to shoot. good.', event: null, hearts: false })
   assert.deepEqual(quitRemark({ ...base, score: 0 }), { line: 'next time.', event: null, hearts: false })

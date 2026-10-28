@@ -9,7 +9,7 @@ import { cycleProgress, cycleStatusOn, relevantCycle } from '#shared/utils/cycle
 import type { Cycle } from '#shared/utils/cycles'
 import {
   birthdayOf, bowlFor, cobwebsFor, crusherWallOf, daySeedOf, doseDatesOf, doseKeysOf, entryOn, feverOf, hungerOf, isCleanWeek, isInjected,
-  latestVital, mazeGhostsOf, mealDayOf, minutesOn as minutesOnDay, oldestOpenVial, paddleScaleFor, sodasInWeek, standingPlateOf, unloggedInWeek, walkDayOf,
+  latestVital, dropGermsOf, mazeGhostsOf, mealDayOf, minutesOn as minutesOnDay, oldestOpenVial, paddleScaleFor, sodasInWeek, standingPlateOf, unloggedInWeek, walkDayOf,
   walkPropFor, weekTallyOf, workoutHrOf, workoutsOn as workoutsOnDay, worldDaysOf
 } from '#shared/utils/tickerDay'
 import type { DayDraw, DayVial } from '#shared/utils/tickerDay'
@@ -176,6 +176,8 @@ export function useTickerDay(s: TickerDaySources) {
   const daySeed = computed(() => daySeedOf(today.value))
   /** The maze's ghosts: the month's sodas as cans, germs in the empty slots. */
   const mazeGhosts = computed(() => mazeGhostsOf(entries.value, today.value))
+  /** The drop's bottle: a germ per soda this month. */
+  const dropGerms = computed(() => dropGermsOf(entries.value, today.value))
   const worldDays = computed(() => worldDaysOf({
     entries: entries.value,
     health: health.value,
@@ -195,6 +197,6 @@ export function useTickerDay(s: TickerDaySources) {
     loggedDays, milestones, earned, build, tier, arms, bellyRead, scans, latestScan, leanGain,
     doseDates, weekTally, cleanWeek, activeCycle, cycleClause,
     finasterideStreak, tadalafilStreak, maneTier, nextMane, bandaged, injected, bowl, doseKeys,
-    crusherWall, paddleScale, crusherLives, daySeed, worldDays, mazeGhosts
+    crusherWall, paddleScale, crusherLives, daySeed, worldDays, mazeGhosts, dropGerms
   }
 }

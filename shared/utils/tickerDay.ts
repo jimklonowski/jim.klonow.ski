@@ -14,6 +14,7 @@ import type { Milestone } from './tickerWardrobe.ts'
 import type { TickerPose, TickerProp } from './tickerSprite.ts'
 import type { CanInput } from './tickerBreakout.ts'
 import type { MazeGhostInput } from './tickerMaze.ts'
+import { dropGermsFor } from './tickerDrop.ts'
 import type { DayInput } from './tickerWorld.ts'
 import type { PlannedDrawStatus } from './plannedDraws.ts'
 import type { HealthMetricsEntry, JournalEntry, WorkoutEntry } from '../types/journal.ts'
@@ -464,6 +465,26 @@ export function mazeGhostsOf(entries: JournalEntry[], today: string): MazeGhosts
   return { ghosts, cans: top.length, title }
 }
 
+// --- the capsule drop's bottle ------------------------------------------------------------------
+// One germ in the bottle for every soda logged in the trailing month — never fewer than four (a
+// clean month gets the kindest bottle), never more than the bottle takes.
+
+export interface DropGerms {
+  germs: number
+  sodas: number
+  /** "25 germs · 25 sodas this month" / "4 germs · a clean month" */
+  title: string
+}
+
+export function dropGermsOf(entries: JournalEntry[], today: string): DropGerms {
+  const from = shiftDays(today, -(CRUSHER_WINDOW_DAYS - 1))
+  let sodas = 0
+  for (const e of entries) if (e.date >= from && e.date <= today) sodas += (e.sodas ?? []).length
+  const germs = dropGermsFor(sodas, 1)
+  const title = sodas ? `${germs} germs · ${sodas} soda${sodas === 1 ? '' : 's'} this month` : `${germs} germs · a clean month`
+  return { germs, sodas, title }
+}
+
 // --- ticker world's month ---------------------------------------------------------------------
 // The trailing thirty days as the level's days (tickerWorld.ts): logged or not, the doses and
 // the sodas, the workout minutes, the recovery, a draw on file. The castle is today.
@@ -566,7 +587,7 @@ export interface AchievementInputs {
 
 /** Every achievement there is, with its progress. */
 export function achievementsOf(i: AchievementInputs): Achievement[] {
-  const { runner, crusher, world, maze } = i.hiScores
+  const { runner, crusher, world, maze, drop } = i.hiScores
   const worldFeat = (feat: string) => (world?.feats?.includes(feat) ? 1 : 0)
   return [
     ...i.milestones.map(m => ({ ...WEARABLE_META[m.prop]!, goal: m.goal, progress: m.progress, unit: m.unit, reward: m.prop })),
@@ -585,6 +606,8 @@ export function achievementsOf(i: AchievementInputs): Achievement[] {
     { id: 'chain-3', name: 'Chain of Three', desc: 'a kicked can that crushed three in a row', icon: 'i-lucide-link', goal: 1, progress: worldFeat('chain-3'), unit: 'chain' },
     { id: 'maze-1000', name: 'Capsule Maze', desc: 'a thousand points in the maze', icon: 'i-lucide-ghost', goal: 1000, progress: maze?.score ?? 0, unit: 'points' },
     { id: 'clean-plate', name: 'Clean Plate', desc: 'every capsule in the maze, eaten', icon: 'i-lucide-utensils', goal: 1, progress: maze?.cleared ? 1 : 0, unit: 'maze' },
+    { id: 'drop-1500', name: 'Capsule Drop', desc: 'fifteen hundred points in the bottle', icon: 'i-lucide-pill', goal: 1500, progress: drop?.score ?? 0, unit: 'points' },
+    { id: 'sterile', name: 'Sterile', desc: 'a bottle scrubbed of every germ', icon: 'i-lucide-bug-off', goal: 1, progress: drop?.cleared ? 1 : 0, unit: 'bottle' },
     { id: 'petted', name: 'Well Petted', desc: 'a hundred pats, all time', icon: 'i-lucide-hand-heart', goal: 100, progress: i.pets, unit: 'pets' },
     { id: 'open-house', name: 'Open House', desc: 'five visits from friends', icon: 'i-lucide-door-open', goal: 5, progress: i.visits, unit: 'visits' },
     { id: 'pincushion', name: 'Pincushion', desc: 'ten blood draws on file', icon: 'i-lucide-test-tube', goal: 10, progress: i.draws, unit: 'draws' },
