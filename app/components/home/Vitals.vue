@@ -4,7 +4,7 @@
          names the shown day, the rows read "latest as of" it, and the deltas are that day's.
          Tapping TODAY returns; the state is the component's own and never reaches the URL. -->
     <TuiHeader
-      :label="`${isToday ? 'TODAY' : shownLabel} · VITALS`"
+      :label="`${isToday ? 'TODAY' : label} · VITALS`"
       fill
     >
       <span class="flex items-center gap-1.5 text-meta">
@@ -12,7 +12,7 @@
           v-if="!isToday"
           type="button"
           class="text-accent hover:text-accent-hover cursor-pointer"
-          @click="shownDate = null"
+          @click="reset()"
         >today</button>
         <button
           type="button"
@@ -95,9 +95,9 @@ import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { shiftDays } from '#shared/utils/dates'
 
 /**
- * The shown day, or null for today. A model so the page can follow it (the PROTEIN row's
- * figures are the day's meals, summed on the page); null rather than today's date so the card
- * keeps reading TODAY across midnight without the page having to notice.
+ * The shown day, or null for today. A model so the page can follow it: the whole left column
+ * scrubs with these arrows (doses, food, workouts, water — and a swipe on a phone, which the
+ * page owns). useDayScrub on this same ref is what both sides read.
  */
 const shownDate = defineModel<string | null>('date', { default: null })
 
@@ -127,26 +127,9 @@ interface Row {
   bar?: { pct: number, class: string }
 }
 
-// --- the shown day ---
-const today = useToday()
-const asOf = computed(() => shownDate.value ?? today.value)
-const isToday = computed(() => shownDate.value == null || shownDate.value >= today.value)
-/** The first day either series has, so ‹ stops where the record starts. */
-const firstDate = computed(() => {
-  const first = [props.entries[0]?.date, props.metrics[0]?.date].filter((d): d is string => !!d).sort()[0]
-  return first ?? null
-})
-const canBack = computed(() => firstDate.value != null && asOf.value > firstDate.value)
-/** "OCT 25", or "SEP 21 2020" once the scrub leaves this year — the record starts at a 2020 weigh-in. */
-const shownLabel = computed(() => {
-  const terse = formatDateTerse(asOf.value)
-  return asOf.value.slice(0, 4) === today.value.slice(0, 4) ? terse.replace(/ \d{4}$/, '') : terse
-})
-function step(n: 1 | -1) {
-  const next = shiftDays(asOf.value, n)
-  if (n < 0 && !canBack.value) return
-  shownDate.value = next >= today.value ? null : next
-}
+// --- the shown day (useDayScrub: ‹ stops at the first day either series has) ---
+const firstDate = computed(() => firstDateOf(props.entries, props.metrics))
+const { asOf, isToday, canBack, label, step, reset } = useDayScrub(shownDate, firstDate)
 
 // "Latest as of" the shown day (Jim's call over strict per-day values, which blank most days):
 // each row is the newest reading on or before it, so a skipped weigh-in still shows the last

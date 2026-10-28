@@ -15,6 +15,8 @@ import type { TickerPose, TickerProp } from './tickerSprite.ts'
 import type { CanInput } from './tickerBreakout.ts'
 import type { MazeGhostInput } from './tickerMaze.ts'
 import { dropGermsFor } from './tickerDrop.ts'
+import { INV_MAX, invadersWaveFor } from './tickerInvaders.ts'
+import type { InvaderInput, InvaderKind } from './tickerInvaders.ts'
 import type { DayInput } from './tickerWorld.ts'
 import type { PlannedDrawStatus } from './plannedDraws.ts'
 import type { HealthMetricsEntry, JournalEntry, WorkoutEntry } from '../types/journal.ts'
@@ -485,6 +487,45 @@ export function dropGermsOf(entries: JournalEntry[], today: string): DropGerms {
   return { germs, sodas, title }
 }
 
+// --- the soda invaders' formation -----------------------------------------------------------------
+// One invader per soda logged in the trailing month, sized by the can: a tall boy (over 13 oz)
+// takes two hits like the bosses, a can one, a mini one; germs fill the formation when the month
+// was too clean to make one. The newest forty when a month overflows the formation.
+
+export interface InvadersWave {
+  wave: InvaderInput[]
+  /** How many are sodas, and how many germs filled in. */
+  cans: number
+  germs: number
+  sodas: number
+  /** "25 cans · 25 sodas this month" / "3 cans + 3 germs · 3 sodas this month" / "6 germs · a clean month" */
+  title: string
+}
+
+/** The crusher's hp mapping, as kinds: minis up to 8 oz, cans to 13, tall boys over; unsized is a can. */
+export function invaderKindFor(oz: number | null): InvaderKind {
+  if (oz == null) return 'can'
+  return oz <= 8 ? 'mini' : oz <= 13 ? 'can' : 'tall'
+}
+
+export function invadersWaveOf(entries: JournalEntry[], today: string): InvadersWave {
+  const from = shiftDays(today, -(CRUSHER_WINDOW_DAYS - 1))
+  const all: InvaderInput[] = []
+  for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (e.date < from || e.date > today) continue
+    for (const s of e.sodas ?? []) all.push({ kind: invaderKindFor(sodaOunces(s.size)), label: (s.drink ?? '').trim().toUpperCase() || null })
+  }
+  const recent = all.slice(-INV_MAX)
+  const wave = invadersWaveFor(recent)
+  const cans = recent.length
+  const germs = wave.length - cans
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+  const title = cans
+    ? `${plural(cans, 'can')}${germs ? ` + ${plural(germs, 'germ')}` : ''} · ${plural(all.length, 'soda')} this month`
+    : `${plural(germs, 'germ')} · a clean month`
+  return { wave, cans, germs, sodas: all.length, title }
+}
+
 // --- ticker world's month ---------------------------------------------------------------------
 // The trailing thirty days as the level's days (tickerWorld.ts): logged or not, the doses and
 // the sodas, the workout minutes, the recovery, a draw on file. The castle is today.
@@ -587,7 +628,7 @@ export interface AchievementInputs {
 
 /** Every achievement there is, with its progress. */
 export function achievementsOf(i: AchievementInputs): Achievement[] {
-  const { runner, crusher, world, maze, drop } = i.hiScores
+  const { runner, crusher, world, maze, drop, invaders } = i.hiScores
   const worldFeat = (feat: string) => (world?.feats?.includes(feat) ? 1 : 0)
   return [
     ...i.milestones.map(m => ({ ...WEARABLE_META[m.prop]!, goal: m.goal, progress: m.progress, unit: m.unit, reward: m.prop })),
@@ -608,6 +649,8 @@ export function achievementsOf(i: AchievementInputs): Achievement[] {
     { id: 'clean-plate', name: 'Clean Plate', desc: 'every capsule in the maze, eaten', icon: 'i-lucide-utensils', goal: 1, progress: maze?.cleared ? 1 : 0, unit: 'maze' },
     { id: 'drop-1500', name: 'Capsule Drop', desc: 'fifteen hundred points in the bottle', icon: 'i-lucide-pill', goal: 1500, progress: drop?.score ?? 0, unit: 'points' },
     { id: 'sterile', name: 'Sterile', desc: 'a bottle scrubbed of every germ', icon: 'i-lucide-bug-off', goal: 1, progress: drop?.cleared ? 1 : 0, unit: 'bottle' },
+    { id: 'invaders-3000', name: 'Soda Invaders', desc: 'three thousand points against the formation', icon: 'i-lucide-rocket', goal: 3000, progress: invaders?.score ?? 0, unit: 'points' },
+    { id: 'clear-sky', name: 'Clear Sky', desc: 'every invader in the wave, shot down', icon: 'i-lucide-sun', goal: 1, progress: invaders?.cleared ? 1 : 0, unit: 'wave' },
     { id: 'petted', name: 'Well Petted', desc: 'a hundred pats, all time', icon: 'i-lucide-hand-heart', goal: 100, progress: i.pets, unit: 'pets' },
     { id: 'open-house', name: 'Open House', desc: 'five visits from friends', icon: 'i-lucide-door-open', goal: 5, progress: i.visits, unit: 'visits' },
     { id: 'pincushion', name: 'Pincushion', desc: 'ten blood draws on file', icon: 'i-lucide-test-tube', goal: 10, progress: i.draws, unit: 'draws' },

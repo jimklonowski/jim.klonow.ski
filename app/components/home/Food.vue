@@ -49,6 +49,12 @@
         :to="{ path: '/journal', query: { meal: suggested }, hash: '#food' }"
         class="text-meta text-accent hover:text-accent-hover"
       >+ add {{ MEAL_SLOT_LABELS[suggested].toLowerCase() }} →</NuxtLink>
+      <!-- A scrubbed-to day: the way to that day's entry, where its meals are. -->
+      <NuxtLink
+        v-else-if="!isToday"
+        :to="`/journal/${asOf}`"
+        class="text-meta text-muted hover:text-accent"
+      >{{ formatDate(asOf, 'monthDay') }} entry →</NuxtLink>
       <NuxtLink
         v-else
         to="/journal#food"
@@ -71,8 +77,13 @@ import {
 import { localTimeNow } from '#shared/utils/time'
 
 const props = defineProps<{
-  /** Today's meals summed (dayNutrition of today's entry). */
+  /** The shown day's meals summed (dayNutrition of that day's entry). */
   day: DayNutrition
+  /**
+   * The day `day` is for, when the home column is scrubbed back (useDayScrub); today when absent.
+   * The 7-day average ends on it and the add-meal link gives way to that day's entry.
+   */
+  date?: string
   /** Every journal entry, for the trailing-week average. */
   entries: JournalEntry[]
   index: EstimateIndex
@@ -114,18 +125,27 @@ const kcalTitle = computed(() => {
   return parts.join(' · ') || undefined
 })
 
-// The trailing week, ending yesterday until today's dinner is logged (nutritionWindow).
-const avg = computed(() => nutritionAverage(props.entries, props.index, today.value, 7))
+// The shown day: today, or the day the column is scrubbed to.
+const asOf = computed(() => props.date ?? today.value)
+const isToday = computed(() => asOf.value >= today.value)
+
+// The trailing week as of the shown day, ending the day before it until its dinner is logged
+// (nutritionWindow) — so a scrubbed-to day reads the average Jim would have seen that day.
+const avg = computed(() => nutritionAverage(props.entries, props.index, asOf.value, 7))
 const avgTitle = computed(() => {
-  const w = nutritionWindow(props.entries, today.value, 7)
-  return `Days with every meal estimated, ${formatDate(w.from, 'monthDay')} – ${w.to === today.value ? 'today' : 'yesterday'} · ${avg.value.days} day${avg.value.days === 1 ? '' : 's'}`
+  const w = nutritionWindow(props.entries, asOf.value, 7)
+  const to = w.to === asOf.value
+    ? (isToday.value ? 'today' : formatDate(w.to, 'monthDay'))
+    : (isToday.value ? 'yesterday' : formatDate(w.to, 'monthDay'))
+  return `Days with every meal estimated, ${formatDate(w.from, 'monthDay')} – ${to} · ${avg.value.days} day${avg.value.days === 1 ? '' : 's'}`
 })
 
 // The clock's meal, re-read each minute so an open tab moves from lunch to dinner. useNow is the
-// reactive trigger; localTimeNow() reads the home-timezone wall clock.
+// reactive trigger; localTimeNow() reads the home-timezone wall clock. Today only: a past day's
+// quick log would land in today's entry.
 const now = useNow({ interval: 60_000 })
 const suggested = computed<MainSlot | null>(() => {
-  if (!props.canEdit) return null
+  if (!props.canEdit || !isToday.value) return null
   void now.value
   const from = MAIN_SLOTS.indexOf(slotForTime(localTimeNow()))
   return MAIN_SLOTS.slice(from).find(slot => !loggedSlots.value.has(slot)) ?? null
