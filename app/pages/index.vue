@@ -445,15 +445,11 @@ const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
 const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
 const addSoda = () => quickLog?.addSoda()
-const addWater = () => quickLog?.addWater()
-/** The WATER bar under the quick-log buttons: null for roles without the buttons. */
-const water = computed(() => {
-  if (!quickLog) return null
-  const ozRaw = quickLog.waterOzToday.value
-  const goal = quickLog.goalOz.value
-  const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
-  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours: quickLog.watersToday.value }
-})
+// A cup is always today's: if the vitals card is scrubbed back, return so the bar shows the pour.
+const addWater = () => {
+  vitalsDate.value = null
+  return quickLog?.addWater()
+}
 // The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
 // estimates endpoint returns nothing for the doctor and the profile is a full-access read, so
 // both are skipped for roles that don't get food (and for guests, who have no session).
