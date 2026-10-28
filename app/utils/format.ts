@@ -22,6 +22,15 @@ export function formatDateTerse(d: string): string {
   return formatDate(d, 'short').replace(',', '').toUpperCase()
 }
 
+/**
+ * "OCT 25", or "SEP 21 2020" once the day leaves the current year — the home page's label for a
+ * scrubbed-to day (the record starts at a 2020 weigh-in, so the year has to be able to show).
+ */
+export function formatDayLabel(d: string, today: string): string {
+  const terse = formatDateTerse(d)
+  return d.slice(0, 4) === today.slice(0, 4) ? terse.replace(/ \d{4}$/, '') : terse
+}
+
 // Workout start_time comes in two shapes (Whoop ISO UTC, Health Auto Export local + offset);
 // both resolve to an instant, rendered on the home-timezone clock like every other time in the
 // app — never the viewer's zone. The first-HH:MM regex this replaced read whatever digits the

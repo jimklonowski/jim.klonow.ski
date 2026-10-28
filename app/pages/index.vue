@@ -71,12 +71,18 @@
          scrolls sideways under a header that stayed put. -->
     <!-- Four blocks (vitals, protocol, cycle, next draw). Two-up between md and lg, where the
          section is the full page width; one stack in the 390px column from lg. -->
-    <section class="bg-bg px-6 pt-4 pb-5 min-w-0 md:grid md:grid-cols-2 md:gap-x-8 lg:block">
+    <!-- The whole column scrubs with the vitals ‹ › (useDayScrub, Jim 2026-10-28): doses, food,
+         the workout line and the WATER bar all read the shown day. On a phone a horizontal swipe
+         anywhere in the column steps it too (useSwipe on this element; right = back a day). -->
+    <section
+      ref="scrubColumnEl"
+      class="bg-bg px-6 pt-4 pb-5 min-w-0 md:grid md:grid-cols-2 md:gap-x-8 lg:block"
+    >
       <!-- tour ids sit on the compact components, not the sections — a full-height column
            as the popover anchor pushes the tour popover to the viewport edge. -->
       <HomeVitals
         id="tour-vitals"
-        v-model:date="vitalsDate"
+        v-model:date="shownDate"
         :entries="entries"
         :metrics="healthMetrics"
         :protein="protein"
@@ -84,7 +90,7 @@
 
       <div>
         <TuiHeader
-          label="PROTOCOL · LOGGED TODAY"
+          :label="`PROTOCOL · LOGGED ${isToday ? 'TODAY' : shownLabel}`"
           fill
           class="mt-4.5 md:mt-0 lg:mt-4.5"
         />
@@ -112,7 +118,7 @@
               > ×{{ row.count }}</span></NuxtLink>
               <span
                 class="ml-auto shrink-0 text-muted"
-                :title="row.count > 1 ? `${row.total} ${unitLabel(row.first.unit)} today` : undefined"
+                :title="row.count > 1 ? `${row.total} ${unitLabel(row.first.unit)} ${dayWord}` : undefined"
               >{{ row.count > 1 ? `${row.count} × ` : '' }}{{ row.first.dose }} {{ unitLabel(row.first.unit) }}<span
                 v-if="equivalent(row.first)"
                 class="hidden lg:inline"
@@ -131,13 +137,14 @@
           v-else
           class="mt-2.5 text-small text-muted"
         >
-          No doses logged today.
+          No doses logged {{ dayWord }}.
         </p>
 
         <!-- Today's meals and the week's protein, from the same figures as the hub's food card. -->
         <HomeFood
           v-if="isFullAccess"
-          :day="todayNutrition"
+          :day="shownNutrition"
+          :date="asOf"
           :entries="entries"
           :index="estimateIndex"
           :target="proteinTarget"
@@ -159,7 +166,7 @@
               <span
                 v-if="i === 0"
                 class="shrink-0"
-              >└ {{ workoutsAreToday ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
+              >└ {{ workoutsOnShownDay ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
               <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
             </div>
             <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
@@ -173,12 +180,13 @@
         </div>
 
         <div class="flex gap-2 mt-4.5">
+          <!-- Scrubbed back, the button is the way into that day's entry instead. -->
           <NuxtLink
             v-if="isFullAccess"
-            :to="`/journal/${today}`"
+            :to="`/journal/${asOf}`"
             class="tui-btn tui-btn-accent flex-1 justify-center"
           >
-            {{ canEdit ? '+ LOG TODAY' : 'TODAY' }}
+            {{ isToday ? (canEdit ? '+ LOG TODAY' : 'TODAY') : (canEdit ? `EDIT ${shownLabel}` : shownLabel) }}
           </NuxtLink>
           <NuxtLink
             to="/journal/calendar"
@@ -247,7 +255,7 @@
             type="button"
             class="text-accent hover:text-accent-hover cursor-pointer whitespace-nowrap"
             title="Back to today"
-            @click="vitalsDate = null"
+            @click="resetDay()"
           >
             {{ water.label }}
           </button>
@@ -458,9 +466,9 @@ const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
 const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
 const addSoda = () => quickLog?.addSoda()
-// A cup is always today's: if the vitals card is scrubbed back, return so the bar shows the pour.
+// A cup is always today's: if the column is scrubbed back, return so the bar shows the pour.
 const addWater = () => {
-  vitalsDate.value = null
+  resetDay()
   return quickLog?.addWater()
 }
 // The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
@@ -472,47 +480,75 @@ const estimateIndex = computed<EstimateIndex>(() => estimates?.index.value ?? ne
 const proteinTarget = computed(() => profile ? profileNumber(profile.data.value, 'protein_target_g', 0) || null : null)
 const {
   hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
-  allWorkouts, todayEntry, dosesToday, sodasToday, flagged, flagCounts,
+  allWorkouts, todayEntry, sodasToday, flagged, flagCounts,
   error: overviewError, refresh: refreshOverview
 } = useOverview(role)
 
-/** Today's meals summed from their figures — the food line reads it (and the PROTEIN row while the vitals card shows today). */
-const todayNutrition = computed(() => dayNutrition(todayEntry.value, estimateIndex.value))
-// The day the vitals card is scrubbed to (null = today, HomeVitals owns the ‹ ›). The PROTEIN
-// row is a day total, not a "latest as of" reading, so it's summed for that day here.
-const vitalsDate = ref<string | null>(null)
-const vitalsNutrition = computed(() => {
-  if (vitalsDate.value == null) return todayNutrition.value
-  return dayNutrition(entries.value.find(e => e.date === vitalsDate.value) ?? null, estimateIndex.value)
+// --- the shown day ---
+// The day the left column is scrubbed to (null = today). HomeVitals draws the ‹ › on the same
+// ref through v-model; useDayScrub on it here gives this page the same derived values the card
+// has, so the doses, food, workout line, LOG button and WATER bar all follow without the card
+// having to expose anything. ‹ stops at the first day of either series, as in the card.
+const shownDate = ref<string | null>(null)
+const firstDate = computed(() => firstDateOf(entries.value, healthMetrics.value))
+const { asOf, isToday, label: shownLabel, step: stepDay, reset: resetDay } = useDayScrub(shownDate, firstDate)
+/** "today" / "on Oct 25" — the word the per-day sentences end with. */
+const dayWord = computed(() => isToday.value ? 'today' : `on ${formatDate(asOf.value, 'monthDay')}`)
+/** The shown day's journal entry, if it has one. */
+const shownEntry = computed(() => isToday.value ? todayEntry.value : entries.value.find(e => e.date === asOf.value) ?? null)
+
+// A horizontal swipe anywhere in the column steps the day on a phone (Jim 2026-10-28): right =
+// back a day, left = forward. VueUse's listeners are passive, so vertical scrolling is untouched;
+// the direction is the dominant axis, and the 60px threshold keeps a wobbly scroll from stepping.
+// The template key differs from the variable name on purpose: with the same name Vue 3.5 tries
+// to assign the element onto this readonly ref and it stays null (no listeners, no swipe).
+const scrubColumn = useTemplateRef<HTMLElement>('scrubColumnEl')
+useSwipe(scrubColumn, {
+  threshold: 60,
+  onSwipeEnd(_e, direction) {
+    if (direction === 'right') stepDay(-1)
+    else if (direction === 'left') stepDay(1)
+  }
 })
+
+/** Today's meals summed from their figures — the food line and the PROTEIN row read it while the column shows today. */
+const todayNutrition = computed(() => dayNutrition(todayEntry.value, estimateIndex.value))
+// The PROTEIN row and the food line are day totals, not "latest as of" readings, so the shown
+// day's meals are summed here.
+const shownNutrition = computed(() => isToday.value ? todayNutrition.value : dayNutrition(shownEntry.value, estimateIndex.value))
 /** Null (no row) for roles without food; `grams` null until a meal with figures is logged. */
 const protein = computed(() => {
   if (!isFullAccess.value) return null
-  const n = vitalsNutrition.value
+  const n = shownNutrition.value
   return { grams: n.estimated > 0 ? n.protein_g : null, target: proteinTarget.value, floor: n.missing.length > 0 }
 })
 /**
  * The WATER bar under the quick-log buttons: null for roles without the buttons. It follows the
- * vitals ‹ › like the PROTEIN row (Jim 2026-10-28: "see previous water intakes"), reading the
- * scrubbed day's pours against the profile's current goal; `label` carries the day once it isn't today.
+ * column's ‹ › like the PROTEIN row (Jim 2026-10-28: "see previous water intakes"), reading the
+ * shown day's pours against the profile's CURRENT goal (goal changes aren't versioned); the
+ * label carries the day once it isn't today.
  */
 const water = computed(() => {
   if (!quickLog) return null
-  const date = vitalsDate.value ?? today.value
-  const isToday = vitalsDate.value == null || vitalsDate.value >= today.value
-  const { oz: ozRaw, count: pours } = isToday
+  const { oz: ozRaw, count: pours } = isToday.value
     ? { oz: quickLog.waterOzToday.value, count: quickLog.watersToday.value }
-    : quickLog.waterOn(date)
+    : quickLog.waterOn(asOf.value)
   const goal = quickLog.goalOz.value
   const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
-  // "WATER · OCT 25", the year kept only outside the current one — the vitals header's rule.
-  const terse = formatDateTerse(date)
-  const label = isToday ? 'WATER' : `WATER · ${date.slice(0, 4) === today.value.slice(0, 4) ? terse.replace(/ \d{4}$/, '') : terse}`
-  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours, isToday, label, dayWord: isToday ? 'today' : `on ${formatDate(date, 'monthDay')}` }
+  return {
+    oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours,
+    isToday: isToday.value, label: isToday.value ? 'WATER' : `WATER · ${shownLabel.value}`, dayWord: dayWord.value
+  }
 })
 
-/** Today's doses with identical ones folded (×N), in time order. */
-const doseRows = computed(() => groupDoses(dosesToday.value))
+/**
+ * The shown day's doses with identical ones folded (×N), in time order. Strictly that day's:
+ * useOverview's dosesToday falls back to the newest entry when today is blank, which under a
+ * "LOGGED TODAY" header read as today's — now ‹ is the way to yesterday's.
+ */
+const doseRows = computed(() => groupDoses(
+  [...(shownEntry.value?.peptides ?? [])].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
+))
 
 // Same conditional-composable rule as useOverview: the role is stable for the component's
 // lifetime (login is a hard navigation), so guests skip the fetch instead of 401ing.
@@ -537,12 +573,14 @@ const { data: digestData, execute: loadDigests, refresh: refreshDigests } = useD
 if (isFullAccess.value) await loadDigests()
 const digests = computed(() => digestData.value ?? [])
 
-/** Every session from the most recent day with a workout, latest first. */
+/** Every session from the most recent workout day on or before the shown day, latest first. */
 const latestWorkouts = computed(() => {
-  const last = allWorkouts.value.at(-1)
+  // "Latest as of" the shown day, the vitals card's rule — a rest day still shows the last ride.
+  const upTo = isToday.value ? allWorkouts.value : allWorkouts.value.filter(w => w.date <= asOf.value)
+  const last = upTo.at(-1)
   if (!last) return []
   // Sorted on the parsed instant: Whoop's ISO and Apple's local strings don't compare as text.
-  return allWorkouts.value
+  return upTo
     .filter(w => w.date === last.date)
     .sort((a, b) => (workoutStartMs(b.start_time) ?? 0) - (workoutStartMs(a.start_time) ?? 0))
 })
@@ -556,8 +594,8 @@ function equivalent(dose: PeptideEntry) {
   return dose.unit === 'iu' ? iuEquivalentLabel(dose.compound, dose.dose) : null
 }
 
-// Sessions from an earlier day get a "last workout" label so they can't read as today's.
-const workoutsAreToday = computed(() => latestWorkouts.value[0]?.date === today.value)
+// Sessions from an earlier day get a "last workout" label so they can't read as the shown day's.
+const workoutsOnShownDay = computed(() => latestWorkouts.value[0]?.date === asOf.value)
 
 // Every session leads with its age — "1h ago" answers what a clock time makes the reader work
 // out. Ticks once a minute so the label stays right while the page sits open (the PWA comes
