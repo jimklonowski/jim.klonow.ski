@@ -1,9 +1,13 @@
 <template>
   <component
-    :is="to ? 'NuxtLink' : 'div'"
+    :is="expandable ? 'button' : to ? 'NuxtLink' : 'div'"
     :to="to"
-    class="block bg-raised border border-line-soft px-3 py-2.5"
-    :class="to ? 'hover:bg-row-hover transition-colors' : ''"
+    :type="expandable ? 'button' : undefined"
+    :aria-haspopup="expandable ? 'dialog' : undefined"
+    :aria-label="expandable ? `Expand ${label} chart` : undefined"
+    class="group block w-full text-left bg-raised border border-line-soft px-3 py-2.5"
+    :class="to || expandable ? 'hover:bg-row-hover hover:border-line transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-[-1px]' : ''"
+    @click="expandable ? (open = true) : undefined"
   >
     <div class="flex items-baseline gap-2 text-micro text-muted">
       <span class="uppercase tracking-widest truncate">{{ label }}</span>
@@ -11,9 +15,16 @@
         v-if="unit"
         class="text-faint shrink-0"
       >{{ unit }}</span>
+      <!-- The expand glyph sits ghost-faint so the value stays the loudest thing on the tile, and
+           lights up with the hover — on a phone it is the one hint the tile opens. -->
       <span
-        class="ml-auto shrink-0"
-        :class="accent ? 'text-accent' : 'text-hi'"
+        v-if="expandable"
+        aria-hidden="true"
+        class="ml-auto shrink-0 text-ghost group-hover:text-accent transition-colors"
+      >⤢</span>
+      <span
+        class="shrink-0"
+        :class="[expandable ? '' : 'ml-auto', accent ? 'text-accent' : 'text-hi']"
       >{{ value }}</span>
     </div>
 
@@ -31,6 +42,7 @@
           :mark-lines="markLines"
           :annotations="placed"
           :connect-nulls="connect"
+          :format-value="format"
           bare
         />
         <template #fallback>
@@ -39,6 +51,27 @@
       </ClientOnly>
     </div>
   </component>
+
+  <!-- Outside the button: the dialog teleports to body anyway, and a click inside it must never
+       read as a click on the tile. Mounted only for expandable tiles; UModal renders nothing
+       until it opens. -->
+  <JournalMetricDetail
+    v-if="expandable"
+    v-model:open="open"
+    :label="label"
+    :unit="unit"
+    :value="value"
+    :accent="accent"
+    :series="series"
+    :data="chartData"
+    :x-axis-key="xKey"
+    :raw-rows="rawRows"
+    :mark-lines="markLines"
+    :annotations="placed"
+    :connect="connect"
+    :show-notes="showNotes"
+    :format="format"
+  />
 </template>
 
 <script setup lang="ts">
@@ -48,6 +81,8 @@ import { CHART_ACCENT } from '~/utils/chartTheme'
 
 // One bordered metric tile: label + unit on the left, latest value on the right, and a bare
 // line beneath. Used for both chart groups on /journal/trends and the vital tiles on the hub.
+// With `expandable` the tile is a button that opens JournalMetricDetail: the same line at full
+// size with axes, the range picker, and a stats strip.
 const props = withDefaults(defineProps<{
   label: string
   unit?: string
@@ -69,12 +104,26 @@ const props = withDefaults(defineProps<{
    * day without one. Streams measured daily (scale, strap) leave it off so a gap shows. */
   connect?: boolean
   to?: string
+  /** Click (or Enter) opens the expanded view. */
+  expandable?: boolean
+  /** `rows` before smoothing, for the expanded view's stats. Falls back to `rows`. */
+  rawRows?: Array<Record<string, string | number | null>>
+  /** The expanded view's picker offers the protocol-notes toggle. */
+  showNotes?: boolean
+  /** How a reading prints in the expanded view's stats (sleep prints as "6h55m"). */
+  format?: (v: number) => string
 }>(), {
   height: 46,
   markLines: () => [],
   annotations: () => [],
-  connect: false
+  connect: false,
+  expandable: false,
+  rawRows: undefined,
+  showNotes: false,
+  format: undefined
 })
+
+const open = ref(false)
 
 const categories = computed(() =>
   Object.fromEntries(props.series.map(s => [s.key, { name: s.name, color: s.color ?? CHART_ACCENT }]))

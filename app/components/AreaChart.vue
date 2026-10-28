@@ -101,6 +101,11 @@ const props = withDefaults(defineProps<{
   /** Draw straight across gaps. For sparse, unaligned series (two markers from different
    * panels) where a null is "not measured that day", not a break in the line. */
   connectNulls?: boolean
+  /** Let the y domain follow the readings instead of anchoring at 0: the expanded view of a
+   * metric tile, where a 165–170 lb weight line held to a zero baseline is a flat stripe. */
+  fitY?: boolean
+  /** How a y value prints on the axis ticks and in the tooltip (sleep minutes as "6h 39m"). */
+  formatValue?: (v: number) => string
 }>(), {
   xAxisKey: 'date',
   height: 160,
@@ -115,7 +120,9 @@ const props = withDefaults(defineProps<{
   ariaLabel: undefined,
   annotations: () => [],
   dualAxis: false,
-  connectNulls: false
+  connectNulls: false,
+  fitY: false,
+  formatValue: undefined
 })
 
 /** "Line chart: Weight, Resting HR — 90 points, 2026-06-24 to 2026-09-22" */
@@ -231,8 +238,9 @@ const definition = computed(() => {
 
   // The echarts charts anchored to a zero baseline except the bare tiles (read for their shape)
   // and dual-axis compares; the scale infers its domain from the marks, so an invisible rule at 0
-  // asks for the same. Only on the primary y scale.
-  if (!props.bare && !props.dualAxis) marks.push(decorative(ruleY([0], { strokeOpacity: 0 })))
+  // asks for the same. Only on the primary y scale, and not when the caller wants the domain
+  // fitted to the readings.
+  if (!props.bare && !props.dualAxis && !props.fitY) marks.push(decorative(ruleY([0], { strokeOpacity: 0 })))
 
   for (const [i, s] of seriesRows.value.entries()) {
     const yScale = props.dualAxis && i === 1 ? 'y2' : undefined
@@ -275,7 +283,7 @@ const definition = computed(() => {
       scale: scaleLinear,
       nice: true,
       grid: !props.bare,
-      axis: props.bare ? false : {}
+      axis: props.bare ? false : props.formatValue ? { ticks: { format: (v: number) => props.formatValue!(v) } } : {}
     }
   }
   if (props.dualAxis) {
@@ -310,12 +318,12 @@ function tipTitle(points: Focused) {
 /** One row per series at the hovered x (a flagged row's dot and its line point are the same reading). */
 function tipRows(points: Focused) {
   const seen = new Set<string>()
-  const out: { name: string, color?: string, value: number }[] = []
+  const out: { name: string, color?: string, value: number | string }[] = []
   for (const p of points) {
     const d = p.datum as Partial<Row>
     if (typeof d?.category !== 'string' || typeof d.value !== 'number' || seen.has(d.category)) continue
     seen.add(d.category)
-    out.push({ name: d.category, color: p.color, value: d.value })
+    out.push({ name: d.category, color: p.color, value: props.formatValue ? props.formatValue(d.value) : d.value })
   }
   return out
 }
