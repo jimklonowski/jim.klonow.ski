@@ -888,10 +888,14 @@ import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
 
 // Shared :ui overrides so every field on this long form reads the same.
-const FIELD_UI = { hint: 'text-micro text-faint' }
+// The size is spelled as a length variable, not `text-micro`: the component theme's class merge
+// (tailwind-merge) knows nothing of the custom ramp, files `text-micro` under text COLOR, and
+// drops it for the `text-faint` beside it — the hint then inherited the field's 14px. Measured
+// 2026-10-28; `text-(length:…)` is unambiguous to the merge.
+const FIELD_UI = { hint: 'text-(length:--text-micro) text-faint' }
 // The vitals' delta caption under the input, in the hint's tone. The Date field keeps the
 // default help style: its "already has an entry — saving replaces it" is a warning, not a caption.
-const VITAL_UI = { ...FIELD_UI, help: 'text-micro text-faint whitespace-nowrap' }
+const VITAL_UI = { ...FIELD_UI, help: 'text-(length:--text-micro) text-faint whitespace-nowrap' }
 // Shared by the USelects and the autocomplete UInputMenus (compound / food / soda) so every
 // popover on the form matches. Autocomplete mode keeps whatever is typed as the value and only
 // suggests from `items`, so off-list compounds and freeform meals still work.

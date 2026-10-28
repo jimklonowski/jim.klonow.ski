@@ -20,10 +20,12 @@
       >{{ kcalText }}</span>
     </div>
 
-    <!-- Macros for the day, the week's average against the protein target. -->
+    <!-- Macros for the day, the week's average against the protein target. The row wraps rather
+         than truncates: in a narrow column the average drops to its own right-aligned line, and
+         on the narrowest phones it breaks between the kcal and the protein, never mid-word. -->
     <div
       v-if="day.meals.length || avg.days"
-      class="flex items-baseline gap-2.5 mt-1 text-meta text-muted"
+      class="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 mt-1 text-meta text-muted"
     >
       <span class="text-ghost shrink-0 invisible">├</span>
       <span
@@ -32,12 +34,15 @@
       >{{ fmtMacros(day) }}</span>
       <span
         v-if="avg.days"
-        class="ml-auto min-w-0 truncate text-right"
+        class="ml-auto min-w-0 flex flex-wrap justify-end gap-x-1.5"
         :title="avgTitle"
-      >7d avg {{ fmtKcal(avg.kcal) }} kcal · <span
-        class="text-hi"
-        :class="target && avg.protein_g >= target ? 'text-accent' : ''"
-      >{{ avg.protein_g }}</span>{{ target ? ` / ${target}` : '' }} g protein{{ avg.estimated ? ' est.' : '' }}</span>
+      >
+        <span class="whitespace-nowrap">7d avg {{ fmtKcal(avg.kcal) }} kcal</span>
+        <span class="whitespace-nowrap">· <span
+          class="text-hi"
+          :class="target && avg.protein_g >= target ? 'text-accent' : ''"
+        >{{ avg.protein_g }}</span>{{ target ? ` / ${target}` : '' }} g protein{{ avg.estimated ? ' est.' : '' }}</span>
+      </span>
     </div>
 
     <!-- The clock's meal when it isn't logged yet (or the next main meal after it), straight
