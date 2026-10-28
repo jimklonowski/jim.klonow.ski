@@ -35,6 +35,8 @@ export async function useQuickLog() {
   const goalOz = computed(() => waterSetting(profileData.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ))
   const waterOzToday = computed(() => waterTotals(todayEntry.value?.water).oz)
   const watersToday = computed(() => waterTotals(todayEntry.value?.water).count)
+  /** Ounces and pours on any day — the home WATER bar reads the day the vitals card is scrubbed to. */
+  const waterOn = (date: string) => waterTotals(entries.value.find(e => e.date === date)?.water)
 
   // The shared local mirror (app/utils/journalPatch.ts) — the same one the widgets use.
   const patchToday = (patch: Partial<{ sodas: SodaEntry[], water: WaterEntry[] }>) => patchJournalDay(data, today.value, patch)
@@ -83,5 +85,5 @@ export async function useQuickLog() {
     }
   }
 
-  return { sodaLabel, sodaDrink, sodaSize, sodasToday, cupOz, goalOz, waterOzToday, watersToday, addingSoda, addingWater, addSoda, addWater }
+  return { sodaLabel, sodaDrink, sodaSize, sodasToday, cupOz, goalOz, waterOzToday, watersToday, waterOn, addingSoda, addingWater, addSoda, addWater }
 }

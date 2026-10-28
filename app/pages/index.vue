@@ -235,13 +235,26 @@
              same bar the PROTEIN tile draws, filled with the hub tracker's water blue (Jim's
              call 2026-10-27; shared/utils/water.ts has the goal and the maths).
              The local mirror useQuickLog patches after a tap is what this reads, so the bar
-             fills on the spot. -->
+             fills on the spot. The vitals ‹ › scrub it too: a past day reads "WATER · OCT 25"
+             with that day's pours, and the label is a tap back to today. -->
         <div
           v-if="water"
           class="flex items-center gap-2 mt-2.5 text-meta"
-          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} today`"
+          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} ${water.dayWord}`"
         >
-          <span class="text-muted">WATER</span>
+          <button
+            v-if="!water.isToday"
+            type="button"
+            class="text-accent hover:text-accent-hover cursor-pointer whitespace-nowrap"
+            title="Back to today"
+            @click="vitalsDate = null"
+          >
+            {{ water.label }}
+          </button>
+          <span
+            v-else
+            class="text-muted"
+          >{{ water.label }}</span>
           <span
             class="num text-row leading-none"
             :class="water.met ? 'text-accent' : 'text-hi'"
@@ -253,7 +266,7 @@
             :aria-valuenow="Math.round(water.ozRaw)"
             aria-valuemin="0"
             :aria-valuemax="water.goal"
-            aria-label="Water today against the daily goal"
+            :aria-label="`Water ${water.dayWord} against the daily goal`"
           >
             <span
               class="absolute inset-y-0 left-0 bg-water transition-[width] duration-300"
@@ -445,15 +458,11 @@ const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
 const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
 const addSoda = () => quickLog?.addSoda()
-const addWater = () => quickLog?.addWater()
-/** The WATER bar under the quick-log buttons: null for roles without the buttons. */
-const water = computed(() => {
-  if (!quickLog) return null
-  const ozRaw = quickLog.waterOzToday.value
-  const goal = quickLog.goalOz.value
-  const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
-  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours: quickLog.watersToday.value }
-})
+// A cup is always today's: if the vitals card is scrubbed back, return so the bar shows the pour.
+const addWater = () => {
+  vitalsDate.value = null
+  return quickLog?.addWater()
+}
 // The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
 // estimates endpoint returns nothing for the doctor and the profile is a full-access read, so
 // both are skipped for roles that don't get food (and for guests, who have no session).
@@ -481,6 +490,25 @@ const protein = computed(() => {
   if (!isFullAccess.value) return null
   const n = vitalsNutrition.value
   return { grams: n.estimated > 0 ? n.protein_g : null, target: proteinTarget.value, floor: n.missing.length > 0 }
+})
+/**
+ * The WATER bar under the quick-log buttons: null for roles without the buttons. It follows the
+ * vitals ‹ › like the PROTEIN row (Jim 2026-10-28: "see previous water intakes"), reading the
+ * scrubbed day's pours against the profile's current goal; `label` carries the day once it isn't today.
+ */
+const water = computed(() => {
+  if (!quickLog) return null
+  const date = vitalsDate.value ?? today.value
+  const isToday = vitalsDate.value == null || vitalsDate.value >= today.value
+  const { oz: ozRaw, count: pours } = isToday
+    ? { oz: quickLog.waterOzToday.value, count: quickLog.watersToday.value }
+    : quickLog.waterOn(date)
+  const goal = quickLog.goalOz.value
+  const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
+  // "WATER · OCT 25", the year kept only outside the current one — the vitals header's rule.
+  const terse = formatDateTerse(date)
+  const label = isToday ? 'WATER' : `WATER · ${date.slice(0, 4) === today.value.slice(0, 4) ? terse.replace(/ \d{4}$/, '') : terse}`
+  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours, isToday, label, dayWord: isToday ? 'today' : `on ${formatDate(date, 'monthDay')}` }
 })
 
 /** Today's doses with identical ones folded (×N), in time order. */
