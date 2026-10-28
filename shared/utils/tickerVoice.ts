@@ -13,7 +13,7 @@ import { isPeakRecovery, recoveryZone } from './recovery.ts'
 import { LEAN_GAIN_LBS, MANE_TIERS, TIER_DAYS } from './tickerWardrobe.ts'
 import type { Milestone } from './tickerWardrobe.ts'
 import { WAKE_HOUR, best, recipeOf, unitLabel } from './tickerDay.ts'
-import type { Achievement, CrusherWall, DayHealth, DayWorkout, Fever, Hunger, MazeGhosts, WeekTally } from './tickerDay.ts'
+import type { Achievement, CrusherWall, DayHealth, DayWorkout, DropGerms, Fever, Hunger, MazeGhosts, WeekTally } from './tickerDay.ts'
 import type { TickerBelly, TickerPose, TickerTier } from './tickerSprite.ts'
 import type { HitBy, WorldSummary } from './tickerWorld.ts'
 import type { JournalEntry, ReconstitutionEntry } from '../types/journal.ts'
@@ -53,11 +53,12 @@ export function recordLines(i: RecordInputs): string[] {
   if (nightBest) lines.push(`best night: ${formatDuration(nightBest.value)} on ${when(nightBest.item.date)}.`)
   const calm = best(i.entries, e => e.rhr, 'min')
   if (calm) lines.push(`lowest resting HR: ${calm.value} bpm on ${when(calm.item.date)}.`)
-  const { runner, crusher, world, maze } = i.hiScores
+  const { runner, crusher, world, maze, drop } = i.hiScores
   if (runner) lines.push(`best run: ${runner.score} points on ${when(runner.date)}.`)
   if (crusher) lines.push(`best crush: ${crusher.score} points on ${when(crusher.date)}${crusher.cleared ? ' — and a whole wall cleared, once.' : '.'}`)
   if (world) lines.push(`best month: ${world.score} points on ${when(world.date)}${world.cleared ? ' — and made it all the way home, once.' : '.'}`)
   if (maze) lines.push(`best maze: ${maze.score} points on ${when(maze.date)}${maze.cleared ? ' — and every capsule eaten, once.' : '.'}`)
+  if (drop) lines.push(`best drop: ${drop.score} points on ${when(drop.date)}${drop.cleared ? ' — and a bottle scrubbed clean, once.' : '.'}`)
   return lines
 }
 
@@ -174,9 +175,9 @@ export function quoteLines(i: QuoteInputs): string[] {
       ? `visitors: ${plural(v.total, 'footprint')}${v.recent[0] ? ` — last ${v.recent[0].label ?? `a ${v.recent[0].role}`} on ${monthDay(v.recent[0].date)}` : ''}.`
       : null,
     // A guest is handed a holder's name only when it is their own; anyone else is "a friend".
-    ...(['runner', 'crusher', 'world', 'maze'] as TickerGame[]).map((g) => {
+    ...(['runner', 'crusher', 'world', 'maze', 'drop'] as TickerGame[]).map((g) => {
       const b = i.visitorsBests[g]
-      const noun = g === 'runner' ? 'run' : g === 'crusher' ? 'crush' : g === 'world' ? 'month' : 'maze'
+      const noun = g === 'runner' ? 'run' : g === 'crusher' ? 'crush' : g === 'world' ? 'month' : g === 'maze' ? 'maze' : 'drop'
       return b ? `visitors' best ${noun}: ${!i.keeper && b.label ? 'you' : b.label ?? 'a friend'}, ${b.score} points.` : null
     }),
     !i.keeper ? `you're on file as ${i.visitorLabel ?? 'a friend'}. it's keeping a footprint.` : null,
@@ -478,16 +479,18 @@ export function walkEndLine(minutes: number): string {
 
 // --- the games ----------------------------------------------------------------------------------
 
-export function playIntroLine(game: TickerGame, wall: CrusherWall, maze?: MazeGhosts): string {
+export function playIntroLine(game: TickerGame, wall: CrusherWall, maze?: MazeGhosts, drop?: DropGerms): string {
   return game === 'runner'
     ? 'space or tap to run. esc quits.'
     : game === 'world'
       ? 'the month, left to right — home is today. ← → run, space jumps (hold for height). esc quits.'
       : game === 'maze'
         ? `every capsule in the maze, ${maze?.title ?? 'vs the ghosts'}. arrows, wasd or a swipe steer; space or tap starts. esc quits.`
-        : wall.count
-          ? `${wall.count} cans on the wall${wall.practice ? ' (last month\'s — this one is clean)' : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
-          : 'nothing to shoot. good. (esc quits)'
+        : game === 'drop'
+          ? `${drop?.title ?? 'germs in the bottle'}. ← → move, ↑ turns, ↓ drops; space or tap starts. esc quits.`
+          : wall.count
+            ? `${wall.count} cans on the wall${wall.practice ? ' (last month\'s — this one is clean)' : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
+            : 'nothing to shoot. good. (esc quits)'
 }
 
 export interface QuitInputs {
@@ -517,7 +520,7 @@ export interface QuitRemark {
 
 /** The line a quit earns, and the one-shot that goes with it. */
 export function quitRemark(i: QuitInputs): QuitRemark {
-  const swept = i.cleared ? (i.game === 'crusher' ? 'wall cleared. ' : i.game === 'world' ? 'made it home. ' : i.game === 'maze' ? 'a maze eaten clean. ' : '') : ''
+  const swept = i.cleared ? (i.game === 'crusher' ? 'wall cleared. ' : i.game === 'world' ? 'made it home. ' : i.game === 'maze' ? 'a maze eaten clean. ' : i.game === 'drop' ? 'bottle scrubbed. ' : '') : ''
   // The keeper's record, or a guest topping the house: the celebration the HUD's NEW BEST promised.
   if (i.keeper ? i.setRecord : i.beatHouse) {
     return {

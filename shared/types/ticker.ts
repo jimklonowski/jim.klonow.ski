@@ -5,8 +5,8 @@ import type { Role } from '#shared/utils/access'
 // counter and the records), never the owner's reaction stamps or another guest's name.
 
 /** The mini-games (the PLAY menu). Each keeps its own record key and leaderboard. */
-export type TickerGame = 'runner' | 'crusher' | 'world' | 'maze'
-export const TICKER_GAMES: readonly TickerGame[] = ['runner', 'crusher', 'world', 'maze']
+export type TickerGame = 'runner' | 'crusher' | 'world' | 'maze' | 'drop'
+export const TICKER_GAMES: readonly TickerGame[] = ['runner', 'crusher', 'world', 'maze', 'drop']
 
 export interface TickerPets {
   total: number
@@ -18,7 +18,7 @@ export interface TickerPets {
 export interface TickerRecord {
   score: number
   date: string
-  /** The crusher: whether a whole wall has ever been cleared; the world: whether the month was ever finished; the maze: whether a level was ever eaten clean (sticky, for the achievements). */
+  /** The crusher: whether a whole wall has ever been cleared; the world: whether the month was ever finished; the maze: whether a level was ever eaten clean; the drop: whether a bottle was ever cleaned (sticky, for the achievements). */
   cleared?: boolean
   /** The world: the feats ever earned on a finished month (sticky, for the achievements). */
   feats?: string[]
