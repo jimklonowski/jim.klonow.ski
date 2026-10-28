@@ -62,6 +62,7 @@ test('a finished game names its game (the runner for older clients) and whether 
   assert.deepEqual(zTickerRun.parse({ score: 2100, game: 'world', cleared: true, feats: ['clean-month', 'chain-3'] }).feats, ['clean-month', 'chain-3'])
   assert.deepEqual(zTickerRun.parse({ score: 1810, game: 'maze', cleared: true }), { score: 1810, game: 'maze', cleared: true, feats: [] })
   assert.deepEqual(zTickerRun.parse({ score: 900, game: 'drop', cleared: true }), { score: 900, game: 'drop', cleared: true, feats: [] })
+  assert.deepEqual(zTickerRun.parse({ score: 3200, game: 'invaders', cleared: true }), { score: 3200, game: 'invaders', cleared: true, feats: [] })
   assert.ok(problem(zTickerRun, { score: 1, game: 'world', feats: ['speedrun'] }), 'only the known feats')
   assert.match(problem(zTickerRun, { score: 1, game: 'pong' }), /game: Bad game/)
   assert.ok(problem(zTickerRun, { score: -1 }))

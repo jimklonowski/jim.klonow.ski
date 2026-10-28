@@ -377,7 +377,7 @@ export const zCycleSave = z.object({
 // --- /ticker: the pet's memory (migration 0009) ---
 // The keys the page may write; `pets` is deliberately absent (server/api/ticker/pet.post.ts
 // counts, nobody sets). Values are small JSON — stamps are strings, the snapshot an object.
-export const TICKER_STATE_KEYS = ['runner', 'crusher', 'world', 'maze', 'drop', 'unlocks', 'achievements', 'flinched', 'birthday', 'saluted', 'landed', 'snapshot', 'visitsSeen', 'mane', 'fed'] as const
+export const TICKER_STATE_KEYS = ['runner', 'crusher', 'world', 'maze', 'drop', 'invaders', 'unlocks', 'achievements', 'flinched', 'birthday', 'saluted', 'landed', 'snapshot', 'visitsSeen', 'mane', 'fed'] as const
 
 export const zTickerStateSave = z.object({
   key: z.enum(TICKER_STATE_KEYS, 'Bad key'),
@@ -400,8 +400,8 @@ export const zTickerStateSave = z.object({
 export const zTickerRun = z.object({
   score: z.number().int().min(0).max(99999),
   /** Which mini-game (the PLAY menu); the runner for older clients. */
-  game: z.enum(['runner', 'crusher', 'world', 'maze', 'drop'], 'Bad game').default('runner'),
-  /** The crusher: this game cleared the whole wall; the world: it reached the castle; the maze: it ate a level clean; the drop: it cleaned a bottle. */
+  game: z.enum(['runner', 'crusher', 'world', 'maze', 'drop', 'invaders'], 'Bad game').default('runner'),
+  /** The crusher: this game cleared the whole wall; the world: it reached the castle; the maze: it ate a level clean; the drop: it cleaned a bottle; the invaders: it cleared a wave. */
   cleared: z.boolean().default(false),
   /** The world: the feats this finished month earned (shared/utils/tickerWorld.ts WORLD_FEATS). */
   feats: z.array(z.enum(['clean-month', 'no-hit-week', 'chain-3'])).max(8).default([])
