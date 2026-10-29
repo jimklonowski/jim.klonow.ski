@@ -76,7 +76,7 @@
          anywhere in the column steps it too (useSwipe on this element; right = back a day). -->
     <section
       ref="scrubColumnEl"
-      class="bg-bg px-6 pt-4 pb-5 min-w-0 md:grid md:grid-cols-2 md:gap-x-8 lg:block"
+      class="bg-bg px-6 pt-4 pb-5 min-w-0 overflow-x-clip md:grid md:grid-cols-2 md:gap-x-8 lg:block"
     >
       <!-- tour ids sit on the compact components, not the sections — a full-height column
            as the popover anchor pushes the tour popover to the viewport edge. -->
@@ -462,18 +462,26 @@ useSwipe(scrubColumn, {
 // the existing elements, not a keyed <Transition>: nothing re-mounts, so there's no flash and no
 // height jump. After the DOM update (flush: 'post') so the new values are what slides in. The
 // global prefers-reduced-motion CSS rule can't reach el.animate(), hence the explicit check.
+// Tuned up 2026-10-29 (Jim: 14px / 220ms / from 30% opacity was "barely noticeable"): a longer
+// travel from fully faded, and a top-to-bottom stagger so the blocks follow one another like a
+// page turning rather than all twitching at once. `fill: 'backwards'` holds a delayed block at
+// its start frame, so it doesn't sit at rest showing the new day and then jump. The column is
+// `overflow-x-clip`: 32px in from the right pushed a phone's content past the viewport mid-slide.
 const reducedMotion = usePreferredReducedMotion()
-const SCRUB_SLIDE_PX = 14
+const SCRUB_SLIDE_PX = 32
+const SCRUB_DURATION_MS = 340
+const SCRUB_STAGGER_MS = 45
 watch(asOf, (to, from) => {
   if (!from || to === from || reducedMotion.value === 'reduce') return
   const dx = to < from ? -SCRUB_SLIDE_PX : SCRUB_SLIDE_PX
-  for (const el of scrubColumn.value?.querySelectorAll<HTMLElement>('[data-scrub]') ?? []) {
+  const blocks = scrubColumn.value?.querySelectorAll<HTMLElement>('[data-scrub]') ?? []
+  blocks.forEach((el, i) => {
     el.getAnimations().forEach(a => a.cancel())
     el.animate(
-      [{ transform: `translateX(${dx}px)`, opacity: 0.3 }, { transform: 'none', opacity: 1 }],
-      { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+      [{ transform: `translateX(${dx}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: SCRUB_DURATION_MS, delay: i * SCRUB_STAGGER_MS, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'backwards' }
     )
-  }
+  })
 }, { flush: 'post' })
 
 /** Today's meals summed from their figures — the INTAKE block reads it while the column shows today. */
