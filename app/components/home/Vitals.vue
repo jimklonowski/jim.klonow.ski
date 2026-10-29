@@ -48,18 +48,24 @@
          sits in the 390px column and the rows read as a list (label · value · delta) as before;
          `lg:contents` dissolves the value+unit wrapper so the delta's ml-auto works there. -->
     <!-- data-scrub: slides in on a day change (the page animates every [data-scrub] block). -->
+    <!-- An odd count (a reading missing on the shown day) would leave the last tile with an empty
+         cell beside it, so that tile spans both columns and takes the lg list layout instead. -->
     <div
       data-scrub
       class="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 lg:flex lg:flex-col lg:gap-3"
     >
       <div
-        v-for="row in rows"
+        v-for="(row, i) in rows"
         :key="row.label"
-        class="flex flex-col min-w-0 lg:flex-row lg:items-baseline lg:gap-2"
+        class="min-w-0"
+        :class="isWide(i) ? 'col-span-2 flex flex-row items-baseline gap-2' : 'flex flex-col lg:flex-row lg:items-baseline lg:gap-2'"
         :title="row.title"
       >
-        <span class="text-meta text-muted lg:w-18.5 lg:shrink-0">{{ row.label }}</span>
-        <span class="flex items-baseline gap-1.5 mt-0.5 lg:contents">
+        <span
+          class="text-meta text-muted"
+          :class="isWide(i) ? 'w-18.5 shrink-0' : 'lg:w-18.5 lg:shrink-0'"
+        >{{ row.label }}</span>
+        <span :class="isWide(i) ? 'contents' : 'flex items-baseline gap-1.5 mt-0.5 lg:contents'">
           <span
             class="num-display text-figure leading-none"
             :class="row.tone === 'accent' ? 'text-accent' : row.tone === 'muted' ? 'text-muted' : 'text-hi'"
@@ -71,8 +77,8 @@
         </span>
         <span
           v-if="row.delta"
-          class="mt-1 text-meta lg:mt-0 lg:ml-auto lg:shrink-0"
-          :class="row.delta.class"
+          class="text-meta"
+          :class="[row.delta.class, isWide(i) ? 'ml-auto shrink-0' : 'mt-1 lg:mt-0 lg:ml-auto lg:shrink-0']"
         >{{ row.delta.text }}</span>
       </div>
     </div>
@@ -141,6 +147,9 @@ function pair<T extends { date: string }>(list: T[], pick: (row: T) => number | 
     title: current && current.date < asOf.value ? `last reading ${formatDate(current.date, 'monthDay')}` : undefined
   }
 }
+
+// Whoop's "optimal" sleep band; 70–84 is "sufficient", under 70 "poor".
+const SLEEP_PERF_OPTIMAL_MIN = 85
 
 function fmtSleep(min: number) {
   // Round the total BEFORE splitting: floor/round separately turned 419.7 into "6h60m".
@@ -229,6 +238,19 @@ const rows = computed(() => {
     })
   }
 
+  // Beside SLEEP so the row reads duration · quality, which leaves RECOVERY · STRAIN as the last
+  // pair, Whoop's own two-up (Jim 2026-10-29).
+  const sleepPerf = pair(metricsAsOf.value, m => m.sleep_performance_pct)
+  if (sleepPerf.current != null) {
+    out.push({
+      label: 'SLEEP PERF',
+      value: `${Math.round(sleepPerf.current)}%`,
+      tone: sleepPerf.current >= SLEEP_PERF_OPTIMAL_MIN ? 'accent' : undefined,
+      title: sleepPerf.title ?? 'Whoop sleep performance: time asleep against what your body needed',
+      delta: sleepPerf.prev != null ? delta(sleepPerf.current, sleepPerf.prev, 'up-good', '', 0) : undefined
+    })
+  }
+
   const recovery = pair(metricsAsOf.value, m => m.recovery_score)
   if (recovery.current != null) {
     out.push({
@@ -252,4 +274,9 @@ const rows = computed(() => {
 
   return out
 })
+
+/** The phone grid's lone last tile (see the template); lg is a list and ignores it. */
+function isWide(i: number) {
+  return rows.value.length % 2 === 1 && i === rows.value.length - 1
+}
 </script>
