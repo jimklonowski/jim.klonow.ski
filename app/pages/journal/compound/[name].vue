@@ -372,6 +372,23 @@ const totalDoses = computed(() => allDoses.value.length)
 const unit = computed(() => allDoses.value.at(-1)?.unit ?? 'mg')
 
 /**
+ * A dose in the page's unit (the latest dose's). The average, the step chart, its captions and
+ * the syringe table all add doses together, and summed raw a 250 mcg beside a 0.25 mg read 125
+ * "mg" (audit #43 item 10). Null for a dose that can't be converted — an IU dose of a compound
+ * with no IU factor among mass doses — which is left out rather than guessed.
+ */
+function inUnit(p: PeptideEntry): number | null {
+  const dose = convertUnitFor(compoundName.value, p.dose, p.unit ?? 'mg', unit.value)
+  return dose == null ? null : Math.round(dose * 1e4) / 1e4
+}
+
+/** The doses that convert, each in the page's unit. */
+const unitDoses = computed(() => allDoses.value.flatMap((p) => {
+  const dose = inUnit(p)
+  return dose == null ? [] : [dose]
+}))
+
+/**
  * Whether every logged dose of this compound went in through a needle — the whole page
  * says "injections" only when that holds. Orals and nasal sprays (finasteride, modafinil)
  * get neutral "dose" wording, and so does a compound logged both ways, since one label has
@@ -384,7 +401,7 @@ const isInjected = computed(() => {
 })
 
 const avgDose = computed(() => {
-  const doses = allDoses.value.map(p => p.dose)
+  const doses = unitDoses.value
   if (!doses.length) return 0
   return Math.round(doses.reduce((a, b) => a + b, 0) / doses.length * 10) / 10
 })
@@ -497,12 +514,14 @@ const EXPOSURE_DAYS = 120
 
 const pkModel = computed(() => PK_MODELS[compoundName.value])
 
-/** Total logged on each dosing day, oldest first — the source for the step chart and its captions. */
+/** Total logged on each dosing day in the page's unit, oldest first — the source for the step
+ * chart and its captions. A day whose doses all fail to convert is left out. */
 const dailyTotals = computed(() =>
-  onDays.value.map(e => ({
-    date: e.date,
-    dose: Math.round(dosesOf(e).reduce((sum, p) => sum + p.dose, 0) * 10) / 10
-  }))
+  onDays.value.flatMap((e) => {
+    const doses = dosesOf(e).map(inUnit).filter((d): d is number => d != null)
+    if (!doses.length) return []
+    return [{ date: e.date, dose: Math.round(doses.reduce((sum, d) => sum + d, 0) * 10) / 10 }]
+  })
 )
 
 const chartWindow = computed(() => {
@@ -625,7 +644,7 @@ const mixLine = computed(() => {
 const syringeChart = computed(() => {
   const mix = currentMix.value
   if (!mix) return []
-  const doses = [...new Set(allDoses.value.map(p => p.dose))].sort((a, b) => a - b)
+  const doses = [...new Set(unitDoses.value)].sort((a, b) => a - b)
   return doses
     .map((dose) => {
       const units = calcUnits(dose, unit.value as DoseUnit, mix.vial_amount, mix.vial_unit, mix.bac_water_ml, compoundName.value)

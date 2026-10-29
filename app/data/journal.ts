@@ -249,6 +249,38 @@ export function doseDefaults(entries: readonly JournalEntry[], compound: string,
   return latest ? { unit: latest.unit, site: oppositeSite(latest.site ?? '') } : null
 }
 
+/** A compound name with its whitespace tidied: trimmed, inner runs as one space. */
+const tidyCompound = (name: string) => name.trim().replace(/\s+/g, ' ')
+const compoundKey = (name: string) => tidyCompound(name).toLowerCase()
+
+/**
+ * Folded name → the spelling a compound is saved under: the catalogue's (KNOWN_COMPOUNDS) when it
+ * has the compound, else the one the log uses most. Everything downstream — adherence, the rings,
+ * the exposure model, vial depletion, the dossier — matches names exactly, so "hcg" typed and
+ * tabbed away from was a second compound none of them counted (audit #43 item 9).
+ */
+export function compoundSpellings(entries: readonly JournalEntry[]): Map<string, string> {
+  const counts = new Map<string, Map<string, number>>()
+  for (const e of entries) {
+    for (const name of [...(e.peptides ?? []), ...(e.reconstitutions ?? [])].map(p => p.compound)) {
+      if (!name?.trim()) continue
+      const spelling = tidyCompound(name)
+      const byKey = counts.get(compoundKey(spelling)) ?? new Map<string, number>()
+      byKey.set(spelling, (byKey.get(spelling) ?? 0) + 1)
+      counts.set(compoundKey(spelling), byKey)
+    }
+  }
+  const out = new Map<string, string>()
+  for (const [key, byKey] of counts) out.set(key, [...byKey].sort((a, b) => b[1] - a[1])[0]![0])
+  for (const name of KNOWN_COMPOUNDS) out.set(compoundKey(name), name)
+  return out
+}
+
+/** The spelling to save a typed compound name under (see compoundSpellings); a new name is kept, tidied. */
+export function canonicalCompound(name: string, spellings: ReadonlyMap<string, string>): string {
+  return spellings.get(compoundKey(name)) ?? tidyCompound(name)
+}
+
 export function blankEntry(date: string): JournalEntry {
   return {
     date,

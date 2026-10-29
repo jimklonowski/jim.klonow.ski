@@ -875,7 +875,7 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, doseDefaults, oppositeSite } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, doseDefaults, oppositeSite } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import {
@@ -1244,6 +1244,9 @@ function buildForm() {
   }
 }
 
+/** How each compound is spelled when saved — "hcg" becomes "hCG" (compoundSpellings). */
+const compoundSpellingMap = computed(() => compoundSpellings(allEntries.value ?? []))
+
 /**
  * A fresh row takes its unit and site from the compound's last dose (doseDefaults) as soon as
  * the compound is chosen. Only while the dose is still blank: a filled-in row keeps whatever
@@ -1251,7 +1254,7 @@ function buildForm() {
  */
 function fillDoseDefaults(peptide: PeptideEntry, compound: unknown) {
   if (peptide.dose || typeof compound !== 'string') return
-  const last = doseDefaults(allEntries.value ?? [], compound, form.date)
+  const last = doseDefaults(allEntries.value ?? [], canonicalCompound(compound, compoundSpellingMap.value), form.date)
   if (!last) return
   peptide.unit = last.unit
   if (last.site) peptide.site = last.site
@@ -1323,6 +1326,9 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
   const payload = {
     ...form,
     date: moving ? from : to,
+    // One spelling per compound, or a case variant is a second compound to everything that reads the log.
+    peptides: form.peptides.map(p => ({ ...p, compound: canonicalCompound(p.compound, compoundSpellingMap.value) })),
+    reconstitutions: form.reconstitutions.map(r => ({ ...r, compound: canonicalCompound(r.compound, compoundSpellingMap.value) })),
     food,
     // A pour row added and never filled (or cleared — v-model.number hands back '') is not a
     // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
