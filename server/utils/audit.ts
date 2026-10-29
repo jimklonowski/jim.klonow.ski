@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import type { AuditEntry } from '#shared/types/audit'
+import { restoreUpsertSql } from '#shared/utils/auditRestore'
 
 // The write audit log (audit_log, migration 0003). Each owner write to a tracked table records
 // the row as it was BEFORE the write, which is what makes deletes and overwrites recoverable:
@@ -33,6 +34,19 @@ export const AUDIT_KEYS = {
 } as const
 
 export type AuditTable = keyof typeof AUDIT_KEYS
+
+/**
+ * Tracked tables whose rows other tracked rows hang off with `ON DELETE CASCADE`. A restore that
+ * removes the parent (undoing its creation) takes the children with it, so it logs each child as
+ * deleted first — the same entries the protocol page's own delete writes, restorable in turn.
+ */
+const AUDIT_CHILDREN: Partial<Record<AuditTable, { table: AuditTable, fk: string }>> = {
+  protocol_items: { table: 'protocol_versions', fk: 'item_id' }
+}
+
+function isForeignKeyError(err: unknown): boolean {
+  return /FOREIGN KEY constraint failed/i.test(err instanceof Error ? err.message : String(err))
+}
 export type AuditAction = AuditEntry['action']
 
 type Row = Record<string, unknown>
@@ -174,10 +188,26 @@ export async function restoreAudit(db: D1Database, id: number, photos: R2Bucket)
   const target = row.before ? JSON.parse(row.before) as Row : null
   const now = await currentRow(db, table, row.row_key)
 
+  const at = new Date().toISOString()
   let write: D1PreparedStatement
+  // Log entries for the child rows a deleting restore cascades away, written before the delete.
+  const childLogs: D1PreparedStatement[] = []
   if (!target) {
     // The entry created the row (or a restore re-created it): restoring removes it.
     if (!now) throw createError({ statusCode: 409, message: 'Can\'t restore: that row is already gone' })
+    const children = AUDIT_CHILDREN[table]
+    if (children) {
+      const { results } = await db.prepare(`SELECT * FROM ${children.table} WHERE ${children.fk} = ?1`).bind(row.row_key).all<Row>()
+      const parent = typeof now.name === 'string' ? now.name : `${table} ${row.row_key}`
+      for (const child of results ?? []) {
+        const childKey = child[AUDIT_KEYS[children.table]] as string | number
+        const summary = `undid #${row.id}: ${parent}: version from ${child.from_date ?? 'the start'}`
+        childLogs.push(db.prepare(`
+          INSERT INTO audit_log (at, action, table_name, row_key, summary, before)
+          VALUES (?1, 'delete', ?2, ?3, ?4, ?5)
+        `).bind(at, children.table, String(childKey), summary.slice(0, 200), JSON.stringify(child)))
+      }
+    }
     write = db.prepare(`DELETE FROM ${table} WHERE ${keyCol} = ?1`).bind(row.row_key)
   }
   else {
@@ -196,23 +226,33 @@ export async function restoreAudit(db: D1Database, id: number, photos: R2Bucket)
     const known = new Set((info ?? []).map(c => c.name))
     const cols = Object.keys(target).filter(c => known.has(c))
     if (!cols.includes(keyCol)) throw createError({ statusCode: 409, message: 'Can\'t restore: the saved row has no key' })
-    write = db.prepare(`INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((_, i) => `?${i + 1}`).join(', ')})`)
-      .bind(...cols.map(c => target[c] ?? null))
+    // An upsert, never INSERT OR REPLACE: REPLACE deletes the row first, and that delete cascades
+    // to its children (audit #43 item 1 — a protocol item's versions).
+    write = db.prepare(restoreUpsertSql(table, keyCol, cols)).bind(...cols.map(c => target[c] ?? null))
   }
 
   // One transaction: the row change, the log of what it replaced, and the entry marked done.
   // A deleting restore is logged as a delete (with the removed row as its before-image): same
   // undo semantics, and the photo purge task recognizes it.
-  const at = new Date().toISOString()
   const logAction: AuditAction = target ? 'restore' : 'delete'
   const summary = `${target ? 'restored' : 'undid'} #${row.id}: ${row.summary ?? ''}`.slice(0, 200)
-  await db.batch([
-    write,
-    db.prepare(`
-      INSERT INTO audit_log (at, action, table_name, row_key, summary, before)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-    `).bind(at, logAction, table, row.row_key, summary, now ? JSON.stringify(now) : null),
-    db.prepare('UPDATE audit_log SET restored_at = ?2 WHERE id = ?1').bind(row.id, at)
-  ])
+  try {
+    await db.batch([
+      ...childLogs,
+      write,
+      db.prepare(`
+        INSERT INTO audit_log (at, action, table_name, row_key, summary, before)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+      `).bind(at, logAction, table, row.row_key, summary, now ? JSON.stringify(now) : null),
+      db.prepare('UPDATE audit_log SET restored_at = ?2 WHERE id = ?1').bind(row.id, at)
+    ])
+  }
+  catch (err) {
+    // A version whose protocol item is gone: the batch rolled back, nothing changed.
+    if (isForeignKeyError(err)) {
+      throw createError({ statusCode: 409, message: 'Can\'t restore: the row it belongs to is gone — restore that first' })
+    }
+    throw err
+  }
   return { table, key: row.row_key }
 }
