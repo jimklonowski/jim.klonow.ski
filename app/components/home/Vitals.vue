@@ -14,9 +14,11 @@
           class="text-accent hover:text-accent-hover cursor-pointer"
           @click="reset()"
         >today</button>
+        <!-- ‹ hugs the left of its box and › the right (Jim 2026-10-29), so › ends flush with
+             the deltas' right edge below instead of a few px inside it. -->
         <button
           type="button"
-          class="inline-flex w-4 justify-center text-prose cursor-pointer disabled:cursor-default"
+          class="inline-flex w-4 justify-start text-prose cursor-pointer disabled:cursor-default"
           :class="canBack ? 'text-faint hover:text-accent' : 'text-ghost'"
           :disabled="!canBack"
           :aria-label="`Show ${formatDate(shiftDays(asOf, -1), 'monthDay')}`"
@@ -24,7 +26,7 @@
         >‹</button>
         <button
           type="button"
-          class="inline-flex w-4 justify-center text-prose cursor-pointer disabled:cursor-default"
+          class="inline-flex w-4 justify-end text-prose cursor-pointer disabled:cursor-default"
           :class="isToday ? 'text-ghost' : 'text-faint hover:text-accent'"
           :disabled="isToday"
           :aria-label="`Show ${formatDate(shiftDays(asOf, 1), 'monthDay')}`"
@@ -60,22 +62,6 @@
           class="mt-1 text-meta lg:mt-0 lg:ml-auto lg:shrink-0"
           :class="row.delta.class"
         >{{ row.delta.text }}</span>
-        <!-- Progress toward a target (protein) in the delta's place. -->
-        <span
-          v-else-if="row.bar"
-          class="mt-1.5 flex items-center gap-2 lg:mt-0 lg:ml-auto lg:shrink-0"
-        >
-          <span class="relative h-1.25 w-22 lg:w-16 bg-line-soft overflow-hidden">
-            <span
-              class="absolute inset-y-0 left-0 bg-accent opacity-70"
-              :style="{ width: `${Math.min(100, row.bar.pct)}%` }"
-            />
-          </span>
-          <span
-            class="text-meta"
-            :class="row.bar.class"
-          >{{ row.bar.pct }}%</span>
-        </span>
       </div>
     </div>
 
@@ -96,23 +82,18 @@ import { shiftDays } from '#shared/utils/dates'
 
 /**
  * The shown day, or null for today. A model so the page can follow it: the whole left column
- * scrubs with these arrows (doses, food, workouts, water — and a swipe on a phone, which the
- * page owns). useDayScrub on this same ref is what both sides read.
+ * scrubs with these arrows (workouts, doses, the INTAKE meters — and a swipe on a phone, which
+ * the page owns). useDayScrub on this same ref is what both sides read.
  */
 const shownDate = defineModel<string | null>('date', { default: null })
 
+// Body signals only: PROTEIN moved to the page's INTAKE block with water and soda (option C of
+// the 2026-10-29 side-panel canvas, Jim's pick).
 const props = defineProps<{
   /** Journal entries, oldest first. */
   entries: JournalEntry[]
   /** Health-metrics entries, oldest first. */
   metrics: HealthMetricsEntry[]
-  /**
-   * Today's protein from the meal figures (shared/utils/nutrition.ts dayNutrition), for the
-   * PROTEIN row beside WEIGHT. `grams` is null until a meal with figures is logged — the row then
-   * reads a muted "—" rather than a loud zero first thing in the morning. `floor` marks a day
-   * with a meal that has no figures yet. Absent (undefined) for roles without food (doctor).
-   */
-  protein?: { grams: number | null, target: number | null, floor: boolean } | null
 }>()
 
 type Direction = 'up-good' | 'up-bad' | 'neutral'
@@ -124,7 +105,6 @@ interface Row {
   tone?: 'accent' | 'muted'
   title?: string
   delta?: { text: string, class: string }
-  bar?: { pct: number, class: string }
 }
 
 // --- the shown day (useDayScrub: ‹ stops at the first day either series has) ---
@@ -170,25 +150,6 @@ function delta(current: number, prev: number, dir: Direction, unit = '', decimal
   return { text, class: dir === 'up-bad' ? 'text-warn' : 'text-danger' }
 }
 
-/** The PROTEIN row: grams against the profile's target, a bar when both are known. */
-function proteinRow(p: NonNullable<typeof props.protein>): Row {
-  const unit = p.target ? `/ ${p.target} g${p.floor ? ' +' : ''}` : `g${p.floor ? ' +' : ''}`
-  const title = p.floor ? 'A meal today has no figures yet — this is a floor' : undefined
-  if (p.grams == null) return { label: 'PROTEIN', value: '—', unit, tone: 'muted', title }
-  const grams = Math.round(p.grams)
-  if (!p.target) return { label: 'PROTEIN', value: grams.toString(), unit, title }
-  const pct = Math.round((grams / p.target) * 100)
-  const met = pct >= 100
-  return {
-    label: 'PROTEIN',
-    value: grams.toString(),
-    unit,
-    tone: met ? 'accent' : undefined,
-    title,
-    bar: { pct, class: met ? 'text-accent' : 'text-muted' }
-  }
-}
-
 const rows = computed(() => {
   const out: Row[] = []
 
@@ -202,10 +163,6 @@ const rows = computed(() => {
       delta: weight.prev != null ? delta(weight.current, weight.prev, 'up-bad') : undefined
     })
   }
-
-  // Second, so the phone's first pair is weight | protein — the two the lean-mass goal is about.
-  // Today's "—" is the morning state and stays; a past day with no meal figures just has no row.
-  if (props.protein && (isToday.value || props.protein.grams != null)) out.push(proteinRow(props.protein))
 
   const bpRow = entriesAsOf.value.findLast(e => e.bp_systolic != null && e.bp_diastolic != null)
   if (bpRow) {

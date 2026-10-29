@@ -71,8 +71,8 @@
          scrolls sideways under a header that stayed put. -->
     <!-- Four blocks (vitals, protocol, cycle, next draw). Two-up between md and lg, where the
          section is the full page width; one stack in the 390px column from lg. -->
-    <!-- The whole column scrubs with the vitals ‹ › (useDayScrub, Jim 2026-10-28): doses, food,
-         the workout line and the WATER bar all read the shown day. On a phone a horizontal swipe
+    <!-- The whole column scrubs with the vitals ‹ › (useDayScrub, Jim 2026-10-28): the workout
+         line, doses and the INTAKE meters all read the shown day. On a phone a horizontal swipe
          anywhere in the column steps it too (useSwipe on this element; right = back a day). -->
     <section
       ref="scrubColumnEl"
@@ -80,59 +80,42 @@
     >
       <!-- tour ids sit on the compact components, not the sections — a full-height column
            as the popover anchor pushes the tour popover to the viewport edge. -->
-      <!-- The wrapper keeps vitals + the WATER bar one cell of the md two-up grid. -->
+      <!-- The wrapper keeps vitals + the workout line one cell of the md two-up grid. -->
       <div>
         <HomeVitals
           id="tour-vitals"
           v-model:date="shownDate"
           :entries="entries"
           :metrics="healthMetrics"
-          :protein="protein"
         />
 
-        <!-- The shown day's water against the profile's goal, closing the vitals block (moved up
-             from under the quick-log buttons, Jim 2026-10-29) — the same bar the PROTEIN tile
-             draws, filled with the hub tracker's water blue (shared/utils/water.ts has the goal
-             and the maths). The local mirror useQuickLog patches after a + CUP tap is what this
-             reads, so the bar fills on the spot. The vitals ‹ › scrub it too: a past day reads
-             "WATER · OCT 25" with that day's pours, and the label is a tap back to today. -->
+        <!-- The workout sits under STRAIN, the body signal it explains (option C of the
+             2026-10-29 side-panel canvas). Label left, value right-aligned, stats on their own
+             line so nothing has to wrap mid-metric in this 390px column. Lists every session
+             from the most recent workout day — a three-workout day used to show only its last. -->
         <div
-          v-if="water"
-          class="flex items-center gap-2 mt-3 text-meta"
-          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} ${water.dayWord}`"
+          v-if="latestWorkouts.length"
+          class="mt-3.5 text-small text-muted space-y-2"
         >
-          <button
-            v-if="!water.isToday"
-            type="button"
-            class="text-accent hover:text-accent-hover cursor-pointer whitespace-nowrap"
-            title="Back to today"
-            @click="resetDay()"
+          <div
+            v-for="(w, i) in latestWorkouts"
+            :key="`${w.date}-${w.start_time ?? i}`"
           >
-            {{ water.label }}
-          </button>
-          <span
-            v-else
-            class="text-muted"
-          >{{ water.label }}</span>
-          <span
-            class="num text-row leading-none"
-            :class="water.met ? 'text-accent' : 'text-hi'"
-          >{{ water.oz }}</span>
-          <span class="text-muted whitespace-nowrap">/ {{ water.goal }} oz</span>
-          <span
-            class="relative flex-1 h-1.25 bg-line-soft overflow-hidden"
-            role="progressbar"
-            :aria-valuenow="Math.round(water.ozRaw)"
-            aria-valuemin="0"
-            :aria-valuemax="water.goal"
-            :aria-label="`Water ${water.dayWord} against the daily goal`"
-          >
-            <span
-              class="absolute inset-y-0 left-0 bg-water transition-[width] duration-300"
-              :style="{ width: `${Math.min(100, water.pct)}%` }"
-            />
-          </span>
-          <span :class="water.met ? 'text-accent' : 'text-muted'">{{ water.pct }}%</span>
+            <div class="flex items-baseline gap-2">
+              <span
+                v-if="i === 0"
+                class="shrink-0"
+              >└ {{ workoutsOnShownDay ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
+              <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
+            </div>
+            <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
+              <span
+                v-for="(part, j) in workoutParts(w)"
+                :key="part"
+                class="whitespace-nowrap"
+              >{{ j ? `· ${part}` : part }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -188,44 +171,27 @@
           No doses logged {{ dayWord }}.
         </p>
 
-        <!-- Today's meals and the week's protein, from the same figures as the hub's food card. -->
-        <HomeFood
+        <!-- Protein, water and soda as aligned meters with their one-tap buttons, then the day's
+             calories — the food line, the WATER bar and the + SODA / + CUP row folded into one
+             block (Jim 2026-10-29). All of it follows the vitals ‹ ›; the buttons always log today. -->
+        <HomeIntake
           v-if="isFullAccess"
           :day="shownNutrition"
           :date="asOf"
+          :day-label="isToday ? 'TODAY' : shownLabel"
           :entries="entries"
           :index="estimateIndex"
           :target="proteinTarget"
+          :water="water"
+          :soda-days="sodaDays"
           :can-edit="canEdit"
+          :cup-oz="cupOz"
+          :soda-label="sodaLabel"
+          :adding-water="addingWater"
+          :adding-soda="addingSoda"
+          @add-water="addWater"
+          @add-soda="addSoda"
         />
-
-        <!-- Mirrors the dose rows above: label left, value right-aligned, stats on their own
-           line so nothing has to wrap mid-metric in this 390px column. Lists every session
-           from the most recent workout day — a three-workout day used to show only its last. -->
-        <div
-          v-if="latestWorkouts.length"
-          class="mt-3.5 text-small text-muted space-y-2"
-        >
-          <div
-            v-for="(w, i) in latestWorkouts"
-            :key="`${w.date}-${w.start_time ?? i}`"
-          >
-            <div class="flex items-baseline gap-2">
-              <span
-                v-if="i === 0"
-                class="shrink-0"
-              >└ {{ workoutsOnShownDay ? '' : 'last ' }}workout{{ latestWorkouts.length > 1 ? 's' : '' }}:</span>
-              <span class="ml-auto text-body text-right">{{ w.workout_type ?? 'Session' }}</span>
-            </div>
-            <div class="flex flex-wrap justify-end gap-x-1.5 mt-0.5">
-              <span
-                v-for="(part, j) in workoutParts(w)"
-                :key="part"
-                class="whitespace-nowrap"
-              >{{ j ? `· ${part}` : part }}</span>
-            </div>
-          </div>
-        </div>
 
         <div class="flex gap-2 mt-4.5">
           <!-- Scrubbed back, the button is the way into that day's entry instead. -->
@@ -256,35 +222,6 @@
           >
             STACK
           </NuxtLink>
-        </div>
-
-        <!-- One-tap soda and water from here too (useQuickLog): the same defaults the hub's
-             trackers use — the last drink logged, the profile's cup size — and the status line
-             above moves with each tap. Write roles only. -->
-        <div
-          v-if="canEdit"
-          class="flex gap-2 mt-2"
-        >
-          <button
-            type="button"
-            class="tui-btn flex-1 justify-center min-w-0"
-            :disabled="addingSoda"
-            :title="`Log a soda: ${sodaLabel}`"
-            @click="addSoda()"
-          >
-            <!-- The drink's size is desktop-only: "+ SODA · DR PEPPER 12oz can" truncated to
-                 "12OZ…" in a phone-width button. -->
-            <span class="truncate">{{ addingSoda ? 'LOGGING…' : `+ SODA · ${sodaDrink}` }}<span class="hidden lg:inline">{{ addingSoda ? '' : sodaSize }}</span></span>
-          </button>
-          <button
-            type="button"
-            class="tui-btn flex-1 justify-center min-w-0"
-            :disabled="addingWater"
-            :title="`Log ${cupOz} oz of water`"
-            @click="addWater()"
-          >
-            <span class="truncate">{{ addingWater ? 'LOGGING…' : `+ CUP ${cupOz}oz` }}</span>
-          </button>
         </div>
       </div>
 
@@ -425,10 +362,10 @@
 </template>
 
 <script setup lang="ts">
-import { diffDays } from '#shared/utils/dates'
+import { diffDays, shiftDays } from '#shared/utils/dates'
 import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
-import { WATER_DEFAULT_CUP_OZ, fmtOzValue } from '#shared/utils/water'
+import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, fmtOzValue, waterSetting, waterTotals } from '#shared/utils/water'
 import { isSluggish, latestRecovery as petRecovery } from '#shared/utils/petState'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
@@ -463,18 +400,19 @@ useEventListener('scroll', trackChromeScrolled, { passive: true })
 // too — two rejected list fetches on every landing, server-rendered and again on mount.
 const quickLog = canEdit.value ? await useQuickLog() : null
 const sodaLabel = computed(() => quickLog?.sodaLabel.value ?? 'SODA')
-const sodaDrink = computed(() => quickLog?.sodaDrink.value ?? 'SODA')
-const sodaSize = computed(() => quickLog?.sodaSize.value ? ` ${quickLog.sodaSize.value}` : '')
 const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
 const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)
-const addSoda = () => quickLog?.addSoda()
-// A cup is always today's: if the column is scrubbed back, return so the bar shows the pour.
+// A cup or a can is always today's: if the column is scrubbed back, return so the row shows it.
+const addSoda = () => {
+  resetDay()
+  return quickLog?.addSoda()
+}
 const addWater = () => {
   resetDay()
   return quickLog?.addWater()
 }
-// The meal figures and the protein target behind the PROTEIN vitals row and the food line. The
+// The meal figures and the protein target behind the INTAKE block's PROTEIN meter. The
 // estimates endpoint returns nothing for the doctor and the profile is a full-access read, so
 // both are skipped for roles that don't get food (and for guests, who have no session).
 const estimates = isFullAccess.value ? await useMealEstimates() : null
@@ -490,7 +428,7 @@ const {
 // --- the shown day ---
 // The day the left column is scrubbed to (null = today). HomeVitals draws the ‹ › on the same
 // ref through v-model; useDayScrub on it here gives this page the same derived values the card
-// has, so the doses, food, workout line, LOG button and WATER bar all follow without the card
+// has, so the workout line, doses, INTAKE meters and LOG button all follow without the card
 // having to expose anything. ‹ stops at the first day of either series, as in the card.
 const shownDate = ref<string | null>(null)
 const firstDate = computed(() => firstDateOf(entries.value, healthMetrics.value))
@@ -514,34 +452,36 @@ useSwipe(scrubColumn, {
   }
 })
 
-/** Today's meals summed from their figures — the food line and the PROTEIN row read it while the column shows today. */
+/** Today's meals summed from their figures — the INTAKE block reads it while the column shows today. */
 const todayNutrition = computed(() => dayNutrition(todayEntry.value, estimateIndex.value))
-// The PROTEIN row and the food line are day totals, not "latest as of" readings, so the shown
-// day's meals are summed here.
+// The intake meters are day totals, not "latest as of" readings, so the shown day's meals are
+// summed here.
 const shownNutrition = computed(() => isToday.value ? todayNutrition.value : dayNutrition(shownEntry.value, estimateIndex.value))
-/** Null (no row) for roles without food; `grams` null until a meal with figures is logged. */
-const protein = computed(() => {
-  if (!isFullAccess.value) return null
-  const n = shownNutrition.value
-  return { grams: n.estimated > 0 ? n.protein_g : null, target: proteinTarget.value, floor: n.missing.length > 0 }
-})
+
+// Water and soda for any day. Write roles read through useQuickLog's local mirror, which a tap
+// patches, so the row moves on the spot; read-only full-access roles (no buttons) read the same
+// journal list straight off the overview.
+const entryOn = (date: string) => entries.value.find(e => e.date === date)
+const waterOn = (date: string) => quickLog ? quickLog.waterOn(date) : waterTotals(entryOn(date)?.water)
+const sodasOn = (date: string) => quickLog ? quickLog.sodasOn(date) : (entryOn(date)?.sodas?.length ?? 0)
 /**
- * The WATER bar closing the vitals block: null for roles without the + CUP button. It follows the
- * column's ‹ › like the PROTEIN row (Jim 2026-10-28: "see previous water intakes"), reading the
- * shown day's pours against the profile's CURRENT goal (goal changes aren't versioned); the
- * label carries the day once it isn't today.
+ * The WATER meter: the shown day's pours against the profile's CURRENT goal (goal changes aren't
+ * versioned). Follows the column's ‹ › (Jim 2026-10-28: "see previous water intakes").
  */
 const water = computed(() => {
-  if (!quickLog) return null
-  const { oz: ozRaw, count: pours } = isToday.value
-    ? { oz: quickLog.waterOzToday.value, count: quickLog.watersToday.value }
-    : quickLog.waterOn(asOf.value)
-  const goal = quickLog.goalOz.value
+  if (!isFullAccess.value) return null
+  const { oz: ozRaw, count: pours } = waterOn(asOf.value)
+  const goal = quickLog?.goalOz.value ?? waterSetting(profile?.data.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ)
   const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
-  return {
-    oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours,
-    isToday: isToday.value, label: isToday.value ? 'WATER' : `WATER · ${shownLabel.value}`, dayWord: dayWord.value
-  }
+  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours }
+})
+/** The SODA meter's week: sodas per day for the 7 days ending on the shown day, oldest first. */
+const sodaDays = computed(() => {
+  if (!isFullAccess.value) return null
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = shiftDays(asOf.value, i - 6)
+    return { date, n: sodasOn(date) }
+  })
 })
 
 /**

@@ -1,16 +1,32 @@
 <template>
   <div v-if="cycle">
+    <!-- The header carries when (option C of the 2026-10-29 side-panel canvas, Jim's pick); the
+         name gets its own line, which wraps — a long plan name used to truncate in the header,
+         and every line below wraps too rather than cutting off mid-compound. -->
     <TuiHeader
-      :label="`CYCLE · ${cycle.name.toUpperCase()}`"
+      :label="headerLabel"
       fill
       class="mt-4.5"
-    />
+    >
+      <span
+        v-if="state === 'upcoming'"
+        class="text-label tracking-[0.06em]"
+        :class="tentativeStart ? 'text-dim' : 'text-muted'"
+      >{{ tentativeStart ? 'NO DATE SET' : formatDate(cycle.start_date, 'monthDay').toUpperCase() }}</span>
+    </TuiHeader>
+    <NuxtLink
+      :to="dossier"
+      class="block mt-2.5 text-small text-hi hover:text-accent"
+    >{{ nameParts.main }}<span
+      v-if="nameParts.note"
+      class="text-muted"
+    >{{ ` ${nameParts.note}` }}</span></NuxtLink>
 
     <!-- ACTIVE: progress, dosing status, what's next. The figure after the bar is the bar's own
          number (time through the cycle); adherence sits on the dose row as "taken", where it
          belongs — "100%" next to a five-sevenths bar read as a contradiction. -->
     <template v-if="state === 'active'">
-      <div class="flex items-baseline gap-2.5 mt-2.5 text-small">
+      <div class="flex items-baseline gap-2.5 mt-1.5 text-small">
         <NuxtLink
           :to="dossier"
           class="text-hi hover:text-accent whitespace-nowrap"
@@ -34,7 +50,7 @@
           <span class="text-ghost shrink-0">├</span>
           <NuxtLink
             :to="`/journal/compound/${encodeURIComponent(row.compound)}`"
-            class="text-body hover:text-accent truncate"
+            class="text-body hover:text-accent min-w-0"
           >{{ row.compound }} {{ row.doseLabel }}</NuxtLink>
           <span
             class="ml-auto shrink-0 text-label tracking-[0.06em]"
@@ -49,7 +65,7 @@
           class="flex gap-2.5"
         >
           <span class="text-ghost shrink-0">├</span>
-          <span class="text-muted truncate">{{ nextPhase }}</span>
+          <span class="text-muted min-w-0">{{ nextPhase }}</span>
         </div>
         <div
           v-if="vitalsLine"
@@ -57,14 +73,14 @@
         >
           <span class="text-ghost shrink-0">├</span>
           <span
-            class="truncate"
+            class="min-w-0"
             :class="vitalsLine.class"
           >{{ vitalsLine.text }}</span>
         </div>
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">└</span>
           <span
-            class="truncate"
+            class="min-w-0"
             :class="drawLine.class"
           >{{ drawLine.text }}</span>
         </div>
@@ -85,21 +101,13 @@
          (month/quarter) swaps the countdown for the period it's pencilled in for; there's no
          day to count to. -->
     <template v-else-if="state === 'upcoming'">
-      <div class="flex flex-col gap-1 mt-2.5 text-small">
+      <div class="flex flex-col gap-1 mt-1.5 text-small">
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">├</span>
-          <NuxtLink
-            :to="dossier"
-            class="text-hi hover:text-accent"
-          >{{ tentativeStart ? `planned for ${tentativeStart}` : `starts in ${startsIn}d` }}</NuxtLink>
           <span
-            class="ml-auto shrink-0 text-label tracking-[0.06em]"
-            :class="tentativeStart ? 'text-dim' : 'text-muted'"
-          >{{ tentativeStart ? 'NO DATE SET' : formatDate(cycle.start_date, 'monthDay') }}</span>
-        </div>
-        <div class="flex gap-2.5">
-          <span class="text-ghost shrink-0">├</span>
-          <span :class="drawLine.class">{{ drawLine.text }}</span>
+            class="min-w-0"
+            :class="drawLine.class"
+          >{{ drawLine.text }}</span>
         </div>
         <div
           v-for="(line, i) in planLines"
@@ -107,7 +115,7 @@
           class="flex gap-2.5"
         >
           <span class="text-ghost shrink-0">{{ i === planLines.length - 1 ? '└' : '├' }}</span>
-          <span class="text-muted truncate">{{ line }}</span>
+          <span class="text-muted min-w-0">{{ line }}</span>
         </div>
       </div>
       <div
@@ -124,7 +132,7 @@
 
     <!-- DONE (recent): the recovery story -->
     <template v-else>
-      <div class="flex flex-col gap-1 mt-2.5 text-small">
+      <div class="flex flex-col gap-1 mt-1.5 text-small">
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">├</span>
           <NuxtLink
@@ -191,6 +199,20 @@ const dossier = computed(() => `/journal/cycle/${cycle.value?.id}`)
 
 /** "Oct 2026"/"Q4 2026" when the start isn't a picked day yet, else null. */
 const tentativeStart = computed(() => cycle.value ? tentativeStartLabel(cycle.value) : null)
+
+/** "CYCLE · Q2 2027" / "CYCLE · STARTS IN 12D" before the start; plain "CYCLE" after, where
+ * the rows under it carry the day count or the end date. */
+const headerLabel = computed(() => {
+  if (state.value !== 'upcoming') return 'CYCLE'
+  return tentativeStart.value ? `CYCLE · ${tentativeStart.value.toUpperCase()}` : `CYCLE · STARTS IN ${startsIn.value}D`
+})
+
+/** The name with a trailing "[…]" aside split off to be muted: "Test + HGH [+ Anavar maybe]". */
+const nameParts = computed(() => {
+  const name = cycle.value?.name ?? ''
+  const m = /^(.*?)\s*(\[[^\]]*\])$/.exec(name)
+  return m && m[1] ? { main: m[1], note: m[2] } : { main: name, note: null }
+})
 
 /** Newest draw on file — the baseline candidate for a cycle with no dated window. */
 const latestDraw = computed(() =>
@@ -340,7 +362,9 @@ const chips = computed(() => {
     const label = meta?.label ?? key
     const s = meta ? getStatus(value, meta) : 'normal'
     const cls = s === 'high' ? 'text-danger' : s === 'low' ? 'text-warn' : s === 'optimal' ? 'text-accent' : 'text-dim'
-    const fmt = (v: number) => Number.isInteger(v) ? v.toString() : v.toFixed(v < 10 ? 1 : 0)
+    // One decimal at most, trailing zero dropped: 51.7 stays 51.7 (it rounded to "52" for values
+    // of 10 and up, Jim 2026-10-29), 35.0 reads 35.
+    const fmt = (v: number) => Number(v.toFixed(1)).toString()
     const prior = diffAgainstBaseline ? baseDraw?.markers[key] : null
     out.push({
       key,

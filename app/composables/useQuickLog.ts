@@ -29,13 +29,15 @@ export async function useQuickLog() {
   const sodaDrink = computed(() => quickAddLabel({ drink: lastSoda.value?.drink }))
   const sodaSize = computed(() => lastSoda.value?.size ?? '')
   const sodasToday = computed(() => (todayEntry.value?.sodas ?? []).length)
+  /** Sodas on any day — the home SODA meter's week ends on the day the column is scrubbed to. */
+  const sodasOn = (date: string) => (entries.value.find(e => e.date === date)?.sodas ?? []).length
 
-  // --- water: the profile's cup size and daily goal (the home page's WATER bar reads the goal) ---
+  // --- water: the profile's cup size and daily goal (the home page's WATER meter reads the goal) ---
   const cupOz = computed(() => waterSetting(profileData.value, 'cup_oz', WATER_DEFAULT_CUP_OZ))
   const goalOz = computed(() => waterSetting(profileData.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ))
   const waterOzToday = computed(() => waterTotals(todayEntry.value?.water).oz)
   const watersToday = computed(() => waterTotals(todayEntry.value?.water).count)
-  /** Ounces and pours on any day — the home WATER bar reads the day the vitals card is scrubbed to. */
+  /** Ounces and pours on any day — the home WATER meter reads the day the vitals card is scrubbed to. */
   const waterOn = (date: string) => waterTotals(entries.value.find(e => e.date === date)?.water)
 
   // The shared local mirror (app/utils/journalPatch.ts) — the same one the widgets use.
@@ -85,5 +87,5 @@ export async function useQuickLog() {
     }
   }
 
-  return { sodaLabel, sodaDrink, sodaSize, sodasToday, cupOz, goalOz, waterOzToday, watersToday, waterOn, addingSoda, addingWater, addSoda, addWater }
+  return { sodaLabel, sodaDrink, sodaSize, sodasToday, sodasOn, cupOz, goalOz, waterOzToday, watersToday, waterOn, addingSoda, addingWater, addSoda, addWater }
 }
