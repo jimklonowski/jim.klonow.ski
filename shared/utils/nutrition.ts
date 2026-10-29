@@ -522,6 +522,29 @@ export interface KnownMeal {
   key: string
   /** Times logged (0 for a library or cache entry never logged under this spelling). */
   count: number
+  /**
+   * The serving's own unit when it counts more than one ("stick" for the two-stick beef sticks),
+   * so a pairing never trades the singular for the serving — see changesCount.
+   */
+  unit?: string
+}
+
+/** The serving unit a pairing must respect: a label-figure portion counting other than one. */
+function servingUnit(index: EstimateIndex, text: string): string | undefined {
+  const p = lookupEstimate(index, text, true)?.portion
+  return p && p.count !== 1 ? p.unit : undefined
+}
+
+const lastWord = (text: string) => text.trim().toLowerCase().split(/\s+/).at(-1)
+
+/**
+ * True when pairing `typed` with `meal` would change how many are eaten: a text ending in the
+ * serving's singular unit is ONE of it (singularServing), its plural is the whole serving, and
+ * mealKey folds the two together. "mozzarella stick" saved as "mozzarella sticks" read 700 kcal
+ * for a 70 kcal stick (audit #43 item 2); the reverse halves a serving.
+ */
+function changesCount(typed: string, meal: KnownMeal): boolean {
+  return meal.unit != null && (lastWord(typed) === meal.unit) !== (lastWord(meal.text) === meal.unit)
 }
 
 /** Every meal a typed text can be matched against: each logged spelling with figures, the library's texts, and the cache's. */
@@ -550,7 +573,10 @@ export function knownMeals(entries: FoodEntry[], index: EstimateIndex): KnownMea
     const key = qty ? mealKey(text) : row.key
     if (key && !out.has(key)) out.set(key, { text, key, count: 0 })
   }
-  return [...out.values()]
+  return [...out.values()].map((m) => {
+    const unit = servingUnit(index, m.text)
+    return unit ? { ...m, unit } : m
+  })
 }
 
 export interface MealSuggestion {
@@ -613,12 +639,15 @@ export function suggestMeal(text: string | null | undefined, known: KnownMeal[])
   if (!key) return null
   const withQty = (t: string) => (qty ? `${qty.n} x ${t}` : t)
 
+  // Same key but a different count ("stick" vs the "sticks" serving) is a different meal, not a
+  // spelling — and nothing else can be a better match for it, so it stays as typed.
   const exact = known.find(k => k.key === key)
-  if (exact) return exact.text === core ? null : { text: withQty(exact.text), strength: 'exact', score: 1 }
+  if (exact) return exact.text === core || changesCount(core, exact) ? null : { text: withQty(exact.text), strength: 'exact', score: 1 }
 
   const tokens = key.split(' ')
   let best: { meal: KnownMeal, score: number, prefixHits: number } | null = null
   for (const meal of known) {
+    if (changesCount(core, meal)) continue
     const { score, prefixHits } = similarity(tokens, meal.key.split(' '))
     if (!best || score > best.score || (score === best.score && meal.count > best.meal.count)) best = { meal, score, prefixHits }
   }

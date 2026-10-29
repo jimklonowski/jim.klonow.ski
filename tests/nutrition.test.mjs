@@ -325,6 +325,25 @@ test('a meal known only under a quantity is a candidate by its core, so another 
   assert.deepEqual(both.find(k => k.key === 'alpha dinner plate'), { text: 'Alpha Dinner Plate', key: 'alpha dinner plate', count: 3 })
 })
 
+test('a singular serving unit is never paired with the plural serving — the count would change (audit #43 item 2)', () => {
+  const known = knownMeals([], new Map())
+  assert.equal(known.find(k => k.text === 'mozzarella sticks')?.unit, 'stick', 'the serving carries its unit')
+  // "mozzarella stick" keys like "mozzarella sticks" (the plural fold) but reads as ONE stick.
+  assert.equal(suggestMeal('mozzarella stick', known), null)
+  assert.deepEqual(resolveMealText('mozzarella stick', known), { text: 'mozzarella stick', changed: false })
+  assert.equal(lookupEstimate(new Map(), 'mozzarella stick').kcal, libraryLookup('mozzarella sticks').kcal / 10)
+  assert.deepEqual(resolveMealText('Beef Stick', known), { text: 'Beef Stick', changed: false })
+  assert.deepEqual(resolveMealText('2 x beef stick', known), { text: '2 x beef stick', changed: false }, 'two of one stick, not two servings')
+  // A spelling that keeps the count still pairs.
+  assert.deepEqual(resolveMealText('Mozzarella Sticks', known), { text: 'mozzarella sticks', changed: true })
+  // Logged in the singular, the singular is the known spelling — and the plural serving must not fold onto it either.
+  const singularFirst = knownMeals([{ food: { snack_pm: 'beef stick' } }], new Map())
+  assert.equal(singularFirst.find(k => k.key === mealKey('beef sticks')).text, 'beef stick')
+  assert.deepEqual(resolveMealText('beef sticks', singularFirst), { text: 'beef sticks', changed: false })
+  // A plural that is not the serving's unit still folds ("pizzas" against slices).
+  assert.deepEqual(resolveMealText('Costco Cheese Pizzas', known), { text: 'costco cheese pizza', changed: true })
+})
+
 test('alias-collision guard: no two library meals answer to the same key', () => {
   const owners = new Map()
   for (const meal of MEAL_LIBRARY) {

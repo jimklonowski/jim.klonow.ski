@@ -1292,11 +1292,15 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
   const moving = to !== from && existingEntry.value != null
   // A meal typed as a new spelling of one that has figures is saved as that one (same key or a
   // strong match) and the toast below says so; the form shows the saved spelling after refresh.
+  // Only a slot this form changed is paired: a meal the day loaded with was saved as typed (or
+  // already paired) back then, and saving the day's notes must not rename it (audit #43 item 2).
   const paired: string[] = []
+  const loadedFood = loadedBase.value?.food ?? {}
   const food = Object.fromEntries(
     Object.entries(form.food)
       .filter(([, v]) => v.trim() !== '')
       .map(([slot, v]) => {
+        if (v.trim() === (loadedFood[slot as MealSlot] ?? '').trim()) return [slot, v.trim()]
         const r = resolveMealText(v, knownMealList.value)
         if (r.changed) paired.push(`${slot}: "${r.text}"`)
         return [slot, r.text]
