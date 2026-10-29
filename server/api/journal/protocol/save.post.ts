@@ -1,3 +1,4 @@
+import { unscoredVersions } from '#shared/utils/protocolStore'
 import { zProtocolItemSave } from '#shared/utils/schemas'
 
 // Insert a protocol item (no id) or update one (id present): the thing taken and how it is
@@ -18,6 +19,16 @@ export default defineEventHandler(async (event) => {
   if (body.id != null) {
     const before = await auditBefore(event, 'protocol_items', body.id)
     if (!before && getAuth(event)?.role === 'owner') throw createError({ statusCode: 404, message: 'No such protocol item' })
+    // The same rule version.post.ts holds a new version to, for the history a kind change inherits.
+    if (body.kind === 'logged') {
+      const { results } = await db.prepare('SELECT from_date, weekdays FROM protocol_versions WHERE item_id = ?1')
+        .bind(body.id).all<{ from_date: string | null, weekdays: string | null }>()
+      const loose = unscoredVersions(results ?? [])
+      if (loose.length) {
+        const which = loose.length === 1 ? 'one of its versions has' : `${loose.length} of its versions have`
+        throw createError({ statusCode: 400, message: `A logged compound is scored from a start date and weekdays, and ${which} none — every past day would read as a missed dose. Give ${loose.length === 1 ? 'it' : 'them'} dates and days first, or keep it standing.` })
+      }
+    }
     await db.prepare(`
       UPDATE protocol_items SET name = ?2, kind = ?3, category = ?4, injected = ?5, on_hand = ?6, notes = ?7, stop_note = ?8, sort = ?9
       WHERE id = ?1

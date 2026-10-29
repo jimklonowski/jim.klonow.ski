@@ -82,6 +82,16 @@ export function parseWeekdays(json: string | null): number[] | null {
 /** Whether two versions of one item overlap: ranges are inclusive, an unknown start reaches
  * back to the dawn of records and an open end reaches forward forever. The save endpoint
  * refuses an overlap — the mapper would otherwise read two doses for one day. */
+/**
+ * The versions a logged compound can't be scored from: no first day or no weekdays. A logged
+ * version saved without them reads from BEFORE_RECORDS on every day of the week (see rulesOf), so
+ * turning a standing item into a logged one marked every day since records began as a missed dose
+ * (audit #43 item 7). version.post.ts refuses such a version; the item save refuses the switch.
+ */
+export function unscoredVersions<V extends { from_date: string | null, weekdays: string | null }>(versions: V[]): V[] {
+  return versions.filter(v => !v.from_date || !parseWeekdays(v.weekdays)?.length)
+}
+
 export function versionOverlaps(
   a: { from_date: string | null, to_date: string | null },
   b: { from_date: string | null, to_date: string | null }

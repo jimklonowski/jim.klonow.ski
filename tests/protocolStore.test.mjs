@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { AS_NEEDED, RULES, STANDING, seedSql } from './_fixtures/protocol.mjs'
-import { BEFORE_RECORDS, parseWeekdays, protocolFromRows, scheduleText, versionOverlaps } from '../shared/utils/protocolStore.ts'
+import { BEFORE_RECORDS, parseWeekdays, protocolFromRows, scheduleText, unscoredVersions, versionOverlaps } from '../shared/utils/protocolStore.ts'
 import { doseLabelOn, scheduledFor, tallySchedule } from '../shared/utils/protocolRules.ts'
 import { protocolSchedule } from '../shared/utils/protocolProse.ts'
 import { ruleAnnotations } from '../shared/utils/chartAnnotations.ts'
@@ -183,4 +183,14 @@ test('the supplements copy in 0013 round-trips: the stack reads the same from th
   }
   assert.ok(renderSupplementContext(p.supplements, '2026-10-23').includes('Nizoral 1% (ketoconazole) shampoo (Mondays + Thursdays)'))
   assert.deepEqual([p.rules, p.standing, p.asNeeded], [[], [], []], 'nothing from the stack is scored against the dose log')
+})
+
+test('a logged compound is only scorable from versions with a first day and weekdays (audit #43 item 7)', () => {
+  const ok = { from_date: '2026-10-24', weekdays: '[2,5]' }
+  const noStart = { from_date: null, weekdays: '[2,5]' }
+  const noDays = { from_date: '2026-06-18', weekdays: null }
+  const emptyDays = { from_date: '2026-06-18', weekdays: '[]' }
+  assert.deepEqual(unscoredVersions([ok, noStart, noDays, emptyDays]), [noStart, noDays, emptyDays])
+  assert.deepEqual(unscoredVersions([ok]), [])
+  assert.deepEqual(unscoredVersions([]), [], 'an item with no history yet can switch freely')
 })
