@@ -84,6 +84,19 @@ test('item windows are week-relative and clamp to an early end', () => {
   assert.equal(cycleRules(cut).length, 1)
 })
 
+test('an extended cycle keeps its open-ended items going; a week-numbered one keeps its own end (audit #43 item 6)', () => {
+  const extended = run({ actual_end: '2027-01-17' }) // two weeks past the planned 2027-01-03
+  assert.equal(cycleEnd(extended), '2027-01-17')
+  assert.deepEqual(itemWindow(extended, primo), { from: '2026-09-14', to: '2027-01-17' })
+  assert.deepEqual(itemWindow(extended, anavar), { from: shiftDays('2026-09-14', 77), to: '2027-01-03' }, 'weeks 12-16 stay weeks 12-16')
+  assert.equal(cycleRules(extended).find(r => r.compound === primo.compound).to, '2027-01-17')
+  // The standing rule for the same compound stays out of the extra weeks.
+  const standing = { compound: primo.compound, doseLabel: '100 mg', weekdays: [1], from: '2026-01-01' }
+  const merged = mergeRules([standing], [extended])
+  assert.ok(!merged.some(r => r.compound === primo.compound && r.doseLabel === '100 mg' && r.from <= '2027-01-17' && (r.to ?? '9999') >= '2027-01-04'),
+    'no standing Primo rule inside the extension')
+})
+
 test('shifting the start date moves every phase with it', () => {
   const c = run({ start_date: '2026-09-21' }) // slipped one week
   assert.deepEqual(itemWindow(c, anavar), { from: shiftDays('2026-09-21', 77), to: '2027-01-10' })

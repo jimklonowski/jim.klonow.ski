@@ -190,15 +190,18 @@ export function doseLabelOf(item: CyclePlanItem): string {
   return `${item.dose} ${item.unit === 'iu' ? 'IU' : item.unit}`
 }
 
-/** Absolute date window for one plan item, clamped to an early actual_end. Null when the
- * cycle was cut before the item's first week ever arrived. */
+/** Absolute date window for one plan item, clamped to an early actual_end. An open-ended item
+ * follows an extension too. Null when the cycle was cut before the item's first week arrived. */
 export function itemWindow(cycle: Cycle, item: CyclePlanItem): { from: string, to: string } | null {
   const from = shiftDays(cycle.start_date, (item.fromWeek - 1) * 7)
   // A week-numbered item never outlives the cycle: on a 10-day plan, "weeks 1-2" ends on day 10,
-  // not day 14, or adherence would score four days the plan never claimed.
+  // not day 14, or adherence would score four days the plan never claimed. It keeps its own last
+  // week when the cycle is extended ("Anavar weeks 12-16" stays five weeks). An open-ended item
+  // runs to the end as lived: capped at the planned end, an extended cycle dropped its rules for
+  // the extra weeks and the standing schedule scored them instead (audit #43 item 6).
   const span = plannedEnd(cycle)
   const weekEnd = item.toWeek != null ? shiftDays(cycle.start_date, item.toWeek * 7 - 1) : null
-  const planned = weekEnd != null && weekEnd < span ? weekEnd : span
+  const planned = weekEnd == null ? cycleEnd(cycle) : weekEnd < span ? weekEnd : span
   const to = cycle.actual_end != null && cycle.actual_end < planned ? cycle.actual_end : planned
   return to < from ? null : { from, to }
 }
