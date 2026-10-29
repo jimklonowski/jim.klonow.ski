@@ -331,7 +331,10 @@ function openForm(cycle?: Cycle, { duplicate = false, precision }: { duplicate?:
       duration: cycle.planned_days ?? cycle.planned_weeks,
       duration_unit: cycle.planned_days != null ? 'days' : 'weeks',
       actual_end: duplicate ? '' : (cycle.actual_end ?? ''),
-      compounds: cycle.compounds.map(c => ({ ...c, toWeek: c.toWeek ?? undefined })),
+      // Own copy of each weekday list: toggleDay splices it in place, and a shallow spread left it
+      // the cached cycle's array — a cancelled edit (or a duplicate) still changed the plan's
+      // rings and adherence, and the next save wrote it (audit #43 item 5).
+      compounds: cycle.compounds.map(c => ({ ...c, weekdays: [...c.weekdays], toWeek: c.toWeek ?? undefined })),
       notes: cycle.notes ?? ''
     })
     // Duplicating into a tentative start needs an anchor the period list actually contains.
