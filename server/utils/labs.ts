@@ -18,9 +18,19 @@ export const STORABLE_MARKER_KEYS: ReadonlySet<string> = new Set(
 const SAFE_PDF_NAME = /^[\w][\w .()+-]{0,120}\.pdf$/i
 
 /**
+ * No figure at all: null, or a blank string. A blank must be caught before the numeric coercion
+ * below — `Number('')` is 0, which is finite, so a cleared field in a hand-edited JSON was stored
+ * as a reading of 0 and flagged LOW (audit #43 item 3).
+ */
+function isAbsent(raw: unknown): boolean {
+  return raw == null || (typeof raw === 'string' && raw.trim() === '')
+}
+
+/**
  * Only known marker keys, only finite numbers. A value arriving as a string ("4.8") is coerced,
- * since a report's own formatting is not worth failing a whole extraction over; anything else is
- * dropped. Returns the rejected keys so the caller can say what it ignored.
+ * since a report's own formatting is not worth failing a whole extraction over; a blank one is
+ * no reading (skipped, like null); anything else is dropped. Returns the rejected keys so the
+ * caller can say what it ignored.
  */
 export function sanitizeMarkers(input: unknown): { markers: Record<string, number>, dropped: string[] } {
   const markers: Record<string, number> = {}
@@ -32,7 +42,7 @@ export function sanitizeMarkers(input: unknown): { markers: Record<string, numbe
       dropped.push(key)
       continue
     }
-    if (raw == null) continue
+    if (isAbsent(raw)) continue
     const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : Number.NaN
     if (Number.isFinite(value)) markers[key] = value
     else dropped.push(key)
@@ -79,7 +89,7 @@ export interface SanitizedDexa {
 export function sanitizeDexa(input: Record<string, unknown>): SanitizedDexa {
   const dropped: string[] = []
   const figure = (path: string, raw: unknown): number | null => {
-    if (raw == null) return null
+    if (isAbsent(raw)) return null
     if (!DEXA_PATHS.has(path)) {
       dropped.push(path)
       return null
