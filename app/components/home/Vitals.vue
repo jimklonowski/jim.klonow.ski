@@ -2,44 +2,56 @@
   <div>
     <!-- ‹ › scrub the card back a day at a time (Whoop's day picker, Jim 2026-10-26): the label
          names the shown day, the rows read "latest as of" it, and the deltas are that day's.
-         Tapping TODAY returns; the state is the component's own and never reaches the URL. -->
+         The arrows wrap the day they change, "┌ ‹ TODAY › · VITALS" (Jim 2026-10-29); the day
+         sits in a fixed-width slot so › doesn't jump between TODAY and OCT 27. The "today" link
+         at the right end returns; the state is the component's own and never reaches the URL. -->
     <TuiHeader
       :label="`${isToday ? 'TODAY' : label} · VITALS`"
       fill
     >
-      <span class="flex items-center gap-1.5 text-meta">
-        <button
-          v-if="!isToday"
-          type="button"
-          class="text-accent hover:text-accent-hover cursor-pointer"
-          @click="reset()"
-        >today</button>
-        <!-- ‹ hugs the left of its box and › the right (Jim 2026-10-29), so › ends flush with
-             the deltas' right edge below instead of a few px inside it. -->
+      <template #label>
         <button
           type="button"
-          class="inline-flex w-4 justify-start text-prose cursor-pointer disabled:cursor-default"
+          class="inline-block w-4 text-center text-prose leading-none tracking-normal cursor-pointer disabled:cursor-default"
           :class="canBack ? 'text-faint hover:text-accent' : 'text-ghost'"
           :disabled="!canBack"
           :aria-label="`Show ${formatDate(shiftDays(asOf, -1), 'monthDay')}`"
           @click="step(-1)"
-        >‹</button>
-        <button
+        >
+          ‹
+        </button><span
+          class="inline-block min-w-[7.5ch] text-center"
+          :class="isToday ? '' : 'text-dim'"
+        >{{ isToday ? 'TODAY' : label }}</span><button
           type="button"
-          class="inline-flex w-4 justify-end text-prose cursor-pointer disabled:cursor-default"
+          class="inline-block w-4 text-center text-prose leading-none tracking-normal cursor-pointer disabled:cursor-default"
           :class="isToday ? 'text-ghost' : 'text-faint hover:text-accent'"
           :disabled="isToday"
           :aria-label="`Show ${formatDate(shiftDays(asOf, 1), 'monthDay')}`"
           @click="step(1)"
-        >›</button>
-      </span>
+        >
+          ›
+        </button>{{ ' · VITALS' }}
+      </template>
+      <button
+        v-if="!isToday"
+        type="button"
+        class="text-meta text-accent hover:text-accent-hover cursor-pointer"
+        @click="reset()"
+      >
+        today
+      </button>
     </TuiHeader>
 
     <!-- Two-up tiles until lg: on a phone these rows used to fill the whole first screen on
          their own, pushing LOG TODAY and the quick-log buttons below the fold. From lg the block
          sits in the 390px column and the rows read as a list (label · value · delta) as before;
          `lg:contents` dissolves the value+unit wrapper so the delta's ml-auto works there. -->
-    <div class="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 lg:flex lg:flex-col lg:gap-3">
+    <!-- data-scrub: slides in on a day change (the page animates every [data-scrub] block). -->
+    <div
+      data-scrub
+      class="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 lg:flex lg:flex-col lg:gap-3"
+    >
       <div
         v-for="row in rows"
         :key="row.label"
@@ -67,6 +79,7 @@
 
     <p
       v-if="!rows.length"
+      data-scrub
       class="mt-3 text-small text-muted"
     >
       {{ isToday ? 'No vitals logged yet.' : `Nothing logged by ${formatDate(asOf, 'monthDay')}.` }}

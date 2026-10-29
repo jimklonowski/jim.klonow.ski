@@ -1,6 +1,8 @@
 <template>
   <div class="tui-label flex items-baseline justify-between gap-3 min-w-0 select-none">
-    <span class="truncate">┌ {{ label }}{{ !fill && dashes ? ` ${'─'.repeat(dashes)}` : '' }}</span>
+    <!-- `#label` replaces the plain label text when it needs controls inside it (the vitals
+         card's ‹ DAY ›); the ┌ stays put either way. -->
+    <span class="truncate">┌ <slot name="label">{{ label }}</slot>{{ !fill && dashes ? ` ${'─'.repeat(dashes)}` : '' }}</span>
     <!-- `fill`: the rule runs to the right edge (or to the slot) whatever the panel's width — a
          long run of the same glyph, clipped. Decorative, so hidden from assistive tech. -->
     <span

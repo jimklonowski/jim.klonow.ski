@@ -22,7 +22,10 @@
          daily targets and each button sits beside the number it moves. The value column is a
          min width, not a fixed one, so a 3-digit water total pushes its bar instead of
          overflowing into it. -->
-    <div class="flex flex-col gap-2 mt-2.5 text-meta">
+    <div
+      data-scrub
+      class="flex flex-col gap-2 mt-2.5 text-meta"
+    >
       <div
         class="flex items-center gap-2"
         :title="protein.title"

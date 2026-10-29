@@ -95,6 +95,7 @@
              from the most recent workout day — a three-workout day used to show only its last. -->
         <div
           v-if="latestWorkouts.length"
+          data-scrub
           class="mt-3.5 text-small text-muted space-y-2"
         >
           <div
@@ -131,6 +132,7 @@
              reader knows. -->
         <div
           v-if="doseRows.length"
+          data-scrub
           class="flex flex-col gap-1.5 mt-2.5 text-small"
         >
           <div
@@ -166,6 +168,7 @@
         </div>
         <p
           v-else
+          data-scrub
           class="mt-2.5 text-small text-muted"
         >
           No doses logged {{ dayWord }}.
@@ -451,6 +454,27 @@ useSwipe(scrubColumn, {
     else if (direction === 'left') stepDay(1)
   }
 })
+
+// A day change slides the day's figures in from the side it came from (Jim 2026-10-29): back a
+// day (‹ or a swipe right) enters from the left, forward from the right — a page turned under
+// the finger. Only the [data-scrub] blocks move (vitals rows, workout, doses, intake meters);
+// the headers stay put so the ‹ › never shift under a thumb mid-tap. The Web Animations API on
+// the existing elements, not a keyed <Transition>: nothing re-mounts, so there's no flash and no
+// height jump. After the DOM update (flush: 'post') so the new values are what slides in. The
+// global prefers-reduced-motion CSS rule can't reach el.animate(), hence the explicit check.
+const reducedMotion = usePreferredReducedMotion()
+const SCRUB_SLIDE_PX = 14
+watch(asOf, (to, from) => {
+  if (!from || to === from || reducedMotion.value === 'reduce') return
+  const dx = to < from ? -SCRUB_SLIDE_PX : SCRUB_SLIDE_PX
+  for (const el of scrubColumn.value?.querySelectorAll<HTMLElement>('[data-scrub]') ?? []) {
+    el.getAnimations().forEach(a => a.cancel())
+    el.animate(
+      [{ transform: `translateX(${dx}px)`, opacity: 0.3 }, { transform: 'none', opacity: 1 }],
+      { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+    )
+  }
+}, { flush: 'post' })
 
 /** Today's meals summed from their figures — the INTAKE block reads it while the column shows today. */
 const todayNutrition = computed(() => dayNutrition(todayEntry.value, estimateIndex.value))
