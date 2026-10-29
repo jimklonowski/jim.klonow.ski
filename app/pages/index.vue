@@ -80,13 +80,61 @@
     >
       <!-- tour ids sit on the compact components, not the sections — a full-height column
            as the popover anchor pushes the tour popover to the viewport edge. -->
-      <HomeVitals
-        id="tour-vitals"
-        v-model:date="shownDate"
-        :entries="entries"
-        :metrics="healthMetrics"
-        :protein="protein"
-      />
+      <!-- The wrapper keeps vitals + the WATER bar one cell of the md two-up grid. -->
+      <div>
+        <HomeVitals
+          id="tour-vitals"
+          v-model:date="shownDate"
+          :entries="entries"
+          :metrics="healthMetrics"
+          :protein="protein"
+        />
+
+        <!-- The shown day's water against the profile's goal, closing the vitals block (moved up
+             from under the quick-log buttons, Jim 2026-10-29) — the same bar the PROTEIN tile
+             draws, filled with the hub tracker's water blue (shared/utils/water.ts has the goal
+             and the maths). The local mirror useQuickLog patches after a + CUP tap is what this
+             reads, so the bar fills on the spot. The vitals ‹ › scrub it too: a past day reads
+             "WATER · OCT 25" with that day's pours, and the label is a tap back to today. -->
+        <div
+          v-if="water"
+          class="flex items-center gap-2 mt-3 text-meta"
+          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} ${water.dayWord}`"
+        >
+          <button
+            v-if="!water.isToday"
+            type="button"
+            class="text-accent hover:text-accent-hover cursor-pointer whitespace-nowrap"
+            title="Back to today"
+            @click="resetDay()"
+          >
+            {{ water.label }}
+          </button>
+          <span
+            v-else
+            class="text-muted"
+          >{{ water.label }}</span>
+          <span
+            class="num text-row leading-none"
+            :class="water.met ? 'text-accent' : 'text-hi'"
+          >{{ water.oz }}</span>
+          <span class="text-muted whitespace-nowrap">/ {{ water.goal }} oz</span>
+          <span
+            class="relative flex-1 h-1.25 bg-line-soft overflow-hidden"
+            role="progressbar"
+            :aria-valuenow="Math.round(water.ozRaw)"
+            aria-valuemin="0"
+            :aria-valuemax="water.goal"
+            :aria-label="`Water ${water.dayWord} against the daily goal`"
+          >
+            <span
+              class="absolute inset-y-0 left-0 bg-water transition-[width] duration-300"
+              :style="{ width: `${Math.min(100, water.pct)}%` }"
+            />
+          </span>
+          <span :class="water.met ? 'text-accent' : 'text-muted'">{{ water.pct }}%</span>
+        </div>
+      </div>
 
       <div>
         <TuiHeader
@@ -237,51 +285,6 @@
           >
             <span class="truncate">{{ addingWater ? 'LOGGING…' : `+ CUP ${cupOz}oz` }}</span>
           </button>
-        </div>
-
-        <!-- Today's water against the profile's goal, right under the tap that moves it — the
-             same bar the PROTEIN tile draws, filled with the hub tracker's water blue (Jim's
-             call 2026-10-27; shared/utils/water.ts has the goal and the maths).
-             The local mirror useQuickLog patches after a tap is what this reads, so the bar
-             fills on the spot. The vitals ‹ › scrub it too: a past day reads "WATER · OCT 25"
-             with that day's pours, and the label is a tap back to today. -->
-        <div
-          v-if="water"
-          class="flex items-center gap-2 mt-2.5 text-meta"
-          :title="`${water.pours} pour${water.pours === 1 ? '' : 's'} ${water.dayWord}`"
-        >
-          <button
-            v-if="!water.isToday"
-            type="button"
-            class="text-accent hover:text-accent-hover cursor-pointer whitespace-nowrap"
-            title="Back to today"
-            @click="resetDay()"
-          >
-            {{ water.label }}
-          </button>
-          <span
-            v-else
-            class="text-muted"
-          >{{ water.label }}</span>
-          <span
-            class="num text-row leading-none"
-            :class="water.met ? 'text-accent' : 'text-hi'"
-          >{{ water.oz }}</span>
-          <span class="text-muted whitespace-nowrap">/ {{ water.goal }} oz</span>
-          <span
-            class="relative flex-1 h-1.25 bg-line-soft overflow-hidden"
-            role="progressbar"
-            :aria-valuenow="Math.round(water.ozRaw)"
-            aria-valuemin="0"
-            :aria-valuemax="water.goal"
-            :aria-label="`Water ${water.dayWord} against the daily goal`"
-          >
-            <span
-              class="absolute inset-y-0 left-0 bg-water transition-[width] duration-300"
-              :style="{ width: `${Math.min(100, water.pct)}%` }"
-            />
-          </span>
-          <span :class="water.met ? 'text-accent' : 'text-muted'">{{ water.pct }}%</span>
         </div>
       </div>
 
@@ -523,7 +526,7 @@ const protein = computed(() => {
   return { grams: n.estimated > 0 ? n.protein_g : null, target: proteinTarget.value, floor: n.missing.length > 0 }
 })
 /**
- * The WATER bar under the quick-log buttons: null for roles without the buttons. It follows the
+ * The WATER bar closing the vitals block: null for roles without the + CUP button. It follows the
  * column's ‹ › like the PROTEIN row (Jim 2026-10-28: "see previous water intakes"), reading the
  * shown day's pours against the profile's CURRENT goal (goal changes aren't versioned); the
  * label carries the day once it isn't today.
