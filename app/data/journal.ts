@@ -1,4 +1,4 @@
-import type { JournalEntry, SodaEntry, Vial, WaterEntry } from '#shared/types/journal'
+import type { JournalEntry, PeptideEntry, SodaEntry, Vial, WaterEntry } from '#shared/types/journal'
 
 // The row shapes live in shared/types/journal.ts (the server reads the same rows); re-exported
 // so the pages' existing `~/data/journal` imports keep working.
@@ -226,6 +226,27 @@ export function oppositeSite(site: string): string {
   if (site.startsWith('left_')) return `right_${site.slice('left_'.length)}`
   if (site.startsWith('right_')) return `left_${site.slice('right_'.length)}`
   return site
+}
+
+/**
+ * What a new dose row picks up when its compound is chosen: the unit that compound was last
+ * logged in, and the mirror of its last site (the same rotation copy-from-previous applies). The
+ * row used to stay at its blank 'mg', so "hCG 250" saved as 250 mg — dropped by the exposure
+ * model and read as ~2.3M IU by the vial inventory, while adherence still counted it (audit #43
+ * item 8). The last dose before `date` when there is one, since a back-filled day should read
+ * like its own time; otherwise the newest. `entries` oldest first, as the journal list comes.
+ */
+export function doseDefaults(entries: readonly JournalEntry[], compound: string, date: string): { unit: PeptideEntry['unit'], site: string } | null {
+  if (!compound) return null
+  let latest: PeptideEntry | null = null
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i]!
+    const dose = e.peptides?.findLast(p => p.compound === compound && p.unit)
+    if (!dose) continue
+    latest ??= dose
+    if (e.date < date) return { unit: dose.unit, site: oppositeSite(dose.site ?? '') }
+  }
+  return latest ? { unit: latest.unit, site: oppositeSite(latest.site ?? '') } : null
 }
 
 export function blankEntry(date: string): JournalEntry {

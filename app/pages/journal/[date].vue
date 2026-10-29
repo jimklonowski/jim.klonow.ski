@@ -211,6 +211,7 @@
                   placeholder="MOTS-C"
                   class="w-full"
                   :ui="SELECT_UI"
+                  @update:model-value="fillDoseDefaults(peptide, $event)"
                 />
               </UFormField>
               <UFormField
@@ -874,7 +875,7 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, oppositeSite } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, doseDefaults, oppositeSite } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import {
@@ -1241,6 +1242,19 @@ function buildForm() {
     water: (entry.water ?? []).map(w => ({ ...w })),
     notes: entry.notes ?? ''
   }
+}
+
+/**
+ * A fresh row takes its unit and site from the compound's last dose (doseDefaults) as soon as
+ * the compound is chosen. Only while the dose is still blank: a filled-in row keeps whatever
+ * unit it was given.
+ */
+function fillDoseDefaults(peptide: PeptideEntry, compound: unknown) {
+  if (peptide.dose || typeof compound !== 'string') return
+  const last = doseDefaults(allEntries.value ?? [], compound, form.date)
+  if (!last) return
+  peptide.unit = last.unit
+  if (last.site) peptide.site = last.site
 }
 
 function addPeptide() {
