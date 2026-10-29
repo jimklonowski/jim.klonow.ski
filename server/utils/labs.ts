@@ -135,6 +135,18 @@ export function sanitizeDexa(input: Record<string, unknown>): SanitizedDexa {
   }
 }
 
+/**
+ * The fasting flag a bloodwork save stores. A draw that was fasting stays fasting: a later one-off
+ * add-on panel (an IGF-1 re-test, say) is non-fasting by nature, and letting it replace the flag
+ * silently relabeled the glucose and lipids already stored for that date. But a flag the owner
+ * flipped by hand on the upload page (`fasting_set`) is a correction and wins either way — the OR
+ * alone made a draw wrongly saved as fasting impossible to fix (audit #43 item 4).
+ */
+export function mergedFasting(existing: boolean, body: { fasting?: boolean, fasting_set?: boolean }): boolean {
+  if (body.fasting_set === true) return body.fasting === true
+  return existing || body.fasting === true
+}
+
 /** Bounded {name, result} pairs; anything without both as non-empty strings is discarded. */
 export function sanitizeQualitative(input: unknown): Array<{ name: string, result: string }> {
   if (!Array.isArray(input)) return []

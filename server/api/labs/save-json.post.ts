@@ -90,10 +90,8 @@ export default defineEventHandler(async (event) => {
     ...newQualitative
   ]
 
-  // Fasting is a property of the draw, and a draw that was fasting stays fasting: a later
-  // one-off add-on panel (an IGF-1 re-test, say) is non-fasting by nature, and letting it
-  // replace the flag silently relabeled the glucose and lipids already stored for that date.
-  const fasting = (!!existing?.fasting || body.fasting === true) ? 1 : 0
+  // Sticky for an add-on panel, overridden by a hand correction — see mergedFasting.
+  const fasting = mergedFasting(!!existing?.fasting, body) ? 1 : 0
 
   await db.prepare(`
     INSERT INTO labs_entries (date, fasting, sources, markers, qualitative)

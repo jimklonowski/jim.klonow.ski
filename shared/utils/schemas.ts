@@ -430,6 +430,8 @@ export const zLabsSave = z.object({
   date: zIsoDate,
   _type: z.enum(['bloodwork', 'dexa', 'echo']).optional(),
   fasting: z.boolean().optional().catch(undefined),
+  /** The owner flipped the fasting cell by hand: `fasting` is a correction, not the extractor's read. */
+  fasting_set: z.boolean().optional().catch(undefined),
   markers: z.unknown().optional(),
   qualitative: z.unknown().optional(),
   sources: z.unknown().optional(),

@@ -543,9 +543,14 @@ const resultCells = computed<ResultCell[]>(() => {
   ]
 })
 
+// The cell was flipped by hand. The save sends it as a correction, which overrides the stored
+// flag — an extractor's read never clears a fasting draw (see mergedFasting in server/utils/labs.ts).
+const fastingSetByHand = ref(false)
+
 function toggleFasting() {
   if (!result.value) return
   result.value.fasting = !result.value.fasting
+  fastingSetByHand.value = true
   editedAfterSave()
 }
 
@@ -584,6 +589,7 @@ async function upload(file: File) {
   error.value = ''
   result.value = null
   saveResult.value = null
+  fastingSetByHand.value = false
 
   try {
     const form = new FormData()
@@ -614,6 +620,7 @@ function reset() {
   summaryError.value = ''
   reportWeight.value = null
   weightModalOpen.value = false
+  fastingSetByHand.value = false
   pdf.value = null
 }
 
@@ -635,7 +642,7 @@ async function saveToSite() {
   try {
     const res = await $fetch<{ ok: boolean, table: string, date: string, planned?: { id: number, date: string } | null }>('/api/labs/save-json', {
       method: 'POST',
-      body: { ...result.value, _type: reportType.value }
+      body: { ...result.value, _type: reportType.value, ...(fastingSetByHand.value ? { fasting_set: true } : {}) }
     })
     saveResult.value = { ok: true, date: res.date, planned: res.planned ?? null }
     // The shell summary carries the last-draw date, flag counts, PDF total and latest DEXA.
