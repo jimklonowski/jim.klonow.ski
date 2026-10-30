@@ -624,12 +624,15 @@ function workoutParts(w: typeof allWorkouts.value[number]) {
 }
 
 /** Flagged markers that are expected on-protocol get a plain-language note under the rows. */
+// Each note reads the flag's direction: "below optimal" under a ferritin flagged HIGH, or
+// "suppression" under an LH flagged HIGH, said the opposite of the row above it (audit #43 item 29).
 const contextNote = computed(() => {
   const notes: string[] = []
-  const keys = new Set(flagged.value.map(f => f.key))
-  if (keys.has('ferritin')) notes.push('ferritin re-test suggested — iron stores below optimal')
-  if (keys.has('fsh') || keys.has('lh')) notes.push('FSH/LH suppression expected on-protocol')
-  if (keys.has('estradiol')) notes.push('estradiol tracks total testosterone; watch for water retention')
+  const status = new Map(flagged.value.map(f => [f.key, f.status]))
+  if (status.get('ferritin') === 'low') notes.push('ferritin re-test suggested — iron stores below optimal')
+  if (status.get('ferritin') === 'high') notes.push('ferritin high — iron stores or inflammation; worth a re-test with CRP')
+  if (status.get('fsh') === 'low' || status.get('lh') === 'low') notes.push('FSH/LH suppression expected on-protocol')
+  if (status.get('estradiol') === 'high') notes.push('estradiol tracks total testosterone; watch for water retention')
   return notes.join('; ') || null
 })
 
