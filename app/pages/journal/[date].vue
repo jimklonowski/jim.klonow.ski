@@ -1334,7 +1334,11 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
     water: form.water.filter(w => typeof w.oz === 'number' && w.oz > 0),
     // What this form started from, so the server merges rather than overwrites (see loadedBase).
-    base: loadedBase.value ?? undefined
+    // Not when a new day is saved over an occupied one the confirm offered to replace: the base
+    // describes the day this form opened on, not that one, and merging against it kept the
+    // target's vitals, sodas, water and meals while overwriting its doses and notes — half a
+    // replace, under a "kept what was logged elsewhere" toast (audit #43 item 11).
+    base: !moving && targetEntry.value ? undefined : loadedBase.value ?? undefined
   }
   const saved = await $fetch<{ ok: boolean, date: string, kept: string[] }>('/api/journal/save', { method: 'POST', body: payload })
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
