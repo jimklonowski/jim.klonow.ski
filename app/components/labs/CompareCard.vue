@@ -87,6 +87,7 @@ import type { LabsEntry } from '#shared/types/labs'
 import { BIOMARKERS, CATEGORY_LABELS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
+import { isCensored } from '~/data/markerCaveats'
 
 const props = defineProps<{
   /** Every draw, any order. */
@@ -162,12 +163,24 @@ function axisLabel(date: string) {
   return spansYears.value ? `${md} ’${date.slice(2, 4)}` : md
 }
 
+// A censored reading (the Sep 9 total T ceiling) is a bound, not a point either line may run
+// through: the comparison is about how two markers move together, and a floor of 1500 drawn as
+// a value bends the testosterone line into a dip that never happened (audit #43 item 15). It is
+// left out (connect-nulls bridges it) and named in the caption.
+const value = (key: string, e: LabsEntry) => (isCensored(key, e.date) ? null : e.markers[key] ?? null)
+
+const censoredOut = computed(() => {
+  const [a, b] = pair.value
+  return sorted.value.flatMap(e => [a, b].filter((k): k is string => !!k && e.markers[k] != null && isCensored(k, e.date))
+    .map(k => `${BIOMARKERS[k]?.label ?? k} ${formatDate(e.date, 'monthDay')}`))
+})
+
 const rows = computed(() => {
   const [a, b] = pair.value
   if (!a || !b) return []
   return sorted.value
-    .filter(e => e.markers[a] != null || e.markers[b] != null)
-    .map(e => ({ date: axisLabel(e.date), a: e.markers[a] ?? null, b: e.markers[b] ?? null }))
+    .filter(e => value(a, e) != null || value(b, e) != null)
+    .map(e => ({ date: axisLabel(e.date), a: value(a, e), b: value(b, e) }))
 })
 
 const categories = computed(() => {
@@ -182,7 +195,8 @@ const markLines = computed(() =>
 
 const metaLine = computed(() => {
   const both = rows.value.filter(r => r.a != null && r.b != null).length
-  return `${rows.value.length} draws · both measured on ${both} · left axis A, right axis B`
+  const out = censoredOut.value.length ? ` · † ${censoredOut.value.join(', ')} left out (a ceiling)` : ''
+  return `${rows.value.length} draws · both measured on ${both} · left axis A, right axis B${out}`
 })
 
 const ariaLabel = computed(() =>

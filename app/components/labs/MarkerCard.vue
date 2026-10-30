@@ -168,7 +168,7 @@
 import { STATUS_COLORS } from '~/utils/chartTheme'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
-import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, readingNoteOn } from '~/data/markerCaveats'
+import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, isCensored, readingNoteOn } from '~/data/markerCaveats'
 
 const props = defineProps<{
   biomarkerKey: string
@@ -212,9 +212,14 @@ const meta = computed(() => (
 const sorted = computed(() => [...props.entries].sort((a, b) => a.date.localeCompare(b.date)))
 const withValue = computed(() => sorted.value.filter(e => e.markers[props.biomarkerKey] != null))
 const current = computed(() => withValue.value.at(-1)?.markers[props.biomarkerKey] ?? null)
-const prev = computed(() =>
-  withValue.value.length >= 2 ? (withValue.value.at(-2)?.markers[props.biomarkerKey] ?? null) : null
-)
+// A change runs between two measurements: a censored reading (the Sep 9 immunoassay ceiling) is
+// neither end — on the face of the card there is no delta, and the draw after it compares with
+// the last real measurement before it (audit #43 item 15).
+const prev = computed(() => {
+  const last = withValue.value.at(-1)
+  if (!last || isCensored(props.biomarkerKey, last.date)) return null
+  return withValue.value.slice(0, -1).findLast(e => !isCensored(props.biomarkerKey, e.date))?.markers[props.biomarkerKey] ?? null
+})
 
 // The newest entry passed in is the draw being viewed. A marker that wasn't on that panel still
 // shows its most recent reading, but as carried forward — dimmed, dated, and without a delta

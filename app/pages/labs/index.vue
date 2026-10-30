@@ -193,6 +193,7 @@
           :unit="BIOMARKERS[key]?.unit"
           :data="chartData(key)"
           :mark-lines="timeTravelling && latest ? [latest.date] : []"
+          marker-key="marker"
         />
       </div>
 
@@ -247,6 +248,7 @@
 import { diffDays } from '#shared/utils/dates'
 import { BIOMARKERS } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
+import { readingNoteOn } from '~/data/markerCaveats'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
 import { nextPlannedDraw } from '#shared/utils/plannedDraws'
 
@@ -405,9 +407,11 @@ const colorClass = qualitativeClass
 
 const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_d', 'ferritin', 'la_volume_index']
 
+// A reading with its own note (a censored ceiling, a different assay) wears the ▲ the marker's
+// own detail chart gives it, so the move into it can't read as measured (audit #43 item 15).
 function chartData(markerKey: string) {
   return entries.value
     .filter(e => e.markers[markerKey] != null)
-    .map(e => ({ date: e.date, value: e.markers[markerKey] as number }))
+    .map(e => ({ date: e.date, value: e.markers[markerKey] as number, marker: readingNoteOn(markerKey, e.date) ? 'triangle' : '' }))
 }
 </script>

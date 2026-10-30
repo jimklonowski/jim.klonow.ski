@@ -87,3 +87,12 @@ export const READING_NOTES: Record<string, ReadingNote[]> = {
 export function readingNoteOn(key: string, date: string): ReadingNote | null {
   return READING_NOTES[key]?.find(n => n.date === date) ?? null
 }
+
+/**
+ * A bound at the instrument's limit, not a measurement (a `censored` note): never the "previous"
+ * reading a change is measured from, never an input to a derived marker, never a point a
+ * two-marker comparison draws through (audit #43 item 15).
+ */
+export function isCensored(key: string, date: string): boolean {
+  return readingNoteOn(key, date)?.censored === true
+}

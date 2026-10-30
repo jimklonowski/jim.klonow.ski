@@ -5,6 +5,7 @@ import type { HealthMetricsEntry, WorkoutEntry } from '#shared/types/journal'
 import type { Role } from '#shared/utils/access'
 import { BIOMARKERS, countFlags, getStatus } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
+import { isCensored } from '~/data/markerCaveats'
 
 export interface FlaggedMarker {
   key: string
@@ -94,9 +95,12 @@ export function useOverview(role: Ref<Role | null>) {
     )
   })
 
+  // Measured against the last real measurement: a censored reading (isCensored) is never the
+  // "before", and a censored latest reading has no change at all (audit #43 item 15).
   function deltaFor(key: string, drawDate: string, value: number): number | null {
+    if (isCensored(key, drawDate)) return null
     const prior = draws.value
-      .filter(d => d.date < drawDate && d.markers[key] != null)
+      .filter(d => d.date < drawDate && d.markers[key] != null && !isCensored(key, d.date))
       .at(-1)
     const prev = prior?.markers[key]
     return prev == null ? null : Math.round((value - prev) * 100) / 100

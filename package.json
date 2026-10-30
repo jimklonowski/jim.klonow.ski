@@ -51,7 +51,7 @@
     "@nuxt/eslint": "^1.17.0",
     "@nuxt/ui": "^4.12.0",
     "@nuxtjs/seo": "6.0.1",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.19.2",
     "@types/three": "^0.186.0",
     "@vueuse/nuxt": "^14.4.0",
     "eslint": "^10.13.0",

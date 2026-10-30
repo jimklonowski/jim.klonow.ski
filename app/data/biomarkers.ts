@@ -1,4 +1,5 @@
 import { roundTo } from '#shared/utils/dates'
+import { isCensored } from './markerCaveats'
 
 export const CATEGORY_LABELS = {
   hormones: 'Hormones',
@@ -130,6 +131,8 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
 // they flow through the cards, category tabs, deltas and trend charts like any other marker.
 type ComputedMeta = BiomarkerMeta & {
   compute: (m: Record<string, number | null>) => number | null
+  /** The markers `compute` reads — none of them may be a censored reading (isCensored). */
+  inputs: string[]
   /**
    * Only meaningful on a fasting draw: computed on a non-fasting one it was a figure out of its
    * own definition, flagged HIGH on the card, the home list and the status line (audit #43 item 14).
@@ -141,21 +144,25 @@ export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
   trig_hdl_ratio: {
     label: 'Trig/HDL Ratio', unit: '', category: 'lipids', refMax: 2.0, optimalMax: 1.5, computed: true,
     description: 'Triglycerides divided by HDL — a strong surrogate for insulin resistance and a marker of small, dense (atherogenic) LDL particles. Optimal is below 2.0; above 3.0 suggests insulin resistance.',
+    inputs: ['triglycerides', 'hdl'],
     compute: m => (m.triglycerides != null && m.hdl) ? roundTo(m.triglycerides / m.hdl, 1) : null
   },
   homa_ir: {
     label: 'HOMA-IR', unit: '', category: 'metabolic', refMax: 2.0, optimalMax: 1.5, computed: true, fastingOnly: true,
     description: 'Homeostatic Model Assessment of Insulin Resistance — (fasting glucose × fasting insulin) / 405. Estimates insulin resistance from a fasting draw. Optimal is below 1.5; values above ~2.9 indicate significant insulin resistance.',
+    inputs: ['glucose', 'insulin'],
     compute: m => (m.glucose != null && m.insulin != null) ? roundTo((m.glucose * m.insulin) / 405, 2) : null
   },
   remnant_cholesterol: {
     label: 'Remnant Cholesterol', unit: 'mg/dL', category: 'lipids', refMax: 30, computed: true,
     description: 'Total cholesterol minus HDL minus LDL — the cholesterol carried in triglyceride-rich remnant particles. An independent, often-overlooked driver of cardiovascular risk. Optimal is below 30 mg/dL.',
+    inputs: ['cholesterol', 'hdl', 'ldl'],
     compute: m => (m.cholesterol != null && m.hdl != null && m.ldl != null) ? roundTo(m.cholesterol - m.hdl - m.ldl, 0) : null
   },
   free_t_pct: {
     label: 'Free T %', unit: '%', category: 'hormones', refMin: 1.5, refMax: 3.0, computed: true,
     description: 'Free testosterone as a percentage of total testosterone (unit-normalized: free pg/mL vs total ng/dL). Reflects how much of your testosterone is bioavailable rather than bound to SHBG. Typically 1.5–3%.',
+    inputs: ['testosterone_free', 'testosterone_total'],
     compute: m => (m.testosterone_free != null && m.testosterone_total) ? roundTo((m.testosterone_free / (m.testosterone_total * 10)) * 100, 2) : null
   }
 }
@@ -164,10 +171,13 @@ export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
 // directly-reported marker always wins over a computed one of the same key. A fasting-only
 // marker is computed only when the draw is known to be fasting. (Trig/HDL is deliberately not
 // fasting-only: CHW reports print no fasting line, so older fasted panels read as non-fasting.)
-export function computeMarkers(markers: Record<string, number | null>, fasting: boolean): Record<string, number | null> {
+// Nor is anything derived from a censored reading on `date` — a free T % over the Sep 9 total T
+// ceiling would be a ratio to a bound, not a measurement.
+export function computeMarkers(markers: Record<string, number | null>, fasting: boolean, date?: string): Record<string, number | null> {
   const out = { ...markers }
   for (const [key, meta] of Object.entries(COMPUTED_MARKERS)) {
     if (meta.fastingOnly && !fasting) continue
+    if (date && meta.inputs.some(k => isCensored(k, date))) continue
     if (out[key] == null) {
       const value = meta.compute(markers)
       if (value != null) out[key] = value

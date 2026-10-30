@@ -72,7 +72,7 @@ importers:
         specifier: 6.0.1
         version: 6.0.1(2f187e199698fab7bb282788dfa08ff2)
       '@types/node':
-        specifier: ^24.0.0
+        specifier: ^24.19.2
         version: 24.19.2
       '@types/three':
         specifier: ^0.186.0

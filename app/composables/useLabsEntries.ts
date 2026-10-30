@@ -6,6 +6,6 @@ export function useLabsEntries() {
     label: 'lab results',
     // Derived markers (Trig/HDL, HOMA-IR, etc.) are computed here rather than stored, so they
     // stay in sync if a formula changes and never need a migration or re-upload.
-    transform: entries => entries.map(e => ({ ...e, markers: computeMarkers(e.markers, e.fasting) }))
+    transform: entries => entries.map(e => ({ ...e, markers: computeMarkers(e.markers, e.fasting, e.date) }))
   })
 }

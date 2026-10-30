@@ -23,3 +23,11 @@ test('a reported value is never overwritten by a computed one', () => {
   assert.equal(computeMarkers({ ...panel, homa_ir: 1.1 }, true).homa_ir, 1.1)
   assert.equal(computeMarkers({ ...panel, homa_ir: 1.1 }, false).homa_ir, 1.1)
 })
+
+test('nothing is derived from a censored reading (audit #43 item 15)', () => {
+  const t = { testosterone_total: 1500, testosterone_free: 250 }
+  // 2026-09-09: the CHW immunoassay ceiling — free T % over a bound is not a measurement.
+  assert.equal(computeMarkers(t, true, '2026-09-09').free_t_pct, undefined)
+  assert.equal(computeMarkers(t, true, '2026-08-15').free_t_pct, 1.67)
+  assert.equal(computeMarkers(t, true).free_t_pct, 1.67, 'no date, no caveat lookup')
+})
