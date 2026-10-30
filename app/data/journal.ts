@@ -1,4 +1,4 @@
-import type { JournalEntry, PeptideEntry, SodaEntry, Vial, WaterEntry } from '#shared/types/journal'
+import type { JournalEntry, PeptideEntry, ReconstitutionEntry, SodaEntry, Vial, WaterEntry } from '#shared/types/journal'
 
 // The row shapes live in shared/types/journal.ts (the server reads the same rows); re-exported
 // so the pages' existing `~/data/journal` imports keep working.
@@ -39,6 +39,24 @@ export const SODA_SIZES = [
 
 export function blankSoda(time: string): SodaEntry {
   return { time, drink: '', size: '' }
+}
+
+const isBlankSoda = (s: SodaEntry) => !s.drink?.trim() && !s.size?.trim()
+
+/**
+ * The day form's rows minus the ones "+ add" opened and nothing filled: a dose or reconstitution
+ * without a compound, a soda with neither drink nor size. Saved, one stray row made the day a
+ * logged day (and the streak longer), a phantom soda in every count, and a grey dot with no name
+ * on the calendar (audit #43 item 20). Blank sodas the day already held (`loadedSodas`) are kept:
+ * a soda tapped without naming it is a real one, and the form must not drop what it didn't add.
+ */
+export function withoutBlankRows<T extends { peptides: PeptideEntry[], reconstitutions: ReconstitutionEntry[], sodas: SodaEntry[] }>(form: T, loadedSodas: readonly SodaEntry[]): Pick<T, 'peptides' | 'reconstitutions' | 'sodas'> {
+  let keepBlank = loadedSodas.filter(isBlankSoda).length
+  return {
+    peptides: form.peptides.filter(p => p.compound.trim() !== ''),
+    reconstitutions: form.reconstitutions.filter(r => r.compound.trim() !== ''),
+    sodas: form.sodas.filter(s => !isBlankSoda(s) || keepBlank-- > 0)
+  }
 }
 
 /** A water row for the day form, pre-filled with the cup size so a tap is one click. */

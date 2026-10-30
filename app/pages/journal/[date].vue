@@ -875,7 +875,7 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, doseDefaults, oppositeSite } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, doseDefaults, oppositeSite, withoutBlankRows } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import {
@@ -1323,12 +1323,15 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
         return [slot, r.text]
       })
   )
+  // Rows "+ add" opened and nothing filled are not saved (withoutBlankRows).
+  const rows = withoutBlankRows(form, (loadedBase.value?.sodas ?? []) as SodaEntry[])
   const payload = {
     ...form,
     date: moving ? from : to,
     // One spelling per compound, or a case variant is a second compound to everything that reads the log.
-    peptides: form.peptides.map(p => ({ ...p, compound: canonicalCompound(p.compound, compoundSpellingMap.value) })),
-    reconstitutions: form.reconstitutions.map(r => ({ ...r, compound: canonicalCompound(r.compound, compoundSpellingMap.value) })),
+    peptides: rows.peptides.map(p => ({ ...p, compound: canonicalCompound(p.compound, compoundSpellingMap.value) })),
+    reconstitutions: rows.reconstitutions.map(r => ({ ...r, compound: canonicalCompound(r.compound, compoundSpellingMap.value) })),
+    sodas: rows.sodas,
     food,
     // A pour row added and never filled (or cleared — v-model.number hands back '') is not a
     // pour; zWaterEntry refuses a missing volume rather than storing a 0 oz tap.
