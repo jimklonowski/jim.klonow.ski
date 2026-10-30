@@ -9,6 +9,7 @@ import { diffDays, shiftDays } from '#shared/utils/dates'
 import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSignals'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 import { cadenceOf } from '#shared/utils/protocolRules'
+import { isEchoOnly } from '../../app/data/biomarkers'
 
 function itemLine(item: CyclePlanItem, plannedWeeks: number): string {
   const to = item.toWeek ?? plannedWeeks
@@ -63,10 +64,13 @@ export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cyc
   try {
     const [loaded, labsRes] = await Promise.all([
       preloaded ?? loadCycles(db),
-      db.prepare('SELECT date FROM labs_entries ORDER BY date ASC').all()
+      db.prepare('SELECT date, markers, qualitative FROM labs_entries ORDER BY date ASC').all()
     ])
     cycles = loaded
-    drawDates = ((labsRes.results ?? []) as Array<{ date: string }>).map(r => r.date)
+    // Blood draws only: an echo-only row is a scan, never a checkpoint or a baseline (isEchoOnly).
+    drawDates = ((labsRes.results ?? []) as Array<{ date: string, markers: string | null, qualitative: string | null }>)
+      .filter(r => !isEchoOnly({ markers: JSON.parse(r.markers || '{}'), qualitative: JSON.parse(r.qualitative || '[]') }))
+      .map(r => r.date)
   }
   catch {
     return ''

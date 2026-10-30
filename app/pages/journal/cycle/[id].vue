@@ -327,7 +327,7 @@
 <script setup lang="ts">
 import { CHART_ACCENT, CHART_DANGER, CHART_WARN } from '~/utils/chartTheme'
 import { getCompoundColor } from '~/data/journal'
-import { BIOMARKERS, getStatus } from '~/data/biomarkers'
+import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 import type { Cycle } from '#shared/utils/cycles'
 import {
@@ -356,7 +356,8 @@ const cycleForm = useTemplateRef('cycleForm')
 const today = useToday()
 const cycle = computed(() => (data.value ?? []).find(c => c.id === Number(route.params.id)) ?? null)
 const entries = computed(() => journalData.value ?? [])
-const draws = computed(() => [...(labsData.value ?? [])].sort((a, b) => a.date.localeCompare(b.date)))
+// Blood draws only: an echo-only row is a scan, never a lab checkpoint (isEchoOnly).
+const draws = computed(() => [...(labsData.value ?? [])].filter(e => !isEchoOnly(e)).sort((a, b) => a.date.localeCompare(b.date)))
 
 const status = computed(() => cycle.value ? cycleStatusOn(cycle.value, today.value) : 'upcoming')
 const endDate = computed(() => cycle.value ? cycleEnd(cycle.value) : today.value)

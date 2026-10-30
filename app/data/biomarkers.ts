@@ -189,6 +189,37 @@ export function computeMarkers(markers: Record<string, number | null>, fasting: 
 // Merge derived markers in so every consumer treats them like report-sourced markers.
 Object.assign(BIOMARKERS, COMPUTED_MARKERS)
 
+// --- echo rows ---
+// An echocardiogram is saved into labs_entries like a draw (its measurements are the 'cardiac'
+// markers, its section findings qualitative results). Echo reports were saved before results
+// carried a `category` tag, so older findings are still recognized by their section names.
+const ECHO_SECTION_NAMES = new Set([
+  'Left Ventricle', 'Right Ventricle', 'Left Atrium', 'Right Atrium', 'Ventricular Septum',
+  'Mitral Valve', 'Aortic Valve', 'Tricuspid Valve', 'Pulmonic Valve', 'Aorta',
+  'Pericardium', 'Inferior Vena Cava', 'Overall Impression'
+])
+
+/** A qualitative result that is an echo finding. */
+export function isEchoFinding(item: { name: string, category?: string }): boolean {
+  return item.category === 'echo' || (!item.category && ECHO_SECTION_NAMES.has(item.name))
+}
+
+/**
+ * A labs_entries row that holds only an echo — cardiac measurements and/or echo findings, no
+ * blood. It is a scan, not a draw: counted as one it fulfilled a planned draw days away, became
+ * "the last draw" (home FLAGGED read its five cardiac markers and nothing else), a scrubber stop,
+ * and a cycle checkpoint (audit #43 item 16). An echo saved onto a blood draw's own date shares
+ * that row, and the row stays a draw. The measurements decide when there are any — an untagged
+ * older finding whose section isn't in the list above must not turn a scan back into a draw —
+ * and the findings only for a row with none.
+ */
+export function isEchoOnly(entry: { markers: Record<string, number | null>, qualitative?: Array<{ name: string, category?: string }> | null }): boolean {
+  const keys = Object.entries(entry.markers ?? {}).filter(([, v]) => v != null).map(([k]) => k)
+  if (keys.length) return keys.every(k => BIOMARKERS[k]?.category === 'cardiac')
+  const findings = entry.qualitative ?? []
+  return findings.length > 0 && findings.every(isEchoFinding)
+}
+
 export function getStatus(value: number | null, meta: BiomarkerMeta): 'optimal' | 'low' | 'high' | 'unknown' {
   if (value === null || value === undefined) return 'unknown'
   if (meta.refMin !== undefined && value < meta.refMin) return 'low'

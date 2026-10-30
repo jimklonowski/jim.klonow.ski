@@ -3,7 +3,7 @@ import type { LabsEntry } from '#shared/types/labs'
 import type { DexaEntry } from '~/composables/useDexaEntries'
 import type { HealthMetricsEntry, WorkoutEntry } from '#shared/types/journal'
 import type { Role } from '#shared/utils/access'
-import { BIOMARKERS, countFlags, getStatus } from '~/data/biomarkers'
+import { BIOMARKERS, countFlags, getStatus, isEchoOnly } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
 import { isCensored } from '~/data/markerCaveats'
 
@@ -44,9 +44,9 @@ export function useOverview(role: Ref<Role | null>) {
   )
   const latestEntry = computed(() => entries.value.at(-1) ?? null)
 
-  /** Lab draws, oldest first. */
+  /** Blood draws, oldest first — an echo-only row is a scan, not a draw (isEchoOnly). */
   const draws = computed<LabsEntry[]>(() =>
-    [...(labs?.data.value ?? [])].sort((a, b) => a.date.localeCompare(b.date))
+    [...(labs?.data.value ?? [])].filter(e => !isEchoOnly(e)).sort((a, b) => a.date.localeCompare(b.date))
   )
   const latestDraw = computed(() => draws.value.at(-1) ?? null)
 

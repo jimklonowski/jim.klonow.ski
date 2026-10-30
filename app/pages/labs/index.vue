@@ -99,7 +99,7 @@
           v-for="key in activeMarkers"
           :key="key"
           :biomarker-key="key"
-          :entries="visibleEntries"
+          :entries="cardEntries(key)"
           :latest-value="timeTravelling ? newest?.markers[key] ?? null : null"
           :auto-open="key === linkedMarker"
         />
@@ -246,7 +246,7 @@
 
 <script setup lang="ts">
 import { diffDays } from '#shared/utils/dates'
-import { BIOMARKERS } from '~/data/biomarkers'
+import { BIOMARKERS, isEchoFinding, isEchoOnly } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { readingNoteOn } from '~/data/markerCaveats'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
@@ -267,7 +267,10 @@ const entries = computed(() => data.value ?? [])
 // or before that date — so the cards, tab counts, summary and echo panel all read as they did
 // then. The viewed date lives in the URL (?asof=YYYY-MM-DD) so a scrubbed view survives a
 // refresh and can be linked to; the latest draw is the absence of the param.
-const drawDates = computed(() => entriesAsOf(entries.value, null).map(e => e.date))
+// Blood draws only: an echo-only row is a scan (isEchoOnly) — it is no scrubber stop, no "last
+// draw", and fulfils no planned draw. It stays in `entries` for the echo panel and cardiac cards.
+const draws = computed(() => entries.value.filter(e => !isEchoOnly(e)))
+const drawDates = computed(() => entriesAsOf(draws.value, null).map(e => e.date))
 const viewedDate = computed<string | null>({
   get: () => resolveAsOf(drawDates.value, route.query.asof),
   set: (date) => {
@@ -277,9 +280,19 @@ const viewedDate = computed<string | null>({
 })
 const timeTravelling = computed(() => viewedDate.value !== null)
 const visibleEntries = computed(() => entriesAsOf(entries.value, viewedDate.value))
+const visibleDraws = computed(() => visibleEntries.value.filter(e => !isEchoOnly(e)))
 /** The draw being viewed — the newest one when not time-travelling. */
-const latest = computed(() => visibleEntries.value.at(-1) ?? null)
-const newest = computed(() => entriesAsOf(entries.value, null).at(-1) ?? null)
+const latest = computed(() => visibleDraws.value.at(-1) ?? null)
+const newest = computed(() => draws.value.at(-1) ?? null)
+
+/**
+ * What a marker card reads. A blood marker's card judges "carried forward" against the newest
+ * row it is handed, so it gets the draws alone: an echo newer than the last draw dimmed every
+ * blood card as stale. A cardiac card gets every row — its readings live in the echo rows.
+ */
+function cardEntries(key: string) {
+  return BIOMARKERS[key]?.category === 'cardiac' ? visibleEntries.value : visibleDraws.value
+}
 const drawsBack = computed(() => latest.value ? drawDates.value.length - 1 - drawDates.value.indexOf(latest.value.date) : 0)
 
 // --- planned draws ---
@@ -373,17 +386,9 @@ const allSources = computed(() =>
 const pdfCount = computed(() => new Set(allSources.value).size)
 
 // --- qualitative results ---
-// Echo reports were saved before results carried a `category` tag, so entries written
-// prior to that still need to be recognized by their known anatomical section names.
-const ECHO_SECTION_NAMES = new Set([
-  'Left Ventricle', 'Right Ventricle', 'Left Atrium', 'Right Atrium', 'Ventricular Septum',
-  'Mitral Valve', 'Aortic Valve', 'Tricuspid Valve', 'Pulmonic Valve', 'Aorta',
-  'Pericardium', 'Inferior Vena Cava', 'Overall Impression'
-])
-
-function isEcho(item: { name: string, category?: string }) {
-  return item.category === 'echo' || (!item.category && ECHO_SECTION_NAMES.has(item.name))
-}
+// Echo findings vs everything else (genetic, other) — isEchoFinding also knows the section names
+// of echo reports saved before results carried a `category` tag.
+const isEcho = isEchoFinding
 
 const allQualitativeResults = computed(() =>
   [...visibleEntries.value]
