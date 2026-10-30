@@ -28,6 +28,25 @@ export function planWhoopRefreshFailure(status: number, storedRefreshToken: stri
   return 'revoke-if-current'
 }
 
+/**
+ * One Whoop data request with a single retry on 401. An access token can be rejected before its
+ * stored expiry — the grant revoked on Whoop's side, or the pair rotated by another isolate — and
+ * every fetch then failed as an opaque 502 while the menu still read "connected", until the expiry
+ * finally forced a refresh (audit #43 item 25). The forced refresh is where the outcome is
+ * decided (planWhoopRefreshFailure): a rotated pair is adopted, a dead grant is revoked and the
+ * menu asks for a reconnect. A second 401 after a successful refresh is handed back as-is.
+ */
+export async function withTokenRetry(
+  tokens: { access_token: string, refresh_token: string },
+  send: (accessToken: string) => Promise<Response>,
+  refresh: (refreshToken: string) => Promise<{ access_token: string }>
+): Promise<Response> {
+  const res = await send(tokens.access_token)
+  if (res.status !== 401) return res
+  const fresh = await refresh(tokens.refresh_token)
+  return send(fresh.access_token)
+}
+
 export interface WhoopWorkoutRecord {
   id?: string
   start?: string

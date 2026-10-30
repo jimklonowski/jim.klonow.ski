@@ -1,5 +1,5 @@
 import type { WhoopStatus } from '#shared/types/whoop'
-import { cycleMetric, metricsByDate, planWhoopRefreshFailure } from '#shared/utils/whoopRecords'
+import { cycleMetric, metricsByDate, planWhoopRefreshFailure, withTokenRetry } from '#shared/utils/whoopRecords'
 import type { WhoopCycleRecord } from '#shared/utils/whoopRecords'
 
 const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token'
@@ -188,15 +188,29 @@ async function refreshWhoopToken(db: D1Database, refreshToken: string): Promise<
   return tokens
 }
 
-async function accessToken(db: D1Database): Promise<string> {
-  let tokens = await getWhoopTokens(db)
+async function currentTokens(db: D1Database): Promise<WhoopTokens> {
+  const tokens = await getWhoopTokens(db)
   if (!tokens) {
     throw createError({ statusCode: 401, message: 'Whoop is not connected' })
   }
   if (tokens.expires_at - Date.now() < REFRESH_BUFFER_MS) {
-    tokens = await refreshWhoopTokenOnce(db, tokens.refresh_token)
+    return refreshWhoopTokenOnce(db, tokens.refresh_token)
   }
-  return tokens.access_token
+  return tokens
+}
+
+/** A GET against the Whoop API — refreshed and retried once if the token is rejected (withTokenRetry). */
+async function whoopGet(db: D1Database, url: string): Promise<Response> {
+  const res = await withTokenRetry(
+    await currentTokens(db),
+    token => fetch(url, { headers: { Authorization: `Bearer ${token}` } }),
+    refreshToken => refreshWhoopTokenOnce(db, refreshToken)
+  )
+  // Rejected even with a token Whoop had just issued: say what will fix it, not just "502".
+  if (res.status === 401) {
+    throw createError({ statusCode: 401, message: 'Whoop rejected the connection — reconnect to restore syncing' })
+  }
+  return res
 }
 
 /**
@@ -204,8 +218,7 @@ async function accessToken(db: D1Database): Promise<string> {
  * says it doesn't exist — a webhook can name a record that was deleted before we read it.
  */
 export async function whoopFetchOne<T>(db: D1Database, path: string): Promise<T | null> {
-  const token = await accessToken(db)
-  const res = await fetch(`${WHOOP_API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  const res = await whoopGet(db, `${WHOOP_API_BASE}${path}`)
   if (res.status === 404) return null
   if (!res.ok) {
     throw createError({ statusCode: 502, message: `Whoop API request failed: ${res.status} ${(await res.text()).slice(0, 200)}` })
@@ -226,7 +239,6 @@ interface WhoopPage<T> {
  * the worst case, and a repeated or empty token ends the walk.
  */
 export async function whoopFetchAll<T>(db: D1Database, path: string, opts: { start?: string, maxPages?: number } = {}): Promise<T[]> {
-  const token = await accessToken(db)
   const records: T[] = []
   const seenTokens = new Set<string>()
   let nextToken: string | undefined
@@ -236,9 +248,8 @@ export async function whoopFetchAll<T>(db: D1Database, path: string, opts: { sta
     if (opts.start) params.set('start', opts.start)
     if (nextToken) params.set('nextToken', nextToken)
 
-    const res = await fetch(`${WHOOP_API_BASE}${path}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    // The token is read per page: a refresh on an earlier page is picked up by the next.
+    const res = await whoopGet(db, `${WHOOP_API_BASE}${path}?${params}`)
     if (!res.ok) {
       throw createError({ statusCode: 502, message: `Whoop API request failed: ${res.status} ${(await res.text()).slice(0, 200)}` })
     }

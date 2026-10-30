@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import {
-  cycleMetric, metricsByDate, planWhoopRefreshFailure, recoveryMetric, sleepMetric,
+  cycleMetric, metricsByDate, planWhoopRefreshFailure, recoveryMetric, sleepMetric, withTokenRetry,
   verifyWhoopSignature, WHOOP_WEBHOOK_MAX_AGE_MS, whoopLocalDate, whoopWorkoutRow
 } from '../shared/utils/whoopRecords.ts'
 import { zWhoopWebhook } from '../shared/utils/schemas.ts'
@@ -109,4 +109,51 @@ test('a failed token refresh: adopt a concurrent rotation, revoke only a current
   assert.equal(planWhoopRefreshFailure(403, 'same-token', 'same-token'), 'transient')
   assert.equal(planWhoopRefreshFailure(500, 'same-token', 'same-token'), 'transient')
   assert.equal(planWhoopRefreshFailure(503, null, 'same-token'), 'transient')
+})
+
+test('a data request rejected with 401 refreshes once and retries (audit #43 item 25)', async () => {
+  const tokens = { access_token: 'old-access', refresh_token: 'refresh-1' }
+  const sent = []
+  const refreshed = []
+  const send = status => async (token) => {
+    sent.push(token)
+    return new Response('', { status: token === 'new-access' ? 200 : status })
+  }
+  const refresh = async (rt) => {
+    refreshed.push(rt)
+    return { access_token: 'new-access' }
+  }
+  const deadGrant = async () => {
+    throw new Error('Whoop connection expired')
+  }
+  const alwaysRejected = async (token) => {
+    sent.push(token)
+    return new Response('', { status: 401 })
+  }
+
+  // A 401 on a token not yet expired: refreshed with the stored refresh token, retried with the new one.
+  let res = await withTokenRetry(tokens, send(401), refresh)
+  assert.equal(res.status, 200)
+  assert.deepEqual(sent, ['old-access', 'new-access'])
+  assert.deepEqual(refreshed, ['refresh-1'])
+
+  // Anything else is returned untouched — no refresh for a 404, a 429 or a 5xx.
+  sent.length = 0
+  refreshed.length = 0
+  for (const status of [200, 404, 429, 503]) {
+    res = await withTokenRetry(tokens, async () => new Response('', { status }), refresh)
+    assert.equal(res.status, status)
+  }
+  assert.deepEqual(refreshed, [])
+
+  // A refresh that fails (a dead grant — the refresh logic revoked it) propagates; no second request.
+  sent.length = 0
+  await assert.rejects(withTokenRetry(tokens, send(401), deadGrant), /expired/)
+  assert.deepEqual(sent, ['old-access'])
+
+  // Still 401 after a successful refresh: handed back (the caller says "reconnect"), never a loop.
+  sent.length = 0
+  res = await withTokenRetry(tokens, alwaysRejected, refresh)
+  assert.equal(res.status, 401)
+  assert.equal(sent.length, 2)
 })
