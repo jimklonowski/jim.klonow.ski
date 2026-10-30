@@ -334,6 +334,21 @@
         @apply="applyWeight"
       />
     </template>
+
+    <!-- The PIN ran out mid-flow: unlock, and the call that needed it runs again -->
+    <UModal
+      v-model:open="pinModalOpen"
+      title="Upload PIN expired"
+      description="Enter your 9-digit upload PIN to carry on — what's on screen is kept."
+    >
+      <template #body>
+        <LabsPinForm
+          variant="modal"
+          button-label="Unlock & continue"
+          @unlocked="onPinUnlocked"
+        />
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -372,6 +387,30 @@ onMounted(async () => {
     uploadAuthed.value = false
   }
 })
+
+// The gate above is read once, on mount. The PIN lasts 12 hours (and "sign out other devices"
+// ends it early), so one that ran out after a paid extraction made SAVE fail with no way back
+// but a reload that threw the result away (audit #43 item 12). A 403 for the PIN now opens the
+// PIN modal, and the call that needed it runs again once unlocked — the result stays on screen.
+const pinModalOpen = ref(false)
+let afterUnlock: (() => void) | null = null
+
+/** A refusal for the PIN itself — not the owner check or the cross-site guard, also 403s. */
+function isPinRefusal(err: unknown): boolean {
+  return (err as { statusCode?: number }).statusCode === 403 && /upload pin/i.test(extractErrorMessage(err, ''))
+}
+
+function askForPin(retry: () => void) {
+  afterUnlock = retry
+  pinModalOpen.value = true
+}
+
+function onPinUnlocked() {
+  const retry = afterUnlock
+  afterUnlock = null
+  pinModalOpen.value = false
+  retry?.()
+}
 
 // Report type
 const REPORT_TYPES = [
@@ -599,7 +638,9 @@ async function upload(file: File) {
     reportWeight.value = typeof result.value.weight_lbs === 'number' ? result.value.weight_lbs : null
   }
   catch (e: unknown) {
-    error.value = extractErrorMessage(e, 'Something went wrong. Please try again.')
+    // Refused before the model was called, so nothing was spent: unlock and read it again.
+    if (isPinRefusal(e)) askForPin(() => upload(file))
+    else error.value = extractErrorMessage(e, 'Something went wrong. Please try again.')
     processing.value = false
   }
   finally {
@@ -652,7 +693,14 @@ async function saveToSite() {
     generateSummary(res.table === 'dexa_entries' ? '/api/dexa/generate-summary' : '/api/labs/generate-summary', res.date)
   }
   catch (e: unknown) {
-    saveResult.value = { ok: false, message: extractErrorMessage(e, 'Failed to save. Please try again.') }
+    if (isPinRefusal(e)) {
+      // Said on the page too, so dismissing the modal leaves SAVE with a reason to press it again.
+      saveResult.value = { ok: false, message: 'Your upload PIN expired — enter it to save. The extraction is kept.' }
+      askForPin(() => saveToSite())
+    }
+    else {
+      saveResult.value = { ok: false, message: extractErrorMessage(e, 'Failed to save. Please try again.') }
+    }
   }
   finally {
     saving.value = false
@@ -672,8 +720,15 @@ async function generateSummary(endpoint: string, date: string) {
     const res = await $fetch<{ summary: string }>(endpoint, { method: 'POST', body: { date } })
     if (run === summaryRun) summary.value = res.summary
   }
-  catch {
-    if (run === summaryRun) summaryError.value = 'Summary generation failed — your results were still saved.'
+  catch (e: unknown) {
+    if (run !== summaryRun) return
+    if (isPinRefusal(e)) {
+      summaryError.value = 'Your upload PIN expired before the summary was written — your results were still saved.'
+      askForPin(() => generateSummary(endpoint, date))
+    }
+    else {
+      summaryError.value = 'Summary generation failed — your results were still saved.'
+    }
   }
   finally {
     if (run === summaryRun) summarizing.value = false
