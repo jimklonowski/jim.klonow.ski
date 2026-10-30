@@ -273,7 +273,7 @@
             />
           </div>
 
-          <template v-if="!itemForm.id && itemForm.kind !== 'as_needed' && !itemForm.on_hand">
+          <template v-if="startsNow">
             <TuiHeader
               label="STARTS"
               :dashes="6"
@@ -281,7 +281,7 @@
             <div class="grid grid-cols-2 gap-3">
               <UFormField
                 label="First day"
-                help="Blank = long-standing"
+                :help="itemForm.kind === 'logged' ? 'Required for a logged compound, with its days' : 'Blank = long-standing'"
               >
                 <UInput
                   v-model="itemForm.start.from_date"
@@ -333,7 +333,7 @@
             </button>
             <UButton
               :loading="savingItem"
-              :disabled="!itemForm.name.trim()"
+              :disabled="!itemFormValid"
               @click="saveItem"
             >
               Save
@@ -601,16 +601,25 @@ async function refreshAll() {
   await Promise.all([refresh(), refreshNuxtData('/journal/protocol')])
 }
 
+/** A new item that is taken starts with its first version; one on hand has nothing dated yet. */
+const startsNow = computed(() => !itemForm.id && itemForm.kind !== 'as_needed' && !itemForm.on_hand)
+
+// The rule the server holds a logged compound's versions to (a first day and weekdays), checked
+// before Save rather than learned from a 400 after the item was half-written (audit #43 item 21).
+const itemFormValid = computed(() =>
+  !!itemForm.name.trim()
+  && (!startsNow.value || itemForm.kind !== 'logged' || (!!itemForm.start.from_date && itemForm.start.weekdays.length > 0))
+)
+
 const { run: saveItem, pending: savingItem } = useSaveAction(async () => {
   const { start, ...item } = itemForm
-  const saved = await $fetch<{ ok: boolean, id: number }>('/api/journal/protocol/save', { method: 'POST', body: item })
-  // A new item that is taken starts with its first version; one on hand has nothing dated yet.
-  if (!item.id && item.kind !== 'as_needed' && !item.on_hand) {
-    await $fetch('/api/journal/protocol/version', {
-      method: 'POST',
-      body: { item_id: saved.id, from_date: start.from_date || null, to_date: null, dose_label: start.dose_label || null, weekdays: start.weekdays, note: null }
-    })
-  }
+  // The item and its first version are written together, so a refused version leaves nothing behind.
+  await $fetch<{ ok: boolean, id: number }>('/api/journal/protocol/save', {
+    method: 'POST',
+    body: startsNow.value
+      ? { ...item, start: { from_date: start.from_date || null, dose_label: start.dose_label || null, weekdays: start.weekdays } }
+      : item
+  })
   await refreshAll()
   itemGuard.markClean()
   itemModalOpen.value = false

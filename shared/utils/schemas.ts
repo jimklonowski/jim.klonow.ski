@@ -235,6 +235,11 @@ export const zVialOpen = z.object({
 export const PROTOCOL_KINDS = ['logged', 'standing', 'as_needed'] as const
 export const PROTOCOL_CATEGORIES = ['injectable', 'oral', 'supplement', 'skin'] as const
 
+// 0–6 (0 = Sunday), deduplicated and sorted so two spellings of one cadence compare equal.
+const zWeekdays = z.array(z.number().int().min(0).max(6)).max(7)
+  .nullish()
+  .transform(d => (d == null ? null : [...new Set(d)].sort((a, b) => a - b)))
+
 export const zProtocolItemSave = z.object({
   id: zId.optional(),
   name: zText(120).min(1, 'name is required'),
@@ -244,13 +249,14 @@ export const zProtocolItemSave = z.object({
   on_hand: z.boolean().default(false),
   notes: zOptText(2000),
   stop_note: zOptText(2000),
-  sort: zNumWithDefault(100, s => s.int())
+  sort: zNumWithDefault(100, s => s.int()),
+  /** A new item's first version, written in the same transaction (audit #43 item 21). */
+  start: z.object({
+    from_date: zOptDate,
+    dose_label: zOptText(120),
+    weekdays: zWeekdays
+  }).optional()
 })
-
-// 0–6 (0 = Sunday), deduplicated and sorted so two spellings of one cadence compare equal.
-const zWeekdays = z.array(z.number().int().min(0).max(6)).max(7)
-  .nullish()
-  .transform(d => (d == null ? null : [...new Set(d)].sort((a, b) => a - b)))
 
 // A version's own consistency only: the cross-version rules (no overlap within an item, a
 // logged compound needs weekdays and a start) need the sibling rows, so the handler enforces them.
