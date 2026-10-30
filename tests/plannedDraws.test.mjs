@@ -123,3 +123,24 @@ test('a cycle checkpoint finds its booked draw by link, else by window', () => {
   assert.equal(planInWindow(plans, '2026-11-25', '2026-12-10').id, 2)
   assert.equal(planInWindow(plans, '2026-12-20', '2026-12-31'), null)
 })
+
+test('one draw fulfils one plan — a missed booking stays missed when its rebooking takes the draw (audit #43 item 17)', () => {
+  const missed = plan({ id: 1, date: '2026-10-15' })
+  const rebooked = plan({ id: 2, date: '2026-10-17', labs_date: '2026-10-17' })
+  const [a, b] = plannedDrawStates([missed, rebooked], ['2026-10-17'], '2026-11-05')
+  assert.equal(a.plan.id, 1)
+  assert.equal(a.status, 'missed', 'the stored link claimed the draw')
+  assert.equal(a.drawDate, null)
+  assert.equal(b.status, 'done')
+  assert.equal(b.drawDate, '2026-10-17')
+
+  // Neither linked: the closest plan gets the draw, the other stays open/missed.
+  const [c, d] = plannedDrawStates([missed, { ...rebooked, labs_date: null }], ['2026-10-17'], '2026-11-05')
+  assert.deepEqual([c.status, d.status], ['missed', 'done'])
+  // An equal gap goes to the newer plan (the rebooking).
+  const [e, f] = plannedDrawStates([missed, { ...rebooked, labs_date: null }], ['2026-10-16'], '2026-11-05')
+  assert.deepEqual([e.status, f.status], ['missed', 'done'])
+  // Two draws, two plans: each gets its own.
+  const two = plannedDrawStates([missed, { ...rebooked, labs_date: null }], ['2026-10-15', '2026-10-17'], '2026-11-05')
+  assert.deepEqual(two.map(s => s.drawDate), ['2026-10-15', '2026-10-17'])
+})

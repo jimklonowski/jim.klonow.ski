@@ -6,6 +6,7 @@
 // very draw a plan was waiting on (its questions come first).
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
 import { activePrep, countdownLabel, drawLabel, plannedDrawStates, purposeLines } from '#shared/utils/plannedDraws'
+import { isEchoOnly } from '../../app/data/biomarkers'
 
 // Three weeks: the biotin hold starts three days out, and a booked draw further off than this
 // changes nothing about how the period's data should read.
@@ -32,10 +33,13 @@ export async function plannedDrawContext(db: D1Database, asOf: string, preloaded
   try {
     const [loaded, labsRes] = await Promise.all([
       preloaded ?? loadPlannedDraws(db),
-      db.prepare('SELECT date FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
+      db.prepare('SELECT date, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
     ])
     plans = loaded
-    drawDates = ((labsRes.results ?? []) as Array<{ date: string }>).map(r => r.date)
+    // Blood draws only: an echo-only row is a scan and fulfils no planned draw (isEchoOnly).
+    drawDates = ((labsRes.results ?? []) as Array<{ date: string, markers: string | null, qualitative: string | null }>)
+      .filter(r => !isEchoOnly({ markers: JSON.parse(r.markers || '{}'), qualitative: JSON.parse(r.qualitative || '[]') }))
+      .map(r => r.date)
   }
   catch {
     return ''

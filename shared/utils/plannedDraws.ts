@@ -91,7 +91,10 @@ export function matchDraw(plan: PlannedDraw, drawDates: string[]): string | null
 }
 
 export function plannedDrawState(plan: PlannedDraw, drawDates: string[], today: string): PlannedDrawState {
-  const drawDate = matchDraw(plan, drawDates)
+  return stateFor(plan, matchDraw(plan, drawDates), today)
+}
+
+function stateFor(plan: PlannedDraw, drawDate: string | null, today: string): PlannedDrawState {
   const inDays = diffDays(today, plan.date)
   let status: PlannedDrawStatus
   if (drawDate) status = 'done'
@@ -102,11 +105,39 @@ export function plannedDrawState(plan: PlannedDraw, drawDates: string[], today: 
   return { plan, status, drawDate, inDays }
 }
 
-/** Every plan with its state, soonest date first. */
+/**
+ * Which draw fulfils which plan, when plans are read together: one draw answers one plan. A
+ * stored link (`labs_date`) claims its draw first; the rest pair by window, the closest plan and
+ * draw first, a tie going to the newer plan (a rebooking supersedes the booking it replaced).
+ * Matched one plan at a time, a missed Oct 15 appointment rebooked for Oct 17 read "done ✓ Oct
+ * 17" off the very draw that fulfilled its replacement (audit #43 item 17).
+ */
+function assignDraws(plans: PlannedDraw[], drawDates: string[]): Map<number, string> {
+  const out = new Map<number, string>()
+  const claimed = new Set<string>()
+  for (const p of plans) {
+    if (!p.labs_date) continue
+    out.set(p.id, p.labs_date)
+    claimed.add(p.labs_date)
+  }
+  const pairs = plans
+    .filter(p => !p.labs_date)
+    .flatMap(p => drawDates.filter(d => canFulfil(p, d)).map(d => ({ p, d, gap: Math.abs(diffDays(p.date, d)) })))
+    .sort((a, b) => a.gap - b.gap || b.p.id - a.p.id)
+  for (const { p, d } of pairs) {
+    if (out.has(p.id) || claimed.has(d)) continue
+    out.set(p.id, d)
+    claimed.add(d)
+  }
+  return out
+}
+
+/** Every plan with its state, soonest date first — each draw fulfilling at most one (assignDraws). */
 export function plannedDrawStates(plans: PlannedDraw[], drawDates: string[], today: string): PlannedDrawState[] {
+  const assigned = assignDraws(plans, drawDates)
   return [...plans]
     .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
-    .map(p => plannedDrawState(p, drawDates, today))
+    .map(p => stateFor(p, assigned.get(p.id) ?? null, today))
 }
 
 /** A plan still waiting on results: booked ahead, today, or past its date without a draw. */
