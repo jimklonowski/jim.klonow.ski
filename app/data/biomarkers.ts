@@ -227,6 +227,24 @@ export function getStatus(value: number | null, meta: BiomarkerMeta): 'optimal' 
   return 'optimal'
 }
 
+/**
+ * The card's word for a reading. getStatus's 'optimal' only means inside the REFERENCE range, and
+ * labelling every such reading "OPT" called a total T of 400 optimal right beside the card's own
+ * 600–1000 optimal band (audit #43 item 27). OPT is earned inside a marker's optimal band; in
+ * range otherwise — or for a marker with no optimal band — it reads IN.
+ */
+export function statusLabel(value: number | null, meta: BiomarkerMeta): 'OPT' | 'IN' | 'LOW' | 'HIGH' | '—' {
+  const status = getStatus(value, meta)
+  if (status === 'unknown') return '—'
+  if (status === 'low') return 'LOW'
+  if (status === 'high') return 'HIGH'
+  const hasBand = meta.optimalMin !== undefined || meta.optimalMax !== undefined
+  const inBand = hasBand
+    && (meta.optimalMin === undefined || value! >= meta.optimalMin)
+    && (meta.optimalMax === undefined || value! <= meta.optimalMax)
+  return inBand ? 'OPT' : 'IN'
+}
+
 /** How many of a draw's markers sit high, low, and in range against BIOMARKERS' reference bands. */
 export function countFlags(markers: Record<string, number | null>): { high: number, low: number, optimal: number } {
   const counts = { high: 0, low: 0, optimal: 0 }

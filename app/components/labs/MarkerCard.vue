@@ -23,7 +23,7 @@
       <span
         class="text-meta shrink-0"
         :style="{ color: statusColor }"
-      >{{ statusLabel }}</span>
+      >{{ label }}</span>
     </div>
 
     <div class="flex items-baseline gap-1.5 mt-2">
@@ -167,7 +167,7 @@
 <script setup lang="ts">
 import { STATUS_COLORS } from '~/utils/chartTheme'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
-import { BIOMARKERS, getStatus } from '~/data/biomarkers'
+import { BIOMARKERS, getStatus, statusLabel } from '~/data/biomarkers'
 import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, isCensored, readingNoteOn } from '~/data/markerCaveats'
 
 const props = defineProps<{
@@ -182,13 +182,6 @@ const props = defineProps<{
    */
   latestValue?: number | null
 }>()
-
-const STATUS_LABELS = {
-  optimal: 'OPT',
-  low: 'LOW',
-  high: 'HIGH',
-  unknown: '—'
-} as const
 
 // Hormones the protocol is expected to suppress — annotated so a LOW reading reads as
 // "as designed" rather than as an unexplained flag.
@@ -253,7 +246,8 @@ const displayValue = computed(() => {
 
 const status = computed(() => getStatus(current.value, meta.value))
 const statusColor = computed(() => STATUS_COLORS[status.value])
-const statusLabel = computed(() => STATUS_LABELS[status.value])
+// OPT only inside the optimal band; in range otherwise is IN (statusLabel in biomarkers.ts).
+const label = computed(() => statusLabel(current.value, meta.value))
 
 // One rule for every printed reading, shared with the home watch tile (shared/utils/markerValue.ts).
 const num = fmtMarkerValue
@@ -319,7 +313,7 @@ const history = computed(() =>
       dateLabel: formatDate(e.date),
       value: num(value),
       color: STATUS_COLORS[s],
-      label: STATUS_LABELS[s],
+      label: statusLabel(value, meta.value),
       flagged: caveatCompoundOn(props.biomarkerKey, e.date, caveatSpans.value) != null,
       noted: readingNoteOn(props.biomarkerKey, e.date) != null
     }

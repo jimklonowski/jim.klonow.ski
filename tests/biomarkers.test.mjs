@@ -1,7 +1,7 @@
 // Derived markers (app/data/biomarkers.ts computeMarkers) — computed at read time, never stored.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeMarkers, isEchoOnly } from '../app/data/biomarkers.ts'
+import { BIOMARKERS, computeMarkers, isEchoOnly, statusLabel } from '../app/data/biomarkers.ts'
 
 const panel = { glucose: 90, insulin: 9, triglycerides: 80, hdl: 50, cholesterol: 180, ldl: 100 }
 
@@ -43,4 +43,20 @@ test('an echo-only row is a scan, not a draw (audit #43 item 16)', () => {
   assert.equal(isEchoOnly({ markers: {}, qualitative: [{ name: 'APOE', result: 'e3/e3', category: 'genetic' }] }), false)
   assert.equal(isEchoOnly({ markers: {}, qualitative: [] }), false)
   assert.equal(isEchoOnly({ markers: { hematocrit: 51.7 } }), false)
+})
+
+test('OPT is earned inside the optimal band; in range otherwise reads IN (audit #43 item 27)', () => {
+  const t = BIOMARKERS.testosterone_total // ref 250–1100, optimal 600–1000
+  assert.equal(statusLabel(400, t), 'IN', 'in range, below the optimal band')
+  assert.equal(statusLabel(800, t), 'OPT')
+  assert.equal(statusLabel(1050, t), 'IN', 'in range, above the optimal band')
+  assert.equal(statusLabel(1500, t), 'HIGH')
+  assert.equal(statusLabel(200, t), 'LOW')
+  assert.equal(statusLabel(null, t), '—')
+  // A marker with no optimal band never earns OPT.
+  assert.equal(BIOMARKERS.hematocrit.optimalMin ?? BIOMARKERS.hematocrit.optimalMax, undefined)
+  assert.equal(statusLabel(45, BIOMARKERS.hematocrit), 'IN')
+  // A one-sided optimal band (hs-CRP: optimal below 0.5).
+  assert.equal(statusLabel(0.3, BIOMARKERS.hs_crp), 'OPT')
+  assert.equal(statusLabel(0.8, BIOMARKERS.hs_crp), 'IN')
 })
