@@ -7,26 +7,9 @@ import { STATUS_COLORS } from '~/utils/chartTheme'
 // reference range; the warn and danger bands are washes of their status hue, so the whole track
 // reads as "where the trouble starts" rather than a bare line with a dot on it.
 //
-// The types and bandTone() are exported from this plain script block (script setup can't
-// export) so the page can build its band specs and caption the tone the dot will show.
-export type MeterTone = 'good' | 'warn' | 'danger' | 'neutral'
-export interface MeterBand {
-  from: number
-  to: number
-  tone: MeterTone
-}
-export interface MeterTick {
-  at: number
-  label: string
-}
-
-/** The band a reading falls in; past the last cutoff it belongs to the last band. */
-export function bandTone(value: number | null, bands: MeterBand[]): MeterTone {
-  if (value == null) return 'neutral'
-  return bands.find(b => value >= b.from && value < b.to)?.tone
-    ?? (value >= (bands.at(-1)?.to ?? Infinity) ? bands.at(-1)?.tone : bands[0]?.tone)
-    ?? 'neutral'
-}
+// The band types and bandTone() live in app/utils/meterBands.ts, shared with the page that
+// builds the band specs and captions the tone the dot will show.
+import { bandTone, type MeterBand, type MeterTick, type MeterTone } from '~/utils/meterBands'
 </script>
 
 <script setup lang="ts">

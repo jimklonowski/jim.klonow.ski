@@ -216,12 +216,14 @@ const facts = computed(() => {
   const e = props.latest
   if (!e) return []
   const out: Array<{ text: string, tag?: string, tagClass?: string }> = []
+  // Strictly under the cutoff, as the /labs/dexa meters read it (bandTone's half-open bands) —
+  // with <= here, an A/G of exactly 1.00 read "optimal" on home and "ELEVATED" there.
   if (e.ag_ratio != null) {
-    const ok = e.ag_ratio <= AG_OPTIMAL_MAX
+    const ok = e.ag_ratio < AG_OPTIMAL_MAX
     out.push({ text: `A/G ${e.ag_ratio.toFixed(2)}`, tag: ok ? 'optimal' : 'high', tagClass: ok ? 'text-accent' : 'text-warn' })
   }
   if (e.vat?.volume_in3 != null) {
-    const ok = e.vat.volume_in3 <= VAT_IDEAL_MAX
+    const ok = e.vat.volume_in3 < VAT_IDEAL_MAX
     out.push({ text: `VAT ${e.vat.volume_in3.toFixed(2)} in³`, tag: ok ? 'ideal' : 'elevated', tagClass: ok ? 'text-accent' : 'text-warn' })
   }
   if (e.bone_density?.total_bmd != null) {

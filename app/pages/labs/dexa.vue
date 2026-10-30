@@ -349,7 +349,7 @@ import { diffDays } from '#shared/utils/dates'
 import { DEXA_OTHER_METRICS, DEXA_TOTAL_METRICS, REGION_LABELS, formatLbs } from '~/data/dexa'
 import { DEXA_NOISE as NOISE, deltaInfo, type Direction } from '~/utils/dexaDeltas'
 import type { DexaEntry, DexaRegion } from '~/composables/useDexaEntries'
-import { bandTone, type MeterBand, type MeterTick, type MeterTone } from '~/components/labs/TierMeter.vue'
+import { bandTone, type MeterBand, type MeterTick, type MeterTone } from '~/utils/meterBands'
 
 useSeoMeta({ title: () => 'Labs · DEXA' })
 
@@ -623,7 +623,8 @@ const meters = computed(() => {
       decimals: 1,
       min: -3.5,
       max: 1.5,
-      bands: [{ from: -3.5, to: -2.5, tone: 'danger' }, { from: -2.5, to: -1, tone: 'warn' }, { from: -1, to: 1.5, tone: 'good' }],
+      // WHO: −2.5 or lower is osteoporosis, so that band owns its upper edge; −1.0 itself is normal.
+      bands: [{ from: -3.5, to: -2.5, tone: 'danger', inclusiveTo: true }, { from: -2.5, to: -1, tone: 'warn' }, { from: -1, to: 1.5, tone: 'good' }],
       ticks: [{ at: -3.5, label: '-3.5' }, { at: -2.5, label: '-2.5' }, { at: -1, label: '-1.0' }, { at: 1.5, label: '+1.5' }],
       captions: { good: 'NORMAL', warn: 'OSTEOPENIA', danger: 'OSTEOPOROSIS', neutral: '—' },
       note: e.bone_density?.total_bmd != null
