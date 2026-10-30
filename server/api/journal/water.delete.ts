@@ -1,5 +1,5 @@
 import { zWaterRemove } from '#shared/utils/schemas'
-import { removeAtSql } from '#shared/utils/journalRemove'
+import { expectedBindings, removeAtSql, removeExpectedSql } from '#shared/utils/journalRemove'
 import type { WaterEntry } from '#shared/types/journal'
 
 // Removes one tap (by index) from a day's `water` array — the widget's undo. Query params, not a
@@ -10,11 +10,15 @@ import type { WaterEntry } from '#shared/types/journal'
 export default defineEventHandler(async (event) => {
   requireWriteAccess(event)
 
-  const { date, index } = validatedQuery(event, zWaterRemove)
+  const { date, index, time, oz } = validatedQuery(event, zWaterRemove)
 
   const db = getDb(event)
   const before = await auditBefore(event, 'journal_entries', date)
-  const res = await db.prepare(removeAtSql('water')).bind(date, index).run()
+  // With the pour the widget saw, only that pour goes — a stale list's index is a no-op.
+  const res = await (time != null && oz != null
+    ? db.prepare(removeExpectedSql('water')).bind(date, index, ...expectedBindings({ time, oz }))
+    : db.prepare(removeAtSql('water')).bind(date, index)
+  ).run()
   const removed = (res.meta.changes ?? 0) > 0
   if (before && removed) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− water on ${date}` })
 

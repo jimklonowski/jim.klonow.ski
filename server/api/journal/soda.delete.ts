@@ -1,5 +1,5 @@
 import { zSodaRemove } from '#shared/utils/schemas'
-import { removeAtSql } from '#shared/utils/journalRemove'
+import { expectedBindings, removeAtSql, removeExpectedSql } from '#shared/utils/journalRemove'
 
 // Removes one entry (by index) from a day's `sodas` array - lets the dashboard widget undo a mis-tap.
 //
@@ -21,11 +21,15 @@ export default defineEventHandler(async (event) => {
 
   // A negative index would build the JSON path '$[-1]', which SQLite rejects outright — the
   // whole statement then failed as an unhandled 500. The schema requires a non-negative integer.
-  const { date, index } = validatedQuery(event, zSodaRemove)
+  const { date, index, time, drink, size } = validatedQuery(event, zSodaRemove)
 
   const db = getDb(event)
   const before = await auditBefore(event, 'journal_entries', date)
-  const res = await db.prepare(removeAtSql('sodas')).bind(date, index).run()
+  // With the entry the widget saw, only that entry goes — a stale list's index is a no-op.
+  const res = await (time != null
+    ? db.prepare(removeExpectedSql('sodas')).bind(date, index, ...expectedBindings({ time, drink, size }))
+    : db.prepare(removeAtSql('sodas')).bind(date, index)
+  ).run()
   const removed = (res.meta.changes ?? 0) > 0
   if (before && removed) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− soda on ${date}` })
 

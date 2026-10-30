@@ -268,12 +268,16 @@ async function remove(index: number) {
   if (removingIndex.value !== null) return
   removingIndex.value = index
   const date = localDateStr()
+  // The entry on screen goes with its index: if another device changed the list since, the
+  // server removes nothing and hands back the current list instead of taking another drink.
+  const seen = todaySodas.value[index]
   try {
-    const { sodas } = await $fetch<{ sodas: SodaEntry[] }>('/api/journal/soda', {
+    const { sodas, removed } = await $fetch<{ sodas: SodaEntry[], removed: boolean }>('/api/journal/soda', {
       method: 'DELETE',
-      query: { date, index }
+      query: { date, index, time: seen?.time ?? '', drink: seen?.drink ?? '', size: seen?.size ?? '' }
     })
     applySodasLocally(date, sodas)
+    if (!removed) toast.add({ title: 'The list had changed', description: 'Another device changed today\'s sodas — nothing was removed. Here is the current list.', color: 'warning' })
     await refreshNuxtData('overview')
   }
   catch (err) {

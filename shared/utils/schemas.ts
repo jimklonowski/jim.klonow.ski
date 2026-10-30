@@ -154,7 +154,12 @@ export const zSodaAdd = z.object({
 export const zSodaRemove = z.object({
   date: zIsoDate,
   // A negative index is an invalid SQLite JSON path ('$[-1]'), which fails the whole statement.
-  index: z.coerce.number().int().min(0)
+  index: z.coerce.number().int().min(0),
+  // The entry the widget saw at that index (audit #43 item 18): sent, the removal only happens if
+  // it is still there. Optional so an installed app still running the old code keeps working.
+  time: z.string().max(5).optional(),
+  drink: z.string().max(60).optional(),
+  size: z.string().max(40).optional()
 })
 
 // --- meals ---
@@ -190,7 +195,13 @@ export const zWaterAdd = z.object({
   oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY)
 })
 
-export const zWaterRemove = zSodaRemove
+export const zWaterRemove = z.object({
+  date: zIsoDate,
+  index: z.coerce.number().int().min(0),
+  // The pour the widget saw at that index (see zSodaRemove); both or neither.
+  time: z.string().max(5).optional(),
+  oz: z.coerce.number().positive().optional()
+})
 
 // --- vials ---
 

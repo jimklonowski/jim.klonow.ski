@@ -266,12 +266,15 @@ async function remove(index: number) {
   if (removingIndex.value !== null) return
   removingIndex.value = index
   const date = today.value
+  // The pour on screen goes with its index (see SodaTracker's remove).
+  const seen = todayWater.value[index]
   try {
-    const { water } = await $fetch<{ water: WaterEntry[] }>('/api/journal/water', {
+    const { water, removed } = await $fetch<{ water: WaterEntry[], removed: boolean }>('/api/journal/water', {
       method: 'DELETE',
-      query: { date, index }
+      query: seen ? { date, index, time: seen.time, oz: seen.oz } : { date, index }
     })
     applyWaterLocally(date, water)
+    if (!removed) toast.add({ title: 'The list had changed', description: 'Another device changed today\'s water — nothing was removed. Here is the current list.', color: 'warning' })
     await refreshNuxtData('overview')
   }
   catch (err) {

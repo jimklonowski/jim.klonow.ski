@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { removeAtSql } from '../shared/utils/journalRemove.ts'
+import { expectedBindings, removeAtSql, removeExpectedSql } from '../shared/utils/journalRemove.ts'
 
 const schema = readFileSync(new URL('../server/database/schema.sql', import.meta.url), 'utf8')
 function dbWith(column, items) {
@@ -37,3 +37,29 @@ for (const column of ['sodas', 'water']) {
     assert.equal(db.prepare(removeAtSql(column)).run('2026-10-20', 0).changes, 0)
   })
 }
+
+// Audit #43 item 18: a stale second device's index must not take a different entry.
+test('sodas: the index removes only the entry the widget saw there', () => {
+  const list = [{ time: '09:00', drink: 'Dr Pepper', size: '12oz can' }, { time: '12:00', drink: 'Coke' }, { time: '15:00', drink: 'Coke', size: '12oz can' }]
+  const db = dbWith('sodas', list)
+  const sql = removeExpectedSql('sodas')
+  // The phone removed 09:00; the laptop still shows it at index 0 → its ✕ must not take 12:00.
+  db.prepare(removeAtSql('sodas')).run('2026-10-21', 0)
+  assert.equal(db.prepare(sql).run('2026-10-21', 0, ...expectedBindings(list[0])).changes, 0)
+  assert.deepEqual(read(db, 'sodas').map(x => x.time), ['12:00', '15:00'])
+  // A missing size matches as '' — the entry as the widget holds it.
+  assert.equal(db.prepare(sql).run('2026-10-21', 0, ...expectedBindings(list[1])).changes, 1)
+  assert.deepEqual(read(db, 'sodas').map(x => x.time), ['15:00'])
+})
+
+test('water: a volume stored as a float still matches its integer reading', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec(schema)
+  // json_object with a REAL bind stores 12.0 — what the widget reads back is 12.
+  db.prepare('INSERT INTO journal_entries (date, water) VALUES (?, json_array(json_object(\'time\', \'09:00\', \'oz\', CAST(? AS REAL)), json_object(\'time\', \'10:00\', \'oz\', 8)))').run('2026-10-21', 12)
+  const sql = removeExpectedSql('water')
+  assert.equal(db.prepare(sql).run('2026-10-21', 0, ...expectedBindings({ time: '09:00', oz: 8 })).changes, 0, 'wrong volume')
+  assert.equal(db.prepare(sql).run('2026-10-21', 0, ...expectedBindings({ time: '10:00', oz: 12 })).changes, 0, 'wrong time')
+  assert.equal(db.prepare(sql).run('2026-10-21', 0, ...expectedBindings({ time: '09:00', oz: 12 })).changes, 1)
+  assert.deepEqual(read(db, 'water'), [{ time: '10:00', oz: 8 }])
+})
