@@ -636,7 +636,7 @@ const expiringNoun = computed(() => stockNoun(vials.value.filter(v => v.status !
 
 const activeProjections = computed(() =>
   activeVials.value
-    .map(vial => ({ vial, proj: projectVial(vial, entries.value, today.value) }))
+    .map(vial => ({ vial, proj: projectVial(vial, entries.value, today.value, vials.value) }))
     .sort((a, b) => (a.proj.daysLeft ?? Infinity) - (b.proj.daysLeft ?? Infinity))
 )
 

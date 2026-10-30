@@ -121,7 +121,7 @@ const stockByCompound = computed(() => {
   for (const vial of props.vials) {
     if (vial.status === 'finished') continue
     const amount = vial.status === 'active'
-      ? computeRemaining(vial, props.entries).remaining
+      ? computeRemaining(vial, props.entries, props.vials).remaining
       : vial.vial_amount * (vial.quantity ?? 1)
     const existing = map.get(vial.compound)
     if (!existing) {

@@ -74,3 +74,21 @@ test('expiry: soon within thirty days, expired once past, nothing without a date
   assert.equal(isExpired(TODAY, TODAY), false)
   assert.equal(isExpired(undefined, TODAY), false)
 })
+
+test('two open vials of one compound share the doses — each dose drawn from the newest opened by its day (audit #43 item 26)', () => {
+  const first = vial({ id: 1, opened_date: '2026-10-10' })
+  const second = vial({ id: 2, opened_date: '2026-10-13' })
+  const sealed = vial({ id: 3, status: 'sealed', opened_date: null })
+  const other = vial({ id: 4, compound: 'BPC-157', opened_date: '2026-10-11' })
+  const all = [first, second, sealed, other]
+  const entries = [10, 11, 12, 13, 14].map(d => dose(`2026-10-${d}`, 3, 'iu')) // 1 mg a day
+  assert.equal(computeUsedAmount(first, entries, all), 3, 'Oct 10–12, then the new vial took over')
+  assert.equal(computeUsedAmount(second, entries, all), 2, 'Oct 13–14')
+  assert.equal(computeUsedAmount(first, entries), 5, 'without its siblings it reads as before')
+  // A same-day pair: the higher id is the newer one.
+  const twin = vial({ id: 5, opened_date: '2026-10-10' })
+  assert.equal(computeUsedAmount(first, entries, [first, twin]), 0)
+  assert.equal(computeUsedAmount(twin, entries, [first, twin]), 5)
+  // projectVial passes them through.
+  assert.equal(projectVial(second, entries, TODAY, all).used, 2)
+})

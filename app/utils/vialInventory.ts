@@ -46,15 +46,38 @@ export function roundAmount(n: number): number {
   return Math.round(n * 1000) / 1000
 }
 
-// Sum of doses of this vial's compound logged on/after its opened_date, expressed in the vial's
-// unit. IU↔mass bridges through IU_PER_MG where the compound has a factor (HGH's mg vials
-// deplete from IU doses); doses in a unit that still can't convert are skipped.
-export function computeUsedAmount(vial: Vial, entries: JournalEntry[]): number {
+/**
+ * The day this vial stops taking doses: the first day a later-opened vial of the same compound
+ * was opened (a same-day pair goes to the higher id), or null while it is the newest. A dose is
+ * drawn from the newest vial opened on or before its day — every dose charged to exactly one.
+ * Charged to every open vial since its opening, two active vials each lost every dose and both
+ * the inventory and the runway under-reported stock (audit #43 item 26). Newest rather than
+ * oldest-first: opening a vial usually means the last one ran out, and filling the old one's
+ * leftover first (whatever the log's slop left on it) would overstate the new one.
+ */
+function lastOwnedDay(vial: Vial, siblings: readonly Vial[]): string | null {
+  const opened = vial.opened_date!
+  let until: string | null = null
+  for (const v of siblings) {
+    if (v === vial || v.compound !== vial.compound || !v.opened_date) continue
+    const later = v.opened_date > opened || (v.opened_date === opened && (v.id ?? 0) > (vial.id ?? 0))
+    if (later && (until == null || v.opened_date < until)) until = v.opened_date
+  }
+  return until
+}
+
+// Sum of doses of this vial's compound logged on/after its opened_date — and before a later vial
+// of the compound took over (lastOwnedDay; `siblings` is the inventory, any status) — expressed in
+// the vial's unit. IU↔mass bridges through IU_PER_MG where the compound has a factor (HGH's mg
+// vials deplete from IU doses); doses in a unit that still can't convert are skipped.
+export function computeUsedAmount(vial: Vial, entries: JournalEntry[], siblings: readonly Vial[] = []): number {
   if (!vial.opened_date) return 0
   const vialUnit = vial.vial_unit
+  const until = lastOwnedDay(vial, siblings)
   let total = 0
   for (const e of entries) {
     if (e.date < vial.opened_date) continue
+    if (until != null && e.date >= until) continue
     for (const p of e.peptides ?? []) {
       if (p.compound !== vial.compound) continue
       const converted = convertUnitFor(vial.compound, p.dose, p.unit, vialUnit)
@@ -64,8 +87,8 @@ export function computeUsedAmount(vial: Vial, entries: JournalEntry[]): number {
   return total
 }
 
-export function computeRemaining(vial: Vial, entries: JournalEntry[]) {
-  const used = computeUsedAmount(vial, entries)
+export function computeRemaining(vial: Vial, entries: JournalEntry[], siblings: readonly Vial[] = []) {
+  const used = computeUsedAmount(vial, entries, siblings)
   const remaining = Math.max(0, vial.vial_amount - used)
   const pct = vial.vial_amount > 0 ? remaining / vial.vial_amount : 0
   return { used, remaining, pct }
@@ -109,8 +132,8 @@ export function estimateDailyRate(
   return { dailyAmount: null, basis: null }
 }
 
-export function projectVial(vial: Vial, entries: JournalEntry[], today: string): VialProjection {
-  const { used, remaining, pct } = computeRemaining(vial, entries)
+export function projectVial(vial: Vial, entries: JournalEntry[], today: string, siblings: readonly Vial[] = []): VialProjection {
+  const { used, remaining, pct } = computeRemaining(vial, entries, siblings)
   const { dailyAmount, basis } = estimateDailyRate(vial, entries, today)
 
   let daysLeft: number | null = null
