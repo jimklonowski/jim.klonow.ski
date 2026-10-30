@@ -1,7 +1,7 @@
-import { digestGaps } from '#shared/utils/digestGaps'
+import { digestGaps, pendingDigests } from '#shared/utils/digestGaps'
 import { zDigestGaps } from '#shared/utils/schemas'
 import { localToday } from '#shared/utils/time'
-import { shiftDays, weekdayOf } from '#shared/utils/dates'
+import { shiftDays } from '#shared/utils/dates'
 import { SCHEDULED_TASKS } from '../../../schedule'
 
 // Days and weeks in the last `days` that have digest-worthy data but no digest — what the digest
@@ -13,11 +13,9 @@ import { SCHEDULED_TASKS } from '../../../schedule'
 // no matter how often it was "filled". (A food-only day counts since Oct 2026: the facts carry a
 // Meals line with the day's estimated calories.)
 
-/** True while today's firing of `task`'s cron is still ahead of us (UTC hour from the schedule). */
-function beforeCronHour(task: string, now: Date): boolean {
-  const cron = Object.entries(SCHEDULED_TASKS).find(([, tasks]) => tasks.includes(task))?.[0]
-  const hour = cron?.split(' ')[1]
-  return !!hour && /^\d+$/.test(hour) && now.getUTCHours() < Number(hour)
+/** The cron expression `task` runs on (server/schedule.ts). */
+function cronOf(task: string): string | undefined {
+  return Object.entries(SCHEDULED_TASKS).find(([, tasks]) => tasks.includes(task))?.[0]
 }
 
 export default defineEventHandler(async (event) => {
@@ -49,14 +47,7 @@ export default defineEventHandler(async (event) => {
   const dates = ((dataRes?.results ?? []) as Array<{ date: string }>).map(r => r.date)
   const have = (digestRes?.results ?? []) as Array<{ type: string, period_end: string }>
 
-  // A period isn't a gap while its own cron is still due today: the daily writes yesterday at
-  // 14:00 UTC, the weekly writes the just-ended week on Sunday at 15:00 UTC.
-  const now = new Date()
-  const pending = {
-    daily: beforeCronHour('digest:daily', now) ? shiftDays(today, -1) : null,
-    weekly: weekdayOf(today) === 0 && beforeCronHour('digest:weekly', now)
-      ? shiftDays(today, -1) // Sunday's yesterday is the Saturday that just ended the week
-      : null
-  }
+  // A period isn't a gap while its own cron run is still ahead (shared/utils/digestGaps.ts).
+  const pending = pendingDigests(Date.now(), today, cronOf('digest:daily'), cronOf('digest:weekly'))
   return { days, ...digestGaps(dates, have, today, days, pending) }
 })

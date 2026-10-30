@@ -5,6 +5,37 @@
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { shiftDays, weekdayOf } from './dates.ts'
 
+/**
+ * The instant a daily-or-weekly cron ("M H * * …", UTC) fires on `date`, in ms — or null for a
+ * cron this can't read. The digest crons fire at 14:00 and 15:00 UTC, which is mid-morning in
+ * Chicago, so the UTC date of a firing is the home date it runs on.
+ */
+export function cronFiringAt(cron: string, date: string): number | null {
+  const [minute, hour] = cron.split(' ')
+  if (!/^\d+$/.test(minute ?? '') || !/^\d+$/.test(hour ?? '')) return null
+  return Date.parse(`${date}T${hour!.padStart(2, '0')}:${minute!.padStart(2, '0')}:00Z`)
+}
+
+/**
+ * The periods whose own cron run is still ahead at `now`. The daily run on `today` writes
+ * yesterday; the weekly run on a Sunday writes the week that ended the Saturday before it. This
+ * used to compare the UTC hour of `now` with the cron's hour while "yesterday" was the home date —
+ * from 19:00 Chicago on, the UTC clock is past midnight, so yesterday read as "still due" though
+ * its run had fired that morning, and a failed digest hid from the evening until midnight (audit
+ * #43 item 24). Comparing instants has no clock to mix up.
+ */
+export function pendingDigests(now: number, today: string, dailyCron: string | undefined, weeklyCron: string | undefined): { daily: string | null, weekly: string | null } {
+  const before = (cron: string | undefined, date: string) => {
+    const at = cron ? cronFiringAt(cron, date) : null
+    return at != null && now < at
+  }
+  const lastSaturday = shiftDays(today, -(((weekdayOf(today) + 1) % 7) || 7))
+  return {
+    daily: before(dailyCron, today) ? shiftDays(today, -1) : null,
+    weekly: before(weeklyCron, shiftDays(lastSaturday, 1)) ? lastSaturday : null
+  }
+}
+
 export interface DigestGaps {
   /** Dates, oldest first. */
   daily: string[]
