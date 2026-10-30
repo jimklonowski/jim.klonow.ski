@@ -128,7 +128,14 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
 // Each `compute` returns null unless every input it needs is present in the draw, so a card
 // only appears once the source markers have been recorded. Merged into BIOMARKERS below, so
 // they flow through the cards, category tabs, deltas and trend charts like any other marker.
-type ComputedMeta = BiomarkerMeta & { compute: (m: Record<string, number | null>) => number | null }
+type ComputedMeta = BiomarkerMeta & {
+  compute: (m: Record<string, number | null>) => number | null
+  /**
+   * Only meaningful on a fasting draw: computed on a non-fasting one it was a figure out of its
+   * own definition, flagged HIGH on the card, the home list and the status line (audit #43 item 14).
+   */
+  fastingOnly?: boolean
+}
 
 export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
   trig_hdl_ratio: {
@@ -137,7 +144,7 @@ export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
     compute: m => (m.triglycerides != null && m.hdl) ? roundTo(m.triglycerides / m.hdl, 1) : null
   },
   homa_ir: {
-    label: 'HOMA-IR', unit: '', category: 'metabolic', refMax: 2.0, optimalMax: 1.5, computed: true,
+    label: 'HOMA-IR', unit: '', category: 'metabolic', refMax: 2.0, optimalMax: 1.5, computed: true, fastingOnly: true,
     description: 'Homeostatic Model Assessment of Insulin Resistance — (fasting glucose × fasting insulin) / 405. Estimates insulin resistance from a fasting draw. Optimal is below 1.5; values above ~2.9 indicate significant insulin resistance.',
     compute: m => (m.glucose != null && m.insulin != null) ? roundTo((m.glucose * m.insulin) / 405, 2) : null
   },
@@ -154,10 +161,13 @@ export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
 }
 
 // Fold derived values into a draw's markers. Won't clobber a value already on the draw, so a
-// directly-reported marker always wins over a computed one of the same key.
-export function computeMarkers(markers: Record<string, number | null>): Record<string, number | null> {
+// directly-reported marker always wins over a computed one of the same key. A fasting-only
+// marker is computed only when the draw is known to be fasting. (Trig/HDL is deliberately not
+// fasting-only: CHW reports print no fasting line, so older fasted panels read as non-fasting.)
+export function computeMarkers(markers: Record<string, number | null>, fasting: boolean): Record<string, number | null> {
   const out = { ...markers }
   for (const [key, meta] of Object.entries(COMPUTED_MARKERS)) {
+    if (meta.fastingOnly && !fasting) continue
     if (out[key] == null) {
       const value = meta.compute(markers)
       if (value != null) out[key] = value

@@ -38,7 +38,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
       GROUP BY compound
       ORDER BY lastDate DESC, compound ASC
     `),
-    db.prepare('SELECT date, markers FROM labs_entries ORDER BY date DESC LIMIT 1'),
+    db.prepare('SELECT date, fasting, markers FROM labs_entries ORDER BY date DESC LIMIT 1'),
     db.prepare('SELECT sources FROM labs_entries'),
     db.prepare('SELECT MAX(date) AS date FROM health_metrics'),
     db.prepare('SELECT date, total FROM dexa_entries ORDER BY date DESC LIMIT 1')
@@ -49,7 +49,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
 
   const drawRow = drawRes?.results?.[0]
   const latestDraw = drawRow
-    ? { date: drawRow.date as string, markers: JSON.parse((drawRow.markers as string) || '{}') as Record<string, number | null> }
+    ? { date: drawRow.date as string, fasting: !!drawRow.fasting, markers: JSON.parse((drawRow.markers as string) || '{}') as Record<string, number | null> }
     : null
 
   const pdfKeys = new Set<string>()

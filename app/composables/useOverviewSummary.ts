@@ -22,7 +22,7 @@ export function useOverviewSummary(role: Ref<Role | null>) {
         // Derived markers (Trig/HDL, HOMA-IR, …) are computed here, same as useLabsEntries does
         // for the full list, so the palette and the flag counts see them too.
         return s.latestDraw
-          ? { ...s, latestDraw: { ...s.latestDraw, markers: computeMarkers(s.latestDraw.markers) } }
+          ? { ...s, latestDraw: { ...s.latestDraw, markers: computeMarkers(s.latestDraw.markers, s.latestDraw.fasting) } }
           : s
       }, {
         // Serve the SSR payload on hydration only — refresh() must hit the network.
