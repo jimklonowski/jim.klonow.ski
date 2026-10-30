@@ -99,14 +99,28 @@ export function clearAuthCookies(event: H3Event) {
  * this request's origin. A request with neither (curl, a Shortcut) is not a browser and passes.
  */
 export function requireSameOrigin(event: H3Event) {
-  const refuse = () => createError({ statusCode: 403, message: 'Cross-site request refused' })
+  if (isCrossSite(event)) throw createError({ statusCode: 403, message: 'Cross-site request refused' })
+}
+
+/**
+ * Whether a browser sent this request from another site (see requireSameOrigin). Fetch metadata
+ * first; otherwise the Origin header, or for a plain navigation (which sends no Origin) the
+ * Referer. A typed URL or a bookmark is `none` — the person's own act, not another site's.
+ */
+export function isCrossSite(event: H3Event): boolean {
   const site = getHeader(event, 'sec-fetch-site')
-  if (site) {
-    if (site !== 'same-origin' && site !== 'none') throw refuse()
-    return
-  }
+  if (site) return site !== 'same-origin' && site !== 'none'
+  const own = getRequestURL(event).origin
   const origin = getHeader(event, 'origin')
-  if (origin && origin !== getRequestURL(event).origin) throw refuse()
+  if (origin) return origin !== own
+  const referer = getHeader(event, 'referer')
+  if (!referer) return false
+  try {
+    return new URL(referer).origin !== own
+  }
+  catch {
+    return true
+  }
 }
 
 // --- Endpoint guards (read event.context.auth, set once per request by the middleware) ---
