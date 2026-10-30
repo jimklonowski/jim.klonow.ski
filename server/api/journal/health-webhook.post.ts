@@ -6,6 +6,18 @@ import { workoutStartMs } from '#shared/utils/time'
 /** Only a session from the last few days warrants a Whoop strain re-read; a backfill of old workouts doesn't. */
 const STRAIN_REFRESH_WINDOW_MS = 3 * 86_400_000
 
+/**
+ * The most D1 statements one delivery may run. A Worker invocation has a query limit, and every
+ * date costs at least one upsert (two with metrics) and every workout one or two — a multi-year
+ * Health Auto Export backfill ran past it partway through, failed, and failed the same way on
+ * every retry (audit #43 item 23). Under D1's 1,000 per invocation on Workers Paid, leaving room for
+ * the Whoop status check and a strain refresh. History that large belongs to the XML import.
+ */
+const MAX_DELIVERY_STATEMENTS = 900
+
+/** Statements per batch: a batch is one transaction, so a failure rolls back a slice, not the delivery. */
+const BATCH_SIZE = 50
+
 interface HealthMetrics {
   vo2_max?: number
   body_fat_pct?: number
@@ -158,6 +170,21 @@ export default defineEventHandler(async (event) => {
   // unrecognized-only day used to INSERT a completely blank journal row, which then read as
   // "data" everywhere (it was the main source of unfillable digest gaps).
   const vitalDates = Object.entries(byDate).filter(([, vitals]) => Object.keys(vitals).length > 0)
+  // Health metrics and workouts in batches, not a round trip per row (server/utils/db.ts).
+  const metricStatements = Object.entries(healthByDate)
+    .filter(([, metricsForDate]) => Object.keys(metricsForDate).length > 0) // same blank-bucket rule as vitals
+    .map(([date, metricsForDate]) => healthMetricsStatement(db, date, metricsForDate))
+    .filter((s): s is D1PreparedStatement => s != null)
+
+  // Refused whole, before anything is written, rather than failing partway through every retry.
+  const statementCount = vitalDates.length + Math.ceil(vitalDates.length / 90) + metricStatements.length + workouts.length * 2
+  if (statementCount > MAX_DELIVERY_STATEMENTS) {
+    throw createError({
+      statusCode: 413,
+      message: `This delivery covers ${vitalDates.length} days of vitals, ${metricStatements.length} of health metrics and ${workouts.length} workouts — more than one request can write. Send a shorter date range, or load the history once through Tools → Import.`
+    })
+  }
+
   if (vitalDates.length) {
     // The write is one INSERT … ON CONFLICT DO UPDATE per date, batched, filling only blanks
     // (shared/utils/vitalsUpsert.ts). It used to SELECT then INSERT, and a quick-add creating the
@@ -171,20 +198,18 @@ export default defineEventHandler(async (event) => {
         .bind(...chunk).all<VitalsRow>()
       for (const row of results ?? []) before.set(row.date, row)
     }
-    const written = await db.batch<VitalsRow>(vitalDates.map(([date, vitals]) => db.prepare(VITALS_UPSERT_SQL).bind(...vitalsBindings(date, vitals))))
-    vitalDates.forEach(([date], i) => {
-      const outcome = vitalsOutcome(before.get(date), written[i]?.results?.[0])
-      if (outcome === 'created') created.push(date)
-      else if (outcome === 'updated') updated.push(date)
-    })
+    for (let i = 0; i < vitalDates.length; i += BATCH_SIZE) {
+      const chunk = vitalDates.slice(i, i + BATCH_SIZE)
+      const written = await db.batch<VitalsRow>(chunk.map(([date, vitals]) => db.prepare(VITALS_UPSERT_SQL).bind(...vitalsBindings(date, vitals))))
+      chunk.forEach(([date], j) => {
+        const outcome = vitalsOutcome(before.get(date), written[j]?.results?.[0])
+        if (outcome === 'created') created.push(date)
+        else if (outcome === 'updated') updated.push(date)
+      })
+    }
   }
 
-  // Health metrics and workouts in batches, not a round trip per row (server/utils/db.ts).
-  const metricStatements = Object.entries(healthByDate)
-    .filter(([, metricsForDate]) => Object.keys(metricsForDate).length > 0) // same blank-bucket rule as vitals
-    .map(([date, metricsForDate]) => healthMetricsStatement(db, date, metricsForDate))
-    .filter((s): s is D1PreparedStatement => s != null)
-  const healthMetricsTouched = await runBatched(db, metricStatements)
+  const healthMetricsTouched = await runBatched(db, metricStatements, BATCH_SIZE)
 
   await upsertWorkouts(db, workouts)
 
