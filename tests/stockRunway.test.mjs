@@ -2,7 +2,8 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cycleCoverage } from '../shared/utils/stockRunway.ts'
+import { containersFor, cycleCoverage } from '../shared/utils/stockRunway.ts'
+import { convertUnitFor } from '../shared/utils/peptideCalc.ts'
 
 // 2026-09-14 is a Monday. Primo Mon+Thu 200mg for 16 weeks = 32 doses = 6400mg.
 // Anavar daily 25mg weeks 12-16 (5 weeks) = 35 doses = 875mg.
@@ -80,4 +81,17 @@ test('a tentative cycle needs its whole plan, whenever you ask', () => {
   assert.equal(whole('2027-06-01'), 6400)
   // A committed cycle still discounts what's behind it, and still retires when it's over.
   assert.equal(cycleCoverage(run({ start_date: '2026-10-01' }), '2027-06-01', stock({})).length, 0)
+})
+
+test('containers for a shortfall count in one unit (audit #43 item 13)', () => {
+  // 2,500 mcg short of 5 mg vials: one vial once the size is in mcg — not 500 (2500 / 5).
+  assert.equal(containersFor(2500, convertUnitFor('BPC-157', 5, 'mg', 'mcg')), 1)
+  assert.equal(containersFor(10001, 5000), 3)
+  // Conversion float dust can't tip an exact two into three.
+  const size = convertUnitFor('BPC-157', 2.01, 'mg', 'mcg') // 2009.9999999999998
+  assert.notEqual(size, 2010, 'the float dust is real')
+  assert.equal(containersFor(4020, size), 2, 'raw, 4020 / size is 2.0000000000000004 → 3')
+  // An IU vial against a mass plan with no IU factor: no hint rather than a wrong one.
+  assert.equal(containersFor(100, convertUnitFor('BPC-157', 10, 'iu', 'mg')), null)
+  assert.equal(containersFor(100, 0), null)
 })

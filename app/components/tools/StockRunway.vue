@@ -103,7 +103,7 @@ import type { DoseUnit } from '#shared/types/journal'
 import { containerNoun } from '#shared/utils/vialForm'
 import { relevantCycle, cycleStatusOn, tentativeStartLabel } from '#shared/utils/cycles'
 import { shiftDays } from '#shared/utils/dates'
-import { cycleCoverage, type CycleCoverage } from '#shared/utils/stockRunway'
+import { containersFor, cycleCoverage, type CycleCoverage } from '#shared/utils/stockRunway'
 
 const props = defineProps<{
   vials: Vial[]
@@ -153,14 +153,14 @@ const coverageRows = computed(() =>
   cycle.value ? cycleCoverage(cycle.value, props.today, onHandIn) : []
 )
 
-// The most common sealed container (size + form) for "SHORT ≈ N vials/bottles" hints. A
+// The most common sealed container (size + unit + form) for "SHORT ≈ N vials/bottles" hints. A
 // bottle's size is its whole-bottle total, so the shortfall comes out in bottles, not tabs.
-function typicalContainer(compound: string): { size: number, form: Vial['form'] } | null {
-  const counts = new Map<string, { size: number, form: Vial['form'], n: number }>()
+function typicalContainer(compound: string): { size: number, unit: DoseUnit, form: Vial['form'] } | null {
+  const counts = new Map<string, { size: number, unit: DoseUnit, form: Vial['form'], n: number }>()
   for (const v of props.vials) {
     if (v.compound !== compound || v.status !== 'sealed') continue
-    const key = `${v.form}:${v.vial_amount}`
-    const entry = counts.get(key) ?? { size: v.vial_amount, form: v.form, n: 0 }
+    const key = `${v.form}:${v.vial_amount}:${v.vial_unit}`
+    const entry = counts.get(key) ?? { size: v.vial_amount, unit: v.vial_unit, form: v.form, n: 0 }
     entry.n += v.quantity ?? 1
     counts.set(key, entry)
   }
@@ -176,8 +176,10 @@ function verdictText(row: CycleCoverage): string {
   if (row.onHand == null) return 'not stocked'
   if (row.short <= 0) return 'ready ✓'
   const typical = typicalContainer(row.compound)
-  const n = typical ? Math.ceil(row.short / typical.size) : 0
-  const containersShort = typical ? ` (≈ ${n} ${containerNoun(typical.form, n)})` : ''
+  // The vial's size in the shortfall's unit (see containersFor); one that can't be converted
+  // gives no hint rather than a wrong one.
+  const n = typical ? containersFor(row.short, convertUnitFor(row.compound, typical.size, typical.unit, row.unit)) : null
+  const containersShort = typical && n != null ? ` (≈ ${n} ${containerNoun(typical.form, n)})` : ''
   return `short ${fmtAmount(row.short)} ${unitLabel(row.unit)}${containersShort}`
 }
 

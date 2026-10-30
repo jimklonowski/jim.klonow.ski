@@ -19,6 +19,18 @@ export interface CycleCoverage {
 }
 
 /**
+ * Containers that cover a shortfall, for the "short ≈ N vials" hint. `size` must already be in
+ * the shortfall's unit — the caller converts it (a vial is labelled in mg, a peptide plan doses
+ * in mcg, and dividing the two raw read "≈ 500 vials", audit #43 item 13). Null without a size.
+ * Rounded before the ceiling so conversion float dust (2.01 mg = 2009.9999999999998 mcg) can't tip
+ * an exact two containers into three.
+ */
+export function containersFor(short: number, size: number | null): number | null {
+  if (size == null || !(size > 0)) return null
+  return Math.ceil(Math.round((short / size) * 1e6) / 1e6)
+}
+
+/**
  * Coverage per plan compound for one cycle. Doses already behind `asOf` don't count —
  * mid-cycle the question is "can I finish?", not "could I have started?". A compound's unit
  * comes from its first plan item; plans that mix units for one compound aren't supported
