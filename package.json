@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.10.29e",
+  "version": "2026.10.30",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -46,7 +46,7 @@
     "@comark/nuxt": "0.8.1",
     "@gltf-transform/core": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
-    "@iconify-json/lucide": "^1.2.148",
+    "@iconify-json/lucide": "^1.2.149",
     "@iconify-json/simple-icons": "^1.2.101",
     "@nuxt/eslint": "^1.17.0",
     "@nuxt/ui": "^4.12.0",
@@ -62,7 +62,7 @@
     "typescript": "^6.0.3",
     "vue": "catalog:",
     "vue-tsc": "^3.3.13",
-    "wrangler": "^4.154.0"
+    "wrangler": "^4.155.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
