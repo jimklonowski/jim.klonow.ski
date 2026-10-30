@@ -6,12 +6,15 @@ import type { Role } from '#shared/utils/access'
 import { BIOMARKERS, countFlags, getStatus, isEchoOnly } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
 import { isCensored } from '~/data/markerCaveats'
+import { currentReadings } from '#shared/utils/labsTimeline'
 
 export interface FlaggedMarker {
   key: string
   meta: BiomarkerMeta
   value: number
   status: 'low' | 'high'
+  /** The draw this reading came from — the latest draw's, or an earlier one inside the window. */
+  date: string
   /** Change vs the previous draw that recorded this marker, or null on a first reading. */
   delta: number | null
 }
@@ -77,17 +80,18 @@ export function useOverview(role: Ref<Role | null>) {
     return [...(source?.peptides ?? [])].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
   })
 
-  /** Every out-of-range marker on the latest draw, high first then low, worst delta first. */
+  /** Each marker's current reading: its newest within the window before the latest draw (currentReadings). */
+  const current = computed(() => currentReadings(draws.value))
+
+  /** Every out-of-range current reading, high first then low, worst delta first. */
   const flagged = computed<FlaggedMarker[]>(() => {
-    const draw = latestDraw.value
-    if (!draw) return []
     const out: FlaggedMarker[] = []
-    for (const [key, value] of Object.entries(draw.markers)) {
+    for (const [key, { value, date }] of current.value) {
       const meta = BIOMARKERS[key]
-      if (!meta || value == null) continue
+      if (!meta) continue
       const status = getStatus(value, meta)
       if (status !== 'high' && status !== 'low') continue
-      out.push({ key, meta, value, status, delta: deltaFor(key, draw.date, value) })
+      out.push({ key, meta, value, status, date, delta: deltaFor(key, date, value) })
     }
     return out.sort((a, b) =>
       (a.status === b.status ? 0 : a.status === 'high' ? -1 : 1)
@@ -106,7 +110,7 @@ export function useOverview(role: Ref<Role | null>) {
     return prev == null ? null : Math.round((value - prev) * 100) / 100
   }
 
-  const flagCounts = computed(() => countFlags(latestDraw.value?.markers ?? {}))
+  const flagCounts = computed(() => countFlags(Object.fromEntries([...current.value].map(([key, r]) => [key, r.value]))))
 
   async function refresh() {
     await Promise.all([

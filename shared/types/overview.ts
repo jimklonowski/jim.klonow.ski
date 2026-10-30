@@ -18,8 +18,10 @@ export interface OverviewSummary {
   sodasToday: number | null
   /** Ounces of water logged today; null for the doctor, same policy as sodas. */
   waterOzToday: number | null
-  /** The newest draw with its raw markers (derived markers are computed client-side). */
+  /** The newest blood draw with its raw markers — for its date; flags and values read `current`. */
   latestDraw: { date: string, fasting: boolean, markers: Record<string, number | null> } | null
+  /** Each marker's newest reading within the window before the latest draw, derived markers included (currentReadings). */
+  current: Record<string, { value: number, date: string }>
   /** Distinct source PDFs across every lab draw. */
   pdfCount: number
   /** Newest health_metrics row (Whoop / Apple Health), or null. */

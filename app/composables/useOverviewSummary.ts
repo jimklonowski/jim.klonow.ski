@@ -1,6 +1,6 @@
 import type { Role } from '#shared/utils/access'
 import type { OverviewSummary } from '#shared/types/overview'
-import { computeMarkers, countFlags } from '~/data/biomarkers'
+import { countFlags } from '~/data/biomarkers'
 
 // The light aggregator behind the site shell (StatusLine, FooterStatus, CommandPalette): one
 // request to /api/overview for the handful of figures those components render. They live in
@@ -17,14 +17,9 @@ export function useOverviewSummary(role: Ref<Role | null>) {
   const requestFetch = useRequestFetch()
 
   const summary = hasSession
-    ? useAsyncData('overview', async () => {
-        const s = await requestFetch<OverviewSummary>('/api/overview')
-        // Derived markers (Trig/HDL, HOMA-IR, …) are computed here, same as useLabsEntries does
-        // for the full list, so the palette and the flag counts see them too.
-        return s.latestDraw
-          ? { ...s, latestDraw: { ...s.latestDraw, markers: computeMarkers(s.latestDraw.markers, s.latestDraw.fasting, s.latestDraw.date) } }
-          : s
-      }, {
+    // Derived markers (Trig/HDL, HOMA-IR, …) arrive computed in `current` — the server runs
+    // computeMarkers per draw before picking each marker's current reading.
+    ? useAsyncData('overview', () => requestFetch<OverviewSummary>('/api/overview'), {
         // Serve the SSR payload on hydration only — refresh() must hit the network.
         getCachedData: (key, app, ctx) => ctx.cause === 'initial' ? app.payload.data[key] : undefined
       })
@@ -32,13 +27,16 @@ export function useOverviewSummary(role: Ref<Role | null>) {
 
   const data = computed<OverviewSummary | null>(() => summary?.data.value ?? null)
   const latestDraw = computed(() => data.value?.latestDraw ?? null)
-  const flagCounts = computed(() => countFlags(latestDraw.value?.markers ?? {}))
+  /** Each marker's current reading (the server's currentReadings) — what the flags and the palette read. */
+  const current = computed(() => data.value?.current ?? {})
+  const flagCounts = computed(() => countFlags(Object.fromEntries(Object.entries(current.value).map(([key, r]) => [key, r.value]))))
   const error = computed(() => summary?.error.value ?? null)
 
   return {
     hasSession,
     data,
     latestDraw,
+    current,
     flagCounts,
     error,
     refresh: () => summary?.refresh() ?? Promise.resolve()

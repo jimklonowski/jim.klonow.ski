@@ -19,7 +19,11 @@
         class="grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[190px_120px_1fr_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2.5 bg-raised border-l-2 hover:bg-row-hover transition-colors"
         :style="{ borderLeftColor: color(f) }"
       >
-        <span class="text-row text-hi truncate">{{ f.meta.label }}</span>
+        <span class="text-row text-hi truncate">{{ f.meta.label }}<span
+          v-if="f.date !== drawDate"
+          class="ml-1.5 text-micro text-muted"
+          :title="`Not on the ${drawDate ? formatDate(drawDate, 'monthDay') : 'latest'} draw — the newest reading, from ${formatDate(f.date, 'monthDay')}`"
+        >· {{ formatDate(f.date, 'monthDay') }}</span></span>
 
         <span
           class="num-display text-stat leading-none whitespace-nowrap text-right lg:text-left"
@@ -46,7 +50,7 @@
       v-if="!flagged.length"
       class="mt-3 text-small text-muted"
     >
-      {{ hasDraw ? 'Every marker on the latest draw is in range.' : 'No lab draws recorded yet.' }}
+      {{ hasDraw ? 'Every current reading is in range.' : 'No lab draws recorded yet.' }}
     </p>
   </div>
 </template>

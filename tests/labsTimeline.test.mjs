@@ -5,7 +5,7 @@
 //
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { drawFlags, entriesAsOf, resolveAsOf } from '../shared/utils/labsTimeline.ts'
+import { currentReadings, drawFlags, entriesAsOf, resolveAsOf } from '../shared/utils/labsTimeline.ts'
 
 const DATES = ['2026-01-16', '2026-02-27', '2026-04-04', '2026-05-30']
 // Reversed on purpose: the API order must not matter.
@@ -36,4 +36,19 @@ test('drawFlags counts readings outside the reference range', () => {
   )
   assert.deepEqual(drawFlags({ a: 10, b: 5, c: 1 }, ranges), { high: 0, low: 0, count: 3 }, 'boundaries are in range')
   assert.deepEqual(drawFlags({}, ranges), { high: 0, low: 0, count: 0 })
+})
+
+test('current readings: each marker\'s newest within the window before the latest draw (audit #43 item 28)', () => {
+  const draws = [
+    { date: '2026-10-21', markers: { igf1: 280 } }, // a one-marker add-on
+    { date: '2026-10-17', markers: { hematocrit: 51.7, igf1: 250, ferritin: null } },
+    { date: '2026-04-04', markers: { vitamin_d: 40 } } // past the 90-day window
+  ]
+  const c = currentReadings(draws)
+  assert.deepEqual(c.get('igf1'), { value: 280, date: '2026-10-21' }, 'the newest reading wins')
+  assert.deepEqual(c.get('hematocrit'), { value: 51.7, date: '2026-10-17' }, 'carried from the full panel')
+  assert.equal(c.has('ferritin'), false, 'a null is no reading')
+  assert.equal(c.has('vitamin_d'), false, 'too old to pass for current')
+  assert.equal(currentReadings([]).size, 0)
+  assert.equal(currentReadings(draws, 365).get('vitamin_d').value, 40)
 })

@@ -3,7 +3,8 @@ import { LOGGED_DAY_SQL, loggedStreakFromDates } from '#shared/utils/journalLog'
 import { localToday } from '#shared/utils/time'
 import { waterTotals } from '#shared/utils/water'
 import type { OverviewSummary } from '#shared/types/overview'
-import { isEchoOnly } from '../../app/data/biomarkers'
+import { currentReadings } from '#shared/utils/labsTimeline'
+import { computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 
 // One small response for the site shell. The status line, footer and ⌘K palette used to reach
 // these figures through useOverview(), which loads every journal, labs, health-metrics, DEXA and
@@ -39,8 +40,9 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
       GROUP BY compound
       ORDER BY lastDate DESC, compound ASC
     `),
-    // A few, not one: the newest row can be an echo, which is a scan and not the latest draw.
-    db.prepare('SELECT date, fasting, markers, qualitative FROM labs_entries ORDER BY date DESC LIMIT 5'),
+    // The recent rows, not one: the newest can be an echo (a scan, not the latest draw), and the
+    // current readings reach back CURRENT_WINDOW_DAYS before the latest draw.
+    db.prepare('SELECT date, fasting, markers, qualitative FROM labs_entries ORDER BY date DESC LIMIT 20'),
     db.prepare('SELECT sources FROM labs_entries'),
     db.prepare('SELECT MAX(date) AS date FROM health_metrics'),
     db.prepare('SELECT date, total FROM dexa_entries ORDER BY date DESC LIMIT 1')
@@ -49,13 +51,20 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   const loggedDates = (loggedRes?.results ?? []).map(r => r.date as string)
   const todayRow = todayRes?.results?.[0]
 
-  const drawRow = drawRes?.results?.find(r => !isEchoOnly({
-    markers: JSON.parse((r.markers as string) || '{}'),
-    qualitative: JSON.parse((r.qualitative as string) || '[]')
-  }))
-  const latestDraw = drawRow
-    ? { date: drawRow.date as string, fasting: !!drawRow.fasting, markers: JSON.parse((drawRow.markers as string) || '{}') as Record<string, number | null> }
-    : null
+  const draws = (drawRes?.results ?? [])
+    .map(r => ({
+      date: r.date as string,
+      fasting: !!r.fasting,
+      markers: JSON.parse((r.markers as string) || '{}') as Record<string, number | null>,
+      qualitative: JSON.parse((r.qualitative as string) || '[]') as Array<{ name: string, category?: string }>
+    }))
+    .filter(d => !isEchoOnly(d))
+  const drawRow = draws[0]
+  const latestDraw = drawRow ? { date: drawRow.date, fasting: drawRow.fasting, markers: drawRow.markers } : null
+  // Each marker's newest reading in the window (shared/utils/labsTimeline.ts) — a one-marker
+  // add-on draw no longer stands for the whole picture in the status line's flags (audit #43
+  // item 28). Derived markers per draw first, so an input never pairs across two draws.
+  const current = Object.fromEntries(currentReadings(draws.map(d => ({ date: d.date, markers: computeMarkers(d.markers, d.fasting, d.date) }))))
 
   const pdfKeys = new Set<string>()
   for (const r of sourcesRes?.results ?? []) {
@@ -79,6 +88,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     sodasToday: auth.role === 'doctor' ? null : (JSON.parse((todayRow?.sodas as string) || '[]') as unknown[]).length,
     waterOzToday: auth.role === 'doctor' ? null : waterTotals(JSON.parse((todayRow?.water as string) || '[]') as Array<{ oz?: number }>).oz,
     latestDraw,
+    current,
     pdfCount: pdfKeys.size,
     latestMetricsDate: (metricsRes?.results?.[0]?.date as string | null | undefined) ?? null,
     latestDexa: dexaRow

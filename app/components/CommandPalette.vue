@@ -48,7 +48,7 @@ const searchTerm = ref('')
 const { role, isOwner, canEdit } = await useAuth()
 // The scalar shell summary — this component sits in the default layout, so it must not drag
 // the full journal and labs lists onto every page the way useOverview() would.
-const { data: summary, latestDraw } = useOverviewSummary(role)
+const { data: summary, current } = useOverviewSummary(role)
 
 defineShortcuts({
   meta_k: () => { open.value = !open.value }
@@ -153,10 +153,11 @@ const actionItems = computed(() => {
 })
 
 const markerItems = computed(() => {
-  const draw = latestDraw.value
+  // Each marker's current reading — the latest draw's, or an earlier one in the window (an
+  // add-on draw doesn't blank every marker it didn't test).
   return Object.entries(BIOMARKERS).map(([key, meta]) => {
-    const value = draw?.markers[key]
-    const status = draw ? getStatus(value ?? null, meta) : 'unknown'
+    const value = current.value[key]?.value
+    const status = getStatus(value ?? null, meta)
     const flag = status === 'high' ? ' · HIGH' : status === 'low' ? ' · LOW' : ''
     return {
       label: meta.label.toLowerCase(),

@@ -1,6 +1,7 @@
 // Pure helpers behind the /labs time-travel scrubber: which draws are visible as of the viewed
 // date, how a `?asof=` query value normalizes, and how many of a draw's readings were out of
 // range. Framework-free so tests/labsTimeline.test.mjs can run them under node --test.
+import { shiftDays } from './dates.ts'
 
 export interface DatedEntry { date: string }
 
@@ -18,6 +19,35 @@ export function entriesAsOf<T extends DatedEntry>(entries: T[], asof: string | n
 export function resolveAsOf(dates: string[], asof: unknown): string | null {
   if (typeof asof !== 'string' || !dates.includes(asof)) return null
   return asof === dates[dates.length - 1] ? null : asof
+}
+
+/** How far back a reading still counts as current, from the newest draw (currentReadings). */
+export const CURRENT_WINDOW_DAYS = 90
+
+/**
+ * Every marker's newest reading among the draws of the last `windowDays` before the newest draw,
+ * with the date it was taken. "What is flagged now" read the newest draw alone: a one-marker
+ * add-on (an IGF-1 or prolactin re-test on its own date) became the whole picture, and the
+ * hematocrit HIGH from the full panel days earlier vanished from home and the status line
+ * (audit #43 item 28). The window keeps a years-old reading of a marker not tested since from
+ * passing for current. `draws` in any order, their derived markers already computed.
+ */
+export function currentReadings(
+  draws: ReadonlyArray<{ date: string, markers: Record<string, number | null> }>,
+  windowDays = CURRENT_WINDOW_DAYS
+): Map<string, { value: number, date: string }> {
+  const sorted = [...draws].sort((a, b) => b.date.localeCompare(a.date))
+  const newest = sorted[0]?.date
+  const out = new Map<string, { value: number, date: string }>()
+  if (!newest) return out
+  const since = shiftDays(newest, -windowDays)
+  for (const d of sorted) {
+    if (d.date < since) break
+    for (const [key, value] of Object.entries(d.markers)) {
+      if (value != null && !out.has(key)) out.set(key, { value, date: d.date })
+    }
+  }
+  return out
 }
 
 export interface RangeMeta { refMin?: number, refMax?: number }
