@@ -159,11 +159,20 @@ export default defineEventHandler(async (event) => {
   // Audited like every other owner write on the row: a regeneration replaces the prose and its
   // provenance, and a worse rewrite (or a prompt change that regressed) is otherwise gone for good.
   const before = await auditBefore(event, 'dexa_entries', date)
-  await db.prepare(`
+  // Only onto the scan this prose describes — a re-save while the call ran (a corrected scale
+  // weight, say) changes the row, and the slower summary must not land on it (audit #43 item 22).
+  const res = await db.prepare(`
     UPDATE dexa_entries
     SET ai_summary = ?2, ai_summary_model = ?3, ai_summary_prompt_hash = ?4, ai_summary_at = ?5
-    WHERE date = ?1
-  `).bind(date, summary, provenance.model, provenance.promptHash, provenance.at).run()
+    WHERE date = ?1 AND weight_lbs IS ?6 AND total IS ?7 AND regions IS ?8 AND vat IS ?9
+      AND ag_ratio IS ?10 AND bone_density IS ?11 AND symmetry IS ?12
+  `).bind(
+    date, summary, provenance.model, provenance.promptHash, provenance.at,
+    target.weight_lbs, target.total, target.regions, target.vat, target.ag_ratio, target.bone_density, target.symmetry
+  ).run()
+  if (!res.meta.changes) {
+    throw createError({ statusCode: 409, message: 'The scan changed while this summary was being written — regenerate it' })
+  }
   await recordAudit(event, { table: 'dexa_entries', key: date, before, summary: `AI summary for the ${date} scan` })
 
   return { ok: true, date, summary, ...provenance }
