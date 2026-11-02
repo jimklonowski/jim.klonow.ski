@@ -128,9 +128,16 @@ export function useOverview(role: Ref<Role | null>) {
     ?? dexa?.error.value ?? workouts?.error.value ?? null
   )
 
+  /** A client-only list (journal, metrics, workouts) still on its first fetch after a hard load. */
+  const settled = (s: string | undefined) => s == null || s === 'success' || s === 'error'
+  const pending = computed(() =>
+    !settled(journal?.status.value) || !settled(metrics?.status.value) || !settled(workouts?.status.value)
+  )
+
   return {
     hasSession,
     error,
+    pending,
     entries,
     draws,
     latestDraw,

@@ -26,6 +26,7 @@
 
     <TuiDataState
       :error="error"
+      :pending="loading"
       @retry="refresh"
     />
 
@@ -163,8 +164,10 @@ import { getCompoundColor } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Entries' })
 
-const { data, refresh, error } = await useJournalEntries()
+const { data, refresh, error, status } = await useJournalEntries()
 const { data: workoutsData } = await useWorkoutsEntries()
+// The journal list is client-only: on a hard load it is still arriving when the page first renders.
+const loading = computed(() => status.value !== 'success' && status.value !== 'error')
 const { data: photosData } = await usePhotoEntries()
 const { data: labsData } = await useLabsEntries()
 const { role, canEdit } = await useAuth()

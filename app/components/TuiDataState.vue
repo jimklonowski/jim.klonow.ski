@@ -17,6 +17,16 @@
     </template>
   </UEmpty>
 
+  <!-- A client-only list's first fetch, on a hard load: the shell is up, the data a moment away.
+       Said plainly rather than left to read as "nothing here". -->
+  <p
+    v-else-if="pending"
+    class="my-4 mx-4 sm:mx-6 text-small text-muted tui-blink"
+    role="status"
+  >
+    loading…
+  </p>
+
   <UEmpty
     v-else-if="empty"
     :title="emptyTitle"
@@ -37,10 +47,14 @@
 // Shared fetch-failure / no-data panel for the read pages. Renders nothing when the page has
 // data — drop it above the content and gate the content on `v-else` (or leave it ungated and
 // let it show only on failure). The pages await their composables in setup, so by the time
-// this renders the request has settled; in-flight loading is the NuxtLoadingIndicator's job.
+// this renders the request has settled — except a client-only list (useListResource's
+// `clientOnly`), which the server never fetched: on a hard load it is still on its way when the
+// page first renders, and `pending` shows that instead of an empty state (audit #43 item 40).
 const props = withDefaults(defineProps<{
   /** The composable's error ref value; truthy means the fetch failed. */
   error?: unknown
+  /** True while a client-only list's first fetch is out (its status is not yet success or error). */
+  pending?: boolean
   /** True when the fetch succeeded but there is nothing to show. */
   empty?: boolean
   emptyTitle?: string
@@ -48,6 +62,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   // `error` deliberately has no default: an `unknown`-typed default trips vue-tsc's
   // factory-function rule. An omitted prop is undefined, which is falsy — same behavior.
+  pending: false,
   empty: false,
   emptyTitle: 'No data yet',
   emptyDescription: ''

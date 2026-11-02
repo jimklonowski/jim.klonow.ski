@@ -38,6 +38,15 @@ interface ListResourceOptions<Raw, T> {
   lazy?: boolean
   /** What the list is, for the "couldn't refresh" toast ("journal entries"). Defaults to the key. */
   label?: string
+  /**
+   * Fetched by the browser after the page mounts, never during SSR — for the big lists. Inlined
+   * into the HTML, the journal (291 KB), workouts (231 KB), digests (96 KB) and health metrics
+   * (59 KB) made the home page's first response 1 MB, re-sent in full on every hard load; the
+   * list endpoints send an ETag with `private, no-cache`, so the same data fetched by the browser
+   * is a 304 on every revisit (audit #43 item 40). The page renders its shell first and the list
+   * arrives a moment later; pages read `status` to show that moment as loading, not empty.
+   */
+  clientOnly?: boolean
 }
 
 // Every list that failed to refresh in the last few seconds shares one toast, so going offline
@@ -84,11 +93,12 @@ function hasContent(value: unknown): boolean {
 export function useListResource<T, Raw = T>(key: string, url: string, options: ListResourceOptions<Raw, T> = {}) {
   const requestFetch = useRequestFetch()
   const nuxtApp = useNuxtApp()
-  const { transform, lazy = false, label = key } = options
+  const { transform, lazy = false, label = key, clientOnly = false } = options
   // Taken in setup: the fetcher below runs later, outside the component's injection context.
   const toast = useToast()
-  // Created while hydrating a hard load: the SSR payload was fetched for this very render.
-  const fromSsr = import.meta.client && nuxtApp.isHydrating
+  // Created while hydrating a hard load: the SSR payload was fetched for this very render. A
+  // client-only list has nothing in the payload, so its hydration-time fetch is its first.
+  const fromSsr = import.meta.client && nuxtApp.isHydrating && !clientOnly
 
   // The value the fetcher last handed to useAsyncData: any other value seen in `data` is a
   // local patch (rule 4).
@@ -138,6 +148,7 @@ export function useListResource<T, Raw = T>(key: string, url: string, options: L
     },
     {
       immediate: !lazy,
+      server: !clientOnly,
       getCachedData: (k, app, ctx) => {
         if (ctx.cause !== 'initial') return undefined
         const cached = app.payload.data[k] ?? app.static.data[k]

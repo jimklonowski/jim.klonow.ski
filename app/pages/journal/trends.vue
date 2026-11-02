@@ -12,6 +12,7 @@
 
     <TuiDataState
       :error="fetchError"
+      :pending="loading"
       @retry="retryAll"
     />
 
@@ -208,10 +209,13 @@ import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, 
 
 useSeoMeta({ title: 'Journal · Trends' })
 
-const { data: journalData, refresh, error } = await useJournalEntries()
-const { data: healthData, refresh: refreshHealth, error: healthError } = await useHealthMetricsEntries()
+const { data: journalData, refresh, error, status } = await useJournalEntries()
+const { data: healthData, refresh: refreshHealth, error: healthError, status: healthStatus } = await useHealthMetricsEntries()
 
 const fetchError = computed(() => error.value ?? healthError.value ?? null)
+// Both lists are client-only: on a hard load they are still arriving when the page first renders.
+const settled = (s: string) => s === 'success' || s === 'error'
+const loading = computed(() => !settled(status.value) || !settled(healthStatus.value))
 function retryAll() {
   refresh()
   refreshHealth()

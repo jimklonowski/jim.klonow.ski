@@ -11,7 +11,8 @@ export interface Digest {
   prompt_hash: string | null
 }
 
-// Lazy: only fetched when the digest panel is first opened (call execute()).
+// Lazy: only fetched when the digest panel is first opened (call execute()) — and by the home
+// page, which awaits it; client-only, so its ~96 KB never rides the SSR payload.
 export function useDigests() {
-  return useListResource<Digest[]>('digests', '/api/journal/digest/list', { lazy: true, label: 'digests' })
+  return useListResource<Digest[]>('digests', '/api/journal/digest/list', { lazy: true, label: 'digests', clientOnly: true })
 }

@@ -12,6 +12,7 @@
 
     <TuiDataState
       :error="error"
+      :pending="loading"
       :empty="!workouts.length"
       empty-title="No workouts synced"
       empty-description="Sessions arrive from Apple Health and Whoop automatically."
@@ -140,7 +141,9 @@ import { CHART_ACCENT, CHART_CYAN, CHART_INDIGO } from '~/utils/chartTheme'
 
 useSeoMeta({ title: 'Journal · Workouts' })
 
-const { data, refresh, error } = await useWorkoutsEntries()
+const { data, refresh, error, status } = await useWorkoutsEntries()
+// The list is client-only: on a hard load it is still arriving when the page first renders.
+const loading = computed(() => status.value !== 'success' && status.value !== 'error')
 
 // Newest first — the log reads backwards from today. Sorting on date alone left a day's
 // sessions in whatever order the API returned, so a morning lift could sit above an evening

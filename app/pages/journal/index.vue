@@ -29,6 +29,7 @@
 
     <TuiDataState
       :error="fetchError"
+      :pending="loading"
       @retry="retryAll"
     />
 
@@ -188,11 +189,14 @@ import { KNOWN_COMPOUNDS } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Overview' })
 
-const { data, refresh, error } = await useJournalEntries()
-const { data: healthData, refresh: refreshHealth, error: healthError } = await useHealthMetricsEntries()
-const { data: workoutsData, refresh: refreshWorkouts, error: workoutsError } = await useWorkoutsEntries()
+const { data, refresh, error, status } = await useJournalEntries()
+const { data: healthData, refresh: refreshHealth, error: healthError, status: healthStatus } = await useHealthMetricsEntries()
+const { data: workoutsData, refresh: refreshWorkouts, error: workoutsError, status: workoutsStatus } = await useWorkoutsEntries()
 
 const fetchError = computed(() => error.value ?? healthError.value ?? workoutsError.value ?? null)
+// The three lists are client-only: on a hard load they are still arriving when the hub first renders.
+const settled = (s: string) => s === 'success' || s === 'error'
+const loading = computed(() => !settled(status.value) || !settled(healthStatus.value) || !settled(workoutsStatus.value))
 function retryAll() {
   refresh()
   refreshHealth()

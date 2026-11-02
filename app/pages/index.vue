@@ -44,8 +44,9 @@
   </div>
 
   <TuiDataState
-    v-else-if="overviewError"
+    v-else-if="overviewError || overviewPending"
     :error="overviewError"
+    :pending="overviewPending"
     @retry="refreshOverview"
   />
 
@@ -425,7 +426,7 @@ const proteinTarget = computed(() => profile ? profileNumber(profile.data.value,
 const {
   hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
   allWorkouts, todayEntry, sodasToday, flagged, flagCounts,
-  error: overviewError, refresh: refreshOverview
+  error: overviewError, pending: overviewPending, refresh: refreshOverview
 } = useOverview(role)
 
 // --- the shown day ---
@@ -544,8 +545,11 @@ const wardrobe = computed(() => wardrobeOf({
 }))
 
 // The digest composable is lazy (the slideover owns it); the home column needs it up front.
+// Fetched on the client only: an explicit execute() runs wherever it is called, so awaited
+// during SSR it put the ~96 KB of digests back into the HTML the store's `clientOnly` keeps them
+// out of (audit #43 item 40). The column fills a moment after mount, with the other lists.
 const { data: digestData, execute: loadDigests, refresh: refreshDigests } = useDigests()
-if (isFullAccess.value) await loadDigests()
+if (import.meta.client && isFullAccess.value) await loadDigests()
 const digests = computed(() => digestData.value ?? [])
 
 /** Every session from the most recent workout day on or before the shown day, latest first. */
