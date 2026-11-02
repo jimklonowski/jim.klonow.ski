@@ -176,7 +176,7 @@
           v-for="(invite, i) in invites"
           :key="invite.id"
           class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2 border-b border-line-soft last:border-0"
-          :class="[i % 2 ? 'bg-inset' : 'bg-raised', invite.revoked ? 'opacity-60' : '']"
+          :class="[i % 2 ? 'bg-inset' : 'bg-raised', state(invite) !== 'active' ? 'opacity-60' : '']"
         >
           <span
             class="shrink-0 px-1.5 py-0.5 border text-label tracking-widest uppercase"
@@ -185,16 +185,19 @@
 
           <span
             class="text-prose truncate"
-            :class="invite.revoked ? 'line-through text-muted' : 'text-hi'"
+            :class="invite.revoked ? 'line-through text-muted' : state(invite) !== 'active' ? 'text-muted' : 'text-hi'"
           >{{ invite.label || 'Unlabeled' }}</span>
 
           <span
-            v-if="invite.revoked"
-            class="text-label tracking-widest uppercase text-danger"
-          >✕ revoked</span>
+            v-if="stateTag(invite)"
+            class="text-label tracking-widest uppercase"
+            :class="invite.revoked ? 'text-danger' : 'text-muted'"
+          >{{ stateTag(invite) }}</span>
 
           <span class="text-meta text-muted">{{ inviteMeta(invite) }}</span>
 
+          <!-- An expired or used-up link no longer redeems, but its sessions stay signed in
+               until it is revoked — so the control stays until then. -->
           <span
             v-if="!invite.revoked"
             class="ml-auto flex items-baseline gap-2.5 shrink-0 text-meta"
@@ -203,6 +206,7 @@
               type="button"
               class="text-faint hover:text-danger cursor-pointer"
               :aria-label="`Revoke link for ${invite.label || 'unlabeled link'}`"
+              :title="state(invite) !== 'active' ? 'No longer redeems — revoking also signs out anyone who used it' : undefined"
               @click="confirmRevoke(invite)"
             >revoke</button>
           </span>
@@ -255,6 +259,7 @@
 <script setup lang="ts">
 import { encode } from 'uqr'
 import type { Invite } from '#shared/types/invites'
+import { inviteState, type InviteState } from '#shared/utils/invites'
 
 useSeoMeta({ title: 'Tools · Sharing' })
 
@@ -294,34 +299,52 @@ const createdQr = computed(() => {
 })
 
 const { data, error: invitesError, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
-// Active links first, revoked sunk to the bottom — each group keeps the API's newest-first order.
+
+// Each link's state (shared/utils/invites.ts): a link past its expiry or at its use limit no
+// longer redeems, and the list said "active" for it anyway (audit #43 item 33). Reactive on the
+// day, so a link that expires while the page is open turns over without a reload.
+const today = useToday()
+const stateOf = (invite: Invite) => inviteState(invite, `${today.value}T${new Date().toISOString().slice(11)}`)
+const states = computed(() => new Map((data.value ?? []).map(i => [i.id, stateOf(i)])))
+const state = (invite: Invite) => states.value.get(invite.id) ?? 'active'
+
+// Links that still redeem first, the closed ones sunk to the bottom — each group keeps the API's
+// newest-first order.
 const invites = computed(() => {
   const list = data.value ?? []
-  return [...list.filter(i => !i.revoked), ...list.filter(i => i.revoked)]
+  return [...list.filter(i => state(i) === 'active'), ...list.filter(i => state(i) !== 'active')]
 })
 
 // Row meta and the title-row counts are assembled here — adjacent <template v-if> blocks in the
 // markup lose the spaces between them once Vue condenses whitespace.
 const countsMeta = computed(() => {
-  const active = invites.value.filter(invite => !invite.revoked).length
-  const revoked = invites.value.length - active
-  const parts = [`${active} active`]
-  if (revoked) parts.push(`${revoked} revoked`)
+  const count = (s: InviteState) => invites.value.filter(i => state(i) === s).length
+  const parts = [`${count('active')} active`]
+  const expired = count('expired') + count('exhausted')
+  if (expired) parts.push(`${expired} expired`)
+  if (count('revoked')) parts.push(`${count('revoked')} revoked`)
   return parts.join(' · ')
 })
 
 function inviteMeta(invite: Invite) {
+  const s = state(invite)
   const uses = invite.max_uses != null
-    ? `${invite.uses}/${invite.max_uses} uses`
+    ? `${invite.uses}/${invite.max_uses} uses${s === 'exhausted' ? ' — limit reached' : ''}`
     : `${invite.uses} uses`
   const parts = [`created ${shortDate(invite.created_at)}`, uses]
-  if (invite.expires_at) parts.push(`expires ${shortDate(invite.expires_at)}`)
+  if (invite.expires_at) parts.push(`${s === 'expired' ? 'expired' : 'expires'} ${shortDate(invite.expires_at)}`)
   return parts.join(' · ')
 }
 
-/** Friend links read as accent, doctor links as the restricted-scope warn tone. */
+/** The state word beside a link that no longer redeems; nothing for an active one. */
+function stateTag(invite: Invite): string {
+  const s = state(invite)
+  return s === 'revoked' ? '✕ revoked' : s === 'expired' ? 'expired' : s === 'exhausted' ? 'used up' : ''
+}
+
+/** Friend links read as accent, doctor links as the restricted-scope warn tone; a closed link is faint. */
 function roleChipClass(invite: Invite) {
-  if (invite.revoked) return 'text-faint border-line-input'
+  if (state(invite) !== 'active') return 'text-faint border-line-input'
   return invite.role === 'doctor'
     ? 'text-warn border-line-input'
     : 'text-accent border-line-accent'
