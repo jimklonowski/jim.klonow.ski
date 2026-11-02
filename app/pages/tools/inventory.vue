@@ -929,11 +929,35 @@ const activeMenu = (v: Vial) => [
   ]
 ]
 
+/**
+ * The calculator opened on this vial's mix, with the compound's last logged dose as the draw. The
+ * link used to carry the vial alone, so the calculator kept its default 250 mcg dose: an hCG or
+ * HGH vial labelled in IU opened to "Vial and dose units must both be mass-based", and without the
+ * compound it could not bridge IU↔mg either (audit #43 item 32). A compound never dosed falls back
+ * to the vial's own unit, which the calculator can always work with.
+ */
 function calculatorLink(v: Vial) {
+  const last = lastDoseOf(v.compound)
   return {
     path: '/tools/calculator',
-    query: { vialAmount: v.vial_amount, vialUnit: v.vial_unit, bacWaterMl: v.bac_water_ml ?? 2 }
+    query: {
+      vialAmount: v.vial_amount,
+      vialUnit: v.vial_unit,
+      bacWaterMl: v.bac_water_ml ?? 2,
+      compound: v.compound,
+      doseUnit: last?.unit ?? v.vial_unit,
+      ...(last ? { dose: last.dose } : {})
+    }
   }
+}
+
+/** The compound's most recent logged dose, for the calculator's draw. */
+function lastDoseOf(compound: string): { dose: number, unit: Vial['vial_unit'] } | null {
+  for (let i = entries.value.length - 1; i >= 0; i--) {
+    const p = entries.value[i]!.peptides?.findLast(p => p.compound === compound && p.dose > 0)
+    if (p) return { dose: p.dose, unit: p.unit }
+  }
+  return null
 }
 
 const { run: setStatus } = useSaveAction(async (v: Vial, status: Vial['status']) => {
