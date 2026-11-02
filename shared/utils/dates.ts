@@ -79,3 +79,12 @@ export function relativeDay(date: string, today: string): string {
 export function trailingDays(today: string, n: number): string[] {
   return Array.from({ length: n }, (_, i) => shiftDays(today, i - (n - 1)))
 }
+
+/**
+ * The first day of the `n`-day window that ends on `today`, inclusive at both ends — the lower
+ * bound for a `date >= from` filter. `today − n` reads one day too far: with today inside the
+ * window, "30d" showed 31 days (audit #43 item 37).
+ */
+export function windowStart(today: string, n: number): string {
+  return shiftDays(today, -(n - 1))
+}

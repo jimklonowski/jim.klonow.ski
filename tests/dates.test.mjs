@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { diffDays, eachDay, roundTo, shiftDays, weekStartOf, weekdayOf } from '../shared/utils/dates.ts'
+import { diffDays, eachDay, roundTo, shiftDays, trailingDays, weekStartOf, weekdayOf, windowStart } from '../shared/utils/dates.ts'
 
 test('shiftDays crosses month, year, and leap-day boundaries', () => {
   assert.equal(shiftDays('2026-09-14', 7), '2026-09-21')
@@ -78,4 +78,12 @@ test('results do not depend on the process timezone', () => {
     })
     assert.deepEqual(JSON.parse(out), ['2026-03-09', 2, '2026-11-01'], tz)
   }
+})
+
+test('windowStart opens an n-day window that ends today — "30d" is thirty days, today the last (audit #43 item 37)', () => {
+  assert.equal(windowStart('2026-11-02', 30), '2026-10-04')
+  assert.equal(eachDay(windowStart('2026-11-02', 30), '2026-11-02').length, 30)
+  assert.equal(windowStart('2026-11-02', 1), '2026-11-02', 'a one-day window is today alone')
+  // The same days trailingDays enumerates.
+  assert.equal(windowStart('2026-11-02', 90), trailingDays('2026-11-02', 90)[0])
 })

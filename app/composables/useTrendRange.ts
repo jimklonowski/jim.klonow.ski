@@ -16,13 +16,15 @@ export function useTrendRange() {
   const notes = useState('journal-trend-notes', () => true)
 
   /**
-   * Inclusive lower bound as YYYY-MM-DD, or null when showing all history. Home-timezone
-   * arithmetic (shared/utils/time.ts): the runtime-local version put the SSR boundary a day
-   * later than the client's every evening, so the charts changed shape on hydration. Anchored on
-   * useToday(), so the window moves at midnight instead of when the picker next changes.
+   * Inclusive lower bound as YYYY-MM-DD, or null when showing all history: the first of the
+   * `days` days ending today (windowStart — "30d" is thirty days with today the last of them).
+   * Home-timezone arithmetic (shared/utils/time.ts): the runtime-local version put the SSR
+   * boundary a day later than the client's every evening, so the charts changed shape on
+   * hydration. Anchored on useToday(), so the window moves at midnight instead of when the
+   * picker next changes.
    */
   const today = useToday()
-  const cutoff = computed(() => days.value ? shiftDays(today.value, -days.value) : null)
+  const cutoff = computed(() => days.value ? windowStart(today.value, days.value) : null)
 
   function inRange<T extends { date: string }>(rows: T[]): T[] {
     const from = cutoff.value
