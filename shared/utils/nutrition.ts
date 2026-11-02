@@ -72,6 +72,16 @@ export function hasFullFigures(n: DayNutrition): boolean {
   return n.meals.length > 0 && n.missing.length === 0
 }
 
+/**
+ * A day that was logged through to dinner. Dinner closes the day — the same signal isDayDone
+ * reads for today — so a day with only breakfast or lunch on it is an unfinished log, not a
+ * light day, and it dragged the 7-day average and the trends calorie line down as though it
+ * were one (audit #43 item 34). A skipped lunch (breakfast + dinner) is still a whole day.
+ */
+export function isWholeDay(entry: DayLike): boolean {
+  return !!entry.food?.dinner?.trim()
+}
+
 /** Snacks share one history: what was a morning snack once suggests itself for an afternoon one. */
 function slotFamily(slot: MealSlot): string {
   return isSnackSlot(slot) ? 'snack' : slot
@@ -668,7 +678,7 @@ export function resolveMealText(text: string, known: KnownMeal[]): { text: strin
 }
 
 export interface NutritionAverage {
-  /** Days in the window with every logged meal estimated (partial days would read low). */
+  /** Days in the window logged through to dinner with every meal estimated (a partial day would read low). */
   days: number
   kcal: number
   protein_g: number
@@ -718,6 +728,7 @@ export function nutritionAverage(
   let estimated = false
   for (const e of entries) {
     if (e.date < from || e.date > to) continue
+    if (!isWholeDay(e)) continue
     const n = dayNutrition(e, index)
     if (!hasFullFigures(n)) continue
     days++

@@ -7,7 +7,7 @@ import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/util
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
 import { bpLabel } from '#shared/utils/bloodPressure'
-import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
+import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, hasFullFigures, isWholeDay, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 
 // The digest's fact sheet: reads a period's vitals / sleep / recovery / doses / workouts from D1
@@ -54,8 +54,9 @@ const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, pep
 
 /**
  * The period's meal log against the figures (library, hand entries, model estimates): how many
- * days logged food, kcal and protein per day over the days whose meals ALL have figures (a
- * half-covered day reads low), and the three most-logged meals.
+ * days logged food, kcal and protein per day over the days logged through to dinner whose meals
+ * ALL have figures (the hub's own rule — a lunch-only day read as a light one, audit #43 item 34),
+ * and the three most-logged meals.
  */
 function foodSummary(entries: JournalRow[], estimates: EstimateIndex) {
   const days = entries.filter(e => MEAL_SLOTS.some(s => e.food?.[s]?.trim()))
@@ -63,8 +64,9 @@ function foodSummary(entries: JournalRow[], estimates: EstimateIndex) {
   let kcal = 0
   let protein = 0
   for (const e of days) {
+    if (!isWholeDay(e)) continue
     const n = dayNutrition(e, estimates)
-    if (!n.meals.length || n.missing.length) continue
+    if (!hasFullFigures(n)) continue
     covered++
     kcal += n.kcal
     protein += n.protein_g
@@ -404,7 +406,7 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   const food = foodSummary(journal, estimates)
   lines.push(food.daysLogged
     ? `Food: meals logged on ${food.daysLogged} day${food.daysLogged === 1 ? '' : 's'}`
-    + `${food.daysCovered ? `; ≈ ${food.kcal} kcal/day and ${food.protein_g} g protein/day over the ${food.daysCovered} day${food.daysCovered === 1 ? '' : 's'} with figures for every meal` : ''}`
+    + `${food.daysCovered ? `; ≈ ${food.kcal} kcal/day and ${food.protein_g} g protein/day over the ${food.daysCovered} day${food.daysCovered === 1 ? '' : 's'} logged through to dinner with figures for every meal` : ''}`
     + `${food.top.length ? `; most logged: ${food.top.join(', ')}` : ''}`
     : 'Food: no meals logged')
 

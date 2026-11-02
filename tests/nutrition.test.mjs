@@ -221,18 +221,20 @@ test('the weekly average counts only fully covered, finished days inside the win
   const index = indexEstimates([est('alpha plate', 1000, 50, 100, 30), est('bravo plate', 500, 25, 50, 15)])
   const entries = [
     { date: '2026-10-12', food: { lunch: 'alpha plate', dinner: 'alpha plate' } }, // before the window: skipped
-    { date: '2026-10-14', food: { lunch: 'alpha plate' } },
+    { date: '2026-10-13', food: { breakfast: 'bravo plate', dinner: 'alpha plate' } }, // a skipped lunch is still a whole day
+    { date: '2026-10-14', food: { lunch: 'alpha plate' } }, // lunch only — an unfinished log, not a 1000 kcal day (audit #43 item 34)
     { date: '2026-10-15', food: { lunch: 'alpha plate', dinner: 'bravo plate' } },
     { date: '2026-10-16', food: { lunch: 'alpha plate', dinner: 'unknown meal' } }, // partial figures: skipped
     { date: '2026-10-17', food: {} }, // nothing logged: skipped
     { date: '2026-10-20', food: { lunch: 'bravo plate' } }, // today, dinner not in: a running total, not a day
     { date: '2026-10-21', food: { lunch: 'alpha plate' } } // after today: skipped
   ]
-  // Oct 13–19: the 14th and 15th. The half-logged 20th used to count as a 500 kcal day.
-  assert.deepEqual(nutritionAverage(entries, index, '2026-10-20'), { days: 2, kcal: 1250, protein_g: 63, estimated: true })
-  // Dinner logged → the window slides to Oct 14–20 and today joins.
+  // Oct 13–19: the 13th (1500) and 15th (1500); the lunch-only 14th is out. The half-logged
+  // 20th used to count as a 500 kcal day.
+  assert.deepEqual(nutritionAverage(entries, index, '2026-10-20'), { days: 2, kcal: 1500, protein_g: 75, estimated: true })
+  // Dinner logged → the window slides to Oct 14–20 and today joins: the 15th and the 20th.
   const withDinner = entries.map(e => (e.date === '2026-10-20' ? { ...e, food: { ...e.food, dinner: 'bravo plate' } } : e))
-  assert.deepEqual(nutritionAverage(withDinner, index, '2026-10-20'), { days: 3, kcal: Math.round((1000 + 1500 + 1000) / 3), protein_g: Math.round((50 + 75 + 50) / 3), estimated: true })
+  assert.deepEqual(nutritionAverage(withDinner, index, '2026-10-20'), { days: 2, kcal: Math.round((1500 + 1000) / 2), protein_g: Math.round((75 + 50) / 2), estimated: true })
   assert.deepEqual(nutritionAverage([], index, '2026-10-20'), { days: 0, kcal: 0, protein_g: 0, estimated: false })
   // Label figures only (a hand entry) → not "est.".
   const manual = indexEstimates([est('alpha plate', 1000, 50, 100, 30, { source: 'manual' })])

@@ -276,7 +276,7 @@ const proteinTarget = computed(() => profileNumber(profileData.value, 'protein_t
 // total is shown above, it must not also count as a whole day here.
 const avg = computed(() => nutritionAverage(entries.value, index.value, today.value, 7))
 const avgWindow = computed(() => nutritionWindow(entries.value, today.value, 7))
-const avgTitle = computed(() => `Days with every meal estimated, ${formatDate(avgWindow.value.from, 'monthDay')} – ${avgWindow.value.to === today.value ? 'today' : 'yesterday'}; today joins once dinner is logged`)
+const avgTitle = computed(() => `Days logged through to dinner with every meal estimated, ${formatDate(avgWindow.value.from, 'monthDay')} – ${avgWindow.value.to === today.value ? 'today' : 'yesterday'}; today joins once dinner is logged`)
 
 // The legacy single Snack appears only on a day that has one; the gap snacks always have a row
 // (as "+ snack" when empty).

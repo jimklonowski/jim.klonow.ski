@@ -201,7 +201,7 @@
 import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
-import { dayNutrition, hasFullFigures, isDayDone, nutritionIsEstimated } from '#shared/utils/nutrition'
+import { dayNutrition, hasFullFigures, isDayDone, isWholeDay, nutritionIsEstimated } from '#shared/utils/nutrition'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
@@ -360,7 +360,9 @@ const foodEstimated = computed(() => inRange(entries.value).some(e => nutritionI
 const foodRaw = computed(() =>
   inRange(entries.value).map((e) => {
     const n = dayNutrition(e, estimateIndex.value)
-    const full = hasFullFigures(n) && isDayDone(e, today.value)
+    // A day logged through to dinner (isWholeDay), with figures on every meal — isDayDone keeps
+    // today off the line until its dinner is in, which for a past day isWholeDay already covers.
+    const full = hasFullFigures(n) && isWholeDay(e) && isDayDone(e, today.value)
     return {
       date: formatDate(e.date, 'monthDay'),
       day: e.date,

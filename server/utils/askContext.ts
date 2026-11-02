@@ -7,7 +7,7 @@ import { profileLabel } from '#shared/utils/profile'
 import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
 import { waterTotals } from '#shared/utils/water'
 import { bpAverageLabel, bpLabel } from '#shared/utils/bloodPressure'
-import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
+import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, hasFullFigures, isWholeDay, type EstimateIndex } from '#shared/utils/nutrition'
 import type { JournalRow, SodaEntry, Vial } from '#shared/types/journal'
 import { calcConcentration } from '#shared/utils/peptideCalc'
 import { roundTo, shiftDays } from '#shared/utils/dates'
@@ -44,15 +44,16 @@ async function journalRows(db: D1Database, since?: string): Promise<JournalRow[]
   return (results ?? []).map(parseJournalRow)
 }
 
-// "food ≈ 1,850 kcal/day, 95 g protein/day (4 days with figures)" over the days whose meals all
-// have figures; null when none do.
+// "food ≈ 1,850 kcal/day, 95 g protein/day (4 days with figures)" over the days logged through
+// to dinner whose meals all have figures (the hub's rule, audit #43 item 34); null when none do.
 function foodText(entries: JournalRow[], estimates: EstimateIndex): string | null {
   let days = 0
   let kcal = 0
   let protein = 0
   for (const e of entries) {
+    if (!isWholeDay(e)) continue
     const n = dayNutrition(e, estimates)
-    if (!n.meals.length || n.missing.length) continue
+    if (!hasFullFigures(n)) continue
     days++
     kcal += n.kcal
     protein += n.protein_g
