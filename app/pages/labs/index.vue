@@ -185,17 +185,26 @@
       class="px-4 sm:px-6 py-4 border-t border-line"
     >
       <TuiHeader label="TRENDS" />
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 mt-2.5">
+      <div
+        v-if="trendCards.length"
+        class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 mt-2.5"
+      >
         <TrendCard
-          v-for="key in CHART_MARKERS"
-          :key="key"
-          :label="BIOMARKERS[key]?.label ?? key"
-          :unit="BIOMARKERS[key]?.unit"
-          :data="chartData(key)"
+          v-for="card in trendCards"
+          :key="card.key"
+          :label="card.label"
+          :unit="card.unit"
+          :data="card.data"
           :mark-lines="timeTravelling && latest ? [latest.date] : []"
           marker-key="marker"
         />
       </div>
+      <p
+        v-else
+        class="mt-2.5 text-small text-muted"
+      >
+        No marker has two readings to chart yet.
+      </p>
 
       <TuiHeader
         label="COMPARE"
@@ -431,4 +440,13 @@ function chartData(markerKey: string) {
     .filter(e => e.markers[markerKey] != null)
     .map(e => ({ date: e.date, value: e.markers[markerKey] as number, marker: readingNoteOn(markerKey, e.date) ? 'triangle' : '' }))
 }
+
+// Only the markers with a line to draw — two readings at least, as the DEXA page's trend cards
+// already require. The fixed list rendered an empty frame for a marker measured once or never
+// (the demo's LA volume index; IGF-1 before its first draw) (audit #43 item 39).
+const trendCards = computed(() =>
+  CHART_MARKERS
+    .map(key => ({ key, label: BIOMARKERS[key]?.label ?? key, unit: BIOMARKERS[key]?.unit, data: chartData(key) }))
+    .filter(card => card.data.length >= 2)
+)
 </script>
