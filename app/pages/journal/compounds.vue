@@ -389,9 +389,17 @@ const timelineLabel = computed(() => {
 
 // --- inactive, grouped ---
 // Only compounds with logged history appear; never-used ones stay out until ⌘K surfaces them.
+// The catalogue's groups, then an "Other" group for the free-typed names the log holds that no
+// group lists — without it an inactive off-catalogue compound counted in the tracked total but
+// had no way onto its dossier from here (audit #43 item 38).
 const inactiveGroups = computed(() => {
   const activeNames = new Set(active.value.map(a => a.compound))
-  return Object.entries(COMPOUND_GROUPS)
+  const listed = new Set(KNOWN_COMPOUNDS)
+  const groups: Array<[string, readonly string[]]> = [
+    ...Object.entries(COMPOUND_GROUPS),
+    ['Other', [...usage.value.keys()].filter(c => !listed.has(c))]
+  ]
+  return groups
     .map(([label, list]) => {
       const rows = list
         .filter(c => !activeNames.has(c) && usage.value.has(c))
