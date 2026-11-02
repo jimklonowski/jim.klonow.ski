@@ -146,7 +146,7 @@
             </span>
           </div>
           <p class="mt-2 text-muted">
-            {{ normalCount }} findings normal
+            {{ echoFooter }}
           </p>
         </div>
         <p
@@ -396,8 +396,14 @@ const allQualitativeResults = computed(() =>
     .flatMap(e => (e.qualitative ?? []).map(q => ({ ...q, date: e.date })))
 )
 const geneticResults = computed(() => allQualitativeResults.value.filter(item => !isEcho(item)))
-const echoResults = computed(() => allQualitativeResults.value.filter(isEcho))
-const echoDate = computed(() => echoResults.value[0]?.date ?? null)
+const allEchoResults = computed(() => allQualitativeResults.value.filter(isEcho))
+const echoDate = computed(() => allEchoResults.value[0]?.date ?? null)
+// The panel, its highlights, the normal count and the modal all describe ONE report — the most
+// recent — as the header and the modal's description say. Reading every echo on file, a second
+// report doubled the "view all N" count, repeated its sections and double-counted the normals
+// (audit #43 item 31). Older reports stay reachable through the scrubber.
+const echoResults = computed(() => allEchoResults.value.filter(r => r.date === echoDate.value))
+const olderEchoCount = computed(() => new Set(allEchoResults.value.filter(r => r.date !== echoDate.value).map(r => r.date)).size)
 const echoOpen = ref(false)
 
 /** The findings worth surfacing inline: anything that isn't plainly reassuring. */
@@ -407,6 +413,12 @@ const echoHighlights = computed(() =>
 const normalCount = computed(() =>
   echoResults.value.filter(r => qualitativeColor(r.result) === 'success').length
 )
+/** "9 findings normal · 1 earlier echo on file — scrub back to read it" */
+const echoFooter = computed(() => {
+  const n = olderEchoCount.value
+  const older = n ? ` · ${n} earlier ${n === 1 ? 'echo' : 'echoes'} on file — scrub back to read ${n === 1 ? 'it' : 'them'}` : ''
+  return `${normalCount.value} findings normal${older}`
+})
 
 const colorClass = qualitativeClass
 
