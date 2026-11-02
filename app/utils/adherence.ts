@@ -38,6 +38,13 @@ export interface AdherenceWeek {
 }
 
 export interface AdherenceRow {
+  /**
+   * Unique among the rows: compound + cadence + the rule's first day. The table used to key its
+   * rows on compound and cadence alone, which two rules of one compound on the same weekdays
+   * share — a cycle's dose ramp ("250 mg weeks 1–4, then 500"), or a standing rule split around
+   * a cycle window — so Vue could patch one row's cells with the other's (audit #43 item 35).
+   */
+  id: string
   compound: string
   doseLabel: string
   cadence: string
@@ -137,6 +144,7 @@ export function computeAdherence(
         { exp: 0, hit: 0 }
       )
       return {
+        id: `${rule.compound}|${rule.weekdays.join('')}|${rule.from}`,
         compound: rule.compound,
         doseLabel: rule.doseLabel,
         cadence: cadenceLabel(rule),

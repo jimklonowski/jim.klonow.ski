@@ -91,3 +91,25 @@ test('a cycle is scored from its first week through today, finished runs include
   assert.equal(done.rows.length, 1)
   assert.equal(done.pct, 0, 'nothing logged in its fortnight')
 })
+
+test('two rules of one compound on the same weekdays get distinct row ids (audit #43 item 35)', () => {
+  // A dose ramp inside a cycle: same compound, same days, a later start.
+  const ramp = [rule('R', [1, 4], { from: '2026-09-01', to: '2026-09-28', doseLabel: '250 mg' }), rule('R', [1, 4], { from: '2026-09-29', doseLabel: '500 mg' })]
+  const rows = computeAdherence([], TODAY, 2, ramp, { includeInactive: true })
+  assert.equal(rows.length, 2)
+  assert.notEqual(rows[0].id, rows[1].id)
+  assert.equal(new Set(rows.map(r => r.id)).size, 2)
+  // The cycle dossier's rows come through the same path.
+  const cycle = {
+    name: 'Ramp',
+    start_date: '2026-10-05',
+    planned_weeks: 4,
+    compounds: [
+      { compound: 'R', dose: 250, unit: 'mg', weekdays: [1, 4], fromWeek: 1, toWeek: 2 },
+      { compound: 'R', dose: 500, unit: 'mg', weekdays: [1, 4], fromWeek: 3 }
+    ]
+  }
+  const { rows: cycleRows } = cycleAdherence([], cycle, TODAY)
+  assert.equal(cycleRows.length, 2)
+  assert.equal(new Set(cycleRows.map(r => r.id)).size, 2, 'the ramp\'s two rows are told apart')
+})

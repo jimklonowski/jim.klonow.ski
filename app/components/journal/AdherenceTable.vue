@@ -41,7 +41,7 @@ function iuTitle(compound: string, label: string): string | undefined {
   <div class="flex flex-col gap-1.5 mt-2.5">
     <div
       v-for="row in rows"
-      :key="`${row.compound}-${row.cadence}`"
+      :key="row.id"
       class="grid grid-cols-[1fr_auto] lg:grid-cols-[180px_150px_minmax(0,1fr)_50px_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2 bg-raised text-small"
     >
       <NuxtLink
