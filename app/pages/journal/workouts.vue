@@ -218,24 +218,38 @@ const typeMix = computed(() => {
 // --- paginated log, grouped by week ---
 const { page, totalPages, pageRows } = usePagination(workouts, 40)
 
+// Every week's sessions and minutes over the WHOLE log, keyed by week start. The group headers
+// used to tally the page's rows alone, so a week whose sessions straddled a page boundary read a
+// partial count and minutes on both pages (audit #43 item 36).
+const weekTotals = computed(() => {
+  const totals = new Map<string, { count: number, minutes: number }>()
+  for (const w of workouts.value) {
+    const weekStart = weekStartOf(w.date)
+    const t = totals.get(weekStart) ?? { count: 0, minutes: 0 }
+    t.count++
+    t.minutes += Math.round(w.duration_min ?? 0)
+    totals.set(weekStart, t)
+  }
+  return totals
+})
+
 const weekGroups = computed(() => {
   const groups: Array<{ weekStart: string, label: string, count: number, minutes: number, rows: WorkoutEntry[] }> = []
   for (const w of pageRows.value) {
     const weekStart = weekStartOf(w.date)
     let group = groups.at(-1)
     if (group?.weekStart !== weekStart) {
+      const totals = weekTotals.value.get(weekStart) ?? { count: 0, minutes: 0 }
       group = {
         weekStart,
         label: formatDate(weekStart, 'monthDay').toUpperCase(),
-        count: 0,
-        minutes: 0,
+        count: totals.count,
+        minutes: totals.minutes,
         rows: []
       }
       groups.push(group)
     }
     group.rows.push(w)
-    group.count++
-    group.minutes += Math.round(w.duration_min ?? 0)
   }
   return groups
 })
