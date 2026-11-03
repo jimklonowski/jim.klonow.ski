@@ -78,6 +78,18 @@ export const REGION_LABELS: Record<string, string> = {
   gynoid: 'Gynoid (Hips)'
 }
 
+/** The region rows' compact uppercase labels (the DEXA page and the home body card): the two
+ *  trunk sub-regions keep a hint of where they are without the parenthetical. */
+export const REGION_SHORT: Record<string, string> = {
+  android: 'ANDROID · ABD',
+  gynoid: 'GYNOID · HIPS'
+}
+
+/** "ANDROID · ABD" / "ARMS" — a region key as its row label. */
+export function regionShortLabel(key: string): string {
+  return REGION_SHORT[key] ?? REGION_LABELS[key]?.toUpperCase() ?? key.toUpperCase()
+}
+
 /** "139.2" / "140" — and "—" for a figure the scan didn't carry. */
 export function formatLbs(v: number | null | undefined) {
   if (v == null) return '—'

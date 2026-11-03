@@ -84,17 +84,20 @@
       </div>
 
       <div class="min-w-0 col-span-2 sm:col-span-1 flex flex-col gap-3">
-        <!-- Fat % by region. Hovering a row lights the region on the figure, and the reverse. -->
-        <div class="text-small">
+        <!-- Fat % by region. Hovering a row lights the region on the figure, and the reverse.
+             The rows share one set of tracks (subgrid) so the label column is as wide as the
+             longest label — "GYNOID · HIPS" — and nothing truncates; a fixed 84px cut the two
+             trunk sub-regions to "ANDROID (A…". -->
+        <div class="grid grid-cols-[auto_52px_minmax(0,1fr)_64px] gap-x-3 text-small">
           <div
             v-for="r in regions"
             :key="r.key"
-            class="grid grid-cols-[84px_52px_minmax(0,1fr)_64px] gap-x-3 items-center py-0.5 -mx-1.5 px-1.5 transition-colors"
+            class="grid grid-cols-subgrid col-span-4 items-center py-0.5 -mx-1.5 px-1.5 transition-colors"
             :class="highlight === r.key ? 'bg-row-hover' : ''"
             @pointerenter="highlight = r.key"
             @pointerleave="highlight = null"
           >
-            <span class="text-label text-muted uppercase tracking-widest truncate">{{ r.label }}</span>
+            <span class="text-label text-muted uppercase tracking-widest whitespace-nowrap">{{ r.label }}</span>
             <span
               class="text-right tabular-nums"
               :class="highlight === r.key ? 'text-accent' : 'text-hi'"
@@ -129,7 +132,7 @@
 
 <script setup lang="ts">
 import type { DexaEntry, DexaRegion } from '~/composables/useDexaEntries'
-import { DEXA_OTHER_METRICS, REGION_LABELS } from '~/data/dexa'
+import { DEXA_OTHER_METRICS, regionShortLabel } from '~/data/dexa'
 import { DEXA_NOISE, deltaInfo } from '~/utils/dexaDeltas'
 import { diffDays } from '#shared/utils/dates'
 
@@ -199,7 +202,7 @@ const regions = computed(() => {
     const delta = deltaInfo(r.fat_pct, prior[key]?.fat_pct, 1, 'down', DEXA_NOISE.regionPct)
     return [{
       key,
-      label: REGION_LABELS[key] ?? key,
+      label: regionShortLabel(key),
       pct: `${r.fat_pct.toFixed(1)}%`,
       fill: fillPct(r.fat_pct),
       delta: delta?.text ?? '—',

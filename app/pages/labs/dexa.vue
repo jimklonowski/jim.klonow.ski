@@ -346,7 +346,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { diffDays } from '#shared/utils/dates'
-import { DEXA_OTHER_METRICS, DEXA_TOTAL_METRICS, REGION_LABELS, formatLbs } from '~/data/dexa'
+import { DEXA_OTHER_METRICS, DEXA_TOTAL_METRICS, formatLbs, regionShortLabel } from '~/data/dexa'
 import { DEXA_NOISE as NOISE, deltaInfo, type Direction } from '~/utils/dexaDeltas'
 import type { DexaEntry, DexaRegion } from '~/composables/useDexaEntries'
 import { bandTone, type MeterBand, type MeterTick, type MeterTone } from '~/utils/meterBands'
@@ -509,10 +509,6 @@ const webgl = ref(true)
 const REGION_ORDER = ['arms', 'legs', 'trunk', 'android', 'gynoid']
 // Android/gynoid are sub-regions of the trunk, so they sit slightly apart.
 const SUBREGIONS = new Set(['android', 'gynoid'])
-const REGION_SHORT: Record<string, string> = {
-  android: 'ANDROID · ABD',
-  gynoid: 'GYNOID · HIPS'
-}
 
 const regionRows = computed(() => {
   const current = (latest.value?.regions ?? {}) as Record<string, DexaRegion | undefined>
@@ -524,7 +520,7 @@ const regionRows = computed(() => {
     const delta = deltaInfo(r.fat_pct, prior[key]?.fat_pct, 1, 'down', NOISE.regionPct)
     return [{
       key,
-      label: REGION_SHORT[key] ?? REGION_LABELS[key]?.toUpperCase() ?? key.toUpperCase(),
+      label: regionShortLabel(key),
       pct: `${r.fat_pct.toFixed(1)}%`,
       fat: formatLbs(r.fat_lbs),
       lean: formatLbs(r.lean_lbs),
