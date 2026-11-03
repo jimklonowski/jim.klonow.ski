@@ -2,6 +2,7 @@ import { zPinLogin } from '#shared/utils/schemas'
 
 export default defineEventHandler(async (event) => {
   requireOwner(event)
+  await enforceRateLimit(event, 'credentials', 'pin')
 
   const { pin } = await readValidatedJson(event, zPinLogin)
   // safeEqual is constant-time and false for an unset LABS_UPLOAD_PIN (server/utils/auth.ts).

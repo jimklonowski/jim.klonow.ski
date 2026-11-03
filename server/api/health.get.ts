@@ -10,7 +10,9 @@ import type { HealthReport } from '#shared/types/health'
 // checks are personal — their ok/503 alone says when the owner last weighed in or wore the
 // strap — so an anonymous caller's answer covers only the task checks. The owner, and a monitor
 // presenting `?token=<HEALTH_TOKEN>`, get the feeds counted in plus the per-check detail.
-// Always the real DB — a demo session's health is not the site's.
+// Always the real DB — a demo session's health is not the site's. Public, so per-IP limited
+// (server/utils/rateLimit.ts): a monitor polls once a minute or so; the four D1 queries behind
+// an answer are not for anyone to hammer.
 
 interface RunRow {
   task: string
@@ -96,6 +98,7 @@ async function feedChecks(db: D1Database, today: string): Promise<HealthCheck[]>
 }
 
 export default defineEventHandler(async (event): Promise<HealthReport> => {
+  await enforceRateLimit(event, 'public', 'health')
   const db = getRealDb(event)
   const now = Date.now()
   const checks = [...await taskChecks(db, now), ...await feedChecks(db, localToday())]

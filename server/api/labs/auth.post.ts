@@ -1,6 +1,7 @@
 import { zPasswordLogin } from '#shared/utils/schemas'
 
 export default defineEventHandler(async (event) => {
+  await enforceRateLimit(event, 'credentials', 'login')
   const { password } = await readValidatedJson(event, zPasswordLogin)
 
   // safeEqual is constant-time and false for an unset LABS_PASSWORD (server/utils/auth.ts).

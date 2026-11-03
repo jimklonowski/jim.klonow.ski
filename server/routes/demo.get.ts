@@ -12,7 +12,8 @@
 // owner typing the URL — goes straight in as before.
 const ROLE_NAMES: Record<string, string> = { owner: 'the owner', friend: 'a friend', doctor: 'a doctor' }
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  await enforceRateLimit(event, 'public', 'demo')
   const current = readAuthCookie(event)
   if (current && current.role !== 'demo' && isCrossSite(event)) {
     setResponseHeaders(event, { 'cache-control': 'no-store', 'x-robots-tag': 'noindex' })

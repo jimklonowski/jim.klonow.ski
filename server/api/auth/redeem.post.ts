@@ -11,7 +11,8 @@ interface InviteRow {
 }
 
 // Public: exchanges a share-link token for a role session cookie. Rate-limited via routeRules
-// in nuxt.config (tokens are 24 random bytes, so brute force is not realistic anyway).
+// in nuxt.config and the credentials binding (tokens are 24 random bytes, so brute force is not
+// realistic anyway).
 //
 // Same-origin only: the /share/[token] page is the one caller. A form on another site could post
 // any friend token here (readBody accepts a urlencoded body too) and the Set-Cookie would land,
@@ -19,6 +20,7 @@ interface InviteRow {
 // (audit #43 item 19).
 export default defineEventHandler(async (event) => {
   requireSameOrigin(event)
+  await enforceRateLimit(event, 'credentials', 'redeem')
   const { token } = await readValidatedJson(event, zRedeem)
 
   // getRealDb, not getDb: invites live only in the real database, and this must keep working
