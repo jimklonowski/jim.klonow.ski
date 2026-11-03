@@ -167,3 +167,59 @@ export function backupToSqlStatements(backup: Backup, maxStatementBytes = 90_000
 export function backupToSql(backup: Backup, maxStatementBytes = 90_000): string {
   return backupToSqlStatements(backup, maxStatementBytes).join('\n') + '\n'
 }
+
+// Verification (audit #43 item 46): what the weekly task checks a fresh snapshot against before
+// the backup counts and the older copies are pruned.
+
+/** Rows per table — stored beside the object (customMetadata.counts) for next week's comparison. */
+export function tableCounts(backup: Backup): Record<string, number> {
+  return Object.fromEntries(Object.entries(backup.tables).map(([name, t]) => [name, t.rows.length]))
+}
+
+/** What the previous backup recorded about itself: per-table counts when it has them, else the
+ * total (backups from before counts existed carry only `rows`). Junk or nothing is no baseline. */
+export interface BackupBaseline {
+  counts: Record<string, number> | null
+  rows: number | null
+}
+
+export function baselineFrom(meta: Record<string, string> | undefined): BackupBaseline | null {
+  if (!meta) return null
+  let counts: Record<string, number> | null = null
+  try {
+    const parsed: unknown = meta.counts ? JSON.parse(meta.counts) : null
+    if (parsed && typeof parsed === 'object' && Object.values(parsed).every(v => typeof v === 'number')) counts = parsed as Record<string, number>
+  }
+  catch {
+    counts = null
+  }
+  const rows = meta.rows !== undefined && Number.isFinite(Number(meta.rows)) ? Number(meta.rows) : null
+  return counts || rows !== null ? { counts, rows } : null
+}
+
+/** A table has to be this big before a drop in it means anything. */
+const COLLAPSE_MIN_ROWS = 10
+
+/**
+ * What this week's snapshot lost against the previous backup: a table that vanished, or one of
+ * at least COLLAPSE_MIN_ROWS rows now holding fewer than half (the total, when the previous
+ * backup recorded only that). The database only grows — rows are edited, rarely deleted, and
+ * the yearly audit prune is a trickle — so a halving is not a week's housekeeping: it is a wiped
+ * table, a bad migration, or a snapshot that read an empty database. Empty means nothing lost.
+ */
+export function collapseReport(previous: BackupBaseline | null, current: Record<string, number>): string[] {
+  if (!previous) return []
+  const out: string[] = []
+  if (previous.counts) {
+    for (const [name, was] of Object.entries(previous.counts)) {
+      const now = current[name]
+      if (now === undefined) out.push(`${name}: table gone (had ${was} rows)`)
+      else if (was >= COLLAPSE_MIN_ROWS && now < was / 2) out.push(`${name}: ${was} → ${now} rows`)
+    }
+  }
+  else if (previous.rows !== null) {
+    const now = Object.values(current).reduce((a, b) => a + b, 0)
+    if (previous.rows >= COLLAPSE_MIN_ROWS && now < previous.rows / 2) out.push(`total: ${previous.rows} → ${now} rows`)
+  }
+  return out
+}

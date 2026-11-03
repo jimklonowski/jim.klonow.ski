@@ -10,8 +10,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import {
-  BACKUP_VERSION, RESTORE_PARENTS, backupToSql, backupToSqlStatements,
-  isBackedUpTable, orderForRestore, toBackupTable
+  BACKUP_VERSION, RESTORE_PARENTS, backupToSql, backupToSqlStatements, baselineFrom, collapseReport,
+  isBackedUpTable, orderForRestore, tableCounts, toBackupTable
 } from '../shared/utils/backup.ts'
 
 const DIR = 'server/database/migrations'
@@ -151,6 +151,34 @@ test('no statement exceeds the byte cap; an unsplittable row refuses loudly', ()
   assert.deepEqual(all(target, 'SELECT * FROM ask_threads'), all(source, 'SELECT * FROM ask_threads'))
 
   assert.throws(() => backupToSql(snapshot(source), 10_000), /ask_threads row alone exceeds/)
+})
+
+test('verification: a table gone or halved is a collapse; growth, small tables and no baseline are not (audit #43 item 46)', () => {
+  const counts = tableCounts(snapshot(seedSource()))
+  assert.equal(counts.journal_entries, 2)
+  assert.equal(counts.ask_messages, 3)
+  assert.equal('whoop_tokens' in counts, false)
+
+  const was = { journal_entries: 400, labs_entries: 30, ask_messages: 9, vials: 12 }
+  assert.deepEqual(collapseReport({ counts: was, rows: 451 }, { journal_entries: 405, labs_entries: 31, ask_messages: 9, vials: 12 }), [], 'a normal week')
+  assert.deepEqual(collapseReport({ counts: was, rows: 451 }, { journal_entries: 405, labs_entries: 31, ask_messages: 0, vials: 12 }), [], 'a table under 10 rows may be emptied on purpose')
+  assert.deepEqual(collapseReport({ counts: was, rows: 451 }, { journal_entries: 405, labs_entries: 14, ask_messages: 9, vials: 12 }),
+    ['labs_entries: 30 → 14 rows'], 'fewer than half')
+  assert.deepEqual(collapseReport({ counts: was, rows: 451 }, { journal_entries: 405, labs_entries: 15, ask_messages: 9, vials: 12 }), [], 'exactly half is the line')
+  assert.deepEqual(collapseReport({ counts: was, rows: 451 }, { journal_entries: 0, labs_entries: 30, ask_messages: 9 }),
+    ['journal_entries: 400 → 0 rows', 'vials: table gone (had 12 rows)'])
+  assert.deepEqual(collapseReport({ counts: was, rows: 451 }, { ...was, brand_new_table: 0 }), [], 'a new table is a migration, not a loss')
+  assert.deepEqual(collapseReport(null, { journal_entries: 1 }), [], 'the first backup has nothing to compare with')
+
+  // A backup from before counts existed recorded only the total.
+  assert.deepEqual(collapseReport({ counts: null, rows: 4283 }, { a: 4000, b: 300 }), [])
+  assert.deepEqual(collapseReport({ counts: null, rows: 4283 }, { a: 12, b: 3 }), ['total: 4283 → 15 rows'])
+
+  assert.deepEqual(baselineFrom({ tables: '21', rows: '4283' }), { counts: null, rows: 4283 })
+  assert.deepEqual(baselineFrom({ tables: '2', rows: '5', counts: '{"a":3,"b":2}' }), { counts: { a: 3, b: 2 }, rows: 5 })
+  assert.deepEqual(baselineFrom({ counts: 'not json' }), null, 'junk is no baseline')
+  assert.deepEqual(baselineFrom({ counts: '{"a":"3"}', rows: 'x' }), null)
+  assert.deepEqual(baselineFrom(undefined), null)
 })
 
 test('the format refuses what it cannot restore faithfully', () => {

@@ -20,6 +20,10 @@
 // names the migrations the source had applied. Rehearse on --local before ever pointing it at
 // --remote. The backup is the whole health history in plaintext once unzipped — keep both files
 // out of the repo (it's public) and delete them when done.
+//
+// The task verifies each copy as it writes it (restore SQL builds, nothing collapsed against the
+// previous week, bytes read back exact); a copy that failed the collapse check sits under
+// backups/d1/<db>/suspect/ with the run's error naming what shrank. Prefer a top-level copy.
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
