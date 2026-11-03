@@ -1,6 +1,7 @@
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
-import { readingNoteOn } from '../../../app/data/markerCaveats'
+import { readingNoteFor } from '../../data/markerCaveats'
+import { PROTOCOL_EVENTS } from '../../data/protocolEvents'
 import { eventContext } from '#shared/utils/protocolEvents'
 
 interface LabsRow {
@@ -69,7 +70,7 @@ export default defineEventHandler(async (event) => {
     const history = draws
       .filter(d => d.markers[key] != null)
       .map((d) => {
-        const note = readingNoteOn(key, d.date)
+        const note = readingNoteFor(key, d.date)
         if (note) readingNotes.push(`† ${label} on ${d.date}${note.censored ? ' (censored at the instrument limit)' : ''}: ${note.note}`)
         return `${d.date === date ? 'NEW ' : ''}${d.date}: ${d.markers[key]}${note ? ' †' : ''}`
       })
@@ -92,7 +93,7 @@ export default defineEventHandler(async (event) => {
   // Shots and dated one-off notes as of the draw date — the difference between "IGF-1 dipped"
   // and "IGF-1 dipped two days after a travel weekend without HGH".
   const vaccineBlock = await vaccineContext(db, date)
-  const eventBlock = eventContext(date)
+  const eventBlock = eventContext(date, PROTOCOL_EVENTS)
   // A draw booked for this date (or one that landed within a few days of its plan) carries the
   // questions it was meant to answer, and the summary opens with them.
   const plannedBlock = await plannedDrawContext(db, date)

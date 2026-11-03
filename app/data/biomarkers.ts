@@ -1,5 +1,4 @@
 import { roundTo } from '#shared/utils/dates'
-import { isCensored } from './markerCaveats'
 
 export const CATEGORY_LABELS = {
   hormones: 'Hormones',
@@ -131,7 +130,7 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
 // they flow through the cards, category tabs, deltas and trend charts like any other marker.
 type ComputedMeta = BiomarkerMeta & {
   compute: (m: Record<string, number | null>) => number | null
-  /** The markers `compute` reads — none of them may be a censored reading (isCensored). */
+  /** The markers `compute` reads — none of them may be a censored reading (the draw's notes). */
   inputs: string[]
   /**
    * Only meaningful on a fasting draw: computed on a non-fasting one it was a figure out of its
@@ -171,13 +170,14 @@ export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
 // directly-reported marker always wins over a computed one of the same key. A fasting-only
 // marker is computed only when the draw is known to be fasting. (Trig/HDL is deliberately not
 // fasting-only: CHW reports print no fasting line, so older fasted panels read as non-fasting.)
-// Nor is anything derived from a censored reading on `date` — a free T % over the Sep 9 total T
-// ceiling would be a ratio to a bound, not a measurement.
-export function computeMarkers(markers: Record<string, number | null>, fasting: boolean, date?: string): Record<string, number | null> {
+// Nor is anything derived from a reading `censored` says is a bound (shared/utils/labNotes.ts
+// isCensored over the draw's notes) — a free T % over the Sep 9 total T ceiling would be a ratio
+// to a bound, not a measurement.
+export function computeMarkers(markers: Record<string, number | null>, fasting: boolean, censored: (key: string) => boolean = () => false): Record<string, number | null> {
   const out = { ...markers }
   for (const [key, meta] of Object.entries(COMPUTED_MARKERS)) {
     if (meta.fastingOnly && !fasting) continue
-    if (date && meta.inputs.some(k => isCensored(k, date))) continue
+    if (meta.inputs.some(censored)) continue
     if (out[key] == null) {
       const value = meta.compute(markers)
       if (value != null) out[key] = value

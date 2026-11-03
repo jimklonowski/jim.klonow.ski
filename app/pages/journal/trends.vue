@@ -201,7 +201,6 @@
 <script setup lang="ts">
 import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
-import { PROTOCOL_EVENTS } from '#shared/utils/protocolEvents'
 import { dayNutrition, hasFullFigures, isDayDone, isWholeDay, nutritionIsEstimated } from '#shared/utils/nutrition'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
@@ -223,6 +222,7 @@ function retryAll() {
 const { data: labsData } = await useLabsEntries()
 const { data: cyclesData } = await useCycles()
 const { rules: protocolRules } = await useProtocol()
+const { data: labNotes } = await useLabNotes()
 const { index: estimateIndex } = await useMealEstimates()
 const { role } = await useAuth()
 
@@ -233,8 +233,9 @@ const entries = computed(() => journalData.value ?? [])
 const healthEntries = computed(() => healthData.value ?? [])
 
 // --- protocol notes (dose changes, dated events, cycles) ---
-// The schedule comes from useProtocol, so the demo sandbox draws its own dose changes (P9).
-// PROTOCOL_EVENTS are the owner's real dated notes and stay off every other session's charts.
+// The schedule comes from useProtocol, so the demo sandbox draws its own dose changes (P9). The
+// dated events arrive as bare bands from /api/labs/notes — the owner's notes stay on the server,
+// and a demo session is sent no bands at all.
 const annotationsAvailable = computed(() => role.value != null)
 const annotations = computed(() => {
   if (!notes.value || !annotationsAvailable.value) return []
@@ -242,7 +243,7 @@ const annotations = computed(() => {
   const cycles = (cyclesData.value ?? [])
     .filter(c => !isTentative(c) && c.start_date <= day)
     .map(c => ({ name: c.name, from: c.start_date, to: cycleEnd(c) < day ? cycleEnd(c) : day }))
-  const events = role.value === 'demo' ? [] : eventAnnotations(PROTOCOL_EVENTS)
+  const events = eventAnnotations(labNotes.value?.events ?? [])
   return [...ruleAnnotations(protocolRules.value), ...events, ...cycleAnnotations(cycles)]
 })
 

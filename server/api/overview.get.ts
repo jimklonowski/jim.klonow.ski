@@ -5,6 +5,7 @@ import { waterTotals } from '#shared/utils/water'
 import type { OverviewSummary } from '#shared/types/overview'
 import { currentReadings } from '#shared/utils/labsTimeline'
 import { computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
+import { isCensoredOn } from '../data/markerCaveats'
 
 // One small response for the site shell. The status line, footer and ⌘K palette used to reach
 // these figures through useOverview(), which loads every journal, labs, health-metrics, DEXA and
@@ -63,8 +64,14 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   const latestDraw = drawRow ? { date: drawRow.date, fasting: drawRow.fasting, markers: drawRow.markers } : null
   // Each marker's newest reading in the window (shared/utils/labsTimeline.ts) — a one-marker
   // add-on draw no longer stands for the whole picture in the status line's flags (audit #43
-  // item 28). Derived markers per draw first, so an input never pairs across two draws.
-  const current = Object.fromEntries(currentReadings(draws.map(d => ({ date: d.date, markers: computeMarkers(d.markers, d.fasting, d.date) }))))
+  // item 28). Derived markers per draw first, so an input never pairs across two draws; the
+  // owner's censored readings (server/data/markerCaveats.ts) are no input — a demo draw on the
+  // same date is a different draw.
+  const demo = auth.role === 'demo'
+  const current = Object.fromEntries(currentReadings(draws.map(d => ({
+    date: d.date,
+    markers: computeMarkers(d.markers, d.fasting, k => !demo && isCensoredOn(k, d.date))
+  }))))
 
   const pdfKeys = new Set<string>()
   for (const r of sourcesRes?.results ?? []) {

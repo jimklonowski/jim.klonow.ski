@@ -1,17 +1,17 @@
-// Medications on the protocol that change how a lab marker reads. A flagged marker gets an
-// asterisk and an "on <compound>" badge on its card, and each affected reading in the detail
-// modal is starred — but only for draws taken while the compound was on the schedule, which the
-// protocol's rules already date, so pre-treatment readings stay unflagged and comparable.
-// (The demo persona's labs carry none of these markers, so nothing shows in demo sessions.)
-import type { ProtocolRule } from '#shared/utils/protocolRules'
-import { ruleActiveOn } from '#shared/utils/protocolRules'
+import type { MarkerCaveat, ReadingNote } from '#shared/utils/labNotes'
 
-export interface MarkerCaveat {
-  /** Protocol compound names (as logged) that skew this marker. */
-  compounds: string[]
-  /** Shown in the detail modal under the description, prefixed with the asterisk. */
-  note: string
-}
+// Medications on the protocol that change how a lab marker reads, and the caveats that belong
+// to one draw (shared/utils/labNotes.ts has the shapes and the pure helpers). A flagged marker
+// gets an asterisk and an "on <compound>" badge on its card, and each affected reading in the
+// detail modal is starred — but only for draws taken while the compound was on the schedule,
+// which the protocol's rules already date, so pre-treatment readings stay unflagged and
+// comparable. (The demo persona's labs carry none of these markers, and a demo session is sent
+// none of this anyway.)
+//
+// Server-side on purpose (audit #43 item 48): the reading notes quote the owner's actual values
+// and the caveats name the medications, and anything a page imports ends up in a public chunk.
+// The client receives the caveats through /api/labs/notes and each draw's notes on the draw
+// itself (/api/labs/list, readingNotesOn).
 
 // Isotretinoin (Accutane, from Nov 2026 for truncal acne) moves the lipid panel and the liver
 // enzymes — the very markers the Primobolan decision is gated on — so each of those cards says
@@ -34,43 +34,14 @@ export const MARKER_CAVEATS: Record<string, MarkerCaveat> = {
   ast: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIVER_NOTE }
 }
 
-/** What the caveat needs of a protocol row: the compound and the dates it ran — a scored rule or a
- * standing med (finasteride moved from the dose log to the standing list in Oct 2026). */
-export type CaveatSpan = Pick<ProtocolRule, 'compound' | 'from' | 'to'>
-
-/**
- * The caveat compound in force on `date` for this marker, or null. `spans` is the protocol's
- * rules plus its standing meds (useProtocol: `[...rules, ...standing]`). PSA stays suppressed for
- * months after a 5-ARI stops, so a span's `to` date ends the flag a little early — acceptable for
- * a badge, and the note stays one click away.
- */
-export function caveatCompoundOn(key: string, date: string, spans: CaveatSpan[]): string | null {
-  const caveat = MARKER_CAVEATS[key]
-  if (!caveat) return null
-  return spans.find(r => caveat.compounds.includes(r.compound) && ruleActiveOn(r, date))?.compound ?? null
-}
-
 // --- per-reading assay notes ---
 
 // Caveats that belong to ONE draw rather than to a medication: a different lab, a different
 // assay, a value censored at the instrument ceiling. MARKER_CAVEATS cannot express these because
 // it keys off which compound was on the schedule, which says nothing about how the sample was run.
 // Flagged readings get a dagger instead of the caveat asterisk so the two stay tellable apart when
-// both land on the same marker.
-export interface ReadingNote {
-  /** Draw date, YYYY-MM-DD — must match a labs_entries date exactly. */
-  date: string
-  /** Shown in the detail modal, prefixed with the dagger and the draw date. */
-  note: string
-  /**
-   * The value sits at the instrument's floor or ceiling and is a bound, not a measurement: the
-   * home watch tile floats it as a hollow dot off the trend line. A note without it is
-   * provenance (a different assay or lab) — the value is real, just not comparable with its
-   * neighbours, so it keeps its place on the line and carries only the dagger.
-   */
-  censored?: boolean
-}
-
+// both land on the same marker. The `date` must match a labs_entries date exactly.
+//
 // The labs summary prompt reads these too (server/api/labs/generate-summary.post.ts daggers the
 // value in the marker history and prints the note), so write each one for the model as much as
 // for the modal: say what the value is, what it may be compared with, and what it may not.
@@ -98,15 +69,22 @@ export const READING_NOTES: Record<string, ReadingNote[]> = {
 }
 
 /** The note attached to this marker on `date`, or null. */
-export function readingNoteOn(key: string, date: string): ReadingNote | null {
+export function readingNoteFor(key: string, date: string): ReadingNote | null {
   return READING_NOTES[key]?.find(n => n.date === date) ?? null
 }
 
-/**
- * A bound at the instrument's limit, not a measurement (a `censored` note): never the "previous"
- * reading a change is measured from, never an input to a derived marker, never a point a
- * two-marker comparison draws through (audit #43 item 15).
- */
-export function isCensored(key: string, date: string): boolean {
-  return readingNoteOn(key, date)?.censored === true
+/** Every marker's note on the draw of `date`, keyed by marker — what rides on the draw in
+ * /api/labs/list; undefined when the draw has none, so a clean draw's JSON stays as it was. */
+export function readingNotesOn(date: string): Record<string, ReadingNote> | undefined {
+  let out: Record<string, ReadingNote> | undefined
+  for (const [key, notes] of Object.entries(READING_NOTES)) {
+    const note = notes.find(n => n.date === date)
+    if (note) (out ??= {})[key] = note
+  }
+  return out
+}
+
+/** A bound at the instrument's limit on `date` (see isCensored in shared/utils/labNotes.ts). */
+export function isCensoredOn(key: string, date: string): boolean {
+  return readingNoteFor(key, date)?.censored === true
 }

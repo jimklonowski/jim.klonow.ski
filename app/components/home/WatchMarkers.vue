@@ -87,7 +87,7 @@
 import type { LabsEntry } from '#shared/types/labs'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
-import { readingNoteOn } from '~/data/markerCaveats'
+import { isCensored } from '#shared/utils/labNotes'
 import { CHART_ACCENT, STATUS_COLORS } from '~/utils/chartTheme'
 
 // The four markers the protocol is steered by, each as its whole draw history in one small
@@ -125,19 +125,16 @@ function refLabel(min?: number, max?: number) {
   return ''
 }
 
-// READING_NOTES are the owner's real assay caveats, keyed by date; the demo persona re-anchors
-// nightly and lands on those dates now and then, which drew the hollow dot on its made-up draw.
-// Only a note marked `censored` (a value at the instrument limit) leaves the line — a provenance
-// note (the estradiol assay pairs) is a real reading and stays on it.
-const { data: me } = useNuxtData<{ role?: string | null }>('auth-me')
-const demo = computed(() => me.value?.role === 'demo')
-
+// A draw's assay notes ride on the draw (LabsEntry.notes; the demo persona's made-up draws carry
+// none, so a shared date no longer drew the hollow dot on one). Only a note marked `censored` (a
+// value at the instrument limit) leaves the line — a provenance note (the estradiol assay pairs)
+// is a real reading and stays on it.
 const tiles = computed(() => WATCH_MARKERS.flatMap((key) => {
   const meta = BIOMARKERS[key]
   if (!meta) return []
   const series = props.draws
     .filter(d => d.markers[key] != null)
-    .map(d => ({ date: d.date, value: d.markers[key] as number, censored: !demo.value && !!readingNoteOn(key, d.date)?.censored }))
+    .map(d => ({ date: d.date, value: d.markers[key] as number, censored: isCensored(d, key) }))
   if (series.length < 2) return []
 
   const latest = series.at(-1)!

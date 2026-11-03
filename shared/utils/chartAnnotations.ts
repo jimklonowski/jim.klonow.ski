@@ -12,7 +12,7 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { shiftDays } from './dates.ts'
-import type { ProtocolEvent } from './protocolEvents.ts'
+import type { EventBand, ProtocolEvent } from './protocolEvents.ts'
 import type { ProtocolRule } from './protocolRules.ts'
 import { cadenceOf, doseLabelOn, predecessorOf, successorOf } from './protocolRules.ts'
 
@@ -77,10 +77,11 @@ export function ruleAnnotations(rules: ProtocolRule[]): ChartAnnotation[] {
   return out
 }
 
-/** Dated events that carry a chart label. Unlabeled ones stay prompt-only context. */
-export function eventAnnotations(events: ProtocolEvent[]): ChartAnnotation[] {
+/** Dated events that carry a chart label — the full events on the server, or the bands
+ * /api/labs/notes sends the client (never the notes). Unlabeled ones stay prompt-only context. */
+export function eventAnnotations(events: Array<Pick<ProtocolEvent, 'from' | 'to' | 'label'>>): ChartAnnotation[] {
   return events
-    .filter((e): e is ProtocolEvent & { label: string } => !!e.label)
+    .filter((e): e is EventBand => !!e.label)
     .map(e => ({ kind: 'event' as const, from: e.from, to: e.to ?? e.from, text: e.label }))
 }
 

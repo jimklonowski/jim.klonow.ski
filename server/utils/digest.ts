@@ -1,5 +1,6 @@
 import { mergeRules } from '#shared/utils/cycles'
 import { eventContext } from '#shared/utils/protocolEvents'
+import { PROTOCOL_EVENTS } from '../data/protocolEvents'
 import { localToday } from '#shared/utils/time'
 import { shiftDays } from '#shared/utils/dates'
 import { dailyDigestFacts, digestTrends, weeklyDigestFacts } from './digestFacts'
@@ -126,7 +127,7 @@ export async function generateDigest(
     vaccineContext(db, end),
     plannedDrawContext(db, end)
   ])
-  const regimen = [supplements, cyclesCtx, vaccines, plannedDraws, eventContext(end)].filter(Boolean).join('\n\n')
+  const regimen = [supplements, cyclesCtx, vaccines, plannedDraws, eventContext(end, PROTOCOL_EVENTS)].filter(Boolean).join('\n\n')
 
   const facts = built.lines.join('\n')
   const prompt = kind === 'weekly' ? weeklyDigestPrompt(start, end, facts, regimen, protocol) : dailyDigestPrompt(end, facts, regimen, protocol)

@@ -14,6 +14,7 @@ import { roundTo, shiftDays } from '#shared/utils/dates'
 import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
 import { eventContext } from '#shared/utils/protocolEvents'
+import { PROTOCOL_EVENTS } from '../data/protocolEvents'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 
 const avg = mean
@@ -291,7 +292,7 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     supplements,
     cyclesCtx,
     vaccines,
-    eventContext(today),
+    eventContext(today, PROTOCOL_EVENTS),
     plannedDraws,
     `Lab draws (every draw on file; marker keys are snake_case, standard US lab units):\n${labs.join('\n') || 'none'}`,
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,

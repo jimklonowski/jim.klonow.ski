@@ -1,6 +1,7 @@
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { eventContext } from '#shared/utils/protocolEvents'
+import { PROTOCOL_EVENTS } from '../../data/protocolEvents'
 
 // The DEXA counterpart of /api/labs/generate-summary: narrates the newest scan against the ones
 // before it and stores the prose on the row with its provenance. The upload page calls it right
@@ -124,7 +125,7 @@ export default defineEventHandler(async (event) => {
   const protocolBlock = protocolLines.length ? `\n${protocolLines.join('\n')}\n` : ''
   const supplementBlock = await supplementContext(db, date)
   const cycleBlock = await cycleContext(db, date)
-  const eventBlock = eventContext(date)
+  const eventBlock = eventContext(date, PROTOCOL_EVENTS)
 
   // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
   // renders it as of the scan date.

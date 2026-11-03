@@ -3,7 +3,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { annotationsAt, cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '../shared/utils/chartAnnotations.ts'
-import { PROTOCOL_EVENTS } from '../shared/utils/protocolEvents.ts'
+import { eventBands } from '../shared/utils/protocolEvents.ts'
+import { PROTOCOL_EVENTS } from '../server/data/protocolEvents.ts'
 import { RULES } from './_fixtures/protocol.mjs'
 
 test('dose steps become short "from→to" lines, plus a start per rule and a stop for ended ones', () => {
@@ -22,6 +23,8 @@ test('dose steps become short "from→to" lines, plus a start per rule and a sto
 test('only labelled events become bands; the rest stay prompt-only', () => {
   const bands = eventAnnotations(PROTOCOL_EVENTS)
   assert.deepEqual(bands, [{ kind: 'event', from: '2026-09-05', to: '2026-09-07', text: 'Labor Day travel' }])
+  // The client is sent the bands alone (audit #43 item 48), and they annotate the same.
+  assert.deepEqual(eventAnnotations(eventBands(PROTOCOL_EVENTS)), bands)
 })
 
 test('a line lands on the first point on or after its date, and only inside the data', () => {

@@ -1,4 +1,5 @@
 import { goalContext } from '#shared/utils/protocolEvents'
+import { PROTOCOL_GOALS } from '../data/protocolEvents'
 import { protocolSchedule } from '#shared/utils/protocolProse'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 
@@ -19,7 +20,7 @@ function fmtDateFull(d: string): string {
 // aiming at from the dated goals (PROTOCOL_GOALS); this text is only the framing. `protocol` is
 // the request's schedule (protocolFor / loadProtocol, from the protocol tables).
 export function readerContext(asOf: string, protocol: ProtocolData): string {
-  const goals = goalContext(asOf)
+  const goals = goalContext(asOf, PROTOCOL_GOALS)
   return `About the reader: an adult man running a self-directed hormone protocol alongside regular training. The core of the protocol is testosterone (TRT), HGH, and hCG — these are the compounds that matter when connecting protocol to outcomes, and they are ongoing. Ancillary peptides (BPC-157, TB-500, MOTS-C, NAD+, GHK-Cu, and the like) come and go around that core; treat their starts and stops as secondary context, not headlines — the schedule below says which are running. He is also weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals, so anything bearing on that decision — blood pressure, resting HR, recovery, and (when labs appear) lipids, hematocrit, and iron/ferritin — deserves attention. He is not currently taking an aromatase inhibitor, but keeps Anastrozole on hand from his TRT clinic for symptomatic use; his estradiol is running high (recently over 100 pg/mL), so when the data hints at estrogen-related effects (water retention, blood-pressure drift, mood/sleep changes), connect that dot explicitly. His priorities: body recomposition (adding lean mass to arms/chest without adding fat), sleep and recovery quality, and keeping cardiovascular markers — blood pressure and resting HR — in a healthy range while on protocol. He tracks soda intake because he is trying to keep it low. He wants honest signal over encouragement: if something looks off or is trending the wrong way, say so directly.
 
 ${protocolSchedule(asOf, protocol.rules, protocol.standing, protocol.asNeeded)}${goals ? `\n\n${goals}` : ''}`

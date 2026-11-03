@@ -168,11 +168,13 @@
 import { STATUS_COLORS } from '~/utils/chartTheme'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus, statusLabel } from '~/data/biomarkers'
-import { MARKER_CAVEATS, READING_NOTES, caveatCompoundOn, isCensored, readingNoteOn } from '~/data/markerCaveats'
+import { caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
+import type { ReadingNote } from '#shared/utils/labNotes'
 
 const props = defineProps<{
   biomarkerKey: string
-  entries: Array<{ date: string, markers: Record<string, number | null> }>
+  /** Draws, each with the owner's assay notes the list attached to it (LabsEntry.notes). */
+  entries: Array<{ date: string, markers: Record<string, number | null>, notes?: Record<string, ReadingNote> }>
   /** Open the detail modal on mount — set when a ?marker= deep link targets this card. */
   autoOpen?: boolean
   /**
@@ -210,8 +212,8 @@ const current = computed(() => withValue.value.at(-1)?.markers[props.biomarkerKe
 // the last real measurement before it (audit #43 item 15).
 const prev = computed(() => {
   const last = withValue.value.at(-1)
-  if (!last || isCensored(props.biomarkerKey, last.date)) return null
-  return withValue.value.slice(0, -1).findLast(e => !isCensored(props.biomarkerKey, e.date))?.markers[props.biomarkerKey] ?? null
+  if (!last || isCensored(last, props.biomarkerKey)) return null
+  return withValue.value.slice(0, -1).findLast(e => !isCensored(e, props.biomarkerKey))?.markers[props.biomarkerKey] ?? null
 })
 
 // The newest entry passed in is the draw being viewed. A marker that wasn't on that panel still
@@ -225,19 +227,20 @@ const hasRange = computed(() => meta.value.refMin !== undefined || meta.value.re
 // Medication caveat (PSA on finasteride): decided per reading off the protocol dates, so the
 // badge follows the reading actually on screen and pre-treatment history stays unstarred. The
 // schedule comes from useProtocol: the scored rules AND the standing meds, since a 5-ARI taken
-// daily without being logged (finasteride since Oct 2026) skews PSA just the same.
+// daily without being logged (finasteride since Oct 2026) skews PSA just the same. The caveats
+// themselves come from /api/labs/notes (useLabNotes): none before it answers, none in the demo.
 const { rules: protocolRules, standing: protocolStanding } = useProtocol()
+const { data: labNotes } = useLabNotes()
 const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value])
-const caveat = computed(() => MARKER_CAVEATS[props.biomarkerKey])
+const caveats = computed(() => labNotes.value?.caveats ?? {})
+const caveat = computed(() => caveats.value[props.biomarkerKey])
 const caveatCompound = computed(() =>
-  carriedFrom.value ? caveatCompoundOn(props.biomarkerKey, carriedFrom.value, caveatSpans.value) : null
+  carriedFrom.value ? caveatCompoundOn(caveats.value, props.biomarkerKey, carriedFrom.value, caveatSpans.value) : null
 )
 
 // Assay caveat (the censored 2026-09-09 immunoassay testosterone): belongs to one draw rather
 // than to a medication, so it follows the reading on screen the way the badge above does.
-const readingNote = computed(() =>
-  carriedFrom.value ? readingNoteOn(props.biomarkerKey, carriedFrom.value) : null
-)
+const readingNote = computed(() => readingNoteOn(withValue.value.at(-1), props.biomarkerKey))
 
 const displayValue = computed(() => {
   const v = current.value
@@ -300,7 +303,7 @@ const chartPoints = computed(() =>
     value: e.markers[props.biomarkerKey] as number,
     // A reading with its own note (a censored or different-assay value) gets an upward triangle
     // instead of the usual dot, so the segment into it cannot be misread as a measured move.
-    marker: readingNoteOn(props.biomarkerKey, e.date) ? 'triangle' : ''
+    marker: readingNoteOn(e, props.biomarkerKey) ? 'triangle' : ''
   }))
 )
 
@@ -314,8 +317,8 @@ const history = computed(() =>
       value: num(value),
       color: STATUS_COLORS[s],
       label: statusLabel(value, meta.value),
-      flagged: caveatCompoundOn(props.biomarkerKey, e.date, caveatSpans.value) != null,
-      noted: readingNoteOn(props.biomarkerKey, e.date) != null
+      flagged: caveatCompoundOn(caveats.value, props.biomarkerKey, e.date, caveatSpans.value) != null,
+      noted: readingNoteOn(e, props.biomarkerKey) != null
     }
   })
 )
@@ -326,10 +329,8 @@ const showCaveat = computed(() =>
 
 // Every per-draw note whose reading is actually on this card, so a daggered history row keeps its
 // explanation one click away even when the reading on the face of the card is a clean one.
-const readingNotes = computed(() => {
-  const shown = new Set(withValue.value.map(e => e.date))
-  return (READING_NOTES[props.biomarkerKey] ?? [])
-    .filter(n => shown.has(n.date))
-    .map(n => ({ ...n, dateLabel: formatDate(n.date) }))
-})
+const readingNotes = computed(() => withValue.value.flatMap((e) => {
+  const n = readingNoteOn(e, props.biomarkerKey)
+  return n ? [{ ...n, date: e.date, dateLabel: formatDate(e.date) }] : []
+}))
 </script>

@@ -7,10 +7,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fmtDay, protocolSchedule as renderSchedule, scheduleContext } from '../shared/utils/protocolProse.ts'
-import { PROTOCOL_GOALS, eventContext, goalContext } from '../shared/utils/protocolEvents.ts'
+import { eventContext as eventContextOf, goalContext as goalContextOf } from '../shared/utils/protocolEvents.ts'
+import { PROTOCOL_EVENTS, PROTOCOL_GOALS } from '../server/data/protocolEvents.ts'
 import { cadenceOf, doseLabelOn } from '../shared/utils/protocolRules.ts'
 import { COMPOUND_INFO } from '../app/data/compoundInfo.ts'
 import { AS_NEEDED, RULES, STANDING } from './_fixtures/protocol.mjs'
+
+// The prose builders over the real server-side entries (the shared module holds only the shapes
+// and builders since audit #43 item 48).
+const eventContext = asOf => eventContextOf(asOf, PROTOCOL_EVENTS)
+const goalContext = (asOf, goals = PROTOCOL_GOALS) => goalContextOf(asOf, goals)
 
 const lineFor = (text, needle) => text.split('\n').find(l => l.includes(needle))
 // The schedule the code constants described (tests/_fixtures/protocol.mjs), as every prompt renders it.
