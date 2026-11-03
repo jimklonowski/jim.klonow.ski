@@ -44,10 +44,16 @@ useHead({
     { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
     // The browser chrome matches the page surface of whichever preset is on.
     { name: 'theme-color', content: () => preset.value.tokens.bg },
-    // Add-to-homescreen: open as a standalone dark app rather than a Safari tab.
+    // Add-to-homescreen: open as a standalone app rather than a Safari tab.
     { name: 'mobile-web-app-capable', content: 'yes' },
     { name: 'apple-mobile-web-app-capable', content: 'yes' },
-    { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
+    // iOS draws the standalone status bar itself, from this tag, not from theme-color: `black`
+    // is an opaque black bar with white text — right over the dark presets' near-black page,
+    // wrong over PAPER, where it sat as a black band on a cream page (audit #43 item 49).
+    // `default` is the opaque white bar with dark text PAPER wants. Neither is translucent, so
+    // the page never paints under the clock and needs no top safe-area inset; viewport-fit=cover
+    // above is for the home indicator at the bottom, which the footer does pad for.
+    { name: 'apple-mobile-web-app-status-bar-style', content: () => (preset.value.light ? 'default' : 'black') },
     { name: 'apple-mobile-web-app-title', content: 'JCK Health' }
   ],
   link: [
