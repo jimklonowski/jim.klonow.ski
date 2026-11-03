@@ -181,3 +181,43 @@ export function sanitizeSources(input: unknown): string[] {
   if (!Array.isArray(input)) return []
   return [...new Set(input.filter((s): s is string => typeof s === 'string' && isLabPdfKey(s)))].slice(0, 20)
 }
+
+// Orphan PDFs (audit #43 item 45). process-pdf stores the PDF at PREVIEW time, on purpose (the
+// saved row may only ever point at a key the server itself wrote), so a preview that was never
+// saved left its file in the bucket for good. The weekly audit:purge task sweeps them: only bare
+// top-level `.pdf` keys are candidates (isLabPdfKey — the bucket also holds backups/d1/… and
+// demo/seed.json under prefixes), only ones older than PDF_GRACE_DAYS (a preview still on screen
+// is hours old at most), and only ones absent from every `sources` array of both tables.
+
+const PDF_GRACE_DAYS = 7
+const DAY_MS = 86_400_000
+
+/** Every lab-PDF key some draw or scan still names, both tables. */
+async function referencedPdfKeys(db: D1Database): Promise<Set<string>> {
+  const refs = new Set<string>()
+  for (const table of ['labs_entries', 'dexa_entries']) {
+    const { results } = await db.prepare(`SELECT sources FROM ${table}`).all<{ sources: string | null }>()
+    for (const r of results ?? []) {
+      for (const key of JSON.parse(r.sources || '[]') as unknown[]) if (typeof key === 'string') refs.add(key)
+    }
+  }
+  return refs
+}
+
+/** Removes the unreferenced, old-enough lab PDFs; returns how many went. Pages through the bucket. */
+export async function purgeOrphanPdfs(db: D1Database, bucket: R2Bucket, now: number): Promise<number> {
+  const refs = await referencedPdfKeys(db)
+  const cutoff = now - PDF_GRACE_DAYS * DAY_MS
+  const orphans: string[] = []
+  let cursor: string | undefined
+  do {
+    const page = await bucket.list({ cursor, limit: 1000 })
+    for (const obj of page.objects) {
+      if (isLabPdfKey(obj.key) && !refs.has(obj.key) && obj.uploaded.getTime() < cutoff) orphans.push(obj.key)
+    }
+    cursor = page.truncated ? page.cursor : undefined
+  } while (cursor)
+  // R2 deletes up to 1000 keys per call.
+  for (let i = 0; i < orphans.length; i += 1000) await bucket.delete(orphans.slice(i, i + 1000))
+  return orphans.length
+}

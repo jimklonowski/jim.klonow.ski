@@ -43,23 +43,31 @@ export default defineEventHandler(async (event) => {
 
   const ext = EXT_BY_MIME[contentType] ?? 'jpg'
   const r2Key = `${date}-${category}-${Date.now()}.${ext}`
-
-  const bucket = getPhotosBucket(event)
-  await bucket.put(r2Key, data, {
-    httpMetadata: { contentType }
-  })
-
   const created_at = new Date().toISOString()
 
+  // The row first, then the file: with the file stored first, an INSERT that failed left an
+  // object in the bucket nothing would ever name or delete (audit #43 item 45). A row whose file
+  // then fails to land is worse than no row (a gallery entry that 404s), so a failed put takes
+  // the row back out before the error reaches the caller.
   const db = getDb(event)
   const result = await db.prepare(`
     INSERT INTO progress_photos (date, category, r2_key, taken_at, created_at)
     VALUES (?1, ?2, ?3, ?4, ?5)
   `).bind(date, category, r2Key, taken_at, created_at).run()
-  await recordAudit(event, { table: 'progress_photos', key: result.meta.last_row_id, before: null, summary: `photo ${date} ${category}` })
+  const id = result.meta.last_row_id
+
+  const bucket = getPhotosBucket(event)
+  try {
+    await bucket.put(r2Key, data, { httpMetadata: { contentType } })
+  }
+  catch (err) {
+    await db.prepare('DELETE FROM progress_photos WHERE id = ?1').bind(id).run().catch(() => {})
+    throw err
+  }
+  await recordAudit(event, { table: 'progress_photos', key: id, before: null, summary: `photo ${date} ${category}` })
 
   return parseProgressPhotoRow({
-    id: result.meta.last_row_id,
+    id,
     date,
     category,
     r2_key: r2Key,

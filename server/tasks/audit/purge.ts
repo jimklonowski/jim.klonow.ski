@@ -1,8 +1,11 @@
+import { purgeOrphanPdfs } from '../../utils/labs'
+
 // Weekly audit-log housekeeping (main DB only; the demo sandbox is never audited):
 //  - a deleted photo's R2 files, left in place so the delete could be restored, are removed once
 //    it has been gone PHOTO_GRACE_DAYS and nobody restored it (the entry is marked purged_at,
 //    after which /tools/data no longer offers the restore);
-//  - entries older than RETENTION_DAYS are dropped.
+//  - entries older than RETENTION_DAYS are dropped;
+//  - lab PDFs no draw or scan names are removed (purgeOrphanPdfs, audit #43 item 45).
 
 const PHOTO_GRACE_DAYS = 30
 const RETENTION_DAYS = 365
@@ -38,13 +41,15 @@ async function purge(env: Env) {
   const pruned = await db.prepare('DELETE FROM audit_log WHERE at < ?1')
     .bind(new Date(now - RETENTION_DAYS * DAY_MS).toISOString()).run()
 
-  return { photos, files, pruned: pruned.meta.changes ?? 0 }
+  const orphanPdfs = await purgeOrphanPdfs(db, env.LABS_BUCKET, now)
+
+  return { photos, files, pruned: pruned.meta.changes ?? 0, orphanPdfs }
 }
 
 export default defineTask({
   meta: {
     name: 'audit:purge',
-    description: 'Remove R2 files of photos deleted 30+ days ago and drop audit entries older than a year'
+    description: 'Remove R2 files of photos deleted 30+ days ago, lab PDFs no draw names, and audit entries older than a year'
   },
   run: event => runLoggedTask(event, 'audit:purge', purge)
 })
