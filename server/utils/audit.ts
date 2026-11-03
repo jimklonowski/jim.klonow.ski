@@ -30,7 +30,11 @@ export const AUDIT_KEYS = {
   protocol_versions: 'id',
   // A hand-entered figure for a meal (correct.post.ts): the one meal_estimates write a person
   // makes; model rows are regenerable and not logged.
-  meal_estimates: 'key'
+  meal_estimates: 'key',
+  // A saved /ask conversation (audit #43 item 44). Its turns are not a table of their own here:
+  // the delete folds them into the thread's before-image as `messages`, and restoring the thread
+  // re-inserts them (restoreAudit) — a conversation came back whole or not at all.
+  ask_threads: 'id'
 } as const
 
 export type AuditTable = keyof typeof AUDIT_KEYS
@@ -104,6 +108,25 @@ export function auditStatement(event: H3Event, entry: AuditWrite): D1PreparedSta
   if (!auditing(event)) return null
   const action: AuditAction = entry.deleted ? 'delete' : entry.before ? 'update' : 'create'
   return insertAudit(getDb(event), action, entry.table, entry.key, entry.before, entry.summary)
+}
+
+/**
+ * Deletes one row and logs it in ONE transaction, the way the photo delete always did. The other
+ * delete handlers ran DELETE then recordAudit as two statements, behind an auditBefore that turns
+ * a failed read into null — so a D1 hiccup on either side left a delete with no entry to undo it
+ * from (audit #43 item 44). Here the before-image is read directly (a failed owner read throws,
+ * never nulls), a missing row is a 404 before anything is written, and the delete and its log
+ * entry ride one db.batch: both land or neither does. `extra` statements (a child table's
+ * cleanup) join the same batch. Returns the row as it was.
+ */
+export async function auditedDelete(event: H3Event, table: AuditTable, key: string | number, summary: (before: Row) => string, extra: D1PreparedStatement[] = []): Promise<Row> {
+  const db = getDb(event)
+  const before = await currentRow(db, table, key)
+  if (!before) throw createError({ statusCode: 404, message: 'Not found' })
+  const del = db.prepare(`DELETE FROM ${table} WHERE ${AUDIT_KEYS[table]} = ?1`).bind(key)
+  const audit = auditStatement(event, { table, key, before, deleted: true, summary: summary(before) })
+  await db.batch(audit ? [...extra, del, audit] : [...extra, del])
+  return before
 }
 
 function insertAudit(db: D1Database, action: AuditAction, table: AuditTable, key: string | number, before: Row | null, summary: string): D1PreparedStatement {
@@ -192,6 +215,8 @@ export async function restoreAudit(db: D1Database, id: number, photos: R2Bucket)
   let write: D1PreparedStatement
   // Log entries for the child rows a deleting restore cascades away, written before the delete.
   const childLogs: D1PreparedStatement[] = []
+  // Child rows a restoring restore puts back after the parent (a thread's turns).
+  const childWrites: D1PreparedStatement[] = []
   if (!target) {
     // The entry created the row (or a restore re-created it): restoring removes it.
     if (!now) throw createError({ statusCode: 409, message: 'Can\'t restore: that row is already gone' })
@@ -225,9 +250,19 @@ export async function restoreAudit(db: D1Database, id: number, photos: R2Bucket)
     const { results: info } = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>()
     const known = new Set((info ?? []).map(c => c.name))
     const cols = Object.keys(target).filter(c => known.has(c))
+    // A thread's turns rode along in its before-image (not a column): they go back in after the
+    // thread row, in the same batch, with their original ids.
+    if (table === 'ask_threads' && Array.isArray(target.messages)) {
+      for (const m of target.messages as Array<Record<string, unknown>>) {
+        childWrites.push(db.prepare(`
+          INSERT INTO ask_messages (id, thread_id, role, content, model, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        `).bind(m.id, row.row_key, m.role, m.content, m.model ?? null, m.created_at))
+      }
+    }
     if (!cols.includes(keyCol)) throw createError({ statusCode: 409, message: 'Can\'t restore: the saved row has no key' })
     // An upsert, never INSERT OR REPLACE: REPLACE deletes the row first, and that delete cascades
-    // to its children (audit #43 item 1 — a protocol item's versions).
+    // to its children (audit #43 item 1 — a protocol item's versions). `messages` is a thread's
+    // before-image extra, not a column, and `cols` already excludes it.
     write = db.prepare(restoreUpsertSql(table, keyCol, cols)).bind(...cols.map(c => target[c] ?? null))
   }
 
@@ -240,6 +275,7 @@ export async function restoreAudit(db: D1Database, id: number, photos: R2Bucket)
     await db.batch([
       ...childLogs,
       write,
+      ...childWrites,
       db.prepare(`
         INSERT INTO audit_log (at, action, table_name, row_key, summary, before)
         VALUES (?1, ?2, ?3, ?4, ?5, ?6)

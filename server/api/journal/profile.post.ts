@@ -29,12 +29,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb(event)
-  const before = await auditBefore(event, 'profile', field.key)
   if (!stored) {
-    await db.prepare('DELETE FROM profile WHERE key = ?1').bind(field.key).run()
-    if (before) await recordAudit(event, { table: 'profile', key: field.key, before, deleted: true, summary: `${field.label} cleared` })
+    // Clearing a fact that is not set is a no-op, not a 404 — the form clears what it never had.
+    const held = await db.prepare('SELECT 1 FROM profile WHERE key = ?1').bind(field.key).first()
+    if (held) await auditedDelete(event, 'profile', field.key, () => `${field.label} cleared`)
     return { ok: true, key: field.key, value: null }
   }
+  const before = await auditBefore(event, 'profile', field.key)
 
   await db.prepare(`
     INSERT INTO profile (key, value, updated_at) VALUES (?1, ?2, ?3)

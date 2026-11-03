@@ -23,7 +23,10 @@ export default defineEventHandler(async (event) => {
 
   const bucket = getPhotosBucket(event)
   await bucket.put(thumbKey, data, { httpMetadata: { contentType: 'image/jpeg' } })
+  // Logged like the photo's other writes (audit #43 item 44): the row's thumb key changes here.
+  const before = await auditBefore(event, 'progress_photos', id)
   await db.prepare('UPDATE progress_photos SET thumb_r2_key = ?1 WHERE id = ?2').bind(thumbKey, id).run()
+  await recordAudit(event, { table: 'progress_photos', key: id, before, summary: `photo ${id}: thumbnail` })
 
   return { ok: true, thumbUrl: toPhotoUrl(thumbKey) }
 })

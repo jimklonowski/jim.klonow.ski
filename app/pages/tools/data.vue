@@ -151,7 +151,8 @@ const TABLE_LABELS: Record<string, string> = {
   planned_draws: 'Planned draw',
   progress_photos: 'Photo',
   profile: 'Profile',
-  meal_estimates: 'Meal figures'
+  meal_estimates: 'Meal figures',
+  ask_threads: 'Ask conversation'
 }
 
 const ACTION_CHIP: Record<AuditEntry['action'], string> = {
