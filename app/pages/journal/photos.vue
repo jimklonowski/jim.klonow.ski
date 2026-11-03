@@ -316,27 +316,9 @@
         </div>
       </section>
 
-      <!-- The whole category in date order, frame by frame -->
-      <section
-        v-if="photosForCategory.length >= 2"
-        class="px-4 sm:px-6 py-4 border-t border-line"
-      >
-        <TuiHeader
-          label="TIMELAPSE"
-          :dashes="11"
-        >
-          <span class="text-label text-muted normal-case">{{ timelapseMeta }}</span>
-        </TuiHeader>
-        <JournalPhotoTimelapse
-          class="mt-2.5"
-          :photos="photosForCategory"
-          :category-label="photoCategoryLabel(category)"
-          :weights="weightByDate"
-          :frame-style="frameStyle"
-        />
-      </section>
-
-      <!-- Every individual photo in this category, for quick stepping (a day can have more than one) -->
+      <!-- Every individual photo in this category, for quick stepping (a day can have more than
+           one). Directly under COMPARE, so swapping the before/after photos is a short reach;
+           the timelapse follows. -->
       <section class="px-4 sm:px-6 py-4 border-t border-line">
         <TuiHeader
           :label="`ALL ${photoCategoryLabel(category).toUpperCase()} · ${photosForCategory.length}`"
@@ -404,6 +386,26 @@
         <p class="mt-2.5 text-meta text-muted">
           Tap <span class="text-warn">before</span> or <span class="text-accent">after</span> above to pick the slot you're filling, then tap a thumbnail. Filling Before arms After for you.{{ isOwner ? ' Long-press a thumbnail for reframe / flip / edit / delete.' : '' }}
         </p>
+      </section>
+
+      <!-- The whole category in date order, frame by frame -->
+      <section
+        v-if="photosForCategory.length >= 2"
+        class="px-4 sm:px-6 py-4 border-t border-line"
+      >
+        <TuiHeader
+          label="TIMELAPSE"
+          :dashes="11"
+        >
+          <span class="text-label text-muted normal-case">{{ timelapseMeta }}</span>
+        </TuiHeader>
+        <JournalPhotoTimelapse
+          class="mt-2.5"
+          :photos="photosForCategory"
+          :category-label="photoCategoryLabel(category)"
+          :weights="weightByDate"
+          :frame-style="frameStyle"
+        />
       </section>
     </template>
 
