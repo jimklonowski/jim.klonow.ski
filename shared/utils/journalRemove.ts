@@ -16,6 +16,23 @@ export function removeAtSql(column: RemovableList): string {
     WHERE date = ?1 AND json_array_length(${column}) > CAST(?2 AS INTEGER)`
 }
 
+/**
+ * The quick-add append for a day's `sodas` or `water` list — one INSERT … ON CONFLICT with
+ * json_insert('$[#]'), so two quick taps can't lose each other (soda.post.ts explains). With a
+ * tap id (?3), the append is a no-op when the list already holds an entry with that id: the
+ * outbox replays a tap it could not confirm, and the first attempt may well have landed (audit
+ * #43 item 43). Binds: ?1 date, ?2 the entry JSON (its `id` inside), ?3 the id or NULL. Plain TS
+ * so the statement is tested against the real schema in node:sqlite.
+ */
+export function appendTapSql(column: RemovableList): string {
+  return `INSERT INTO journal_entries (date, ${column}) VALUES (?1, json_array(json(?2)))
+    ON CONFLICT(date) DO UPDATE SET ${column} = CASE
+      WHEN ?3 IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(journal_entries.${column}) WHERE json_extract(value, '$.id') = ?3)
+        THEN journal_entries.${column}
+      ELSE json_insert(journal_entries.${column}, '$[#]', json(?2))
+    END`
+}
+
 /** The entry a widget saw at the index it asks to remove. */
 export type ExpectedEntry = { time: string, drink?: string, size?: string } | { time: string, oz: number }
 

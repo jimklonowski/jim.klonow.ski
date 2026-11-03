@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { expectedBindings, removeAtSql, removeExpectedSql } from '../shared/utils/journalRemove.ts'
+import { appendTapSql, expectedBindings, removeAtSql, removeExpectedSql } from '../shared/utils/journalRemove.ts'
 
 const schema = readFileSync(new URL('../server/database/schema.sql', import.meta.url), 'utf8')
 function dbWith(column, items) {
@@ -63,3 +63,25 @@ test('water: a volume stored as a float still matches its integer reading', () =
   assert.equal(db.prepare(sql).run('2026-10-21', 0, ...expectedBindings({ time: '09:00', oz: 12 })).changes, 1)
   assert.deepEqual(read(db, 'water'), [{ time: '10:00', oz: 8 }])
 })
+
+// Audit #43 item 43: the quick-add append with a tap id is idempotent — a replay of a tap that
+// landed appends nothing — while taps without an id append every time, as they always did.
+for (const column of ['sodas', 'water']) {
+  test(`${column}: a replayed tap id appends once; id-less taps append every time`, () => {
+    const db = new DatabaseSync(':memory:')
+    db.exec(schema)
+    const entry = id => JSON.stringify(column === 'sodas' ? { time: '09:00', drink: 'Coke', id } : { time: '09:00', oz: 12, id })
+    const count = () => JSON.parse(db.prepare(`SELECT ${column} FROM journal_entries WHERE date = ?`).get('2026-11-03')?.[column] ?? '[]').length
+    const sql = appendTapSql(column)
+    db.prepare(sql).run('2026-11-03', entry('tap-aaaaaaaa'), 'tap-aaaaaaaa')
+    assert.equal(count(), 1, 'first tap creates the row')
+    db.prepare(sql).run('2026-11-03', entry('tap-aaaaaaaa'), 'tap-aaaaaaaa')
+    assert.equal(count(), 1, 'the same id again appends nothing')
+    db.prepare(sql).run('2026-11-03', entry('tap-bbbbbbbb'), 'tap-bbbbbbbb')
+    assert.equal(count(), 2, 'a different id appends')
+    db.prepare(sql).run('2026-11-03', entry(undefined), null)
+    db.prepare(sql).run('2026-11-03', entry(undefined), null)
+    assert.equal(count(), 4, 'no id: appends every time, the old behaviour')
+    assert.equal(db.prepare(`SELECT ${column} FROM journal_entries WHERE date = ?`).get('2026-11-03')[column].includes('"id":"tap-aaaaaaaa"'), true, 'the id is stored on the entry')
+  })
+}

@@ -155,8 +155,15 @@
       >
         <span class="text-faint shrink-0">{{ s.time }}</span>
         <span class="text-hi truncate">{{ sodaLabel(s) }}</span>
+        <!-- A tap the outbox is still sending has no server index to remove by; it is marked
+             instead, and the ✕ comes back once it lands. -->
+        <span
+          v-if="isPendingId(s.id)"
+          class="ml-auto shrink-0 text-meta text-muted"
+          title="Kept while offline — sent when you're back online"
+        >⏳ pending</span>
         <button
-          v-if="!readonly"
+          v-else-if="!readonly"
           type="button"
           class="ml-auto shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50"
           :disabled="removingIndex !== null"
@@ -176,6 +183,7 @@
 import { SODA_DRINKS, SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
 import { lastSoda as lastSodaOf, quickAddLabel as quickAddLabelOf } from '#shared/utils/soda'
+import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
 withDefaults(defineProps<{
   readonly?: boolean
@@ -237,12 +245,15 @@ function applySodasLocally(date: string, sodas: SodaEntry[]) {
 async function quickAdd(useCustom = false) {
   adding.value = true
   const date = localDateStr()
+  const time = localTimeStr()
   const drink = (useCustom ? customDrink.value : lastDrink.value) || undefined
   const size = (useCustom ? customSize.value : lastSize.value) || undefined
+  // The tap's own id rides with it (and in the outbox): the server skips a replay it already holds.
+  const id = newTapId()
   try {
     const { sodas } = await $fetch<{ sodas: SodaEntry[] }>('/api/journal/soda', {
       method: 'POST',
-      body: { date, time: localTimeStr(), drink, size }
+      body: { date, time, drink, size, id }
     })
     applySodasLocally(date, sodas)
     // The status line's "soda N today" reads the scalar shell summary, not this list.
@@ -254,8 +265,15 @@ async function quickAdd(useCustom = false) {
     }
   }
   catch (err) {
-    const msg = extractErrorMessage(err, 'Unknown error')
-    toast.add({ title: 'Failed to log soda', description: msg, color: 'error' })
+    // No answer at all (offline): keep the tap and show it as logged, pending (useQuickLogOutbox).
+    const kept = isNoResponse(err) ? keepTap({ id, kind: 'soda', date, time, drink, size }, toast) : null
+    if (kept) {
+      applySodasLocally(date, [...(entries.value.find(e => e.date === date)?.sodas ?? []), kept as SodaEntry])
+      if (useCustom) customOpen.value = false
+    }
+    else {
+      toast.add({ title: 'Failed to log soda', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
+    }
   }
   finally {
     adding.value = false

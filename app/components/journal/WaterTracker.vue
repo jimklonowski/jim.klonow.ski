@@ -162,7 +162,15 @@
         >
           <span class="text-faint shrink-0">{{ w.time }}</span>
           <span class="text-hi">{{ fmtOz(w.oz) }} oz</span>
+          <!-- A pour the outbox is still sending has no server index to remove by; it is marked
+               instead, and the ✕ comes back once it lands. -->
+          <span
+            v-if="isPendingId(w.id)"
+            class="ml-auto shrink-0 text-meta text-muted"
+            title="Kept while offline — sent when you're back online"
+          >⏳ pending</span>
           <button
+            v-else
             type="button"
             class="ml-auto shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50"
             :disabled="removingIndex !== null"
@@ -191,6 +199,7 @@
 // the ledger and the status line all move with each tap.
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, WATER_MAX_OZ_PER_ENTRY, fmtOzValue, waterProgress, waterSetting, waterTotals } from '#shared/utils/water'
 import type { WaterEntry } from '~/data/journal'
+import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
 withDefaults(defineProps<{
   readonly?: boolean
@@ -242,10 +251,13 @@ async function quickAdd(oz: number | '', fromPanel = false) {
   if (!isValidOz(oz)) return
   adding.value = true
   const date = today.value
+  const time = localTimeNow()
+  // The tap's own id rides with it (and in the outbox): the server skips a replay it already holds.
+  const id = newTapId()
   try {
     const { water } = await $fetch<{ water: WaterEntry[] }>('/api/journal/water', {
       method: 'POST',
-      body: { date, time: localTimeNow(), oz }
+      body: { date, time, oz, id }
     })
     applyWaterLocally(date, water)
     // The status line's "water N oz" reads the scalar shell summary, not this list.
@@ -253,7 +265,15 @@ async function quickAdd(oz: number | '', fromPanel = false) {
     if (fromPanel) panelOpen.value = false
   }
   catch (err) {
-    toast.add({ title: 'Failed to log water', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
+    // No answer at all (offline): keep the tap and show it as logged, pending (useQuickLogOutbox).
+    const kept = isNoResponse(err) ? keepTap({ id, kind: 'water', date, time, oz }, toast) : null
+    if (kept) {
+      applyWaterLocally(date, [...(entries.value.find(e => e.date === date)?.water ?? []), kept as WaterEntry])
+      if (fromPanel) panelOpen.value = false
+    }
+    else {
+      toast.add({ title: 'Failed to log water', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
+    }
   }
   finally {
     adding.value = false

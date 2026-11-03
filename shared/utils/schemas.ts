@@ -78,10 +78,14 @@ export const zReconstitutionEntry = z.object({
   bac_water_ml: zNumWithDefault(0, s => s.nonnegative())
 })
 
+// `id` is the tap's own id when the quick-log outbox made it (audit #43 item 43); carried through
+// the day form's save so a stored entry keeps it — the three-way merge keys items on every field,
+// and an entry saved back without its id would read as a second item and be doubled.
 export const zSodaEntry = z.object({
   time: zText(5).default(''),
   drink: zText(60).optional(),
-  size: zText(40).optional()
+  size: zText(40).optional(),
+  id: zText(40).optional()
 })
 
 // A water tap always carries its volume: there is no label to parse it from later, and a 0 oz
@@ -89,7 +93,8 @@ export const zSodaEntry = z.object({
 // before saving rather than sending them here.
 export const zWaterEntry = z.object({
   time: zText(5).default(''),
-  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY)
+  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY),
+  id: zText(40).optional()
 })
 
 // The food JSON's keys (shared/utils/nutrition.ts): three meals, the legacy snack, three gap snacks.
@@ -144,11 +149,18 @@ export const zJournalSave = z.object({
 
 // --- sodas (quick-add widget) ---
 
+// A tap's own id (the quick-log outbox, audit #43 item 43): a tap made offline is queued and
+// replayed, and a replay of a request that had in fact landed must not log the soda twice — the
+// append is skipped when the day's array already holds the id. Optional: a tap made online, or
+// by a non-JS caller, carries none and appends as before.
+const zTapId = z.string().regex(/^[a-z0-9-]{8,40}$/).optional()
+
 export const zSodaAdd = z.object({
   date: zIsoDate.optional(),
   time: zClockTime.optional(),
   drink: zText(60).optional(),
-  size: zText(40).optional()
+  size: zText(40).optional(),
+  id: zTapId
 })
 
 export const zSodaRemove = z.object({
@@ -192,7 +204,8 @@ export const zMealCorrect = z.object({
 export const zWaterAdd = z.object({
   date: zIsoDate.optional(),
   time: zClockTime.optional(),
-  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY)
+  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY),
+  id: zTapId
 })
 
 export const zWaterRemove = z.object({

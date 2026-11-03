@@ -76,9 +76,27 @@
 </template>
 
 <script setup lang="ts">
+import type { JournalEntry } from '~/data/journal'
+import { useQuickLogOutbox } from '~/composables/useQuickLogOutbox'
+import { patchJournalDay } from '~/utils/journalPatch'
+
 const route = useRoute()
 const { role, isOwner } = await useAuth()
 const paletteOpen = useState('command-palette-open', () => false)
+
+// The quick-log outbox's replay is armed here, on every page, for anyone who can tap (owner and
+// demo — the roles the soda/water endpoints accept). A tap kept while offline is sent when the
+// browser comes back online or the tab is next looked at; when it lands, the server's list is
+// mirrored into the shared journal store (the pending mark clears) and the status line's counts
+// re-read (audit #43 item 43).
+if (role.value === 'owner' || role.value === 'demo') {
+  const journal = useNuxtData<JournalEntry[]>('/journal')
+  useQuickLogOutbox((tap, lists) => {
+    if (lists.sodas) patchJournalDay(journal.data, tap.date, { sodas: lists.sodas })
+    if (lists.water) patchJournalDay(journal.data, tap.date, { water: lists.water })
+    refreshNuxtData('overview')
+  })
+}
 
 const items = computed(() => [
   { label: 'Home', to: '/' },

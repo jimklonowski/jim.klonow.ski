@@ -1,4 +1,5 @@
 import { zSodaAdd } from '#shared/utils/schemas'
+import { appendTapSql } from '#shared/utils/journalRemove'
 import { localTimeNow, localToday } from '#shared/utils/time'
 
 // Lightweight quick-add used by the dashboard soda widget - appends one entry to today's
@@ -18,17 +19,21 @@ export default defineEventHandler(async (event) => {
   // Worker's own clock is UTC, which put an evening soda on tomorrow's entry).
   const date = body.date ?? localToday()
   const time = body.time ?? localTimeNow()
-  const entry = JSON.stringify({ time, drink: body.drink || undefined, size: body.size || undefined })
+  const entry = JSON.stringify({ time, drink: body.drink || undefined, size: body.size || undefined, id: body.id })
 
   const db = getDb(event)
   const before = await auditBefore(event, 'journal_entries', date)
-  await db.prepare(`
-    INSERT INTO journal_entries (date, sodas) VALUES (?1, json_array(json(?2)))
-    ON CONFLICT(date) DO UPDATE SET sodas = json_insert(sodas, '$[#]', json(?2))
-  `).bind(date, entry).run()
-  await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ soda on ${date}${body.drink ? ` (${body.drink})` : ''}` })
+  // With a tap id, a replay of a tap that already landed appends nothing (appendTapSql). The
+  // upsert reports a change either way, so "appended" is read off the list's length against the
+  // pre-write count — the audit image for the owner, its own read for the demo sandbox.
+  const heldBefore = (JSON.parse(((before?.sodas as string | undefined)
+    ?? (await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>())?.sodas
+    ?? '[]')) as unknown[]).length
+  await db.prepare(appendTapSql('sodas')).bind(date, entry, body.id ?? null).run()
 
   const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
-  const sodas = JSON.parse(row!.sodas) as Array<{ time: string, drink?: string, size?: string }>
-  return { ok: true, date, sodas }
+  const sodas = JSON.parse(row!.sodas) as Array<{ time: string, drink?: string, size?: string, id?: string }>
+  const appended = sodas.length > heldBefore
+  if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ soda on ${date}${body.drink ? ` (${body.drink})` : ''}` })
+  return { ok: true, date, sodas, appended }
 })

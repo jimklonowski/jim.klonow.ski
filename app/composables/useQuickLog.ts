@@ -2,6 +2,7 @@ import type { SodaEntry, WaterEntry } from '#shared/types/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, waterSetting, waterTotals } from '#shared/utils/water'
 import { lastSoda as lastSodaOf, quickAddLabel } from '#shared/utils/soda'
 import { patchJournalDay } from '~/utils/journalPatch'
+import { isNoResponse, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
 // One-tap soda and water logging for places that aren't the journal hub (the home page's LOG
 // TODAY row). Same endpoints, same "last drink" and "cup size" defaults as the two tracker
@@ -49,10 +50,16 @@ export async function useQuickLog() {
   async function addSoda() {
     if (addingSoda.value) return
     addingSoda.value = true
+    const date = today.value
+    const time = localTimeNow()
+    const drink = lastSoda.value?.drink || undefined
+    const size = lastSoda.value?.size || undefined
+    // The tap's own id rides with it (and in the outbox): the server skips a replay it already holds.
+    const id = newTapId()
     try {
       const { sodas } = await $fetch<{ sodas: SodaEntry[] }>('/api/journal/soda', {
         method: 'POST',
-        body: { date: today.value, time: localTimeNow(), drink: lastSoda.value?.drink || undefined, size: lastSoda.value?.size || undefined }
+        body: { date, time, drink, size, id }
       })
       patchToday({ sodas })
       // The status line moves too, but a tap deserves a word of its own (audit #42 item 38).
@@ -60,7 +67,10 @@ export async function useQuickLog() {
       await refreshNuxtData('overview')
     }
     catch (err) {
-      toast.add({ title: 'Failed to log soda', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
+      // No answer at all (offline): keep the tap and show it as logged, pending (useQuickLogOutbox).
+      const kept = isNoResponse(err) ? keepTap({ id, kind: 'soda', date, time, drink, size }, toast) : null
+      if (kept) patchToday({ sodas: [...(todayEntry.value?.sodas ?? []), kept as SodaEntry] })
+      else toast.add({ title: 'Failed to log soda', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
     }
     finally {
       addingSoda.value = false
@@ -70,17 +80,23 @@ export async function useQuickLog() {
   async function addWater() {
     if (addingWater.value) return
     addingWater.value = true
+    const date = today.value
+    const time = localTimeNow()
+    const oz = cupOz.value
+    const id = newTapId()
     try {
       const { water } = await $fetch<{ water: WaterEntry[] }>('/api/journal/water', {
         method: 'POST',
-        body: { date: today.value, time: localTimeNow(), oz: cupOz.value }
+        body: { date, time, oz, id }
       })
       patchToday({ water })
-      toast.add({ title: `Logged ${cupOz.value} oz of water`, description: `${waterTotals(water).oz} oz today`, color: 'success', icon: 'i-lucide-check' })
+      toast.add({ title: `Logged ${oz} oz of water`, description: `${waterTotals(water).oz} oz today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
     }
     catch (err) {
-      toast.add({ title: 'Failed to log water', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
+      const kept = isNoResponse(err) ? keepTap({ id, kind: 'water', date, time, oz }, toast) : null
+      if (kept) patchToday({ water: [...(todayEntry.value?.water ?? []), kept as WaterEntry] })
+      else toast.add({ title: 'Failed to log water', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })
     }
     finally {
       addingWater.value = false

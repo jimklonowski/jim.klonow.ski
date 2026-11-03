@@ -1,4 +1,5 @@
 import { zWaterAdd } from '#shared/utils/schemas'
+import { appendTapSql } from '#shared/utils/journalRemove'
 import { localTimeNow, localToday } from '#shared/utils/time'
 import type { WaterEntry } from '#shared/types/journal'
 
@@ -13,17 +14,21 @@ export default defineEventHandler(async (event) => {
   // Home-timezone fallbacks for non-JS callers; the widget sends both (a Worker's clock is UTC).
   const date = body.date ?? localToday()
   const time = body.time ?? localTimeNow()
-  const entry = JSON.stringify({ time, oz: body.oz })
+  const entry = JSON.stringify({ time, oz: body.oz, id: body.id })
 
   const db = getDb(event)
   const before = await auditBefore(event, 'journal_entries', date)
-  await db.prepare(`
-    INSERT INTO journal_entries (date, water) VALUES (?1, json_array(json(?2)))
-    ON CONFLICT(date) DO UPDATE SET water = json_insert(water, '$[#]', json(?2))
-  `).bind(date, entry).run()
-  await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ ${body.oz} oz water on ${date}` })
+  // With a tap id, a replay of a tap that already landed appends nothing (appendTapSql). The
+  // upsert reports a change either way, so "appended" is read off the list's length against the
+  // pre-write count — the audit image for the owner, its own read for the demo sandbox.
+  const heldBefore = (JSON.parse(((before?.water as string | undefined)
+    ?? (await db.prepare('SELECT water FROM journal_entries WHERE date = ?1').bind(date).first<{ water: string }>())?.water
+    ?? '[]')) as unknown[]).length
+  await db.prepare(appendTapSql('water')).bind(date, entry, body.id ?? null).run()
 
   const row = await db.prepare('SELECT water FROM journal_entries WHERE date = ?1').bind(date).first<{ water: string }>()
   const water = JSON.parse(row?.water ?? '[]') as WaterEntry[]
-  return { ok: true, date, water }
+  const appended = water.length > heldBefore
+  if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ ${body.oz} oz water on ${date}` })
+  return { ok: true, date, water, appended }
 })
