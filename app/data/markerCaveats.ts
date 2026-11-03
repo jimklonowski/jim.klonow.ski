@@ -13,11 +13,25 @@ export interface MarkerCaveat {
   note: string
 }
 
+// Isotretinoin (Accutane, from Nov 2026 for truncal acne) moves the lipid panel and the liver
+// enzymes — the very markers the Primobolan decision is gated on — so each of those cards says
+// the reading was taken on it. One note per marker; the compound list is shared.
+const ISOTRETINOIN = ['Isotretinoin']
+const ISOTRETINOIN_LIPID_NOTE = 'Starred readings were taken while on isotretinoin, which raises triglycerides (in roughly a quarter to half of patients) and LDL and lowers HDL, mostly inside the first 4–8 weeks of a course and reversibly after it ends. Read an on-treatment lipid against the pre-course baseline as a drug effect first, not as diet or as the anabolic question — and do not treat it as the baseline that gates an oral anabolic.'
+const ISOTRETINOIN_LIVER_NOTE = 'Starred readings were taken while on isotretinoin, which raises ALT and AST mildly in a minority of patients, dose-dependently and reversibly. A rise during the course is expected drug effect to monitor rather than new liver injury to investigate, unless it climbs past about three times the upper limit; and it is not a clean liver baseline for an oral anabolic.'
+
 export const MARKER_CAVEATS: Record<string, MarkerCaveat> = {
   psa: {
     compounds: ['Finasteride', 'Dutasteride'],
     note: 'Starred readings were taken while on a 5-alpha-reductase inhibitor. Finasteride and dutasteride roughly halve PSA once 6–12 months in (less during the first months), so double an on-treatment value before comparing it with the untreated range or with earlier readings — and treat any rise from the on-treatment low as meaningful even while the number stays small.'
-  }
+  },
+  triglycerides: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  ldl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  hdl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  cholesterol: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  non_hdl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  alt: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIVER_NOTE },
+  ast: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIVER_NOTE }
 }
 
 /** What the caveat needs of a protocol row: the compound and the dates it ran — a scored rule or a

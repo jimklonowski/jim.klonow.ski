@@ -867,6 +867,23 @@ export const COMPOUND_INFO: Record<string, CompoundInfo> = {
     caution: 'Splitting doses within a day raises hepcidin more while absorbing no more total iron than a single daily dose, so ordinary repletion is better served by one morning dose or alternate-day dosing (Moretti, Blood 2015; Stoffel, Lancet Haematol 2017). Contraindicated in hereditary hemochromatosis (C282Y homozygotes) and in iron overload. In an erythrocytosis state, low iron acts as a brake on red cell production, so supplementing can remove that brake and let hematocrit climb — the mechanism hepcidin mimetics such as rusfertide exploit in reverse. High doses commonly cause constipation, nausea and dark stools. Ferritin is an acute phase reactant and also reads high right after an iron load, so a ferritin drawn during or within about a week of loading overstates true iron stores.'
   },
 
+  'Isotretinoin': {
+    category: 'Oral Retinoid (Acne)',
+    aka: 'Accutane / Absorica / Claravis — 13-cis-retinoic acid',
+    summary: 'A vitamin A derivative and the one acne treatment that shrinks the sebaceous glands themselves, cutting sebum output by up to ~90% and with it the follicular plugging and C. acnes load behind the lesions. The standard course for severe or treatment-resistant acne, including truncal acne driven by exogenous androgens that topicals (adapalene, benzoyl peroxide, azelaic acid, tretinoin) could not control. It treats the gland, not the androgen load: the signal from TRT plus hCG stays whatever it was.',
+    dosing: {
+      range: '0.5–1 mg/kg/day; 40 mg/day is a typical fixed dose, sometimes started lower for the first weeks to blunt the initial flare',
+      frequency: 'Once daily (or split into two doses on a higher total)',
+      typicalDaily: { amount: 40, unit: 'mg' },
+      timing: 'With a meal that carries some fat — absorption roughly doubles against an empty stomach (the Absorica formulation is less food-dependent). Same meal each day so exposure stays even.',
+      notes: 'Courses are planned to a cumulative dose, commonly 120–150 mg/kg over 15–20+ weeks (about 5 months at 40 mg/day for ~80 kg); reaching it is what makes a remission likely to hold. No vitamin A supplements alongside — the two add up.'
+    },
+    cycling: 'One course, then stop — most people need only one; a second course is sometimes given after a relapse. Topical retinoids and benzoyl peroxide are usually paused for the duration since isotretinoin already thins and dries the skin, and wax, dermabrasion or laser treatments wait until at least six months after the last dose because the skin scars easily.',
+    storage: 'Room temperature, in the original blister pack, away from light.',
+    halfLife: '~21 hours for isotretinoin, ~29 hours for its active 4-oxo metabolite — steady state within about a week; the drug is gone from plasma within roughly 10 days of stopping, which is why the one-month pregnancy and blood-donation deferrals after a course are enough.',
+    caution: 'Severely teratogenic — dispensed only under iPLEDGE, and no blood donation during the course or for a month after it (a transfused unit could reach a pregnant recipient). Lipids and liver are the lab story: triglycerides rise in roughly a quarter to half of patients and LDL in many, HDL falls, and ALT/AST climb mildly — usually inside the first 4–8 weeks, dose-dependent and reversible after stopping. Those are the same markers that gate an oral anabolic decision, so a draw during the course is not a clean baseline for one, and an oral AAS on top of the course stacks two hepatotoxic, lipid-worsening agents. CK rises with hard training and can read very high after a heavy session. Expect dry lips, skin, eyes and nose (nosebleeds), sun sensitivity, and muscle or joint aches; low mood or sleep changes are reported and worth watching rather than dismissing. Never combined with tetracycline antibiotics (intracranial hypertension) or with supplemental vitamin A.'
+  },
+
   'Tadalafil': {
     category: 'PDE5 Inhibitor',
     aka: 'Cialis',
