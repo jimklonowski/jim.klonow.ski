@@ -27,8 +27,8 @@ export function blankVial(compound = ''): Vial {
 }
 
 export const SODA_DRINKS = [
-  'Dr Pepper', 'Coke', 'Cherry Coke', 'Diet Coke', 'Coke Zero', 'Wild Cherry Pepsi', 'Sprite', 'Mountain Dew', 'Root Beer', 'Mr Pibb',
-  'Orange Fanta', 'Orange Crush', 'Canada Dry', 'Ginger Ale'
+  'Dr Pepper', 'Dr Pepper Cherry', 'Coke', 'Cherry Coke', 'Diet Coke', 'Coke Zero', 'Wild Cherry Pepsi', 'Sprite', '7 Up', '7 Up Shirley Temple',
+  'Mountain Dew', 'Root Beer', 'Mr Pibb', 'Orange Fanta', 'Orange Crush', 'Canada Dry', 'Canada Dry Fruit Splash', 'Ginger Ale'
 ]
 
 // Sizes are stored as freeform strings on each soda entry, so renaming one here means migrating
