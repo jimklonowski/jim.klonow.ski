@@ -600,6 +600,8 @@ onMounted(async () => {
       (window as unknown as Record<string, unknown>).__bodyMeshDebug = {
         pickAt,
         bounds: () => ({ sphere: geometry.boundingSphere, box: geometry.boundingBox, yaw: yaw.value, mode: props.mode, camera: camera.type }),
+        /** Frames rendered so far, and whether the loop is parked off screen — for a headless frame-rate check. */
+        frames: () => ({ frames, onScreen }),
         hits: (x: number, y: number) => {
           const r = el.getBoundingClientRect()
           pointer.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1)
@@ -668,7 +670,31 @@ onMounted(async () => {
     const timer = new THREE.Timer()
     let raf = 0
     cleanups.push(() => cancelAnimationFrame(raf))
+    // The loop runs only while the canvas is on screen. It used to schedule itself for the life
+    // of the page, so a mesh scrolled out of view — the home tile sits a few screens down on a
+    // phone, and the DEXA page's figure scrolls off under its tables — kept rendering at display
+    // rate, with the GPU and battery it costs (audit #43 item 42). Off screen the chain stops;
+    // on re-entry the timer is read once to drop the hidden interval, so auto-rotate resumes
+    // from where it was instead of snapping forward by however long the figure was hidden.
+    let onScreen = true
+    let frames = 0
+    const observer = new IntersectionObserver(([entry]) => {
+      const now = !!entry?.isIntersecting
+      if (now === onScreen) return
+      onScreen = now
+      if (now) {
+        timer.update()
+        if (!raf) raf = requestAnimationFrame(loop)
+      }
+    }, { threshold: 0 })
+    observer.observe(el)
+    cleanups.push(() => observer.disconnect())
     const loop = () => {
+      if (!onScreen) {
+        raf = 0
+        return
+      }
+      frames++
       timer.update()
       const dt = timer.getDelta()
       if (!drag && !flat.value) {
