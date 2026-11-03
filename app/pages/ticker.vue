@@ -80,7 +80,7 @@
       </template>
 
       <!-- a game takes the stage over; the figure comes back when it quits -->
-      <TickerRunner
+      <LazyTickerRunner
         v-if="playing === 'runner'"
         ref="runner"
         :build="build"
@@ -90,7 +90,7 @@
         @over="score => onGameOver('runner', score, false)"
         @quit="onGameQuit"
       />
-      <TickerBreakout
+      <LazyTickerBreakout
         v-else-if="playing === 'crusher'"
         ref="runner"
         :build="build"
@@ -107,7 +107,7 @@
         @over="(score, cleared) => onGameOver('crusher', score, cleared)"
         @quit="onGameQuit"
       />
-      <TickerWorld
+      <LazyTickerWorld
         v-else-if="playing === 'world'"
         ref="runner"
         :build="build"
@@ -121,7 +121,7 @@
         @over="(score, cleared, feats, summary) => onGameOver('world', score, cleared, feats, summary)"
         @quit="onGameQuit"
       />
-      <TickerMaze
+      <LazyTickerMaze
         v-else-if="playing === 'maze'"
         ref="runner"
         :build="build"
@@ -136,7 +136,7 @@
         @over="(score, cleared) => onGameOver('maze', score, cleared)"
         @quit="onGameQuit"
       />
-      <TickerDrop
+      <LazyTickerDrop
         v-else-if="playing === 'drop'"
         ref="runner"
         :build="build"
@@ -150,7 +150,7 @@
         @over="(score, cleared) => onGameOver('drop', score, cleared)"
         @quit="onGameQuit"
       />
-      <TickerInvaders
+      <LazyTickerInvaders
         v-else-if="playing === 'invaders'"
         ref="runner"
         :build="build"
