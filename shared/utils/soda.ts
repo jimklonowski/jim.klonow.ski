@@ -53,18 +53,22 @@ export function fmtSodaOz(t: SodaTotals): string {
 // soda's ~150. Soda calories feed the day's nutrition total (shared/utils/nutrition.ts).
 const KCAL_PER_12OZ: Record<string, number> = {
   'dr pepper': 150,
+  'dr pepper cherry': 160,
   'coke': 140,
   'cherry coke': 150,
   'diet coke': 0,
   'coke zero': 0,
   'wild cherry pepsi': 160,
   'sprite': 140,
+  '7 up': 140,
+  '7 up shirley temple': 170,
   'mountain dew': 170,
   'root beer': 160,
   'mr pibb': 140,
   'orange fanta': 160,
   'orange crush': 160,
   'canada dry': 140,
+  'canada dry fruit splash': 140,
   'ginger ale': 140
 }
 const DEFAULT_KCAL_PER_12OZ = 150
