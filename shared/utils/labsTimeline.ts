@@ -5,6 +5,17 @@ import { shiftDays } from './dates.ts'
 
 export interface DatedEntry { date: string }
 
+/**
+ * Every marker key with a value on any draw, one row per key (`key`), in key order — what the
+ * ⌘K palette may jump to (audit #43 item 51). A key present with a null value (a report that
+ * printed the line without a figure) doesn't count. tests/measuredMarkersSql.test.mjs runs it on
+ * the real schema.
+ */
+export const MEASURED_MARKERS_SQL = `
+  SELECT DISTINCT m.key AS key FROM labs_entries AS l, json_each(COALESCE(l.markers, '{}')) AS m
+  WHERE m.value IS NOT NULL ORDER BY m.key
+`
+
 /** Entries sorted ascending and cut off at `asof` (inclusive). `null` means everything. */
 export function entriesAsOf<T extends DatedEntry>(entries: T[], asof: string | null): T[] {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))

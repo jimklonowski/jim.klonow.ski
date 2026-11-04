@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { STATUS_COLORS } from '~/utils/chartTheme'
+import { fmtMarkerValue } from '#shared/utils/markerValue'
 import type { FlaggedMarker } from '~/composables/useOverview'
 
 const props = defineProps<{
@@ -77,17 +78,17 @@ function color(f: FlaggedMarker) {
   return STATUS_COLORS[f.status]
 }
 
-/** The value as the lab reported it — 51.7, 1.28, 2070 — trimmed to two decimals only where a
- * computed marker carries more. It used to round anything from 10 up to a whole number, so a
- * hematocrit of 51.7 read "52" against a 51.1 limit. */
-function format(v: number) {
-  return Number.isInteger(v) ? v.toString() : String(Math.round(v * 100) / 100)
-}
+// One rule for every printed reading (shared/utils/markerValue.ts): a whole number as itself,
+// anything else to one decimal — the same figure the marker's own card shows. This tile had its
+// own two-decimal copy, so a free T % read 1.67 here and 1.7 on the card (audit #43 item 51).
+const format = fmtMarkerValue
 
-/** e.g. "HIGH ▲ 1782", "HIGH ▼ 172.9", or "LOW · first" on a first-ever reading. */
+/** e.g. "HIGH ▲ 1782", "HIGH ▼ 172.9", "LOW · first" on a first-ever reading, "HIGH · no change"
+ * when the move is under the printed resolution. */
 function tag(f: FlaggedMarker) {
   const label = f.status.toUpperCase()
   if (f.delta == null) return `${label} · first`
+  if (Math.abs(f.delta) < 0.05) return `${label} · no change`
   const arrow = f.delta >= 0 ? '▲' : '▼'
   return `${label} ${arrow} ${format(Math.abs(f.delta))}`
 }

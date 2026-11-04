@@ -3,7 +3,7 @@ import { LOGGED_DAY_SQL, loggedStreakFromDates } from '#shared/utils/journalLog'
 import { localToday } from '#shared/utils/time'
 import { waterTotals } from '#shared/utils/water'
 import type { OverviewSummary } from '#shared/types/overview'
-import { currentReadings } from '#shared/utils/labsTimeline'
+import { MEASURED_MARKERS_SQL, currentReadings } from '#shared/utils/labsTimeline'
 import { computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 import { isCensoredOn } from '../data/markerCaveats'
 
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   const db = getDb(event)
   const today = localToday()
 
-  const [loggedRes, latestRes, rhrRes, todayRes, recentRes, compoundsRes, drawRes, sourcesRes, metricsRes, dexaRes] = await db.batch<Record<string, unknown>>([
+  const [loggedRes, latestRes, rhrRes, todayRes, recentRes, compoundsRes, drawRes, sourcesRes, metricsRes, dexaRes, measuredRes] = await db.batch<Record<string, unknown>>([
     // The dates with something hand-entered — the streak walk and the logged-day count.
     db.prepare(`SELECT date FROM journal_entries WHERE ${LOGGED_DAY_SQL} ORDER BY date ASC`),
     db.prepare('SELECT MAX(date) AS date FROM journal_entries'),
@@ -46,7 +46,10 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     db.prepare('SELECT date, fasting, markers, qualitative FROM labs_entries ORDER BY date DESC LIMIT 20'),
     db.prepare('SELECT sources FROM labs_entries'),
     db.prepare('SELECT MAX(date) AS date FROM health_metrics'),
-    db.prepare('SELECT date, total FROM dexa_entries ORDER BY date DESC LIMIT 1')
+    db.prepare('SELECT date, total FROM dexa_entries ORDER BY date DESC LIMIT 1'),
+    // Every marker ever measured, for the palette: a marker nobody has drawn is not a place to
+    // jump to, and one drawn years ago still is (audit #43 item 51).
+    db.prepare(MEASURED_MARKERS_SQL)
   ])
 
   const loggedDates = (loggedRes?.results ?? []).map(r => r.date as string)
@@ -96,6 +99,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     waterOzToday: auth.role === 'doctor' ? null : waterTotals(JSON.parse((todayRow?.water as string) || '[]') as Array<{ oz?: number }>).oz,
     latestDraw,
     current,
+    measured: (measuredRes?.results ?? []).map(r => r.key as string),
     pdfCount: pdfKeys.size,
     latestMetricsDate: (metricsRes?.results?.[0]?.date as string | null | undefined) ?? null,
     latestDexa: dexaRow

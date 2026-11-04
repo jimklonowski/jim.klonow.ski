@@ -4,8 +4,8 @@
     title="Command palette"
     description="Jump to a marker, day, or compound"
     :ui="{
-      overlay: 'bg-[rgba(3,5,4,0.75)] backdrop-blur-sm',
-      content: 'w-155 max-w-[92vw] bg-raised border border-accent shadow-[0_0_28px_rgba(44,232,164,0.18)] ring-0'
+      overlay: 'bg-bg/75 backdrop-blur-sm',
+      content: 'w-155 max-w-[92vw] bg-raised border border-accent shadow-(--panel-shadow) ring-0'
     }"
   >
     <template #content>
@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { isFullAccessRole } from '#shared/utils/access'
+import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { CompoundInfo } from '~/data/compoundInfo'
 
@@ -48,7 +49,7 @@ const searchTerm = ref('')
 const { role, isOwner, canEdit } = await useAuth()
 // The scalar shell summary — this component sits in the default layout, so it must not drag
 // the full journal and labs lists onto every page the way useOverview() would.
-const { data: summary, current } = useOverviewSummary(role)
+const { data: summary, current, measured } = useOverviewSummary(role)
 
 defineShortcuts({
   meta_k: () => { open.value = !open.value }
@@ -153,15 +154,19 @@ const actionItems = computed(() => {
 })
 
 const markerItems = computed(() => {
-  // Each marker's current reading — the latest draw's, or an earlier one in the window (an
-  // add-on draw doesn't blank every marker it didn't test).
-  return Object.entries(BIOMARKERS).map(([key, meta]) => {
+  // Only markers some draw has measured (or derived — those sit in `current`): the catalogue's
+  // never-drawn entries led to an empty card (audit #43 item 51). Each one's current reading —
+  // the latest draw's, or an earlier one in the window (an add-on draw doesn't blank every
+  // marker it didn't test) — printed the way every card prints it; a marker last measured
+  // before the window says so instead of a bare unit.
+  const known = new Set([...measured.value, ...Object.keys(current.value)])
+  return Object.entries(BIOMARKERS).filter(([key]) => known.has(key)).map(([key, meta]) => {
     const value = current.value[key]?.value
     const status = getStatus(value ?? null, meta)
     const flag = status === 'high' ? ' · HIGH' : status === 'low' ? ' · LOW' : ''
     return {
       label: meta.label.toLowerCase(),
-      suffix: value != null ? `${value} ${meta.unit}${flag}` : meta.unit,
+      suffix: value != null ? `${fmtMarkerValue(value)}${meta.unit ? ` ${meta.unit}` : ''}${flag}` : 'not on a recent draw',
       onSelect: () => go(`/labs?marker=${key}`)
     }
   })

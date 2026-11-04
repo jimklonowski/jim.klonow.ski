@@ -142,7 +142,7 @@ type ComputedMeta = BiomarkerMeta & {
 export const COMPUTED_MARKERS: Record<string, ComputedMeta> = {
   trig_hdl_ratio: {
     label: 'Trig/HDL Ratio', unit: '', category: 'lipids', refMax: 2.0, optimalMax: 1.5, computed: true,
-    description: 'Triglycerides divided by HDL — a strong surrogate for insulin resistance and a marker of small, dense (atherogenic) LDL particles. Optimal is below 2.0; above 3.0 suggests insulin resistance.',
+    description: 'Triglycerides divided by HDL — a strong surrogate for insulin resistance and a marker of small, dense (atherogenic) LDL particles. Under 2.0 is in range and under 1.5 optimal; above 3.0 suggests insulin resistance.',
     inputs: ['triglycerides', 'hdl'],
     compute: m => (m.triglycerides != null && m.hdl) ? roundTo(m.triglycerides / m.hdl, 1) : null
   },

@@ -29,6 +29,8 @@ export function useOverviewSummary(role: Ref<Role | null>) {
   const latestDraw = computed(() => data.value?.latestDraw ?? null)
   /** Each marker's current reading (the server's currentReadings) — what the flags and the palette read. */
   const current = computed(() => data.value?.current ?? {})
+  /** Every marker key measured on any draw — the palette's MARKERS group, with `current` for the derived ones. */
+  const measured = computed(() => data.value?.measured ?? [])
   const flagCounts = computed(() => countFlags(Object.fromEntries(Object.entries(current.value).map(([key, r]) => [key, r.value]))))
   const error = computed(() => summary?.error.value ?? null)
 
@@ -37,6 +39,7 @@ export function useOverviewSummary(role: Ref<Role | null>) {
     data,
     latestDraw,
     current,
+    measured,
     flagCounts,
     error,
     refresh: () => summary?.refresh() ?? Promise.resolve()

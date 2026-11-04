@@ -185,7 +185,12 @@ const rows = computed(() => {
 
 const categories = computed(() => {
   const [a, b] = pair.value
-  const name = (k: string | null) => (k ? `${BIOMARKERS[k]?.label ?? k} (${BIOMARKERS[k]?.unit ?? ''})` : '')
+  // A ratio has no unit — no "()" after it (audit #43 item 51).
+  const name = (k: string | null) => {
+    if (!k) return ''
+    const unit = BIOMARKERS[k]?.unit
+    return `${BIOMARKERS[k]?.label ?? k}${unit ? ` (${unit})` : ''}`
+  }
   return { a: { name: name(a), color: COLOR_A }, b: { name: name(b), color: COLOR_B } }
 })
 

@@ -22,6 +22,8 @@ export interface OverviewSummary {
   latestDraw: { date: string, fasting: boolean, markers: Record<string, number | null> } | null
   /** Each marker's newest reading within the window before the latest draw, derived markers included (currentReadings). */
   current: Record<string, { value: number, date: string }>
+  /** Every marker key measured on any draw, ever — what the palette may jump to (audit #43 item 51). */
+  measured: string[]
   /** Distinct source PDFs across every lab draw. */
   pdfCount: number
   /** Newest health_metrics row (Whoop / Apple Health), or null. */
