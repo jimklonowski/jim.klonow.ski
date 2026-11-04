@@ -1,7 +1,7 @@
 // The labs save sanitizers (server/utils/labs.ts) — what reaches labs_entries / dexa_entries.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mergedFasting, purgeOrphanPdfs, sanitizeDexa, sanitizeMarkers } from '../server/utils/labs.ts'
+import { isLabPdfKey, mergedFasting, purgeOrphanPdfs, sanitizeDexa, sanitizeMarkers, sanitizeSources } from '../server/utils/labs.ts'
 
 test('markers: numbers and numeric strings are kept, unknown keys and junk are dropped', () => {
   const { markers, dropped } = sanitizeMarkers({ hematocrit: 51.7, ferritin: ' 35 ', not_a_marker: 1, ldl: 'high' })
@@ -38,6 +38,31 @@ test('fasting: a flag flipped by hand is a correction and wins either way (audit
   assert.equal(mergedFasting(true, { fasting: false, fasting_set: true }), false, 'a draw wrongly saved as fasting can be cleared')
   assert.equal(mergedFasting(false, { fasting: true, fasting_set: true }), true)
   assert.equal(mergedFasting(true, { fasting_set: true }), false, 'flipped to NO arrives as fasting: false — absent reads as not fasting')
+})
+
+test('isLabPdfKey: a flat "<description>-<date>.pdf" name and nothing else — the PDF proxy serves whatever key passes (audit #43 item 53)', () => {
+  for (const ok of ['AdvancedLabs-2026-04-04.pdf', 'CHWLabs-2024-09-26.pdf', 'IGF1-2026-05-30.PDF', 'Quest-E2-ultrasensitive-2026-10-17.pdf']) {
+    assert.equal(isLabPdfKey(ok), true, ok)
+  }
+  const refused = [
+    'backups/d1/jim-klonow-ski-db/2026-09-24.json.gz', // the weekly database backup
+    'demo/seed.json',
+    'backups/d1/jim-klonow-ski-db/2026-09-24.pdf', // a path, even with the right extension
+    '../AdvancedLabs-2026-04-04.pdf',
+    'backups\\d1\\x.pdf',
+    'backups%2Fd1%2Fx.pdf', // the proxy's segment decodes %2F — never let the encoded form through
+    'Jimmy%20K%20Total%20Body.pdf',
+    '.pdf', '-.pdf', 'report.pdf.exe', 'report.json', 'report', '',
+    `${'x'.repeat(130)}.pdf`
+  ]
+  for (const bad of refused) assert.equal(isLabPdfKey(bad), false, JSON.stringify(bad))
+})
+
+test('sanitizeSources keeps only safe keys, once each, twenty at most', () => {
+  assert.deepEqual(sanitizeSources(['A-2026-01-01.pdf', 'backups/d1/x.json.gz', 7, null, 'A-2026-01-01.pdf', 'B-2026-02-02.pdf']), ['A-2026-01-01.pdf', 'B-2026-02-02.pdf'])
+  assert.deepEqual(sanitizeSources('A-2026-01-01.pdf'), [], 'not an array')
+  assert.deepEqual(sanitizeSources(undefined), [])
+  assert.equal(sanitizeSources(Array.from({ length: 30 }, (_, i) => `R-${i}.pdf`)).length, 20)
 })
 
 test('orphan PDFs: only an unreferenced, bare .pdf key past the grace goes; the bucket is paged (audit #43 item 45)', async () => {

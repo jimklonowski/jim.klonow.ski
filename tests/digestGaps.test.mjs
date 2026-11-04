@@ -1,10 +1,31 @@
 // The "fill gaps" rules (shared/utils/digestGaps.ts): which past days and weeks lack a digest.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cronFiringAt, digestGaps, pendingDigests } from '../shared/utils/digestGaps.ts'
+import { cronFiringAt, digestGaps, digestPeriod, pendingDigests } from '../shared/utils/digestGaps.ts'
+import { weekdayOf } from '../shared/utils/dates.ts'
 
 // 2026-09-28 is a Monday; the week before ran Sun Sep 20 – Sat Sep 26.
 const TODAY = '2026-09-28'
+
+test('a digest covers yesterday; a weekly the Sunday–Saturday week the Sunday cron closes (audit #43 item 53)', () => {
+  assert.deepEqual(digestPeriod('daily', TODAY), { start: '2026-09-27', end: '2026-09-27' })
+  // The weekly cron fires on Sunday 2026-09-27: the week that ended Saturday the 26th.
+  const sunday = '2026-09-27'
+  const week = digestPeriod('weekly', sunday)
+  assert.deepEqual(week, { start: '2026-09-20', end: '2026-09-26' })
+  assert.equal(weekdayOf(week.start), 0, 'starts on a Sunday')
+  assert.equal(weekdayOf(week.end), 6, 'ends on a Saturday')
+  // Every Sunday for a year closes a Sunday–Saturday week — the shape digestGaps counts.
+  for (let i = 0; i < 52; i++) {
+    const d = new Date(Date.UTC(2026, 0, 4 + 7 * i)).toISOString().slice(0, 10)
+    const p = digestPeriod('weekly', d)
+    assert.equal(weekdayOf(p.start), 0, d)
+    assert.equal(weekdayOf(p.end), 6, d)
+  }
+  // A regenerate names its own end day: the week ending that Saturday, or that one day.
+  assert.deepEqual(digestPeriod('weekly', TODAY, '2026-09-19'), { start: '2026-09-13', end: '2026-09-19' })
+  assert.deepEqual(digestPeriod('daily', TODAY, '2026-09-01'), { start: '2026-09-01', end: '2026-09-01' })
+})
 
 test('a past day with data and no daily digest is a gap; today is not', () => {
   const g = digestGaps(['2026-09-25', '2026-09-26', '2026-09-27', TODAY], [{ type: 'daily', period_end: '2026-09-26' }], TODAY, 30)

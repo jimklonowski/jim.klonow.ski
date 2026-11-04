@@ -2,7 +2,7 @@ import { mergeRules } from '#shared/utils/cycles'
 import { eventContext } from '#shared/utils/protocolEvents'
 import { PROTOCOL_EVENTS } from '../data/protocolEvents'
 import { localToday } from '#shared/utils/time'
-import { shiftDays } from '#shared/utils/dates'
+import { digestPeriod } from '#shared/utils/digestGaps'
 import { dailyDigestFacts, digestTrends, weeklyDigestFacts } from './digestFacts'
 import { dailyDigestPrompt, weeklyDigestPrompt } from './digestPrompts'
 import { loadProtocol } from './protocolLoader'
@@ -85,9 +85,9 @@ export async function generateDigest(
   endDate?: string
 ): Promise<DigestResult> {
   // Home-timezone yesterday: the crons fire mid-morning Central where UTC agrees, but an
-  // on-demand regenerate after 7pm used to pick a period ending on the wrong day.
-  const end = endDate ?? shiftDays(localToday(), -1)
-  const start = kind === 'weekly' ? shiftDays(end, -6) : end
+  // on-demand regenerate after 7pm used to pick a period ending on the wrong day. The window
+  // itself (a weekly is the Sunday–Saturday week ending on `end`) is digestPeriod, tested.
+  const { start, end } = digestPeriod(kind, localToday(), endDate)
 
   // The effective dosing schedule — the standing rules (the protocol tables, or the code
   // constants until seeded) with any planned cycle merged in — and the home-timezone "today", so

@@ -36,6 +36,18 @@ export function pendingDigests(now: number, today: string, dailyCron: string | u
   }
 }
 
+/**
+ * The period a digest covers: the day before `today` (or `endDate`, for a regenerate), and for
+ * a weekly the seven days ending on it. The weekly cron runs on a Sunday, so its period is the
+ * Sunday–Saturday week just ended — the same weeks digestGaps and pendingDigests count — and a
+ * weekly regenerated for any Saturday is that Saturday's week. Pure, so tests/digestGaps.test.mjs
+ * pins the Sunday–Saturday shape (audit #43 item 53).
+ */
+export function digestPeriod(kind: 'daily' | 'weekly', today: string, endDate?: string): { start: string, end: string } {
+  const end = endDate ?? shiftDays(today, -1)
+  return { start: kind === 'weekly' ? shiftDays(end, -6) : end, end }
+}
+
 export interface DigestGaps {
   /** Dates, oldest first. */
   daily: string[]
