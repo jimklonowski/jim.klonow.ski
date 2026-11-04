@@ -13,15 +13,15 @@ const entries = [
   day('2026-10-28', hcg('left_glute'))
 ]
 
-test('the unit the compound was last logged in, and the mirror of its last site', () => {
-  assert.deepEqual(doseDefaults(entries, 'hCG', '2026-10-29'), { unit: 'iu', site: 'right_glute' })
-  assert.deepEqual(doseDefaults(entries, 'HGH', '2026-10-29'), { unit: 'iu', site: 'abdomen' }, 'an unsided site passes through')
+test('the amount and unit the compound was last logged at, and the mirror of its last site', () => {
+  assert.deepEqual(doseDefaults(entries, 'hCG', '2026-10-29'), { dose: 250, unit: 'iu', site: 'right_glute' })
+  assert.deepEqual(doseDefaults(entries, 'HGH', '2026-10-29'), { dose: 2, unit: 'iu', site: 'abdomen' }, 'an unsided site passes through')
 })
 
 test('a back-filled day reads from the dose before it, not the newest', () => {
-  assert.deepEqual(doseDefaults(entries, 'hCG', '2026-10-25'), { unit: 'iu', site: 'left_glute' })
+  assert.deepEqual(doseDefaults(entries, 'hCG', '2026-10-25'), { dose: 250, unit: 'iu', site: 'left_glute' })
   // Nothing before it: the newest is still a better guess than a blank 'mg'.
-  assert.deepEqual(doseDefaults(entries, 'hCG', '2026-10-01'), { unit: 'iu', site: 'right_glute' })
+  assert.deepEqual(doseDefaults(entries, 'hCG', '2026-10-01'), { dose: 250, unit: 'iu', site: 'right_glute' })
 })
 
 test('a compound never logged, or no compound, leaves the row alone', () => {
@@ -30,7 +30,7 @@ test('a compound never logged, or no compound, leaves the row alone', () => {
   assert.equal(doseDefaults([], 'hCG', '2026-10-29'), null)
 })
 
-test('an old row without a site still gives its unit', () => {
+test('an old row without a site still gives its amount and unit', () => {
   const legacy = [day('2026-01-05', { compound: 'hCG', dose: 300, unit: 'iu' })]
-  assert.deepEqual(doseDefaults(legacy, 'hCG', '2026-10-29'), { unit: 'iu', site: '' })
+  assert.deepEqual(doseDefaults(legacy, 'hCG', '2026-10-29'), { dose: 300, unit: 'iu', site: '' })
 })

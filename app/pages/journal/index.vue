@@ -43,7 +43,11 @@
           class="bg-raised border border-line-soft px-4 py-3.5 hover:bg-row-hover transition-colors"
         >
           <p class="text-micro text-muted uppercase tracking-widest">
-            {{ tile.label }}
+            {{ tile.label }}<span
+              v-if="tile.asOf"
+              class="text-faint"
+              :title="`Newest reading is from ${tile.asOf}`"
+            > · {{ tile.asOf }}</span>
           </p>
           <p class="num-display text-big leading-none mt-1.5">
             {{ tile.value }}
@@ -151,6 +155,11 @@
             <span v-if="whoop.sleep">Sleep <span class="num-display text-hi text-head">{{ whoop.sleep }}</span></span>
             <span v-if="whoop.strain != null">Strain <span class="num-display text-hi text-head">{{ whoop.strain }}</span></span>
             <span
+              v-if="whoop.asOf"
+              class="text-meta text-faint"
+              :title="`Newest Whoop reading is from ${whoop.asOf}`"
+            >as of {{ whoop.asOf }}</span>
+            <span
               v-if="whoop.recovery == null && !whoop.sleep && whoop.strain == null"
               class="text-muted"
             >No Whoop data synced yet.</span>
@@ -223,10 +232,20 @@ function series(pick: (e: typeof entries.value[number]) => number | null | undef
   return entries.value.slice(-30).map(pick).filter((v): v is number => v != null)
 }
 
-/** Latest and previous readings of a field, for the delta caption. */
+/** Latest and previous readings of a field, for the delta caption, and the latest one's day. */
 function pair(pick: (e: typeof entries.value[number]) => number | null | undefined) {
-  const vals = entries.value.map(pick).filter((v): v is number => v != null)
-  return { current: vals.at(-1) ?? null, prev: vals.length >= 2 ? vals.at(-2)! : null }
+  const dated = entries.value.flatMap((e) => {
+    const v = pick(e)
+    return v != null ? [{ date: e.date, value: v }] : []
+  })
+  const latest = dated.at(-1)
+  return { current: latest?.value ?? null, prev: dated.length >= 2 ? dated.at(-2)!.value : null, date: latest?.date ?? null }
+}
+
+/** "· OCT 28" beside a tile's label when its newest reading isn't today's — a figure that looks
+ * current but is three days old was the hub's quiet lie (audit #43 item 52). */
+function asOfLabel(date: string | null): string | null {
+  return date && date !== today.value ? formatDate(date, 'monthDay') : null
 }
 
 /**
@@ -259,6 +278,7 @@ const vitalTiles = computed(() => {
     {
       label: 'Weight',
       value: weight.current != null ? weight.current.toFixed(1) : '—',
+      asOf: asOfLabel(weight.date),
       values: series(e => e.weight_lbs),
       color: CHART_ACCENT,
       ...delta(weight.current, weight.prev, true, 1)
@@ -266,6 +286,7 @@ const vitalTiles = computed(() => {
     {
       label: 'BP',
       value: sys.current != null && dia.current != null ? `${sys.current}/${dia.current}` : '—',
+      asOf: asOfLabel(sys.date),
       values: series(e => e.bp_systolic),
       color: CHART_DANGER,
       // One caption can only track one number, so it follows systolic (the clinical headline)
@@ -275,6 +296,7 @@ const vitalTiles = computed(() => {
     {
       label: 'RHR',
       value: rhr.current != null ? Math.round(rhr.current).toString() : '—',
+      asOf: asOfLabel(rhr.date),
       values: series(e => e.rhr),
       color: CHART_WARN,
       ...delta(rhr.current, rhr.prev, true)
@@ -282,6 +304,7 @@ const vitalTiles = computed(() => {
     {
       label: 'HRV',
       value: hrv.current != null ? Math.round(hrv.current).toString() : '—',
+      asOf: asOfLabel(hrv.date),
       values: series(e => e.hrv),
       color: CHART_INDIGO,
       ...delta(hrv.current, hrv.prev, false)
@@ -349,11 +372,12 @@ const workoutParts = computed(() => {
 })
 
 // --- whoop strip ---
-/** Latest non-null reading of a health field, whatever day it landed on. */
-function latestHealth(field: string): number | null {
+/** Latest non-null reading of a health field, whatever day it landed on, with that day. */
+function latestHealth(field: string): { value: number, date: string } | null {
   for (let i = healthEntries.value.length - 1; i >= 0; i--) {
-    const v = (healthEntries.value[i] as unknown as Record<string, number | null>)[field]
-    if (v != null) return v
+    const e = healthEntries.value[i]!
+    const v = (e as unknown as Record<string, number | null>)[field]
+    if (v != null) return { value: v, date: e.date }
   }
   return null
 }
@@ -362,11 +386,15 @@ const whoop = computed(() => {
   const sleep = latestHealth('sleep_total_min')
   const recovery = latestHealth('recovery_score')
   const strain = latestHealth('strain')
+  // The newest of the three readings' days: before the morning sync (or after a strap-less
+  // week) the strip is yesterday's or older, and says so (audit #43 item 52).
+  const newest = [sleep, recovery, strain].map(r => r?.date).filter((d): d is string => !!d).sort().at(-1) ?? null
   // Whoop reports strain to six decimals; the useful precision is one.
   return {
-    recovery: recovery != null ? Math.round(recovery) : null,
-    sleep: sleep != null ? formatDuration(sleep) : '',
-    strain: strain != null ? strain.toFixed(1) : null
+    recovery: recovery ? Math.round(recovery.value) : null,
+    sleep: sleep ? formatDuration(sleep.value) : '',
+    strain: strain ? strain.value.toFixed(1) : null,
+    asOf: asOfLabel(newest)
   }
 })
 

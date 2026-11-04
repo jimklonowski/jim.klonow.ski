@@ -12,7 +12,7 @@ import type { JournalEntry } from '~/data/journal'
 import type { Cycle } from '#shared/utils/cycles'
 import { cycleRules, mergeRules } from '#shared/utils/cycles'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
-import { ruleActiveOn } from '#shared/utils/protocolRules'
+import { predecessorOf, ruleActiveOn, successorOf } from '#shared/utils/protocolRules'
 import { diffDays, shiftDays, weekStartOf, weekdayOf } from '#shared/utils/dates'
 
 // The rule set itself, plus scheduledFor() for the calendar rings, live in
@@ -101,6 +101,13 @@ function statusOf(rule: ProtocolRule, logged: Set<string>, today: string): Adher
   return { kind: 'next', label: '—' }
 }
 
+/** A rule with the rows it took over from, oldest first — one compound's cadence history. */
+function chainOf(rule: ProtocolRule, rules: ProtocolRule[]): ProtocolRule[] {
+  const chain = [rule]
+  for (let prev = predecessorOf(rule, rules); prev && !chain.includes(prev); prev = predecessorOf(prev, rules)) chain.unshift(prev)
+  return chain
+}
+
 export function computeAdherence(
   entries: JournalEntry[],
   today: string,
@@ -123,19 +130,31 @@ export function computeAdherence(
   const currentWeek = weekStartOf(today)
   const weekStarts = Array.from({ length: weeksBack }, (_, i) => shiftDays(currentWeek, -7 * (weeksBack - 1 - i)))
 
+  // A cadence change hands a compound from one row to the next (predecessorOf — "hCG 300 IU
+  // Tue/Fri/Sun" ending the day before "250 IU Tue/Fri" begins). That used to be two rows, each
+  // scored only inside its own window, so the strip went blank and restarted at the change.
+  // One row per chain now, each day scored against the row in force that day; the label,
+  // cadence and status are the row in force today's — a standing rule split around a cycle is
+  // a chain too, and its newest member is the one that resumes after the cycle (audit #43
+  // item 52). A finished chain reads as its last row.
   return rules
-    .filter(r => includeInactive || ruleActiveOn(r, today))
-    .map((rule) => {
+    .filter(r => !successorOf(r, rules))
+    .map(r => chainOf(r, rules))
+    .filter(chain => includeInactive || chain.some(r => ruleActiveOn(r, today)))
+    .map((chain) => {
+      const inForce = (d: string) => chain.find(r => ruleActiveOn(r, d))
+      const rule = inForce(today) ?? chain.at(-1)!
       const logged = doseDates.get(rule.compound) ?? new Set<string>()
       const weeks: AdherenceWeek[] = weekStarts.map((weekStart) => {
         let expected = 0
         let actual = 0
         for (let i = 0; i < 7; i++) {
           const d = shiftDays(weekStart, i)
-          if (d > today || !ruleActiveOn(rule, d)) continue
+          const r = d > today ? undefined : inForce(d)
+          if (!r) continue
           if (logged.has(d)) actual++
           // Today isn't a miss while it can still be dosed — it counts once logged.
-          if (rule.weekdays.includes(weekdayOf(d)) && (d < today || logged.has(d))) expected++
+          if (r.weekdays.includes(weekdayOf(d)) && (d < today || logged.has(d))) expected++
         }
         return { weekStart, expected, actual, partial: weekStart === currentWeek }
       })
@@ -144,7 +163,7 @@ export function computeAdherence(
         { exp: 0, hit: 0 }
       )
       return {
-        id: `${rule.compound}|${rule.weekdays.join('')}|${rule.from}`,
+        id: `${rule.compound}|${rule.weekdays.join('')}|${chain[0]!.from}`,
         compound: rule.compound,
         doseLabel: rule.doseLabel,
         cadence: cadenceLabel(rule),

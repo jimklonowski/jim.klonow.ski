@@ -164,11 +164,12 @@
           >
             <span class="flex items-center gap-3 text-meta">
               <button
-                v-if="canEdit && prevEntry?.peptides?.length"
+                v-if="canEdit && prevDosedEntry"
                 type="button"
                 class="text-accent hover:text-accent-hover cursor-pointer"
+                :title="`Add ${formatDate(prevDosedEntry.date, 'monthDay')}'s doses, sites mirrored — what's typed stays`"
                 @click="copyFromPrevious"
-              >copy prev</button>
+              >copy {{ formatDate(prevDosedEntry.date, 'monthDay').toLowerCase() }}</button>
               <button
                 v-if="canEdit"
                 type="button"
@@ -875,7 +876,7 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, doseDefaults, oppositeSite, withoutBlankRows } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, copyDoses, doseDefaults, lastSoda, withoutBlankRows } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
 import {
@@ -1135,11 +1136,17 @@ const nextEntry = computed(() => {
   return allEntries.value.filter(e => e.date > dateParam.value)[0] ?? null
 })
 
-// Sides alternate day to day, so each copied dose lands on the mirror of the
-// previous entry's site (left_glute → right_glute); unsided routes copy as-is.
+// The last day that actually has doses — the row before this one is often a vitals-only day
+// the watch wrote, which left "copy prev" with nothing to copy (audit #43 item 52).
+const prevDosedEntry = computed(() =>
+  allEntries.value?.filter(e => e.date < dateParam.value && e.peptides?.length).at(-1) ?? null
+)
+
+// Sides alternate day to day, so each copied dose lands on the mirror of that day's site
+// (left_glute → right_glute); unsided routes copy as-is. Rows already typed stay (copyDoses).
 function copyFromPrevious() {
-  if (!prevEntry.value?.peptides?.length) return
-  form.peptides = prevEntry.value.peptides.map(p => ({ ...p, site: oppositeSite(p.site) }))
+  if (!prevDosedEntry.value?.peptides?.length) return
+  form.peptides = copyDoses(form.peptides, prevDosedEntry.value.peptides)
 }
 
 // Pooled across all four meal slots (and all days) so an order typed for lunch once
@@ -1248,14 +1255,15 @@ function buildForm() {
 const compoundSpellingMap = computed(() => compoundSpellings(allEntries.value ?? []))
 
 /**
- * A fresh row takes its unit and site from the compound's last dose (doseDefaults) as soon as
- * the compound is chosen. Only while the dose is still blank: a filled-in row keeps whatever
- * unit it was given.
+ * A fresh row takes its amount, unit and site from the compound's last dose (doseDefaults) as
+ * soon as the compound is chosen. Only while the dose is still blank: a filled-in row keeps
+ * whatever it was given.
  */
 function fillDoseDefaults(peptide: PeptideEntry, compound: unknown) {
   if (peptide.dose || typeof compound !== 'string') return
   const last = doseDefaults(allEntries.value ?? [], canonicalCompound(compound, compoundSpellingMap.value), form.date)
   if (!last) return
+  peptide.dose = last.dose
   peptide.unit = last.unit
   if (last.site) peptide.site = last.site
 }
@@ -1276,8 +1284,10 @@ function removeReconstitution(i: number) {
   form.reconstitutions.splice(i, 1)
 }
 
+// Opens with the last soda named (today's rows first, then the newest day with one): the
+// usual drink in the usual size, time now — a phone shouldn't need both pickers for a repeat.
 function addSoda() {
-  form.sodas.push(blankSoda(localTimeNow()))
+  form.sodas.push({ ...blankSoda(localTimeNow()), ...(lastSoda(form.sodas, allEntries.value ?? []) ?? {}) })
 }
 
 function removeSoda(i: number) {

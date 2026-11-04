@@ -1,5 +1,8 @@
 <template>
-  <nav class="flex gap-3.5 sm:gap-4 px-4 sm:px-6 border-b border-line overflow-x-auto">
+  <nav
+    ref="nav"
+    class="flex gap-3.5 sm:gap-4 px-4 sm:px-6 border-b border-line overflow-x-auto"
+  >
     <NuxtLink
       v-for="tab in tabs"
       :key="tab.to"
@@ -8,6 +11,7 @@
       :class="isActive(tab)
         ? 'text-accent border-accent'
         : 'text-nav-idle border-transparent hover:text-accent'"
+      :data-active="isActive(tab) || undefined"
     >
       {{ tab.label }}
     </NuxtLink>
@@ -55,4 +59,17 @@ function isActive(tab: { to: string }) {
   if (tab.to === '/journal/cycles') return path.startsWith('/journal/cycle/')
   return path.startsWith(tab.to + '/')
 }
+
+// Ten tabs overflow a phone, and the lit one sat off the right edge on CALENDAR, PHOTOS and
+// VACCINES (audit #43 item 52). Centre it by scrolling the strip itself — not scrollIntoView,
+// which would also move the page vertically — on mount and on every route change.
+const nav = useTemplateRef<HTMLElement>('nav')
+function revealActive() {
+  const strip = nav.value
+  const active = strip?.querySelector<HTMLElement>('[data-active]')
+  if (!strip || !active || strip.scrollWidth <= strip.clientWidth) return
+  strip.scrollLeft = active.offsetLeft - (strip.clientWidth - active.offsetWidth) / 2
+}
+onMounted(revealActive)
+watch(() => route.path, () => nextTick(revealActive))
 </script>

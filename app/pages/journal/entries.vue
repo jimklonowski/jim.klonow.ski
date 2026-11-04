@@ -46,6 +46,17 @@
       <span class="shrink-0 text-micro text-muted">
         <span class="text-band">▪</span> logged · <span class="text-accent">▪</span> +photos/recon
       </span>
+      <!-- The ledger lists every row, watch-written vitals days included; this hides those so a
+           phone scrolls hand-logged days only (audit #43 item 52). -->
+      <button
+        type="button"
+        class="shrink-0 text-micro cursor-pointer"
+        :class="loggedOnly ? 'text-body' : 'text-faint hover:text-accent'"
+        :aria-pressed="loggedOnly"
+        @click="loggedOnly = !loggedOnly"
+      >
+        logged only <span :class="loggedOnly ? 'text-accent' : 'text-faint'">[{{ loggedOnly ? 'on' : 'off' }}]</span>
+      </button>
     </div>
 
     <!-- Ledger -->
@@ -63,81 +74,92 @@
         <span class="text-right">Flags</span>
       </div>
 
-      <NuxtLink
+      <template
         v-for="row in pageRows"
         :key="row.date"
-        :to="canOpenDays ? `/journal/${row.date}` : ''"
-        class="grid gap-x-2.5 gap-y-1 items-baseline py-2 border-b border-line-row last:border-0 text-small"
-        :class="[gridCols, row.isToday ? 'bg-inset' : '', canOpenDays ? 'hover:bg-row-hover transition-colors' : 'pointer-events-none']"
       >
-        <span class="text-hi uppercase">{{ formatDate(row.date, 'monthDay') }}</span>
-        <span class="text-dim truncate">{{ row.vitals }}</span>
+        <!-- The dates read "Oct 28" and the ledger runs back years: a year line where the
+             year changes, and at the top of a page that is not this year's. -->
+        <div
+          v-if="row.year"
+          class="pt-3 pb-1 text-micro text-faint tracking-[0.12em]"
+        >
+          {{ row.year }}
+        </div>
+        <NuxtLink
+          :to="canOpenDays ? `/journal/${row.date}` : ''"
+          class="grid gap-x-2.5 gap-y-1 items-baseline py-2 border-b border-line-row last:border-0 text-small"
+          :class="[gridCols, row.isToday ? 'bg-inset' : '', canOpenDays ? 'hover:bg-row-hover transition-colors' : 'pointer-events-none']"
+        >
+          <span class="text-hi uppercase">{{ formatDate(row.date, 'monthDay') }}</span>
+          <span class="text-dim truncate">{{ row.vitals }}</span>
 
-        <!-- Same treatment as the workout log: below lg the four trailing cells share one
+          <!-- Same treatment as the workout log: below lg the four trailing cells share one
              wrapped row instead of alternating between the date and vitals columns, which put
              the right-aligned flags under the date. `lg:contents` restores the real grid. -->
-        <span class="col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:contents">
-          <span class="flex items-center gap-1 flex-wrap">
-            <span
-              v-for="c in row.compounds"
-              :key="c"
-              class="w-1.5 h-1.5 rounded-full shrink-0"
-              :style="{ background: getCompoundColor(c) }"
-              :title="c"
-            />
-            <span
-              v-if="row.photos"
-              class="text-micro text-faint"
-              :title="`${row.photos} progress photo${row.photos > 1 ? 's' : ''}`"
-            >📷</span>
-            <span
-              v-if="row.recon"
-              class="text-micro text-faint"
-              :title="`${row.recon} reconstitution${row.recon > 1 ? 's' : ''}`"
-            >⚗</span>
-            <span
-              v-if="row.isDraw"
-              class="text-micro text-accent whitespace-nowrap"
-            >▲ lab draw</span>
-          </span>
+          <span class="col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:contents">
+            <span class="flex items-center gap-1 flex-wrap">
+              <span
+                v-for="c in row.compounds"
+                :key="c"
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :style="{ background: getCompoundColor(c) }"
+                :title="c"
+              />
+              <span
+                v-if="row.photos"
+                class="text-micro text-faint"
+                :title="`${row.photos} progress photo${row.photos > 1 ? 's' : ''}`"
+              >📷</span>
+              <span
+                v-if="row.recon"
+                class="text-micro text-faint"
+                :title="`${row.recon} reconstitution${row.recon > 1 ? 's' : ''}`"
+              >⚗</span>
+              <span
+                v-if="row.isDraw"
+                class="text-micro text-accent whitespace-nowrap"
+              >▲ lab draw</span>
+            </span>
 
-          <!-- Ounces when the sizes carried them (ounces are what the goal tracks — two mini cans
+            <!-- Ounces when the sizes carried them (ounces are what the goal tracks — two mini cans
                are less than one bottle), the count for unsized rows, blank for none. -->
-          <!-- Below lg the column header is hidden, so a bare "36oz 84oz" said nothing about
+            <!-- Below lg the column header is hidden, so a bare "36oz 84oz" said nothing about
                which was which — each figure carries its word there. -->
-          <span
-            v-if="showSoda"
-            class="text-muted whitespace-nowrap"
-            :title="row.sodas ? `${row.sodas} soda${row.sodas === 1 ? '' : 's'}` : undefined"
-          ><template v-if="row.sodaOz || row.sodas"><span class="lg:hidden text-faint">soda </span>{{ row.sodaOz ? `${row.sodaOz}oz` : row.sodas }}</template></span>
-
-          <span
-            v-if="showSoda"
-            class="text-muted whitespace-nowrap"
-          ><template v-if="row.waterOz"><span class="lg:hidden text-faint">water </span>{{ row.waterOz }}oz</template></span>
-
-          <span
-            class="text-accent"
-            :title="row.workouts ? `${row.workouts} workout${row.workouts > 1 ? 's' : ''}` : undefined"
-          >{{ row.workouts ? '✓' : '' }}</span>
-
-          <span class="text-right lg:ml-0 ml-auto">
             <span
-              v-for="flag in row.flags"
-              :key="flag.text"
-              :class="flag.class"
-              class="ml-2"
-            >{{ flag.text }}</span>
+              v-if="showSoda"
+              class="text-muted whitespace-nowrap"
+              :title="row.sodas ? `${row.sodas} soda${row.sodas === 1 ? '' : 's'}` : undefined"
+            ><template v-if="row.sodaOz || row.sodas"><span class="lg:hidden text-faint">soda </span>{{ row.sodaOz ? `${row.sodaOz}oz` : row.sodas }}</template></span>
+
+            <span
+              v-if="showSoda"
+              class="text-muted whitespace-nowrap"
+            ><template v-if="row.waterOz"><span class="lg:hidden text-faint">water </span>{{ row.waterOz }}oz</template></span>
+
+            <span
+              class="text-accent"
+              :title="row.workouts ? `${row.workouts} workout${row.workouts > 1 ? 's' : ''}` : undefined"
+            >{{ row.workouts ? '✓' : '' }}</span>
+
+            <span class="text-right lg:ml-0 ml-auto">
+              <span
+                v-for="flag in row.flags"
+                :key="flag.text"
+                :class="flag.class"
+                class="ml-2"
+              >{{ flag.text }}</span>
+            </span>
           </span>
-        </span>
-      </NuxtLink>
+        </NuxtLink>
+      </template>
 
       <!-- A failed load is the error state above, not an empty log. -->
       <p
-        v-if="!error && !entries.length"
+        v-if="!error && !ledgerEntries.length"
         class="py-5 text-small text-muted"
       >
-        No entries logged yet.
+        {{ loggedOnly && entries.length ? 'No hand-logged days yet — only synced vitals.' : 'No entries logged yet.' }}
       </p>
     </div>
 
@@ -226,7 +248,10 @@ const streakStrip = computed(() => {
 })
 
 // --- ledger rows ---
-const { page, totalPages, pageRows: pagedEntries } = usePagination(entries, 15)
+// Kept across visits: a phone that wants hand-logged days only wants them every time.
+const loggedOnly = useState('journal-entries-logged-only', () => false)
+const ledgerEntries = computed(() => (loggedOnly.value ? loggedEntries.value : entries.value))
+const { page, totalPages, pageRows: pagedEntries } = usePagination(ledgerEntries, 15)
 
 /** "167.8lb · 125/74 · ♥60 · HRV 52", skipping whatever wasn't recorded. */
 function vitalsLine(e: typeof entries.value[number]) {
@@ -249,11 +274,15 @@ function flagsFor(e: typeof entries.value[number], fasting: boolean) {
 }
 
 const pageRows = computed(() =>
-  pagedEntries.value.map((e) => {
+  pagedEntries.value.map((e, i, rows) => {
     const isDraw = drawDates.value.has(e.date)
     const fasting = drawDates.value.get(e.date) === true
+    const year = e.date.slice(0, 4)
+    const previousYear = i ? rows[i - 1]!.date.slice(0, 4) : today.value.slice(0, 4)
     return {
       date: e.date,
+      /** Set on the first row of a new year (newest first), or a page's first row when it isn't this year's. */
+      year: year !== previousYear ? year : null,
       isToday: e.date === today.value,
       isDraw,
       vitals: vitalsLine(e),

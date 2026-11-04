@@ -92,14 +92,15 @@ test('a cycle is scored from its first week through today, finished runs include
   assert.equal(done.pct, 0, 'nothing logged in its fortnight')
 })
 
-test('two rules of one compound on the same weekdays get distinct row ids (audit #43 item 35)', () => {
-  // A dose ramp inside a cycle: same compound, same days, a later start.
+test('a handover (dose ramp, cadence change) is ONE continuous row; rows that do not hand over stay apart with distinct ids (audit #43 items 35 + 52)', () => {
+  // A dose ramp: same compound, same days, the second row starting the day after the first ends.
+  // It used to be two rows, each blank outside its own window, so the strip restarted at the step.
   const ramp = [rule('R', [1, 4], { from: '2026-09-01', to: '2026-09-28', doseLabel: '250 mg' }), rule('R', [1, 4], { from: '2026-09-29', doseLabel: '500 mg' })]
   const rows = computeAdherence([], TODAY, 2, ramp, { includeInactive: true })
-  assert.equal(rows.length, 2)
-  assert.notEqual(rows[0].id, rows[1].id)
-  assert.equal(new Set(rows.map(r => r.id)).size, 2)
-  // The cycle dossier's rows come through the same path.
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].doseLabel, '500 mg', 'the row in force today names the row')
+  assert.equal(rows[0].id, 'R|14|2026-09-01', 'keyed by the chain\'s first day')
+  // The cycle dossier's ramp comes through the same path.
   const cycle = {
     name: 'Ramp',
     start_date: '2026-10-05',
@@ -110,6 +111,33 @@ test('two rules of one compound on the same weekdays get distinct row ids (audit
     ]
   }
   const { rows: cycleRows } = cycleAdherence([], cycle, TODAY)
-  assert.equal(cycleRows.length, 2)
-  assert.equal(new Set(cycleRows.map(r => r.id)).size, 2, 'the ramp\'s two rows are told apart')
+  assert.equal(cycleRows.length, 1)
+  assert.equal(cycleRows[0].doseLabel, '500 mg')
+  // Two rows of one compound with a gap between them are not a handover: two rows, told apart.
+  const gapped = [rule('S', [1], { from: '2026-01-01', to: '2026-08-31' }), rule('S', [1], { from: '2026-10-01' })]
+  const apart = computeAdherence([], TODAY, 2, gapped, { includeInactive: true })
+  assert.equal(apart.length, 2)
+  assert.equal(new Set(apart.map(r => r.id)).size, 2)
+})
+
+test('a cadence change scores each day against the row in force that day, so the strip never restarts (audit #43 item 52)', () => {
+  // hCG Tue/Fri/Sun through Oct 15, then Tue/Fri from Oct 16 — the real 2026-10-24 handover's shape.
+  const chain = [
+    rule('hCG', [0, 2, 5], { from: '2026-01-01', to: '2026-10-15', doseLabel: '300 IU' }),
+    rule('hCG', [2, 5], { from: '2026-10-16', doseLabel: '250 IU' })
+  ]
+  // Week of Oct 11: Sun 11 + Tue 13 under the old row, Fri 16 under the new = 3 expected.
+  // Week of Oct 18 (today Fri 23): Tue 20 under the new row = 1; Sun 18 is no longer a dose day.
+  const rows = computeAdherence(dosed('hCG', '2026-10-11', '2026-10-13', '2026-10-16', '2026-10-20'), TODAY, 2, chain)
+  assert.equal(rows.length, 1, 'one row across the change, not two')
+  const [h] = rows
+  assert.deepEqual(h.weeks.map(w => [w.weekStart, w.expected, w.actual]), [['2026-10-11', 3, 3], ['2026-10-18', 1, 1]])
+  assert.equal(h.pct, 100)
+  assert.equal(h.doseLabel, '250 IU')
+  assert.equal(h.cadence, 'TUE+FRI')
+  assert.deepEqual(h.status, { kind: 'due', label: 'DUE TODAY' })
+  // Sun 18 taken anyway counts as a dose-day, not as an expected one.
+  const extra = computeAdherence(dosed('hCG', '2026-10-11', '2026-10-13', '2026-10-16', '2026-10-18'), TODAY, 2, chain)[0]
+  assert.deepEqual(extra.weeks.map(w => [w.expected, w.actual]), [[3, 3], [1, 1]])
+  assert.deepEqual(extra.status, { kind: 'overdue', label: 'DUE TODAY' }, 'Tue 20 was never covered')
 })

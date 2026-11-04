@@ -8,16 +8,18 @@
     >
       <template #actions>
         <span class="flex items-center gap-2.5">
+          <!-- A finger needs ~44px; the glyphs are a third of that, so the hit area is padded
+               out (negative margin keeps the header's own height) — audit #43 item 52. -->
           <button
             type="button"
-            class="text-prose text-faint hover:text-accent cursor-pointer"
+            class="inline-flex items-center justify-center min-w-11 min-h-11 -my-2 text-prose text-faint hover:text-accent cursor-pointer"
             aria-label="Previous month"
             @click="prevMonth"
           >‹</button>
           <span class="num-display text-hi text-title w-38 text-center">{{ monthLabel }}</span>
           <button
             type="button"
-            class="text-prose text-faint hover:text-accent cursor-pointer"
+            class="inline-flex items-center justify-center min-w-11 min-h-11 -my-2 text-prose text-faint hover:text-accent cursor-pointer"
             aria-label="Next month"
             @click="nextMonth"
           >›</button>
@@ -80,7 +82,7 @@
         v-for="(cell, i) in calendarCells"
         :key="i"
         :type="cell.date && canOpenDays ? 'button' : undefined"
-        class="bg-bg px-2 py-2 min-h-22 text-left align-top"
+        class="bg-bg px-1 py-1.5 sm:px-2 sm:py-2 min-h-22 min-w-0 overflow-hidden text-left align-top"
         :class="[
           cell.date && canOpenDays ? 'cursor-pointer hover:bg-row-hover transition-colors' : '',
           cell.isToday ? 'outline outline-accent -outline-offset-1' : '',
@@ -128,22 +130,24 @@
             >{{ cell.marks }}</span>
           </div>
 
+          <!-- A phone cell is ~47px wide: "planned draw" alone spilled into the neighbour, so
+               below sm only the glyph shows (the title and aria-label still carry the words). -->
           <div
             v-if="cell.isDraw"
-            class="mt-1 text-label text-accent"
+            class="mt-1 text-label text-accent whitespace-nowrap"
           >
-            ▲ lab draw
+            ▲<span class="hidden sm:inline"> lab draw</span>
           </div>
           <div
             v-if="cell.isPlannedDraw"
-            class="mt-1 text-label text-muted"
+            class="mt-1 text-label text-muted whitespace-nowrap"
           >
-            △ planned draw
+            △<span class="hidden sm:inline"> planned draw</span>
           </div>
 
           <div
             v-if="cell.weight"
-            class="mt-1 text-small text-muted"
+            class="mt-1 text-small text-muted truncate"
           >
             {{ cell.weight }}
           </div>

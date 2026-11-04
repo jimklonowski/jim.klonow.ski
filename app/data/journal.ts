@@ -44,6 +44,36 @@ export function blankSoda(time: string): SodaEntry {
 const isBlankSoda = (s: SodaEntry) => !s.drink?.trim() && !s.size?.trim()
 
 /**
+ * What "+ add" opens a soda row with: the drink and size of the last soda named — today's form
+ * first, then the newest day with one (audit #43 item 52). The usual soda is the usual soda; a
+ * blank row meant picking the same two values on a phone every time. `entries` oldest first.
+ */
+export function lastSoda(formSodas: readonly SodaEntry[], entries: readonly JournalEntry[]): Pick<SodaEntry, 'drink' | 'size'> | null {
+  const pick = (list: readonly SodaEntry[] | undefined) => list?.findLast(s => !isBlankSoda(s))
+  const own = pick(formSodas)
+  if (own) return { drink: own.drink, size: own.size }
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const s = pick(entries[i]!.sodas)
+    if (s) return { drink: s.drink, size: s.size }
+  }
+  return null
+}
+
+/**
+ * "copy prev": the previous dosed day's doses added to what the form already holds, each on
+ * the mirror of its site. Rows already typed stay — the button used to replace them all — and a
+ * compound the form already names is not added twice; blank "+ add" rows make way.
+ */
+export function copyDoses(current: readonly PeptideEntry[], previous: readonly PeptideEntry[]): PeptideEntry[] {
+  const kept = current.filter(p => p.compound.trim() !== '')
+  const have = new Set(kept.map(p => p.compound))
+  return [
+    ...kept,
+    ...previous.filter(p => p.compound && !have.has(p.compound)).map(p => ({ ...p, site: oppositeSite(p.site) }))
+  ]
+}
+
+/**
  * The day form's rows minus the ones "+ add" opened and nothing filled: a dose or reconstitution
  * without a compound, a soda with neither drink nor size. Saved, one stray row made the day a
  * logged day (and the streak longer), a phantom soda in every count, and a grey dot with no name
@@ -247,24 +277,27 @@ export function oppositeSite(site: string): string {
 }
 
 /**
- * What a new dose row picks up when its compound is chosen: the unit that compound was last
- * logged in, and the mirror of its last site (the same rotation copy-from-previous applies). The
- * row used to stay at its blank 'mg', so "hCG 250" saved as 250 mg — dropped by the exposure
- * model and read as ~2.3M IU by the vial inventory, while adherence still counted it (audit #43
- * item 8). The last dose before `date` when there is one, since a back-filled day should read
- * like its own time; otherwise the newest. `entries` oldest first, as the journal list comes.
+ * What a new dose row picks up when its compound is chosen: the amount and unit that compound
+ * was last logged at, and the mirror of its last site (the same rotation copy-from-previous
+ * applies). The row used to stay at its blank 'mg', so "hCG 250" saved as 250 mg — dropped by
+ * the exposure model and read as ~2.3M IU by the vial inventory, while adherence still counted
+ * it (audit #43 item 8); the amount joined in item 52, since a protocol dose is the same dose
+ * nearly every time. The last dose before `date` when there is one, since a back-filled day
+ * should read like its own time; otherwise the newest. `entries` oldest first, as the journal
+ * list comes.
  */
-export function doseDefaults(entries: readonly JournalEntry[], compound: string, date: string): { unit: PeptideEntry['unit'], site: string } | null {
+export function doseDefaults(entries: readonly JournalEntry[], compound: string, date: string): { dose: number, unit: PeptideEntry['unit'], site: string } | null {
   if (!compound) return null
+  const of = (p: PeptideEntry) => ({ dose: p.dose, unit: p.unit, site: oppositeSite(p.site ?? '') })
   let latest: PeptideEntry | null = null
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i]!
     const dose = e.peptides?.findLast(p => p.compound === compound && p.unit)
     if (!dose) continue
     latest ??= dose
-    if (e.date < date) return { unit: dose.unit, site: oppositeSite(dose.site ?? '') }
+    if (e.date < date) return of(dose)
   }
-  return latest ? { unit: latest.unit, site: oppositeSite(latest.site ?? '') } : null
+  return latest ? of(latest) : null
 }
 
 /** A compound name with its whitespace tidied: trimmed, inner runs as one space. */
