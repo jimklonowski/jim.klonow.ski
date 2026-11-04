@@ -135,6 +135,17 @@ export interface HealthMetricsEntry {
   recovery_score: number | null
   strain: number | null
   sleep_performance_pct: number | null
+  /** Apple Health via the webhook (migration 0015, audit #43 item 56); null before it. */
+  steps: number | null
+  active_kcal: number | null
+  basal_kcal: number | null
+  resp_rate: number | null
+  spo2_pct: number | null
+  waist_in: number | null
+  dietary_water_oz: number | null
+  /** Health Auto Export's stamps for the night, verbatim ("2026-10-21 23:12:00 -0500"). */
+  sleep_start: string | null
+  sleep_end: string | null
 }
 
 export interface WorkoutEntry {

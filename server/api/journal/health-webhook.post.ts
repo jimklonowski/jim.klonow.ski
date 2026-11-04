@@ -1,6 +1,7 @@
 import { zHealthWebhook } from '#shared/utils/schemas'
 import { VITALS_SELECT, VITALS_UPSERT_SQL, vitalsBindings, vitalsOutcome } from '#shared/utils/vitalsUpsert'
-import type { Vitals, VitalsRow } from '#shared/utils/vitalsUpsert'
+import type { VitalsRow } from '#shared/utils/vitalsUpsert'
+import { parseHealthExport } from '#shared/utils/healthExport'
 import { workoutStartMs } from '#shared/utils/time'
 
 /** Only a session from the last few days warrants a Whoop strain re-read; a backfill of old workouts doesn't. */
@@ -18,17 +19,6 @@ const MAX_DELIVERY_STATEMENTS = 900
 /** Statements per batch: a batch is one transaction, so a failure rolls back a slice, not the delivery. */
 const BATCH_SIZE = 50
 
-interface HealthMetrics {
-  vo2_max?: number
-  body_fat_pct?: number
-  lean_body_mass_lbs?: number
-  sleep_total_min?: number
-  sleep_rem_min?: number
-  sleep_deep_min?: number
-  sleep_core_min?: number
-  sleep_awake_min?: number
-}
-
 interface Workout {
   external_id: string | null
   date: string
@@ -39,10 +29,6 @@ interface Workout {
   avg_hr: number | null
   max_hr: number | null
   distance_mi: number | null
-}
-
-function hoursToMin(qty: number) {
-  return Math.round(qty * 60)
 }
 
 // Handles both `{ activeEnergyBurned: 450 }` and `{ activeEnergyBurned: { qty: 450 } }` shapes
@@ -70,70 +56,10 @@ export default defineEventHandler(async (event) => {
   // in a batch can't fail the sync (a metric without a data array used to throw mid-loop).
   const { data: { metrics, workouts: workoutsIn } } = await readValidatedJson(event, zHealthWebhook)
 
-  const byDate: Record<string, Vitals> = {}
-  const healthByDate: Record<string, HealthMetrics> = {}
-
-  for (const metric of metrics) {
-    const { name, units, data } = metric
-    for (const point of data ?? []) {
-      const dateStr = String(point.date ?? '').substring(0, 10)
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue
-      if (!byDate[dateStr]) byDate[dateStr] = {}
-      if (!healthByDate[dateStr]) healthByDate[dateStr] = {}
-
-      const qty = typeof point.qty === 'number'
-        ? point.qty
-        : typeof point.value === 'number' ? point.value : null
-
-      if (name === 'body_mass' && qty != null) {
-        byDate[dateStr].weight_lbs = units === 'kg'
-          ? Math.round(qty * 2.20462 * 10) / 10
-          : Math.round(qty * 10) / 10
-      }
-      else if (name === 'resting_heart_rate' && qty != null) {
-        byDate[dateStr].rhr = Math.round(qty)
-      }
-      else if (name === 'heart_rate_variability' && qty != null) {
-        byDate[dateStr].hrv = Math.round(qty)
-      }
-      else if (name === 'blood_pressure') {
-        if (typeof point.systolic === 'number') byDate[dateStr].bp_systolic = Math.round(point.systolic)
-        if (typeof point.diastolic === 'number') byDate[dateStr].bp_diastolic = Math.round(point.diastolic)
-      }
-      else if (name === 'blood_pressure_systolic' && qty != null) {
-        byDate[dateStr].bp_systolic = Math.round(qty)
-      }
-      else if (name === 'blood_pressure_diastolic' && qty != null) {
-        byDate[dateStr].bp_diastolic = Math.round(qty)
-      }
-      else if (name === 'vo2_max' && qty != null) {
-        healthByDate[dateStr].vo2_max = Math.round(qty * 10) / 10
-      }
-      else if (name === 'body_fat_percentage' && qty != null) {
-        // Health Auto Export's scale for this metric (fraction like 0.225 vs already-percent
-        // like 22.5) needs confirming against a real payload before trusting this value.
-        healthByDate[dateStr].body_fat_pct = qty <= 1 ? Math.round(qty * 1000) / 10 : Math.round(qty * 10) / 10
-      }
-      else if (name === 'lean_body_mass' && qty != null) {
-        healthByDate[dateStr].lean_body_mass_lbs = units === 'kg'
-          ? Math.round(qty * 2.20462 * 10) / 10
-          : Math.round(qty * 10) / 10
-      }
-      else if (name === 'sleep_analysis') {
-        const h = healthByDate[dateStr]
-        if (typeof point.rem === 'number') h.sleep_rem_min = hoursToMin(point.rem)
-        if (typeof point.deep === 'number') h.sleep_deep_min = hoursToMin(point.deep)
-        if (typeof point.core === 'number') h.sleep_core_min = hoursToMin(point.core)
-        if (typeof point.awake === 'number') h.sleep_awake_min = hoursToMin(point.awake)
-        // Health Auto Export's own `asleep` field on this metric has been unreliable (observed
-        // as 0 while rem/deep/core were correct), so derive total time asleep from the stages
-        // instead - this matches how HealthKit itself defines "asleep" (rem + core + deep).
-        if (h.sleep_rem_min != null || h.sleep_deep_min != null || h.sleep_core_min != null) {
-          h.sleep_total_min = (h.sleep_rem_min ?? 0) + (h.sleep_deep_min ?? 0) + (h.sleep_core_min ?? 0)
-        }
-      }
-    }
-  }
+  // The per-date vitals and health metrics, every unit converted (shared/utils/healthExport.ts,
+  // tested) — including the steps, energies, respiratory rate, SpO2, waist, water and the sleep
+  // start/end stamps the webhook used to drop (audit #43 item 56).
+  const { byDate, healthByDate } = parseHealthExport(metrics)
 
   const workouts: Workout[] = []
   for (const w of workoutsIn) {

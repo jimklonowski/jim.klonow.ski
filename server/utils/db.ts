@@ -176,17 +176,31 @@ export function parseHealthMetricsRow(row: Record<string, unknown>) {
     sleep_awake_min: (row.sleep_awake_min as number | null) ?? null,
     recovery_score: (row.recovery_score as number | null) ?? null,
     strain: (row.strain as number | null) ?? null,
-    sleep_performance_pct: (row.sleep_performance_pct as number | null) ?? null
+    sleep_performance_pct: (row.sleep_performance_pct as number | null) ?? null,
+    // Migration 0015 (audit #43 item 56); `?? null` also covers a row read before it applied.
+    steps: (row.steps as number | null | undefined) ?? null,
+    active_kcal: (row.active_kcal as number | null | undefined) ?? null,
+    basal_kcal: (row.basal_kcal as number | null | undefined) ?? null,
+    resp_rate: (row.resp_rate as number | null | undefined) ?? null,
+    spo2_pct: (row.spo2_pct as number | null | undefined) ?? null,
+    waist_in: (row.waist_in as number | null | undefined) ?? null,
+    dietary_water_oz: (row.dietary_water_oz as number | null | undefined) ?? null,
+    sleep_start: (row.sleep_start as string | null | undefined) ?? null,
+    sleep_end: (row.sleep_end as string | null | undefined) ?? null
   }
 }
 
 export const HEALTH_METRIC_FIELDS = [
   'vo2_max', 'body_fat_pct', 'lean_body_mass_lbs',
   'sleep_total_min', 'sleep_rem_min', 'sleep_deep_min', 'sleep_core_min', 'sleep_awake_min',
-  'recovery_score', 'strain', 'sleep_performance_pct'
+  'recovery_score', 'strain', 'sleep_performance_pct',
+  'steps', 'active_kcal', 'basal_kcal', 'resp_rate', 'spo2_pct', 'waist_in', 'dietary_water_oz',
+  'sleep_start', 'sleep_end'
 ] as const
 
 export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
+/** What a field holds: numbers throughout, except the two sleep stamps. */
+export type HealthMetricValues = Partial<Record<HealthMetricField, number | string>>
 
 // Shared by the Apple Health webhook and the Whoop sync task - health_metrics has no manual-entry
 // UI, so whichever source has a value for a field just overwrites it (no null-only-patch needed).
@@ -196,7 +210,7 @@ export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
 // the menu wore as ⚠ until the next clean sync. ON CONFLICT touches only this call's fields, so
 // concurrent writers with different fields still merge instead of clobbering each other.
 /** The health_metrics upsert for one date as a statement, or null when there is nothing to write. */
-export function healthMetricsStatement(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): D1PreparedStatement | null {
+export function healthMetricsStatement(db: D1Database, date: string, fields: HealthMetricValues): D1PreparedStatement | null {
   const cols = HEALTH_METRIC_FIELDS.filter(f => fields[f] != null)
   if (cols.length === 0) return null
   return db.prepare(`
@@ -206,7 +220,7 @@ export function healthMetricsStatement(db: D1Database, date: string, fields: Par
   `).bind(date, ...cols.map(f => fields[f]!))
 }
 
-export async function upsertHealthMetrics(db: D1Database, date: string, fields: Partial<Record<HealthMetricField, number>>): Promise<boolean> {
+export async function upsertHealthMetrics(db: D1Database, date: string, fields: HealthMetricValues): Promise<boolean> {
   const stmt = healthMetricsStatement(db, date, fields)
   if (!stmt) return false
   await stmt.run()

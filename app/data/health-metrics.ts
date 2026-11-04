@@ -36,6 +36,43 @@ export const HEALTH_METRICS_META: Record<string, DexaMetricMeta> = {
     label: 'Sleep Performance',
     unit: '%',
     description: 'Whoop\'s sleep performance score - how much you slept relative to what your body needed.'
+  },
+  // Apple Health through the Health Auto Export webhook (audit #43 item 56).
+  steps: {
+    label: 'Steps',
+    unit: 'steps',
+    description: 'Steps for the day, from Apple Watch and iPhone via Apple Health.'
+  },
+  active_kcal: {
+    label: 'Active Energy',
+    unit: 'kcal',
+    description: 'Apple Watch\'s estimate of energy spent moving — the activity part of the day\'s expenditure. Days with no watch wear read low, not zero.'
+  },
+  basal_kcal: {
+    label: 'Resting Energy',
+    unit: 'kcal',
+    description: 'Apple\'s estimate of resting energy for the day (basal metabolic rate scaled to the hours tracked).'
+  },
+  resp_rate: {
+    label: 'Respiratory Rate',
+    unit: 'br/min',
+    description: 'Breaths per minute during sleep, from Apple Watch. A rise of a breath or two over your own baseline often precedes illness.'
+  },
+  spo2_pct: {
+    label: 'Blood Oxygen',
+    unit: '%',
+    description: 'Blood oxygen saturation from Apple Watch (spot readings and overnight). Normal is 95–100 % at sea level; readings are noisy and a single low one means little.'
+  },
+  waist_in: {
+    label: 'Waist',
+    unit: 'in',
+    lowerIsBetter: true,
+    description: 'Waist circumference as logged to Apple Health (a tape measurement, not a scale estimate).'
+  },
+  dietary_water_oz: {
+    label: 'Water (Health)',
+    unit: 'oz',
+    description: 'Water logged to Apple Health for the day (the watch\'s own water logging). Separate from the journal\'s water taps — the two are not merged.'
   }
 }
 

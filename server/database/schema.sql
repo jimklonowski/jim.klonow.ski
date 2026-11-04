@@ -94,7 +94,18 @@ CREATE TABLE IF NOT EXISTS health_metrics (
   sleep_awake_min INTEGER,
   recovery_score REAL,
   strain REAL,
-  sleep_performance_pct REAL
+  sleep_performance_pct REAL,
+  -- Migration 0015: the Apple Health metrics the webhook used to drop (audit #43 item 56).
+  steps INTEGER,
+  active_kcal REAL,
+  basal_kcal REAL,
+  resp_rate REAL,
+  spo2_pct REAL,
+  waist_in REAL,
+  dietary_water_oz REAL,
+  -- Health Auto Export's own stamps for the night ("2026-10-21 23:12:00 -0500"), kept verbatim.
+  sleep_start TEXT,
+  sleep_end TEXT
 );
 
 CREATE TABLE IF NOT EXISTS workouts (
