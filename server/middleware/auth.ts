@@ -28,8 +28,14 @@ export default defineEventHandler(async (event) => {
 
   if (isApi) return // endpoints enforce their own requirements
   if (path === LOGIN_PATH) return
-  // A signed-out /ticker (a pasted link, a crawler) lands on the sign-in page carrying its
-  // Open Graph card: the login page reads `for=ticker` and points at /ticker/og.png.
-  if (!auth) return sendRedirect(event, path === '/ticker' ? `${LOGIN_PATH}?for=ticker` : LOGIN_PATH, 302)
+  // The sign-in page gets the page asked for, query included, and sends the person back there
+  // once signed in (`from`, read through safeReturnPath — audit #43 item 50). A signed-out
+  // /ticker (a pasted link, a crawler) also carries `for=ticker`: the login page reads it and
+  // points its Open Graph card at /ticker/og.png.
+  if (!auth) {
+    const url = getRequestURL(event)
+    const query = new URLSearchParams({ ...(path === '/ticker' ? { for: 'ticker' } : {}), from: url.pathname + url.search })
+    return sendRedirect(event, `${LOGIN_PATH}?${query}`, 302)
+  }
   if (!canAccessPage(auth.role, path)) return sendRedirect(event, '/labs', 302)
 })

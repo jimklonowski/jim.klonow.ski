@@ -191,12 +191,15 @@ export function setUploadCookie(event: H3Event) {
   })
 }
 
-/** Async since it reads the session cutoff: a PIN unlocked before "sign out everywhere" is dead too. */
-export async function requireUploadPin(event: H3Event) {
+/** Whether a live upload-PIN token is on the request. Async since it reads the session cutoff: a
+ * PIN unlocked before "sign out everywhere" is dead too. */
+export async function hasUploadPin(event: H3Event): Promise<boolean> {
   const payload = verifyToken(getCookie(event, UPLOAD_COOKIE))
-  if (!payload || payload.r !== 'upload' || (payload.iat ?? 0) < await ownerSessionCutoff(event)) {
-    throw createError({ statusCode: 403, message: 'Upload PIN required' })
-  }
+  return !!payload && payload.r === 'upload' && (payload.iat ?? 0) >= await ownerSessionCutoff(event)
+}
+
+export async function requireUploadPin(event: H3Event) {
+  if (!await hasUploadPin(event)) throw createError({ statusCode: 403, message: 'Upload PIN required' })
 }
 
 // --- Sign out everywhere ---

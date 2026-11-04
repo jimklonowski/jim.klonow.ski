@@ -87,6 +87,22 @@ export function isProtectedPage(path: string): boolean {
     || p === '/ticker'
 }
 
+/**
+ * The page to come back to after signing in, from the `from` query value both middlewares write
+ * when they bounce a signed-out visitor to the login page (audit #43 item 50) — or null for
+ * anything that is not one of our own gated pages: an absolute URL, a protocol-relative
+ * `//host`, a backslash or control character, the login page itself, a public page. The caller
+ * falls back to its default. A page the role cannot open is still the middleware's call, which
+ * sends it to /labs as it always did.
+ */
+export function safeReturnPath(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.length > 2000) return null
+  if (!raw.startsWith('/') || raw.startsWith('//') || /[\\\s\p{Cc}]/u.test(raw)) return null
+  const pathname = raw.split(/[?#]/, 1)[0]!
+  if (!isProtectedPage(pathname) || normalizePath(pathname) === LOGIN_PATH) return null
+  return raw
+}
+
 export function canAccessPage(role: Role, path: string): boolean {
   const p = normalizePath(path) // the prefixes below are lowercase; the router isn't case-picky
   if (role === 'owner') return true

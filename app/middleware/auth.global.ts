@@ -39,6 +39,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
 
-  if (!role) return navigateTo(LOGIN_PATH)
+  // The page asked for rides along, so sign-in lands back on it (audit #43 item 50).
+  if (!role) return navigateTo({ path: LOGIN_PATH, query: { from: to.fullPath } })
   if (!canAccessPage(role, path)) return navigateTo('/labs')
 })

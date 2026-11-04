@@ -375,10 +375,15 @@ interface LabResult {
   symmetry?: Record<string, number>
 }
 
-// PIN gate — validated server-side (httpOnly cookie, not readable by JS)
-const uploadAuthed = ref(false)
+// PIN gate — validated server-side (httpOnly cookie, not readable by JS). Seeded from
+// /api/auth/me, which the shell fetches for this very render, so a PIN still in force draws the
+// drop zone in the SSR HTML instead of a gate that flipped after mount (audit #43 item 50). The
+// mount check only ever lifts the gate — for an answer cached before a PIN entered elsewhere.
+const { uploadUnlocked } = await useAuth()
+const uploadAuthed = ref(uploadUnlocked.value)
 
 onMounted(async () => {
+  if (uploadAuthed.value) return
   try {
     await $fetch('/api/labs/validate-upload')
     uploadAuthed.value = true

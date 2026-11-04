@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  canAccessPage, isFullAccessRole, isProtectedPage, LOGIN_PATH, normalizePath
+  canAccessPage, isFullAccessRole, isProtectedPage, LOGIN_PATH, normalizePath, safeReturnPath
 } from '../shared/utils/access.ts'
 
 test('the gate is case-insensitive, because the router is', () => {
@@ -96,6 +96,20 @@ test('isProtectedPage gates every section and nothing else', () => {
   // The login page sits inside the /labs prefix and is deliberately still "protected" here —
   // both middlewares exempt it explicitly, so the prefix test stays a pure prefix test.
   assert.equal(isProtectedPage(LOGIN_PATH), true)
+})
+
+test('the return path after sign-in is one of our gated pages, query and all, or nothing (audit #43 item 50)', () => {
+  assert.equal(safeReturnPath('/journal/trends'), '/journal/trends')
+  assert.equal(safeReturnPath('/labs?marker=hematocrit'), '/labs?marker=hematocrit', 'the deep link keeps its query')
+  assert.equal(safeReturnPath('/ticker'), '/ticker')
+  assert.equal(safeReturnPath('/journal/2026-09-22#doses'), '/journal/2026-09-22#doses')
+  const refused = [
+    '//evil.example/labs', 'https://evil.example/labs', '/labs\\@evil.example', '\\\\evil', '/labs\n', '/labs%0d\r',
+    '/labs/login', '/labs/login?from=/labs', '/LABS/LOGIN/',
+    '/', '/privacy', '/demo', '/share/abc', 'labs', '',
+    null, undefined, 42, ['/labs'], `/labs?${'x'.repeat(2100)}`
+  ]
+  for (const bad of refused) assert.equal(safeReturnPath(bad), null, JSON.stringify(bad))
 })
 
 test('trailing slashes do not open a hole', () => {

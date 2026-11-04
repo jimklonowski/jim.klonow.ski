@@ -5,6 +5,8 @@
 //
 // `inline` is the upload page's panel (❯ prompt, left-aligned error). `modal` is the compact
 // body for the labs index's "regenerate" modal.
+import { signInFailure } from '#shared/utils/authFailure'
+
 const props = withDefaults(defineProps<{
   variant?: 'inline' | 'modal'
   buttonLabel?: string
@@ -28,8 +30,9 @@ async function submit() {
     pin.value = ''
     emit('unlocked')
   }
-  catch {
-    error.value = 'Incorrect PIN. Try again.'
+  catch (err) {
+    // A wrong PIN, a rate limit, a session that ended, a dead network: each says which.
+    error.value = signInFailure(err, 'Incorrect PIN. Try again.')
     pin.value = ''
   }
   finally {

@@ -95,6 +95,8 @@
 
 <script setup lang="ts">
 import { REPO_URL } from '#shared/utils/site'
+import { safeReturnPath } from '#shared/utils/access'
+import { signInFailure } from '#shared/utils/authFailure'
 
 definePageMeta({ layout: false })
 // One of only two pages a signed-out visitor can reach, so it's the one place a crawler could
@@ -107,6 +109,10 @@ definePageMeta({ layout: false })
 // what keeps it out of search.
 const route = useRoute()
 const forTicker = route.query.for === 'ticker'
+// Where sign-in lands: the gated page the middleware bounced here from (`from`, query and all),
+// if it is one of ours; otherwise the pet page for a ticker link, else the labs hub (audit #43
+// item 50 — a deep link used to drop its path here).
+const returnTo = safeReturnPath(route.query.from) ?? (forTicker ? '/ticker' : '/labs')
 useSeoMeta({
   title: () => 'Labs · Sign In',
   robots: 'noindex, nofollow',
@@ -134,10 +140,12 @@ async function handleSubmit() {
   try {
     await $fetch('/api/labs/auth', { method: 'POST', body: { password: form.password } })
     // Hard navigation so the page SSR-renders with full data instead of hydrating empty
-    window.location.href = forTicker ? '/ticker' : '/labs'
+    window.location.href = returnTo
   }
-  catch {
-    error.value = 'Incorrect password. Try again.'
+  catch (err) {
+    // Only a refusal is the password's fault; a rate limit, a dead network or a server error
+    // says so (shared/utils/authFailure.ts).
+    error.value = signInFailure(err, 'Incorrect password. Try again.')
   }
   finally {
     loading.value = false
