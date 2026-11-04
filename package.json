@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.11.03b",
+  "version": "2026.11.04",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -33,8 +33,8 @@
     "theme:css": "node scripts/theme/build-themes-css.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
-    "@tanstack/charts": "^1.2.0",
+    "@anthropic-ai/sdk": "^1.4.0",
+    "@tanstack/charts": "^1.2.1",
     "@unhead/vue": "^3.4.3",
     "@vueuse/core": "^14.4.0",
     "exifr": "^7.1.3",
@@ -46,7 +46,7 @@
     "@comark/nuxt": "0.8.1",
     "@gltf-transform/core": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
-    "@iconify-json/lucide": "^1.2.150",
+    "@iconify-json/lucide": "^1.2.151",
     "@iconify-json/simple-icons": "^1.2.101",
     "@nuxt/eslint": "^1.17.0",
     "@nuxt/ui": "^4.12.0",
@@ -56,13 +56,13 @@
     "@vueuse/nuxt": "^14.4.0",
     "eslint": "^10.14.0",
     "nitro-cloudflare-dev": "^0.2.2",
-    "nuxt": "4.6.3",
+    "nuxt": "4.6.4",
     "nuxt-security": "^2.7.0",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "^4.3.4",
     "typescript": "^6.0.3",
     "vue": "catalog:",
     "vue-tsc": "^3.3.14",
-    "wrangler": "^4.156.2"
+    "wrangler": "^4.157.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
