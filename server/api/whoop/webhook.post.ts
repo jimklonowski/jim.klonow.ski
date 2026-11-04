@@ -1,6 +1,6 @@
 import { zWhoopWebhook } from '#shared/utils/schemas'
-import { cycleMetric, metricsByDate, recoveryMetric, sleepMetric, verifyWhoopSignature, whoopWorkoutKey, whoopWorkoutRow } from '#shared/utils/whoopRecords'
-import type { WhoopCycleRecord, WhoopRecoveryRecord, WhoopSleepRecord, WhoopWorkoutRecord } from '#shared/utils/whoopRecords'
+import { WHOOP_WEBHOOK_TYPES, cycleMetric, metricsByDate, recoveryMetric, sleepMetric, verifyWhoopSignature, whoopWorkoutKey, whoopWorkoutRow } from '#shared/utils/whoopRecords'
+import type { WhoopCycleRecord, WhoopRecoveryRecord, WhoopSleepRecord, WhoopWebhookType, WhoopWorkoutRecord } from '#shared/utils/whoopRecords'
 
 // Whoop's push channel (developer.whoop.com/docs/developing/webhooks, v2 model). Whoop POSTs
 // { user_id, id, type, trace_id } when a sleep, recovery or workout is scored, changed or
@@ -25,7 +25,12 @@ const STRAIN_LOOKBACK_MS = 3 * 86_400_000
 
 type Hook = { id: string, type: string }
 
+/** The six event types Whoop sends (shared/utils/whoopRecords.ts) — the switch below is typed by them. */
+const isWebhookType = (type: string): type is WhoopWebhookType => (WHOOP_WEBHOOK_TYPES as readonly string[]).includes(type)
+
 async function handle(db: D1Database, hook: Hook) {
+  // Acknowledged, not acted on: a type this app doesn't read is not something a retry could fix.
+  if (!isWebhookType(hook.type)) return { skipped: `event type ${hook.type} is not one this app reads` }
   switch (hook.type) {
     case 'sleep.updated': {
       const sleep = await whoopFetchOne<WhoopSleepRecord>(db, `/v2/activity/sleep/${hook.id}`)
@@ -81,7 +86,7 @@ async function handle(db: D1Database, hook: Hook) {
     default:
       // sleep.deleted / recovery.deleted: health_metrics keeps one value per day, not Whoop's
       // record ids, so there's no row to find; the next scored night overwrites the day anyway.
-      // Anything else is an event type this app doesn't read.
+      // (An unknown type never reaches here — isWebhookType above acknowledges it.)
       return { skipped: 'event not used' }
   }
 }

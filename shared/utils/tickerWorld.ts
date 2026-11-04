@@ -1386,7 +1386,7 @@ export function worldPose(s: WorldState): 'idle' | 'walk1' | 'walk2' | 'happy' |
   return 'idle'
 }
 
-/** Enemies still in play (for the HUD and the tests). */
+/** Enemies still in play. Nothing on screen counts them (the HUD counts cans); the tests do. */
 export function enemiesLeft(s: WorldState): number {
   return s.level.enemies.filter(e => e.mode === 'walk' || e.mode === 'shell').length
 }

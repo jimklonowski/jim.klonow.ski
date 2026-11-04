@@ -67,7 +67,8 @@ export function doseLabelOn(rule: ProtocolRule, date: string): string {
 
 /**
  * The row this one took over from: same compound, ending the day before this one starts. A
- * cadence change is two rows (see PROTOCOL_RULES), and mergeRules splits a standing rule around
+ * cadence change is two rows (a "change from <date>" on /journal/protocol ends one version and
+ * starts the next — server/utils/protocolLoader.ts), and mergeRules splits a standing rule around
  * a cycle the same way, so a handover reads everywhere as one compound changing — the prose
  * names the change, the chart draws one line, and the old row never reads as "discontinued".
  */

@@ -163,11 +163,6 @@ export function sanitizeQualitative(input: unknown): Array<{ name: string, resul
 }
 
 /**
- * Plain PDF object keys only — no paths, no other extensions. The PDF proxy serves any key it is
- * handed to an authenticated reader, so an attacker-supplied `sources` entry would turn a lab row
- * into a link to some other object in the bucket.
- */
-/**
  * A lab PDF's object key: a flat "[Description]-[YYYY-MM-DD].pdf"-style name. Nothing else in the
  * labs bucket may leave through the PDF proxy — it also holds prefixed objects (demo/seed.json,
  * backups/d1/…), and the proxy's single path segment decodes %2F, so without this check any

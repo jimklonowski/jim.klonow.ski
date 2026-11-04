@@ -127,7 +127,6 @@ const GLYPHS: Record<string, string[]> = {
 }
 
 export const FONT_COLS = 5
-export const FONT_ROWS = 7
 
 export function hasGlyph(ch: string): boolean {
   return ch.toUpperCase() in GLYPHS
