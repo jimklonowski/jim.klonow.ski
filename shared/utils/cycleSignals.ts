@@ -19,6 +19,7 @@ import type { Cycle } from './cycles'
 import { cycleEnd, cycleStatusOn } from './cycles.ts'
 import { roundTo, shiftDays } from './dates.ts'
 import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
+import { RATE_FLAG_LBS_WK, RATE_WATCH_LBS_WK, weightTrend } from './weightTrend.ts'
 
 /** Structural shapes of journal_entries / health_metrics rows — the app types and raw D1 rows
  * both satisfy them. */
@@ -82,9 +83,6 @@ const METRICS: MetricDef[] = [
 const BASELINE_DAYS = 28
 const CURRENT_DAYS = 14
 const MIN_POINTS = MIN_WINDOW_POINTS
-/** Sustained weight change this fast escalates regardless of the level delta. */
-const RATE_WATCH_LBS_WK = 1.5
-const RATE_FLAG_LBS_WK = 2.5
 
 interface Point { date: string, value: number }
 
@@ -145,14 +143,10 @@ export function computeCycleSignals(
 
     const current = avg(points, curFrom > start ? curFrom : start, asOf)
 
-    // Weight rate: last week of the window vs the week before it, so two weeks of steady
-    // climb read as lbs/week even when the 4-week baseline hasn't moved much yet.
-    let ratePerWeek: number | null = null
-    if (m.key === 'weight') {
-      const lastWk = avg(points, shiftDays(asOf, -6), asOf)
-      const priorWk = avg(points, shiftDays(asOf, -13), shiftDays(asOf, -7))
-      if (lastWk != null && priorWk != null) ratePerWeek = roundTo(lastWk - priorWk, 1)
-    }
+    // Weight rate: the slope of the gap-aware trend over its 14-day window as of the cycle-so-far
+    // (shared/utils/weightTrend.ts) — the figure the tiles and the digests print, so two weeks
+    // of steady climb read as lbs/week even when the 4-week baseline hasn't moved much yet.
+    const ratePerWeek = m.key === 'weight' ? weightTrend(points, asOf).ratePerWeek : null
 
     if (baseline == null || current == null) {
       return {

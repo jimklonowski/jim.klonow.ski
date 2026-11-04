@@ -98,6 +98,7 @@ import type { JournalEntry } from '~/data/journal'
 import type { HealthMetricsEntry } from '#shared/types/journal'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { shiftDays } from '#shared/utils/dates'
+import { fmtRate, weightTrend } from '#shared/utils/weightTrend'
 
 /**
  * The shown day, or null for today. A model so the page can follow it: the whole left column
@@ -175,14 +176,26 @@ function delta(current: number, prev: number, dir: Direction, unit = '', decimal
 const rows = computed(() => {
   const out: Row[] = []
 
-  const weight = pair(entriesAsOf.value, e => e.weight_lbs)
-  if (weight.current != null) {
+  // The TREND weight (shared/utils/weightTrend.ts), not this morning's scale reading: a weigh-in
+  // swings a couple of pounds on water and the day before, so the figure is the gap-aware EMA
+  // and the delta is lbs/week over the last 14 days — the scale's own number rides beside it.
+  const wt = weightTrend(entriesAsOf.value.flatMap(e => (e.weight_lbs != null ? [{ date: e.date, value: e.weight_lbs }] : [])), asOf.value)
+  if (wt.trend != null && wt.latest) {
+    const rate = wt.ratePerWeek
+    const flat = rate != null && Math.abs(rate) < 0.2
     out.push({
       label: 'WEIGHT',
-      value: weight.current.toFixed(1),
-      unit: 'lbs',
-      title: weight.title,
-      delta: weight.prev != null ? delta(weight.current, weight.prev, 'up-bad') : undefined
+      value: wt.trend.toFixed(1),
+      unit: `lbs · scale ${wt.latest.value.toFixed(1)}`,
+      title: [
+        `trend weight — the scale read ${wt.latest.value.toFixed(1)} on ${formatDate(wt.latest.date, 'monthDay')}`,
+        rate != null ? `${fmtRate(rate)} over 14 days (${wt.ratePoints} weigh-ins, ${wt.confidence})` : `${wt.ratePoints} weigh-in${wt.ratePoints === 1 ? '' : 's'} in 14 days — four make a rate`
+      ].join(' · '),
+      delta: rate == null
+        ? { text: '● no rate yet', class: 'text-muted' }
+        : flat
+          ? { text: '● flat', class: 'text-muted' }
+          : { text: `${rate > 0 ? '▲' : '▼'} ${fmtRate(rate)}`, class: rate > 0 ? 'text-warn' : 'text-accent' }
     })
   }
 

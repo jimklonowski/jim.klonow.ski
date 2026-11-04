@@ -195,6 +195,7 @@
 import { formatDuration, HEALTH_METRICS_META } from '~/data/health-metrics'
 import { CHART_ACCENT, CHART_DANGER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 import { KNOWN_COMPOUNDS } from '~/data/journal'
+import { fmtRate, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
 
 useSeoMeta({ title: 'Journal · Overview' })
 
@@ -267,8 +268,16 @@ function labelDelta(d: { text: string, class: string }, suffix: string) {
   return d.text.startsWith('●') ? d : { ...d, text: `${d.text} ${suffix}` }
 }
 
+/** The weight tile's delta is the trend's rate, not one weigh-in against the one before. */
+function rateDelta(rate: number | null) {
+  if (rate == null) return { text: '● no rate yet', class: 'text-muted' }
+  if (Math.abs(rate) < 0.2) return { text: '● flat', class: 'text-muted' }
+  return { text: `${rate > 0 ? '▲' : '▼'} ${fmtRate(rate)}`, class: rate > 0 ? 'text-warn' : 'text-accent' }
+}
+
 const vitalTiles = computed(() => {
-  const weight = pair(e => e.weight_lbs)
+  // The figure is the trend weight (shared/utils/weightTrend.ts); the sparkline the scale readings.
+  const wt = weightTrend(weighInsOf(entries.value), today.value)
   const rhr = pair(e => e.rhr)
   const hrv = pair(e => e.hrv)
   const sys = pair(e => e.bp_systolic)
@@ -276,12 +285,12 @@ const vitalTiles = computed(() => {
 
   return [
     {
-      label: 'Weight',
-      value: weight.current != null ? weight.current.toFixed(1) : '—',
-      asOf: asOfLabel(weight.date),
+      label: wt.latest ? `Weight · trend (scale ${wt.latest.value.toFixed(1)})` : 'Weight',
+      value: wt.trend != null ? wt.trend.toFixed(1) : '—',
+      asOf: asOfLabel(wt.latest?.date ?? null),
       values: series(e => e.weight_lbs),
       color: CHART_ACCENT,
-      ...delta(weight.current, weight.prev, true, 1)
+      ...rateDelta(wt.ratePerWeek)
     },
     {
       label: 'BP',

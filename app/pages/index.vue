@@ -371,6 +371,7 @@ import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, fmtOzValue, waterSetting, waterTotals } from '#shared/utils/water'
 import { isSluggish, latestRecovery as petRecovery } from '#shared/utils/petState'
+import { weightTrend } from '#shared/utils/weightTrend'
 import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
 import { groupDoses } from '#shared/utils/doseGroups'
@@ -663,13 +664,19 @@ const latestRhr = computed(() =>
 const latestRecovery = computed(() => petRecovery(healthMetrics.value))
 const sluggish = computed(() => isSluggish(healthMetrics.value))
 
+// The weight figure is the trend (shared/utils/weightTrend.ts), the sparkline the raw weigh-ins.
+const weightFigure = computed(() => {
+  const wt = weightTrend(entries.value.flatMap(e => (e.weight_lbs != null ? [{ date: e.date, value: e.weight_lbs }] : [])), today.value)
+  return wt.trend != null ? wt.trend.toFixed(1) : '—'
+})
+
 const trends = computed(() => [
-  { label: 'WEIGHT lbs', values: series(entries.value, e => e.weight_lbs), decimals: 1 },
+  { label: 'WEIGHT lbs · trend', values: series(entries.value, e => e.weight_lbs), decimals: 1, latest: weightFigure.value },
   { label: 'HRV ms', values: series(entries.value, e => e.hrv), decimals: 0 },
   { label: 'RECOVERY %', values: series(healthMetrics.value, m => m.recovery_score), decimals: 0 }
 ].map(t => ({
   ...t,
-  latest: t.values.length ? t.values.at(-1)!.toFixed(t.decimals) : '—'
+  latest: 'latest' in t ? t.latest : t.values.length ? t.values.at(-1)!.toFixed(t.decimals) : '—'
 })))
 
 useSeoMeta({ title: 'Home' })

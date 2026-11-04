@@ -7,6 +7,7 @@ import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/util
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
 import { bpLabel } from '#shared/utils/bloodPressure'
+import { TREND_LOOKBACK_DAYS, describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, hasFullFigures, isWholeDay, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
 
@@ -209,7 +210,7 @@ export interface DigestFacts {
 // `rules` is the effective dosing schedule (standing + planned cycles) and `today` the
 // home-timezone date, both for the schedule check — see scheduleContext in protocolProse.ts.
 export async function dailyDigestFacts(db: D1Database, date: string, rules: ProtocolRule[], today: string): Promise<DigestFacts> {
-  const [journal, health, workouts, prev, baseJournal, baseHealth, labDates, estimates] = await Promise.all([
+  const [journal, health, workouts, prev, baseJournal, baseHealth, labDates, estimates, trendJournal] = await Promise.all([
     journalInRange(db, date, date),
     healthInRange(db, date, date),
     workoutsInRange(db, date, date),
@@ -217,15 +218,18 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     journalInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
     healthInRange(db, shiftDays(date, -7), shiftDays(date, -1)),
     labDatesInRange(db, date, date),
-    loadEstimateIndex(db)
+    loadEstimateIndex(db),
+    // Six weeks of weigh-ins: enough for the trend to settle and its 14-day rate window to fill.
+    journalInRange(db, shiftDays(date, -TREND_LOOKBACK_DAYS), date)
   ])
   const entry = journal[0] ?? null
   const h = health[0] ?? null
 
   const lines: string[] = []
+  const wt = weightTrend(weighInsOf(trendJournal), date)
   if (entry?.weight_lbs != null) {
-    const delta = prev?.weight_lbs != null ? ` (${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${roundTo(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDay(prev.date)})` : ''
-    lines.push(`Weight: ${entry.weight_lbs} lbs${delta}`)
+    const delta = prev?.weight_lbs != null ? `${entry.weight_lbs - prev.weight_lbs >= 0 ? '+' : ''}${roundTo(entry.weight_lbs - prev.weight_lbs)} vs ${fmtDay(prev.date)}` : ''
+    lines.push(`Weight: ${entry.weight_lbs} lbs (${[describeTrend(wt), delta].filter(Boolean).join('; ')})`)
   }
   const bp = bpLabel(entry)
   if (bp) lines.push(`Blood pressure: ${bp}`)
@@ -277,6 +281,8 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
 
   const stats = {
     weight_lbs: entry?.weight_lbs ?? null,
+    weight_trend: wt.trend,
+    weight_rate_wk: wt.ratePerWeek,
     rhr: entry?.rhr ?? null,
     hrv: entry?.hrv ?? null,
     recovery: h?.recovery_score ?? null,
@@ -322,7 +328,7 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
 export async function weeklyDigestFacts(db: D1Database, start: string, end: string, rules: ProtocolRule[], today: string): Promise<DigestFacts> {
   const prevStart = shiftDays(start, -7)
   const prevEnd = shiftDays(start, -1)
-  const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates, estimates] = await Promise.all([
+  const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates, estimates, trendJournal] = await Promise.all([
     journalInRange(db, start, end),
     healthInRange(db, start, end),
     workoutsInRange(db, start, end),
@@ -330,15 +336,18 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
     healthInRange(db, prevStart, prevEnd),
     workoutsInRange(db, prevStart, prevEnd),
     labDatesInRange(db, start, end),
-    loadEstimateIndex(db)
+    loadEstimateIndex(db),
+    journalInRange(db, shiftDays(end, -TREND_LOOKBACK_DAYS), end)
   ])
 
   const weights = journal.map(e => e.weight_lbs).filter((v): v is number => v != null)
   const lines: string[] = []
+  // The trend and its rate carry the week (shared/utils/weightTrend.ts); the first-to-last
+  // delta the line used to lead with is two single weigh-ins, mostly water.
+  const wt = weightTrend(weighInsOf(trendJournal), end)
   if (weights.length) {
-    const first = weights[0]!
     const last = weights[weights.length - 1]!
-    lines.push(`Weight: ${last} lbs now (${last - first >= 0 ? '+' : ''}${roundTo(last - first)} over the week), avg ${roundTo(avg(weights)!)}, range ${Math.min(...weights)}–${Math.max(...weights)}`)
+    lines.push(`Weight: ${last} lbs on the last weigh-in; ${describeTrend(wt)}; week avg ${roundTo(avg(weights)!)}, range ${Math.min(...weights)}–${Math.max(...weights)}`)
   }
   const rhr = avg(journal.map(e => e.rhr!).filter(v => v != null))
   if (rhr != null) lines.push(`Avg resting HR: ${roundTo(rhr)} bpm`)
@@ -444,6 +453,8 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
 
   const stats = {
     weight_lbs: weights.at(-1) ?? null,
+    weight_trend: wt.trend,
+    weight_rate_wk: wt.ratePerWeek,
     weight_change: weights.length >= 2 ? roundTo(weights.at(-1)! - weights[0]!) : null,
     avg_recovery: rec != null ? roundTo(rec) : null,
     avg_strain: strain != null ? roundTo(strain) : null,

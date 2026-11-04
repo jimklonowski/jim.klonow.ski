@@ -14,6 +14,7 @@ import { roundTo, shiftDays } from '#shared/utils/dates'
 import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
 import { eventContext } from '#shared/utils/protocolEvents'
+import { describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
 import { PROTOCOL_EVENTS } from '../data/protocolEvents'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 
@@ -286,8 +287,13 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     .filter(w => (w.date as string) >= shiftDays(today, -DAILY_WINDOW_DAYS))
     .map(w => `${w.date}: ${w.workout_type ?? 'Workout'}${w.duration_min != null ? ` ${w.duration_min}min` : ''}${w.calories != null ? ` ${w.calories}kcal` : ''}${w.avg_hr != null ? ` avgHR ${w.avg_hr}` : ''}`)
 
+  // The trend weight and its rate (shared/utils/weightTrend.ts) — the same figures the tiles and
+  // digests show, so "am I gaining?" is answered from the trend, not from two scale readings.
+  const weightNow = describeTrend(weightTrend(weighInsOf(journal), today))
+
   const sections = [
     `Today is ${today}.`,
+    weightNow ? `Weight now: ${weightNow} — the trend is the gap-aware EMA of the weigh-ins, the rate the 14-day slope; prefer these to single-day readings.` : '',
     profile,
     supplements,
     cyclesCtx,

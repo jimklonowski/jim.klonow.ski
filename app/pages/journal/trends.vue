@@ -203,6 +203,7 @@ import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations }
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { dayNutrition, hasFullFigures, isDayDone, isWholeDay, nutritionIsEstimated } from '#shared/utils/nutrition'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
+import { fmtRate, weightTrend } from '#shared/utils/weightTrend'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
 
@@ -281,6 +282,11 @@ const drawMarkLines = computed(() =>
 // --- vitals group ---
 const VITAL_FIELDS = ['weight_lbs', 'bp_systolic', 'bp_diastolic', 'rhr', 'hrv']
 
+// The trend weight (shared/utils/weightTrend.ts) over the WHOLE history, so the line entering the
+// visible range already carries what came before; the tile's figure is the trend as of today.
+const weightTrendAll = computed(() => weightTrend(entries.value.flatMap(e => (e.weight_lbs != null ? [{ date: e.date, value: e.weight_lbs }] : [])), today.value))
+const trendByDay = computed(() => new Map(weightTrendAll.value.points.map(p => [p.date, p.trend])))
+
 // Each group keeps its raw rows beside the (maybe) smoothed ones: the tiles chart the smoothed
 // line, their expanded view takes the stats from what was actually measured.
 const vitalRaw = computed(() =>
@@ -288,6 +294,7 @@ const vitalRaw = computed(() =>
     date: formatDate(e.date, 'monthDay'),
     day: e.date,
     weight_lbs: e.weight_lbs ?? null,
+    weight_trend: trendByDay.value.get(e.date) ?? null,
     bp_systolic: e.bp_systolic ?? null,
     bp_diastolic: e.bp_diastolic ?? null,
     rhr: e.rhr ?? null,
@@ -316,10 +323,15 @@ const vitalTiles = computed(() => {
   const dia = latest(rows, 'bp_diastolic')
   return [
     {
+      // The figure is the trend weight and the unit carries its rate; the chart draws the scale
+      // readings with the trend line through them (audit #43 item 55).
       label: 'Weight',
-      unit: 'lbs',
-      value: fmt(latest(rows, 'weight_lbs'), 1),
-      series: [{ key: 'weight_lbs', name: 'Weight', color: CHART_ACCENT }],
+      unit: weightTrendAll.value.ratePerWeek != null ? `lbs trend · ${fmtRate(weightTrendAll.value.ratePerWeek)}` : 'lbs trend',
+      value: weightTrendAll.value.trend != null ? weightTrendAll.value.trend.toFixed(1) : fmt(latest(rows, 'weight_lbs'), 1),
+      series: [
+        { key: 'weight_lbs', name: 'Scale', color: CHART_ACCENT },
+        { key: 'weight_trend', name: 'Trend', color: CHART_INDIGO }
+      ],
       // Only the weight chart carries the lab-draw verticals, per the mock.
       markLines: drawMarkLines.value
     },
