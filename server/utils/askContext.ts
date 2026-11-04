@@ -285,7 +285,7 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
 
   const recentWorkouts = workouts
     .filter(w => (w.date as string) >= shiftDays(today, -DAILY_WINDOW_DAYS))
-    .map(w => `${w.date}: ${w.workout_type ?? 'Workout'}${w.duration_min != null ? ` ${w.duration_min}min` : ''}${w.calories != null ? ` ${w.calories}kcal` : ''}${w.avg_hr != null ? ` avgHR ${w.avg_hr}` : ''}`)
+    .map(w => `${w.date}: ${w.workout_type ?? 'Workout'}${w.duration_min != null ? ` ${w.duration_min}min` : ''}${w.calories != null ? ` ${w.calories}kcal` : ''}${w.avg_hr != null ? ` avgHR ${w.avg_hr}` : ''}${w.strain != null ? ` strain ${w.strain}` : ''}${Array.isArray(w.hr_zones) ? ` zones(min) z0–z5 ${(w.hr_zones as number[]).join('/')}` : ''}`)
 
   // The trend weight and its rate (shared/utils/weightTrend.ts) — the same figures the tiles and
   // digests show, so "am I gaining?" is answered from the trend, not from two scale readings.

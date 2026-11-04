@@ -105,7 +105,14 @@ CREATE TABLE IF NOT EXISTS health_metrics (
   dietary_water_oz REAL,
   -- Health Auto Export's own stamps for the night ("2026-10-21 23:12:00 -0500"), kept verbatim.
   sleep_start TEXT,
-  sleep_end TEXT
+  sleep_end TEXT,
+  -- Migration 0016: Whoop's recovery/sleep extras (audit #43 item 57). Whoop's SpO2 and
+  -- respiratory rate are their own columns so Apple's never overwrite them, or vice versa.
+  skin_temp_c REAL,
+  whoop_spo2_pct REAL,
+  whoop_resp_rate REAL,
+  sleep_consistency_pct REAL,
+  sleep_efficiency_pct REAL
 );
 
 CREATE TABLE IF NOT EXISTS workouts (
@@ -118,7 +125,10 @@ CREATE TABLE IF NOT EXISTS workouts (
   calories REAL,
   avg_hr INTEGER,
   max_hr INTEGER,
-  distance_mi REAL
+  distance_mi REAL,
+  -- Migration 0016: Whoop's per-session strain and heart-rate zone minutes (JSON array, zones 0–5).
+  strain REAL,
+  hr_zones TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
 

@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import {
-  cycleMetric, metricsByDate, planWhoopRefreshFailure, recoveryMetric, sleepMetric, withTokenRetry,
+  cycleMetric, metricsByDate, planWhoopRefreshFailure, recoveryMetric, recoveryMetrics, sleepMetric, sleepMetrics, withTokenRetry,
   verifyWhoopSignature, WHOOP_WEBHOOK_MAX_AGE_MS, whoopLocalDate, whoopWorkoutRow
 } from '../shared/utils/whoopRecords.ts'
 import { zWhoopWebhook } from '../shared/utils/schemas.ts'
@@ -28,6 +28,29 @@ test('only scored records become metrics, and naps never do', () => {
   assert.equal(recoveryMetric({ ...rec, score_state: 'UNSCORABLE' }), null)
 })
 
+test('the extras Whoop already sends land beside the scores — SpO2, skin temp, consistency, efficiency, respiratory rate (audit #43 item 57)', () => {
+  const rec = { created_at: '2026-09-28T12:05:00Z', score_state: 'SCORED', score: { recovery_score: 70, spo2_percentage: 96.44, skin_temp_celsius: 33.456, resting_heart_rate: 54 } }
+  assert.deepEqual(recoveryMetrics(rec), [
+    { date: '2026-09-28', field: 'recovery_score', value: 70 },
+    { date: '2026-09-28', field: 'whoop_spo2_pct', value: 96.4 },
+    { date: '2026-09-28', field: 'skin_temp_c', value: 33.46 }
+  ])
+  assert.deepEqual(recoveryMetrics({ ...rec, score_state: 'PENDING_SCORE' }), [])
+  assert.deepEqual(recoveryMetrics({ created_at: '2026-09-28T12:05:00Z', score_state: 'SCORED', score: { recovery_score: 70 } }), [{ date: '2026-09-28', field: 'recovery_score', value: 70 }], 'absent extras write nothing')
+
+  const night = { end: '2026-09-28T12:00:00Z', nap: false, score_state: 'SCORED', score: { sleep_performance_percentage: 81, sleep_consistency_percentage: 77, sleep_efficiency_percentage: 91.23, respiratory_rate: 14.82 } }
+  assert.deepEqual(sleepMetrics(night), [
+    { date: '2026-09-28', field: 'sleep_performance_pct', value: 81 },
+    { date: '2026-09-28', field: 'sleep_consistency_pct', value: 77 },
+    { date: '2026-09-28', field: 'sleep_efficiency_pct', value: 91.2 },
+    { date: '2026-09-28', field: 'whoop_resp_rate', value: 14.8 }
+  ])
+  assert.deepEqual(sleepMetrics({ ...night, nap: true }), [], 'a nap never writes')
+  // metricsByDate takes the arrays, newest record winning per field.
+  const older = { ...night, end: '2026-09-28T11:00:00Z', score: { ...night.score, sleep_performance_percentage: 60 } }
+  assert.deepEqual(metricsByDate([night, older], s => s.end, sleepMetrics)['2026-09-28'], { sleep_performance_pct: 81, sleep_consistency_pct: 77, sleep_efficiency_pct: 91.2, whoop_resp_rate: 14.8 })
+})
+
 test('strain lands on the day its cycle started', () => {
   // A Monday-morning cycle ends Tuesday morning; its strain is Monday's.
   const cycle = { start: '2026-09-28T12:00:00Z', end: '2026-09-29T11:30:00Z', score_state: 'SCORED', score: { strain: 9.4 } }
@@ -48,15 +71,22 @@ test('merging per date keeps the newest record, whatever order the API returned 
 test('a workout maps to its whoop:<id> row, with scores only once scored', () => {
   const w = {
     id: 'a1b2', start: '2026-09-28T22:00:00Z', end: '2026-09-28T22:45:30Z', sport_name: 'Cycling', score_state: 'SCORED',
-    score: { average_heart_rate: 140, max_heart_rate: 171, kilojoule: 1600, distance_meter: 16093.4 }
+    score: {
+      strain: 12.345, average_heart_rate: 140, max_heart_rate: 171, kilojoule: 1600, distance_meter: 16093.4,
+      zone_durations: { zone_zero_milli: 60000, zone_one_milli: 300000, zone_two_milli: 900000, zone_three_milli: 1200000, zone_four_milli: 270000, zone_five_milli: 0 }
+    }
   }
   assert.deepEqual(whoopWorkoutRow(w), {
     external_id: 'whoop:a1b2', date: '2026-09-28', workout_type: 'Cycling', start_time: w.start,
-    duration_min: 45.5, calories: 382, avg_hr: 140, max_hr: 171, distance_mi: 10
+    duration_min: 45.5, calories: 382, avg_hr: 140, max_hr: 171, distance_mi: 10,
+    strain: 12.3, hr_zones: [1, 5, 15, 20, 4.5, 0]
   })
   const pending = whoopWorkoutRow({ ...w, score_state: 'PENDING_SCORE' })
   assert.equal(pending.calories, null)
   assert.equal(pending.avg_hr, null)
+  assert.equal(pending.strain, null)
+  assert.equal(pending.hr_zones, null)
+  assert.equal(whoopWorkoutRow({ ...w, score: { ...w.score, zone_durations: { zone_one_milli: 5 } } }).hr_zones, null, 'a partial zone set is no zone set')
   assert.equal(whoopWorkoutRow({ ...w, id: undefined }), null)
 })
 

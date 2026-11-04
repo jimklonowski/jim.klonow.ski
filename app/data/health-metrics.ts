@@ -73,6 +73,32 @@ export const HEALTH_METRICS_META: Record<string, DexaMetricMeta> = {
     label: 'Water (Health)',
     unit: 'oz',
     description: 'Water logged to Apple Health for the day (the watch\'s own water logging). Separate from the journal\'s water taps — the two are not merged.'
+  },
+  // Whoop's recovery/sleep extras (audit #43 item 57).
+  skin_temp_c: {
+    label: 'Skin Temp',
+    unit: '°C',
+    description: 'Whoop\'s overnight skin temperature. The number itself matters less than a departure from your own baseline — a rise of half a degree or more often shows up a day before illness.'
+  },
+  whoop_spo2_pct: {
+    label: 'Blood Oxygen (Whoop)',
+    unit: '%',
+    description: 'Whoop\'s overnight blood oxygen saturation. Kept apart from the Apple Watch reading; both are noisy, and a trend matters more than one night.'
+  },
+  whoop_resp_rate: {
+    label: 'Resp Rate (Whoop)',
+    unit: 'br/min',
+    description: 'Whoop\'s overnight respiratory rate. Very stable for a given person — a rise of a breath or two over your baseline is an early illness tell.'
+  },
+  sleep_consistency_pct: {
+    label: 'Sleep Consistency',
+    unit: '%',
+    description: 'Whoop\'s measure of how regular bedtime and wake time have been over the last four days. Regularity moves recovery about as much as duration does.'
+  },
+  sleep_efficiency_pct: {
+    label: 'Sleep Efficiency',
+    unit: '%',
+    description: 'Time asleep as a share of time in bed, from Whoop. Under about 85 % means a lot of the night was spent awake.'
   }
 }
 

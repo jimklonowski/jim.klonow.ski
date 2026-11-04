@@ -1,5 +1,5 @@
 /// <reference path="../../../worker-configuration.d.ts" />
-import { cycleMetric, metricsByDate, recoveryMetric, sleepMetric, whoopWorkoutRow } from '#shared/utils/whoopRecords'
+import { cycleMetric, metricsByDate, recoveryMetrics, sleepMetrics, whoopWorkoutRow } from '#shared/utils/whoopRecords'
 import type { WhoopCycleRecord, WhoopRecoveryRecord, WhoopSleepRecord, WhoopWorkoutRecord } from '#shared/utils/whoopRecords'
 
 // The nightly reconciliation. Since 2026-09-28 Whoop also pushes each scored sleep, recovery and
@@ -64,8 +64,10 @@ async function syncWhoop(db: D1Database) {
   const sleep = settled(sleepRes, 'sleep')
   const cycles = settled(cyclesRes, 'cycle')
 
-  const byDate = metricsByDate(recovery, r => r.created_at, recoveryMetric)
-  metricsByDate(sleep, s => s.end, sleepMetric, byDate)
+  // Scores plus the extras each record carries — SpO2, skin temp, consistency, efficiency,
+  // respiratory rate (audit #43 item 57).
+  const byDate = metricsByDate(recovery, r => r.created_at, recoveryMetrics)
+  metricsByDate(sleep, s => s.end, sleepMetrics, byDate)
   metricsByDate(cycles, c => c.start, cycleMetric, byDate)
 
   // One upsert per date, batched (server/utils/db.ts runBatched) — not a round trip per day.

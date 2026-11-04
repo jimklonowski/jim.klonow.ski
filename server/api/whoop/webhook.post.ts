@@ -1,5 +1,5 @@
 import { zWhoopWebhook } from '#shared/utils/schemas'
-import { WHOOP_WEBHOOK_TYPES, cycleMetric, metricsByDate, recoveryMetric, sleepMetric, verifyWhoopSignature, whoopWorkoutKey, whoopWorkoutRow } from '#shared/utils/whoopRecords'
+import { WHOOP_WEBHOOK_TYPES, cycleMetric, metricsByDate, recoveryMetrics, sleepMetrics, verifyWhoopSignature, whoopWorkoutKey, whoopWorkoutRow } from '#shared/utils/whoopRecords'
 import type { WhoopCycleRecord, WhoopRecoveryRecord, WhoopSleepRecord, WhoopWebhookType, WhoopWorkoutRecord } from '#shared/utils/whoopRecords'
 
 // Whoop's push channel (developer.whoop.com/docs/developing/webhooks, v2 model). Whoop POSTs
@@ -35,10 +35,12 @@ async function handle(db: D1Database, hook: Hook) {
     case 'sleep.updated': {
       const sleep = await whoopFetchOne<WhoopSleepRecord>(db, `/v2/activity/sleep/${hook.id}`)
       if (!sleep) return { skipped: 'sleep no longer exists' }
-      const m = sleepMetric(sleep)
-      if (!m) return { skipped: sleep.nap ? 'nap' : 'not scored yet' }
-      await upsertHealthMetrics(db, m.date, { [m.field]: m.value })
-      return { dates: [m.date], fields: [m.field] }
+      // The performance score plus consistency, efficiency and respiratory rate (item 57).
+      const byDate = metricsByDate([sleep], s => s.end, sleepMetrics)
+      const dates = Object.keys(byDate)
+      if (!dates.length) return { skipped: sleep.nap ? 'nap' : 'not scored yet' }
+      for (const [date, fields] of Object.entries(byDate)) await upsertHealthMetrics(db, date, fields)
+      return { dates, fields: [...new Set(Object.values(byDate).flatMap(f => Object.keys(f)))].sort() }
     }
     case 'recovery.updated': {
       // The id is the recovery's sleep; the recovery itself is read through that sleep's cycle.
@@ -51,8 +53,8 @@ async function handle(db: D1Database, hook: Hook) {
           maxPages: 1
         })
       ])
-      const byDate = metricsByDate(recovery ? [recovery] : [], r => r.created_at, recoveryMetric)
-      metricsByDate([sleep], s => s.end, sleepMetric, byDate)
+      const byDate = metricsByDate(recovery ? [recovery] : [], r => r.created_at, recoveryMetrics)
+      metricsByDate([sleep], s => s.end, sleepMetrics, byDate)
       metricsByDate(cycles, c => c.start, cycleMetric, byDate)
       await runBatched(db, Object.entries(byDate)
         .map(([date, fields]) => healthMetricsStatement(db, date, fields))

@@ -27,6 +27,9 @@ const START_WINDOW_MS = 10 * 60 * 1000
 const FRAGMENT_RATIO = 0.25
 
 const METRIC_FIELDS = ['duration_min', 'calories', 'avg_hr', 'max_hr', 'distance_mi'] as const
+// Whoop-only extras (migration 0016): filled from whichever copy has them, never counted toward
+// richness — or the Whoop copy would outrank the watch's figures by carrying two more fields.
+const EXTRA_FIELDS = ['strain', 'hr_zones'] as const
 
 export interface MergeableWorkout {
   external_id: string | null
@@ -38,6 +41,8 @@ export interface MergeableWorkout {
   avg_hr: number | null
   max_hr: number | null
   distance_mi: number | null
+  strain?: number | null
+  hr_zones?: number[] | null
 }
 
 export type MergedWorkout<T extends MergeableWorkout> = T & { sources: string[] }
@@ -78,6 +83,9 @@ function mergeCluster<T extends MergeableWorkout>(cluster: T[]): MergedWorkout<T
   for (const w of ranked.slice(1)) {
     for (const f of METRIC_FIELDS) {
       if (merged[f] == null && w[f] != null) (merged as MergeableWorkout)[f] = w[f]
+    }
+    for (const f of EXTRA_FIELDS) {
+      if (merged[f] == null && w[f] != null) (merged as MergeableWorkout)[f] = w[f] as never
     }
   }
   // A session lasts as long as its longest whole record. The richest copy isn't always the

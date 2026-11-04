@@ -146,6 +146,12 @@ export interface HealthMetricsEntry {
   /** Health Auto Export's stamps for the night, verbatim ("2026-10-21 23:12:00 -0500"). */
   sleep_start: string | null
   sleep_end: string | null
+  /** Whoop's recovery/sleep extras (migration 0016, audit #43 item 57); null before it. */
+  skin_temp_c: number | null
+  whoop_spo2_pct: number | null
+  whoop_resp_rate: number | null
+  sleep_consistency_pct: number | null
+  sleep_efficiency_pct: number | null
 }
 
 export interface WorkoutEntry {
@@ -159,6 +165,9 @@ export interface WorkoutEntry {
   avg_hr: number | null
   max_hr: number | null
   distance_mi: number | null
+  /** Whoop's strain for the session and its minutes in heart-rate zones 0–5 (migration 0016); null from Apple. */
+  strain: number | null
+  hr_zones: number[] | null
   /** Which trackers recorded this session (e.g. ['apple', 'whoop']) — merged server-side. */
   sources: string[]
 }

@@ -186,7 +186,13 @@ export function parseHealthMetricsRow(row: Record<string, unknown>) {
     waist_in: (row.waist_in as number | null | undefined) ?? null,
     dietary_water_oz: (row.dietary_water_oz as number | null | undefined) ?? null,
     sleep_start: (row.sleep_start as string | null | undefined) ?? null,
-    sleep_end: (row.sleep_end as string | null | undefined) ?? null
+    sleep_end: (row.sleep_end as string | null | undefined) ?? null,
+    // Migration 0016 (audit #43 item 57): Whoop's recovery/sleep extras.
+    skin_temp_c: (row.skin_temp_c as number | null | undefined) ?? null,
+    whoop_spo2_pct: (row.whoop_spo2_pct as number | null | undefined) ?? null,
+    whoop_resp_rate: (row.whoop_resp_rate as number | null | undefined) ?? null,
+    sleep_consistency_pct: (row.sleep_consistency_pct as number | null | undefined) ?? null,
+    sleep_efficiency_pct: (row.sleep_efficiency_pct as number | null | undefined) ?? null
   }
 }
 
@@ -195,7 +201,8 @@ export const HEALTH_METRIC_FIELDS = [
   'sleep_total_min', 'sleep_rem_min', 'sleep_deep_min', 'sleep_core_min', 'sleep_awake_min',
   'recovery_score', 'strain', 'sleep_performance_pct',
   'steps', 'active_kcal', 'basal_kcal', 'resp_rate', 'spo2_pct', 'waist_in', 'dietary_water_oz',
-  'sleep_start', 'sleep_end'
+  'sleep_start', 'sleep_end',
+  'skin_temp_c', 'whoop_spo2_pct', 'whoop_resp_rate', 'sleep_consistency_pct', 'sleep_efficiency_pct'
 ] as const
 
 export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
@@ -251,7 +258,22 @@ export function parseWorkoutRow(row: Record<string, unknown>) {
     calories: (row.calories as number | null) ?? null,
     avg_hr: (row.avg_hr as number | null) ?? null,
     max_hr: (row.max_hr as number | null) ?? null,
-    distance_mi: (row.distance_mi as number | null) ?? null
+    distance_mi: (row.distance_mi as number | null) ?? null,
+    // Migration 0016: Whoop's per-session strain and zone minutes; null from Apple and before it.
+    strain: (row.strain as number | null | undefined) ?? null,
+    hr_zones: parseHrZones(row.hr_zones)
+  }
+}
+
+/** The six zone minutes as stored (a JSON array), or null for anything else. */
+function parseHrZones(raw: unknown): number[] | null {
+  if (typeof raw !== 'string' || !raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.every(v => typeof v === 'number') ? parsed : null
+  }
+  catch {
+    return null
   }
 }
 
@@ -316,7 +338,12 @@ export interface WorkoutUpsert {
   avg_hr: number | null
   max_hr: number | null
   distance_mi: number | null
+  /** Whoop only (migration 0016); Apple's rows carry neither. */
+  strain?: number | null
+  hr_zones?: number[] | null
 }
+
+const hrZonesJson = (w: WorkoutUpsert) => (w.hr_zones ? JSON.stringify(w.hr_zones) : null)
 
 // Shared by the Apple Health webhook and the Whoop sync task. When external_id is present the
 // row is upserted on it (idempotent re-sync). Without one, the UNIQUE(external_id) constraint
@@ -333,8 +360,8 @@ export function workoutStatement(db: D1Database, w: WorkoutUpsert): D1PreparedSt
   // Sports" both land as "Disc Golf", so the read-time merge can't flip the label between syncs.
   const workoutType = normalizeWorkoutType(w.workout_type)
   return db.prepare(`
-    INSERT INTO workouts (external_id, date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+    INSERT INTO workouts (external_id, date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi, strain, hr_zones)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
     ON CONFLICT(external_id) DO UPDATE SET
       date = excluded.date,
       workout_type = excluded.workout_type,
@@ -343,8 +370,10 @@ export function workoutStatement(db: D1Database, w: WorkoutUpsert): D1PreparedSt
       calories = excluded.calories,
       avg_hr = excluded.avg_hr,
       max_hr = excluded.max_hr,
-      distance_mi = excluded.distance_mi
-  `).bind(w.external_id, w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi)
+      distance_mi = excluded.distance_mi,
+      strain = excluded.strain,
+      hr_zones = excluded.hr_zones
+  `).bind(w.external_id, w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi, w.strain ?? null, hrZonesJson(w))
 }
 
 /**
@@ -383,9 +412,9 @@ export async function upsertWorkout(db: D1Database, w: WorkoutUpsert): Promise<v
     }
     else {
       await db.prepare(`
-        INSERT INTO workouts (date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-      `).bind(w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi).run()
+        INSERT INTO workouts (date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi, strain, hr_zones)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+      `).bind(w.date, workoutType, w.start_time, w.duration_min, w.calories, w.avg_hr, w.max_hr, w.distance_mi, w.strain ?? null, hrZonesJson(w)).run()
     }
   }
 }

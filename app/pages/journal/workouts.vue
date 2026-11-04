@@ -96,13 +96,18 @@
           <span class="col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:contents">
             <span class="num-display text-muted text-right whitespace-nowrap">{{ workoutTime(w.start_time) ?? '' }}</span>
             <span class="text-dim text-right whitespace-nowrap">{{ w.duration_min != null ? `${w.duration_min} min` : '' }}</span>
-            <span class="text-dim text-right whitespace-nowrap">{{ w.calories != null ? `${w.calories} kcal` : '' }}</span>
+            <!-- Whoop's session strain rides beside the calories (audit #43 item 57); the zone
+                 minutes it reported sit in the heart-rate cell's tooltip. -->
+            <span
+              class="text-dim text-right whitespace-nowrap"
+              :title="w.strain != null ? `Whoop strain ${w.strain} for this session` : undefined"
+            >{{ [w.calories != null ? `${w.calories} kcal` : null, w.strain != null ? `⚡ ${w.strain}` : null].filter(Boolean).join(' · ') }}</span>
             <!-- Coloured by avg, not max: max spikes on nearly every session and would light the
                whole column up. The max reads dimmer so the pair stays scannable as avg-first. -->
             <span
               class="text-right whitespace-nowrap"
               :class="hrClass(w.avg_hr)"
-              :title="hrZone(w.avg_hr) ?? undefined"
+              :title="[hrZone(w.avg_hr), zonesTitle(w.hr_zones)].filter(Boolean).join(' · ') || undefined"
             >{{ w.avg_hr != null ? `♥ ${w.avg_hr}` : w.max_hr != null ? '♥ —' : ''
             }}<span
               v-if="hrZone(w.avg_hr)"
@@ -275,5 +280,12 @@ function hrZone(hr: number | null): string | null {
   if (hr > 180) return 'peak zone'
   if (hr > 150) return 'hard zone'
   return null
+}
+
+/** "Whoop zones (min) z0 1 · z1 5 · …" for the heart-rate cell's tooltip; empty zones are left out. */
+function zonesTitle(zones: number[] | null | undefined): string | null {
+  if (!zones?.length) return null
+  const parts = zones.map((min, z) => (min ? `z${z} ${min}` : null)).filter(Boolean)
+  return parts.length ? `Whoop zones (min): ${parts.join(' · ')}` : null
 }
 </script>

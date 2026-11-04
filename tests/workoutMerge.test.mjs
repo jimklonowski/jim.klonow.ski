@@ -16,6 +16,17 @@ function pick(w) {
   return { date, workout_type, start_time, duration_min, calories, avg_hr, max_hr, distance_mi, sources }
 }
 
+test('Whoop\'s strain and zones ride along on the merged session without outranking the watch\'s figures (audit #43 item 57)', () => {
+  const [m] = mergeWorkouts([
+    row({ external_id: 'A', start_time: '2026-10-19 18:46:34 -0500', duration_min: 40.7, calories: 376, avg_hr: 157, max_hr: 183, distance_mi: 13.3 }),
+    row({ external_id: 'whoop:x', workout_type: 'spin', start_time: '2026-10-19T23:42:13.000Z', duration_min: 45, calories: 531, avg_hr: 149, max_hr: 180, strain: 12.3, hr_zones: [1, 5, 15, 20, 4.5, 0] })
+  ])
+  assert.equal(m.avg_hr, 157, 'the watch still leads')
+  assert.equal(m.strain, 12.3)
+  assert.deepEqual(m.hr_zones, [1, 5, 15, 20, 4.5, 0])
+  assert.deepEqual(m.sources, ['apple', 'whoop'])
+})
+
 // The rows exactly as the workouts table held them for the 45-min HIIT ride of 2026-10-19: the
 // watch failed to reach the bike twice (two false starts under two minutes each, every metric
 // filled in), then the real recording, plus Whoop's copy twice (its own row and the one it wrote

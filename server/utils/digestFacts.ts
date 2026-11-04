@@ -46,7 +46,7 @@ function doseDatesOf(entries: JournalRow[]): Map<string, Set<string>> {
 type HealthRow = Pick<HealthMetricsEntry,
   'date' | 'recovery_score' | 'strain' | 'sleep_total_min' | 'sleep_performance_pct'
   | 'sleep_deep_min' | 'sleep_rem_min' | 'body_fat_pct' | 'lean_body_mass_lbs'>
-type WorkoutRow = Pick<WorkoutEntry, 'date' | 'workout_type' | 'duration_min' | 'calories' | 'avg_hr'>
+type WorkoutRow = Pick<WorkoutEntry, 'date' | 'workout_type' | 'duration_min' | 'calories' | 'avg_hr'> & { strain?: number | null }
 
 const JOURNAL_COLS = 'date, weight_lbs, bp_systolic, bp_diastolic, rhr, hrv, peptides, sodas, water, food, notes'
 
@@ -250,7 +250,7 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   else lines.push('Doses logged: none')
 
   if (workouts.length) {
-    lines.push(`Workouts: ${workouts.map(w => `${w.workout_type ?? 'Workout'}${w.duration_min != null ? ` ${w.duration_min}min` : ''}${w.calories != null ? ` ${w.calories}kcal` : ''}`).join('; ')}`)
+    lines.push(`Workouts: ${workouts.map(w => `${w.workout_type ?? 'Workout'}${w.duration_min != null ? ` ${w.duration_min}min` : ''}${w.calories != null ? ` ${w.calories}kcal` : ''}${w.strain != null ? ` strain ${w.strain}` : ''}`).join('; ')}`)
   }
 
   const sodas = sodaSummary(journal)

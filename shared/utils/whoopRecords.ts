@@ -54,10 +54,20 @@ export interface WhoopWorkoutRecord {
   sport_name?: string
   score_state?: string
   score?: {
+    strain?: number
     average_heart_rate?: number
     max_heart_rate?: number
     kilojoule?: number
     distance_meter?: number
+    /** Milliseconds in each heart-rate zone, zone 0 (below 50 % of max) through zone 5. */
+    zone_durations?: {
+      zone_zero_milli?: number
+      zone_one_milli?: number
+      zone_two_milli?: number
+      zone_three_milli?: number
+      zone_four_milli?: number
+      zone_five_milli?: number
+    }
   }
 }
 
@@ -66,7 +76,11 @@ export interface WhoopRecoveryRecord {
   sleep_id?: string
   created_at?: string
   score_state?: string
-  score?: { recovery_score?: number }
+  score?: {
+    recovery_score?: number
+    spo2_percentage?: number
+    skin_temp_celsius?: number
+  }
 }
 
 export interface WhoopSleepRecord {
@@ -76,7 +90,12 @@ export interface WhoopSleepRecord {
   /** True for a nap. Naps carry their own (low) performance score and must not overwrite the night. */
   nap?: boolean
   score_state?: string
-  score?: { sleep_performance_percentage?: number }
+  score?: {
+    sleep_performance_percentage?: number
+    sleep_consistency_percentage?: number
+    sleep_efficiency_percentage?: number
+    respiratory_rate?: number
+  }
 }
 
 export interface WhoopCycleRecord {
@@ -87,8 +106,10 @@ export interface WhoopCycleRecord {
   score?: { strain?: number }
 }
 
-/** The health_metrics columns Whoop feeds. */
-export type WhoopMetricField = 'recovery_score' | 'sleep_performance_pct' | 'strain'
+/** The health_metrics columns Whoop feeds (the last five since migration 0016, audit #43 item 57). */
+export type WhoopMetricField
+  = 'recovery_score' | 'sleep_performance_pct' | 'strain'
+    | 'skin_temp_c' | 'whoop_spo2_pct' | 'whoop_resp_rate' | 'sleep_consistency_pct' | 'sleep_efficiency_pct'
 
 export interface WhoopMetric {
   date: string
@@ -107,6 +128,10 @@ export interface WhoopWorkoutRow {
   avg_hr: number | null
   max_hr: number | null
   distance_mi: number | null
+  /** The session's strain, once scored. */
+  strain: number | null
+  /** Minutes in zones 0–5, once scored and when Whoop reports them. */
+  hr_zones: number[] | null
 }
 
 // Only SCORED records carry real measurements; PENDING_SCORE and UNSCORABLE come back with an
@@ -151,29 +176,67 @@ export function whoopWorkoutRow(w: WhoopWorkoutRecord): WhoopWorkoutRow | null {
     calories: s?.kilojoule != null ? Math.round(s.kilojoule / KJ_PER_KCAL) : null,
     avg_hr: s?.average_heart_rate ?? null,
     max_hr: s?.max_heart_rate ?? null,
-    distance_mi: s?.distance_meter != null ? Math.round(s.distance_meter / METERS_PER_MILE * 100) / 100 : null
+    distance_mi: s?.distance_meter != null ? Math.round(s.distance_meter / METERS_PER_MILE * 100) / 100 : null,
+    strain: typeof s?.strain === 'number' ? Math.round(s.strain * 10) / 10 : null,
+    hr_zones: zoneMinutes(s?.zone_durations)
   }
+}
+
+const ZONE_KEYS = ['zone_zero_milli', 'zone_one_milli', 'zone_two_milli', 'zone_three_milli', 'zone_four_milli', 'zone_five_milli'] as const
+
+/** Whoop's zone durations (ms) as minutes to a tenth, zones 0–5; null unless every zone is given. */
+function zoneMinutes(z: NonNullable<WhoopWorkoutRecord['score']>['zone_durations']): number[] | null {
+  if (!z) return null
+  const out = ZONE_KEYS.map(k => z[k])
+  if (!out.every((v): v is number => typeof v === 'number')) return null
+  return out.map(ms => Math.round(ms / 6000) / 10)
 }
 
 /** The `workouts.external_id` a Whoop workout id is stored under. */
 export const whoopWorkoutKey = (id: string) => `whoop:${id}`
 
+/** Every numeric score field present, each as a metric on `date`. */
+function scoreMetrics(date: string | null, pairs: Array<[WhoopMetricField, unknown, number?]>): WhoopMetric[] {
+  if (!date) return []
+  return pairs.flatMap(([field, value, decimals]) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? [{ date, field, value: decimals == null ? value : Math.round(value * 10 ** decimals) / 10 ** decimals }]
+      : []
+  )
+}
+
 // Recovery records have no start/end of their own (tied to a sleep/cycle id) - created_at is
-// the closest approximation to "the day this recovery is for".
+// the closest approximation to "the day this recovery is for". The score, plus the SpO2 and skin
+// temperature Whoop measures overnight (audit #43 item 57).
+export function recoveryMetrics(r: WhoopRecoveryRecord): WhoopMetric[] {
+  if (r.score_state !== SCORED) return []
+  return scoreMetrics(whoopLocalDate(r.created_at), [
+    ['recovery_score', r.score?.recovery_score],
+    ['whoop_spo2_pct', r.score?.spo2_percentage, 1],
+    ['skin_temp_c', r.score?.skin_temp_celsius, 2]
+  ])
+}
+
+/** The recovery score alone — the shape the older callers and tests read. */
 export function recoveryMetric(r: WhoopRecoveryRecord): WhoopMetric | null {
-  if (r.score_state !== SCORED) return null
-  const date = whoopLocalDate(r.created_at)
-  const value = r.score?.recovery_score
-  return date && typeof value === 'number' ? { date, field: 'recovery_score', value } : null
+  return recoveryMetrics(r).find(m => m.field === 'recovery_score') ?? null
+}
+
+// The night's performance, plus its consistency, efficiency and respiratory rate (item 57).
+export function sleepMetrics(s: WhoopSleepRecord): WhoopMetric[] {
+  // A nap is a second sleep record for the same day, scored against a nap's own (much
+  // shorter) need — letting one land would overwrite the night's performance with ~10%.
+  if (s.nap || s.score_state !== SCORED) return []
+  return scoreMetrics(whoopLocalDate(s.end), [
+    ['sleep_performance_pct', s.score?.sleep_performance_percentage],
+    ['sleep_consistency_pct', s.score?.sleep_consistency_percentage],
+    ['sleep_efficiency_pct', s.score?.sleep_efficiency_percentage, 1],
+    ['whoop_resp_rate', s.score?.respiratory_rate, 1]
+  ])
 }
 
 export function sleepMetric(s: WhoopSleepRecord): WhoopMetric | null {
-  // A nap is a second sleep record for the same day, scored against a nap's own (much
-  // shorter) need — letting one land would overwrite the night's performance with ~10%.
-  if (s.nap || s.score_state !== SCORED) return null
-  const date = whoopLocalDate(s.end)
-  const value = s.score?.sleep_performance_percentage
-  return date && typeof value === 'number' ? { date, field: 'sleep_performance_pct', value } : null
+  return sleepMetrics(s).find(m => m.field === 'sleep_performance_pct') ?? null
 }
 
 export function cycleMetric(c: WhoopCycleRecord): WhoopMetric | null {
@@ -195,13 +258,13 @@ export function cycleMetric(c: WhoopCycleRecord): WhoopMetric | null {
 export function metricsByDate<T>(
   records: T[],
   stamp: (r: T) => string | null | undefined,
-  toMetric: (r: T) => WhoopMetric | null,
+  toMetric: (r: T) => WhoopMetric | WhoopMetric[] | null,
   into: Record<string, Partial<Record<WhoopMetricField, number>>> = {}
 ): Record<string, Partial<Record<WhoopMetricField, number>>> {
   const sorted = [...records].sort((a, b) => String(stamp(a) ?? '').localeCompare(String(stamp(b) ?? '')))
   for (const record of sorted) {
-    const m = toMetric(record)
-    if (m) into[m.date] = { ...into[m.date], [m.field]: m.value }
+    const out = toMetric(record)
+    for (const m of Array.isArray(out) ? out : out ? [out] : []) into[m.date] = { ...into[m.date], [m.field]: m.value }
   }
   return into
 }
