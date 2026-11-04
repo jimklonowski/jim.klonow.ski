@@ -20,6 +20,8 @@ export const AUDIT_KEYS = {
   supplements: 'id',
   vials: 'id',
   vaccinations: 'id',
+  // Blood out, against the hematocrit campaign (audit #43 item 59).
+  phlebotomies: 'id',
   cycles: 'id',
   planned_draws: 'id',
   progress_photos: 'id',

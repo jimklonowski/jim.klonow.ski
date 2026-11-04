@@ -251,7 +251,7 @@ const WEEKLY_WINDOW_WEEKS = 20
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone; `protocol` the request's
  * schedule (protocolFor), which decides which compounds count as standing for the trend anchors. */
 export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData): Promise<string> {
-  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, estimates] = await Promise.all([
+  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
@@ -266,6 +266,8 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     profileLine(db),
     // The next booked draw and its questions — "when's my next draw?" and "what am I waiting on?".
     plannedDrawContext(db, today),
+    // Blood taken out on purpose (audit #43 item 59): the reason a hematocrit fell, and iron lost.
+    phlebotomyContext(db, today),
     // Meal figures (library, hand entries, model estimates) for the meals in the day and week lines.
     loadEstimateIndex(db)
   ])
@@ -300,6 +302,7 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     vaccines,
     eventContext(today, PROTOCOL_EVENTS),
     plannedDraws,
+    phlebotomies,
     `Lab draws (every draw on file; marker keys are snake_case, standard US lab units):\n${labs.join('\n') || 'none'}`,
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,
     `Compound history (all-time, from the dose log):\n${compoundLines(journal).join('\n') || 'none'}`,

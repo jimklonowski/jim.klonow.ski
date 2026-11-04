@@ -92,6 +92,9 @@ const jumpItems = computed(() => {
     { label: 'home', suffix: '/', onSelect: () => go('/') },
     { label: 'labs · bloodwork', suffix: '/labs', onSelect: () => go('/labs') },
     { label: 'body composition · dexa', suffix: '/labs/dexa', onSelect: () => go('/labs/dexa') },
+    // Plain words, no middle dot: the search is strict about a contiguous match, and "hematocrit
+    // control" is what gets typed.
+    { label: 'hematocrit control panel', suffix: '/labs/hematocrit · ladder · phlebotomies · iron', onSelect: () => go('/labs/hematocrit') },
     { label: 'journal · overview', suffix: '/journal', onSelect: () => go('/journal') },
     { label: 'journal · trends', suffix: 'vitals + health charts', onSelect: () => go('/journal/trends') },
     { label: 'journal · compounds', suffix: 'usage + timeline', onSelect: () => go('/journal/compounds') },

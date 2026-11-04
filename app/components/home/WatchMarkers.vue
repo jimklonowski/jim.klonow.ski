@@ -13,7 +13,7 @@
       <NuxtLink
         v-for="t in tiles"
         :key="t.key"
-        :to="{ path: '/labs', query: { marker: t.key } }"
+        :to="t.key === 'hematocrit' ? '/labs/hematocrit' : { path: '/labs', query: { marker: t.key } }"
         :aria-label="t.aria"
         class="block bg-raised border border-line-soft px-3 py-2.5 hover:bg-row-hover hover:border-line-input transition-colors min-w-0"
       >

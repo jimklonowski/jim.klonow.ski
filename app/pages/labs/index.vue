@@ -40,6 +40,12 @@
           :sources="allSources"
         />
         <NuxtLink
+          to="/labs/hematocrit"
+          class="tui-btn"
+        >
+          HCT →
+        </NuxtLink>
+        <NuxtLink
           to="/labs/dexa"
           class="tui-btn"
         >

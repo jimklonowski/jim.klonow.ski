@@ -73,6 +73,16 @@
           {{ meta.description }}
         </p>
 
+        <!-- The one marker with a campaign of its own: the ladder, the turnover windows after a
+             dose change, phlebotomies and their iron cost live on /labs/hematocrit (item 59). -->
+        <NuxtLink
+          v-if="biomarkerKey === 'hematocrit'"
+          to="/labs/hematocrit"
+          class="tui-btn tui-btn-accent inline-flex"
+        >
+          CONTROL PANEL →
+        </NuxtLink>
+
         <p
           v-if="showCaveat"
           class="text-small leading-[1.7] text-warn border-l-2 border-warn pl-2.5"

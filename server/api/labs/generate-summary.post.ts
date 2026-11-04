@@ -97,6 +97,8 @@ export default defineEventHandler(async (event) => {
   // A draw booked for this date (or one that landed within a few days of its plan) carries the
   // questions it was meant to answer, and the summary opens with them.
   const plannedBlock = await plannedDrawContext(db, date)
+  // Blood removed on purpose before this draw: the reason a hematocrit fell, and iron lost (item 59).
+  const phlebotomyBlock = await phlebotomyContext(db, date)
 
   // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
   // renders it as of the draw date.
@@ -104,7 +106,7 @@ export default defineEventHandler(async (event) => {
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, markerLines, readingNotes, qualitativeBlock
+    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()

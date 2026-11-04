@@ -38,6 +38,9 @@ const OWNER_PAGES = [
 const DOCTOR_PAGES = [
   /^\/labs$/,
   /^\/labs\/dexa$/,
+  // The hematocrit campaign — phlebotomies, the action ladder, the turnover windows — is
+  // clinical context of the first order (audit #43 item 59).
+  /^\/labs\/hematocrit$/,
   /^\/journal$/,
   /^\/journal\/trends$/,
   /^\/journal\/compounds$/,

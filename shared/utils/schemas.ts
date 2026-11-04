@@ -372,6 +372,17 @@ export const zVaccinationSave = z.object({
   notes: zOptText(2000)
 })
 
+// A phlebotomy (audit #43 item 59): the volume and the pre-donation hemoglobin are optional —
+// a clinic doesn't always say — and bounded to what a visit can be.
+export const zPhlebotomySave = z.object({
+  id: zId.optional(),
+  date: zIsoDate,
+  kind: z.enum(['donation', 'therapeutic']),
+  ml: z.preprocess(blankAsAbsent, z.number().int().min(50).max(1500).nullish()).transform(v => v ?? null),
+  pre_hgb: z.preprocess(blankAsAbsent, z.number().min(5).max(25).nullish()).transform(v => v ?? null),
+  notes: zOptText(2000)
+})
+
 // The key is checked against PROFILE_FIELDS in the handler (a select field also checks its
 // options there); '' or a missing value clears the fact. A number is accepted and stored as its
 // string: a number input emits one, and the card modal's post of `9` for the water cup was a 400

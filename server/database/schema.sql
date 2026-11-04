@@ -306,6 +306,19 @@ CREATE TABLE IF NOT EXISTS planned_draws (
   created_at TEXT NOT NULL
 );
 
+-- Blood removed on purpose — a donation or a therapeutic phlebotomy — against the hematocrit
+-- campaign (migration 0017; shared/utils/hematocrit.ts, /labs/hematocrit). One row per visit.
+CREATE TABLE IF NOT EXISTS phlebotomies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- 'donation' | 'therapeutic'
+  ml INTEGER,                    -- volume removed; a whole-blood donation is ~500 mL
+  pre_hgb REAL,                  -- the finger-stick hemoglobin before, g/dL, when given
+  notes TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_phlebotomies_date ON phlebotomies(date);
+
 -- Share invites: owner-minted links (/share/<id>) that grant read-only role sessions.
 -- Redemption is gated by expires_at/max_uses; setting revoked=1 (or deleting the row) also
 -- invalidates every session cookie minted from the invite — the auth middleware re-checks
