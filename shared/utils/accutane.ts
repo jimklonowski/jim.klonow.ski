@@ -22,6 +22,12 @@ export const LBS_PER_KG = 2.20462
 export const COURSE_BASELINE_LOOKBACK_DAYS = 90
 /** The acne photo set wants a session at least this often; older and the strip's chip goes amber. */
 export const STALE_PHOTO_DAYS = 14
+/**
+ * The course's photo record starts this many days before capsule one: the baseline set is shot
+ * in the days just before the start, while a physique session the week before is not part of
+ * the course (Jim's Nov 2 chest and face shots showed up as the course's first frames).
+ */
+export const PHOTO_BASELINE_LOOKBACK_DAYS = 3
 /** No blood donation during the course or for this long after the last dose. */
 export const DONATION_DEFERRAL_DAYS = 30
 /** Waxing, dermabrasion and laser wait this long after the last dose — the skin scars easily. */
@@ -330,10 +336,14 @@ export interface PhotoStrip<P> {
   stale: boolean
 }
 
-/** Per region of a set: the newest photo and how old it is. Stale past STALE_PHOTO_DAYS. */
-export function photoStrip<P extends { date: string, category: string, id: number }>(photos: readonly P[], categories: readonly string[], today: string): PhotoStrip<P> {
+/**
+ * Per region of a set: the newest photo and how old it is. Stale past STALE_PHOTO_DAYS. Only
+ * photos dated on or after `from` count (the course's record, baseline days included) — pass
+ * null for the whole library.
+ */
+export function photoStrip<P extends { date: string, category: string, id: number }>(photos: readonly P[], categories: readonly string[], today: string, from: string | null = null): PhotoStrip<P> {
   const regions = categories.map((category) => {
-    const mine = photos.filter(p => p.category === category).sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
+    const mine = photos.filter(p => p.category === category && (from == null || p.date >= from)).sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
     const latest = mine.at(-1) ?? null
     const daysAgo = latest ? diffDays(latest.date, today) : null
     return { category, latest, count: mine.length, daysAgo, stale: daysAgo == null || daysAgo > STALE_PHOTO_DAYS }
