@@ -362,10 +362,11 @@
 
 <script setup lang="ts">
 import {
-  COURSE_TARGET_MG_PER_KG, ISOTRETINOIN, RESEARCH_TARGET_MG_PER_KG,
+  COURSE_TARGET_MG_PER_KG, ISOTRETINOIN, PHOTO_BASELINE_LOOKBACK_DAYS, RESEARCH_TARGET_MG_PER_KG,
   baselineDrawDate, courseDoses, courseLabs, courseLadder, courseStats, isotretinoinCycle, photoStrip, plannedMgPerDay,
   recheckDraw, signalSummary, weeklySeries, type CourseMarkerRow
 } from '#shared/utils/accutane'
+import { shiftDays } from '#shared/utils/dates'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { photoCategoryLabel } from '#shared/utils/photoCategories'
 import { photoSet } from '#shared/utils/photoSets'
@@ -497,10 +498,12 @@ function deltaClass(row: CourseMarkerRow) {
 
 // --- photos ---
 const acne = photoSet('acne')
-const strip = computed(() => photoStrip(photosRes?.data.value ?? [], acne.categories, today.value))
+// The course's own record: from the baseline days before capsule one, never the physique
+// session the week before.
+const strip = computed(() => photoStrip(photosRes?.data.value ?? [], acne.categories, today.value, course.value ? shiftDays(course.value.start_date, -PHOTO_BASELINE_LOOKBACK_DAYS) : null))
 const photosMeta = computed(() => {
   const s = strip.value
-  if (!s.lastSession) return 'no acne set shot yet'
+  if (!s.lastSession) return 'no acne set shot since the course began'
   return `last session ${formatDate(s.lastSession, 'monthDay')} · ${s.daysSince === 0 ? 'today' : `${s.daysSince} d ago`}${s.stale ? ' · due' : ''}`
 })
 

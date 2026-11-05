@@ -188,6 +188,20 @@ test('the photo strip knows each region\'s newest shot and when the last session
   const old = photoStrip(photos, ['chest'], `2026-12-${String(21 + STALE_PHOTO_DAYS - 30 + 1).padStart(2, '0')}`)
   assert.equal(old.stale, true, 'one day past the stale line')
   assert.equal(photoStrip([], ['chest'], '2026-11-30').lastSession, null)
+
+  // The course's record starts in the baseline days before capsule one: a physique session the
+  // week before is not its first frame, the set shot the day before is.
+  const library = [
+    { id: 1, date: '2026-11-02', category: 'chest' }, // physique session, five days before
+    { id: 2, date: '2026-11-06', category: 'chest' }, // baseline set, the day before
+    { id: 3, date: '2026-11-02', category: 'face' }
+  ]
+  const fromBaseline = photoStrip(library, ['chest', 'face'], '2026-11-07', '2026-11-04')
+  assert.equal(fromBaseline.regions[0].latest.id, 2)
+  assert.equal(fromBaseline.regions[0].count, 1)
+  assert.equal(fromBaseline.regions[1].latest, null, 'the Nov 2 face shot is not in the course')
+  assert.equal(fromBaseline.lastSession, '2026-11-06')
+  assert.equal(photoStrip(library, ['chest'], '2026-11-07', null).regions[0].count, 2, 'null = the whole library')
 })
 
 test('a stream folds into course-relative weeks with a baseline band, and the summary carries gaps', () => {
