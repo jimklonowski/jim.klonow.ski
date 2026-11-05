@@ -45,217 +45,282 @@
       @retry="refresh"
     />
 
-    <div
-      v-if="draws.length"
-      class="px-4 sm:px-6 pb-6 space-y-5"
-    >
-      <!-- The ladder: where the reading sits and what the next rung asks -->
-      <section>
-        <TuiHeader
-          label="LADDER"
-          :dashes="14"
+    <template v-if="draws.length">
+      <!-- Stat cells, the compound page's row: the reading, its rung, the iron store, the visits -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-y border-line">
+        <div
+          v-for="cell in statCells"
+          :key="cell.label"
+          class="bg-bg px-4 sm:px-6 py-3.5"
         >
-          <span class="text-label text-muted normal-case">50 watch · 52 act · 54 stop</span>
-        </TuiHeader>
-        <div class="mt-2 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-6 gap-y-3 items-start">
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
+            {{ cell.label }}
+          </p>
+          <p
+            class="num-display text-display leading-none mt-1.5 whitespace-nowrap"
+            :class="cell.class"
+          >
+            {{ cell.value }}<span
+              v-if="cell.unit"
+              class="text-meta text-muted"
+            > {{ cell.unit }}</span>
+          </p>
+          <p
+            v-if="cell.note"
+            class="text-meta text-muted mt-1"
+          >
+            {{ cell.note }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Main split, the compound page's: the ladder and dossier in a 380px track, the data on
+           the right. Both need min-w-0 so the chart's pixel width can't hold the grid open. -->
+      <div class="grid gap-px bg-line lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <section class="bg-bg px-4 sm:px-6 py-4 space-y-4 min-w-0">
+          <!-- The ladder: where the reading sits and what the next rung asks -->
           <div>
-            <p class="text-micro text-muted uppercase tracking-widest">
-              Current
-            </p>
-            <p class="num-display text-big leading-none mt-1">
-              <span :class="toneClass(headline.rung?.tone)">{{ headline.current ? fmt(headline.current.value) : '—' }}</span>
-              <span class="text-label text-muted"> %</span>
-            </p>
-            <p
-              v-if="headline.current"
-              class="text-label text-muted mt-1"
+            <TuiHeader
+              label="LADDER"
+              :dashes="14"
             >
-              {{ formatDate(headline.current.date, 'monthDay') }}
-              <span v-if="headline.currentIsTransitional"> · transitional</span>
+              <span class="text-label text-muted normal-case">{{ ladderLine }}</span>
+            </TuiHeader>
+            <div class="mt-2">
+              <div
+                v-for="rung in ladderRows"
+                :key="rung.at"
+                class="flex items-baseline gap-2.5 py-2 border-b border-line-row last:border-0"
+                :class="rung.reached ? '' : 'opacity-60'"
+              >
+                <span
+                  class="num-display text-title w-8 shrink-0"
+                  :class="rung.reached ? toneClass(rung.tone) : 'text-muted'"
+                >{{ rung.at }}</span>
+                <span
+                  class="text-meta uppercase tracking-[0.08em] w-11 shrink-0"
+                  :class="rung.reached ? toneClass(rung.tone) : 'text-faint'"
+                >{{ rung.label }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-small text-dim leading-[1.6]">{{ rung.action }}</span>
+                  <span
+                    v-if="rung.here"
+                    class="block text-meta text-accent mt-0.5"
+                  >◀ here{{ headline.next ? ` · ${headline.next.gap} to ${headline.next.rung.at} ${headline.next.rung.label}` : ' · top of the ladder' }}</span>
+                </span>
+              </div>
+            </div>
+            <p
+              v-if="headline.transitional"
+              class="mt-3 text-small text-dim leading-[1.7] border-l-2 border-warn pl-2.5"
+            >
+              <span class="text-warn">Transitional:</span> {{ headline.transitional.change }} was {{ headline.daysIn }} days ago. Red cells turn over on a ~{{ RBC_TURNOVER_DAYS }}-day cycle, so the full effect of that change isn't expected before {{ formatDate(headline.transitional.to, 'monthDay') }} — a flat reading until then is the expected reading, not the change failing.
             </p>
           </div>
-          <div class="space-y-1">
-            <div
-              v-for="rung in ladderRows"
-              :key="rung.at"
-              class="flex items-baseline gap-2.5 py-1 border-b border-line-row last:border-0"
-              :class="rung.reached ? '' : 'opacity-60'"
+
+          <!-- Dossier: what the number is and the rules of thumb the panel runs on -->
+          <div>
+            <TuiHeader
+              label="DOSSIER"
+              :dashes="20"
+            />
+            <p class="mt-2.5 text-row leading-[1.7] text-dim">
+              {{ HEMATOCRIT_DOSSIER.summary }}
+            </p>
+            <dl class="mt-3 space-y-2 text-small">
+              <div v-if="driverLine">
+                <dt class="text-label text-muted uppercase tracking-[0.12em]">
+                  Drivers on the protocol
+                </dt>
+                <dd class="text-dim">
+                  {{ driverLine }}
+                </dd>
+              </div>
+              <div
+                v-for="entry in HEMATOCRIT_DOSSIER.entries"
+                :key="entry.label"
+              >
+                <dt class="text-label text-muted uppercase tracking-[0.12em]">
+                  {{ entry.label }}
+                </dt>
+                <dd class="text-dim">
+                  {{ entry.text }}
+                </dd>
+                <dd
+                  v-if="entry.note"
+                  class="text-faint"
+                >
+                  {{ entry.note }}
+                </dd>
+              </div>
+            </dl>
+            <p class="mt-3 text-small text-warn leading-[1.6]">
+              ⚠ {{ HEMATOCRIT_DOSSIER.caution }}
+            </p>
+          </div>
+        </section>
+
+        <section class="bg-bg px-4 sm:px-6 py-4 space-y-4 min-w-0">
+          <!-- The chart: Hct and Hgb, dose changes as lines, turnover windows as bands, phlebotomies as verticals -->
+          <div>
+            <TuiHeader
+              label="HCT · HGB"
+              :dashes="12"
             >
-              <span
-                class="num-display text-title w-10 shrink-0"
-                :class="rung.reached ? toneClass(rung.tone) : 'text-muted'"
-              >{{ rung.at }}</span>
-              <span
-                class="text-meta uppercase tracking-[0.08em] w-12 shrink-0"
-                :class="rung.reached ? toneClass(rung.tone) : 'text-faint'"
-              >{{ rung.label }}</span>
-              <span class="text-small text-dim">{{ rung.action }}</span>
-              <span
-                v-if="rung.here"
-                class="ml-auto shrink-0 text-meta text-accent"
-              >◀ here{{ headline.next ? ` · ${headline.next.gap} to ${headline.next.rung.at}` : '' }}</span>
+              <span class="hidden sm:inline text-label text-muted normal-case">
+                <span class="text-ember">│</span> dose change · <span class="text-faint">▒</span> turnover window · <span class="text-muted">┊</span> phlebotomy
+              </span>
+            </TuiHeader>
+            <AreaChart
+              :data="chartRows"
+              :categories="chartCategories"
+              :height="200"
+              :annotations="placedAnnotations"
+              :mark-lines="phlebotomyDates"
+              dual-axis
+              connect-nulls
+              fit-y
+              show-legend
+              class="mt-2.5"
+              :aria-label="`Hematocrit and hemoglobin across ${draws.length} draws, with dose changes and phlebotomies marked`"
+            />
+          </div>
+
+          <!-- Phlebotomies -->
+          <div>
+            <TuiHeader
+              label="PHLEBOTOMIES"
+              :dashes="8"
+            >
+              <span class="hidden sm:inline text-label text-muted normal-case">blood out · the draw before against the first after</span>
+            </TuiHeader>
+            <p
+              v-if="!effects.length"
+              class="mt-2 text-small text-muted"
+            >
+              None logged.{{ canEdit ? ' Use + LOG PHLEBOTOMY after a donation or a therapeutic draw — the chart marks it and the next CBC shows what it bought.' : '' }}
+            </p>
+            <div
+              v-else
+              class="mt-1.5"
+            >
+              <div
+                v-for="e in [...effects].reverse()"
+                :key="e.phlebotomy.id"
+                class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
+              >
+                <span class="text-small text-muted tabular-nums w-23 shrink-0">{{ formatDate(e.phlebotomy.date) }}</span>
+                <span class="text-prose text-hi">{{ kindLabel(e.phlebotomy.kind) }}</span>
+                <span class="text-small text-muted">{{ e.phlebotomy.ml ?? DEFAULT_DONATION_ML }} mL<span
+                  v-if="e.phlebotomy.ml == null"
+                  class="text-faint"
+                > (assumed)</span> · ≈{{ Math.round((e.phlebotomy.ml ?? DEFAULT_DONATION_ML) * IRON_MG_PER_ML_BLOOD) }} mg iron</span>
+                <span
+                  v-if="e.phlebotomy.pre_hgb != null"
+                  class="text-small text-muted"
+                >pre-Hgb {{ e.phlebotomy.pre_hgb }}</span>
+                <span
+                  v-if="e.before || e.after"
+                  class="text-small"
+                  :class="e.hctDelta != null && e.hctDelta < 0 ? 'text-accent' : 'text-dim'"
+                >Hct {{ e.before ? fmt(e.before.value) : '—' }} → {{ e.after ? fmt(e.after.value) : 'no draw yet' }}{{ e.hctDelta != null ? ` (${e.hctDelta > 0 ? '+' : ''}${e.hctDelta})` : '' }}</span>
+                <span
+                  v-if="e.phlebotomy.notes"
+                  class="text-small text-faint"
+                >{{ e.phlebotomy.notes }}</span>
+                <span
+                  v-if="canEdit"
+                  class="ml-auto flex items-baseline gap-2 shrink-0"
+                >
+                  <button
+                    type="button"
+                    class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
+                    :aria-label="`Edit the ${kindLabel(e.phlebotomy.kind).toLowerCase()} on ${e.phlebotomy.date}`"
+                    @click="openEditModal(e.phlebotomy)"
+                  >edit</button>
+                  <button
+                    type="button"
+                    class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
+                    :aria-label="`Delete the ${kindLabel(e.phlebotomy.kind).toLowerCase()} on ${e.phlebotomy.date}`"
+                    @click="confirmDelete(e.phlebotomy)"
+                  >✕</button>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <p
-          v-if="headline.transitional"
-          class="mt-3 text-small text-dim leading-[1.7] border-l-2 border-warn pl-2.5"
-        >
-          <span class="text-warn">Transitional:</span> {{ headline.transitional.change }} was {{ headline.daysIn }} days ago. Red cells turn over on a ~{{ RBC_TURNOVER_DAYS }}-day cycle, so the full effect of that change isn't expected before {{ formatDate(headline.transitional.to, 'monthDay') }} — a flat reading until then is the expected reading, not the change failing.
-        </p>
-      </section>
 
-      <!-- The chart: Hct and Hgb, dose changes as lines, turnover windows as bands, phlebotomies as verticals -->
-      <section>
-        <TuiHeader
-          label="HCT · HGB"
-          :dashes="12"
-        >
-          <span class="text-label text-muted normal-case">
-            <span class="text-ember">│</span> dose change · <span class="text-faint">▒</span> turnover window · <span class="text-muted">┊</span> phlebotomy
-          </span>
-        </TuiHeader>
-        <AreaChart
-          :data="chartRows"
-          :categories="chartCategories"
-          :height="200"
-          :annotations="placedAnnotations"
-          :mark-lines="phlebotomyDates"
-          dual-axis
-          connect-nulls
-          fit-y
-          show-legend
-          class="mt-2"
-          :aria-label="`Hematocrit and hemoglobin across ${draws.length} draws, with dose changes and phlebotomies marked`"
-        />
-      </section>
-
-      <!-- Phlebotomies -->
-      <section>
-        <TuiHeader
-          label="PHLEBOTOMIES"
-          :dashes="8"
-        >
-          <span class="text-label text-muted normal-case">blood out · the draw before against the first after</span>
-        </TuiHeader>
-        <p
-          v-if="!effects.length"
-          class="mt-2 text-small text-muted"
-        >
-          None logged.{{ canEdit ? ' Use + LOG PHLEBOTOMY after a donation or a therapeutic draw — the chart marks it and the next CBC shows what it bought.' : '' }}
-        </p>
-        <div
-          v-else
-          class="mt-1.5"
-        >
-          <div
-            v-for="e in [...effects].reverse()"
-            :key="e.phlebotomy.id"
-            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0 group"
-          >
-            <span class="text-small text-muted tabular-nums w-23 shrink-0">{{ formatDate(e.phlebotomy.date) }}</span>
-            <span class="text-prose text-hi">{{ kindLabel(e.phlebotomy.kind) }}</span>
-            <span class="text-small text-muted">{{ e.phlebotomy.ml ?? DEFAULT_DONATION_ML }} mL<span
-              v-if="e.phlebotomy.ml == null"
-              class="text-faint"
-            > (assumed)</span> · ≈{{ Math.round((e.phlebotomy.ml ?? DEFAULT_DONATION_ML) * IRON_MG_PER_ML_BLOOD) }} mg iron</span>
-            <span
-              v-if="e.phlebotomy.pre_hgb != null"
-              class="text-small text-muted"
-            >pre-Hgb {{ e.phlebotomy.pre_hgb }}</span>
-            <span
-              v-if="e.before || e.after"
-              class="text-small"
-              :class="e.hctDelta != null && e.hctDelta < 0 ? 'text-accent' : 'text-dim'"
-            >Hct {{ e.before ? fmt(e.before.value) : '—' }} → {{ e.after ? fmt(e.after.value) : 'no draw yet' }}{{ e.hctDelta != null ? ` (${e.hctDelta > 0 ? '+' : ''}${e.hctDelta})` : '' }}</span>
-            <span
-              v-if="e.phlebotomy.notes"
-              class="text-small text-faint"
-            >{{ e.phlebotomy.notes }}</span>
-            <span
-              v-if="canEdit"
-              class="ml-auto flex items-baseline gap-2 shrink-0"
+          <!-- Iron: the campaign's cost against what the protocol puts back -->
+          <div>
+            <TuiHeader
+              label="IRON"
+              :dashes="15"
             >
-              <button
-                type="button"
-                class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
-                :aria-label="`Edit the ${kindLabel(e.phlebotomy.kind).toLowerCase()} on ${e.phlebotomy.date}`"
-                @click="openEditModal(e.phlebotomy)"
-              >edit</button>
-              <button
-                type="button"
-                class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
-                :aria-label="`Delete the ${kindLabel(e.phlebotomy.kind).toLowerCase()} on ${e.phlebotomy.date}`"
-                @click="confirmDelete(e.phlebotomy)"
-              >✕</button>
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Iron: the campaign's cost against what the protocol puts back -->
-      <section>
-        <TuiHeader
-          label="IRON"
-          :dashes="15"
-        >
-          <span class="text-label text-muted normal-case">last {{ IRON_WINDOW_DAYS }} days · estimates: {{ IRON_MG_PER_ML_BLOOD }} mg per mL out, {{ Math.round(ORAL_IRON_ABSORBED * 100) }} % of oral iron absorbed</span>
-        </TuiHeader>
-        <div class="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div
-            v-for="stat in ironStats"
-            :key="stat.label"
-            class="bg-raised border border-line-soft px-3.5 py-3"
-          >
-            <p class="text-micro text-muted uppercase tracking-widest">
-              {{ stat.label }}
+              <span class="hidden sm:inline text-label text-muted normal-case">{{ ironNote }}</span>
+            </TuiHeader>
+            <p class="sm:hidden mt-1 text-meta text-faint">
+              {{ ironNote }}
+            </p>
+            <div class="mt-2.5 grid grid-cols-2 xl:grid-cols-4 gap-px bg-line border border-line">
+              <div
+                v-for="stat in ironStats"
+                :key="stat.label"
+                class="bg-bg px-3.5 py-3"
+              >
+                <p class="text-micro text-muted uppercase tracking-widest">
+                  {{ stat.label }}
+                </p>
+                <p
+                  class="num-display text-tile leading-none mt-1.5"
+                  :class="stat.class"
+                >
+                  {{ stat.value }}<span class="text-label text-muted"> {{ stat.unit }}</span>
+                </p>
+                <p class="text-label text-faint mt-1">
+                  {{ stat.note }}
+                </p>
+              </div>
+            </div>
+            <p
+              v-if="ledger.sources.length"
+              class="mt-2 text-meta text-faint leading-[1.6]"
+            >
+              Oral iron in the window: {{ ledger.sources.map(s => `${s.label} — ${s.mg} mg over ${s.days} d`).join(' · ') }}
             </p>
             <p
-              class="num-display text-tile leading-none mt-1.5"
-              :class="stat.class"
+              v-else
+              class="mt-2 text-meta text-faint leading-[1.6]"
             >
-              {{ stat.value }}<span class="text-label text-muted"> {{ stat.unit }}</span>
-            </p>
-            <p class="text-label text-faint mt-1">
-              {{ stat.note }}
+              No oral iron on the protocol in the window — a standing iron item or an iron cycle would count here.
             </p>
           </div>
-        </div>
-        <p
-          v-if="ledger.sources.length"
-          class="mt-2 text-small text-muted"
-        >
-          Oral iron in the window: {{ ledger.sources.map(s => `${s.label} — ${s.mg} mg over ${s.days} d`).join(' · ') }}
-        </p>
-        <p
-          v-else
-          class="mt-2 text-small text-muted"
-        >
-          No oral iron on the protocol in the window — a standing iron item or an iron cycle would count here.
-        </p>
-      </section>
 
-      <!-- Transitional draws: the ones that cannot show the change yet -->
-      <section v-if="transitionalDraws.length">
-        <TuiHeader
-          label="TRANSITIONAL DRAWS"
-          :dashes="4"
-        >
-          <span class="text-label text-muted normal-case">inside the {{ RBC_TURNOVER_DAYS }}-day window after a change</span>
-        </TuiHeader>
-        <div class="mt-1.5">
-          <div
-            v-for="d in transitionalDraws"
-            :key="d.date"
-            class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
-          >
-            <span class="text-small text-muted tabular-nums w-23 shrink-0">{{ formatDate(d.date) }}</span>
-            <span class="num-display text-title text-hi">{{ fmt(d.hematocrit!) }}<span class="text-label text-muted"> %</span></span>
-            <span class="text-small text-dim">{{ d.daysAfter }} d after {{ d.change }}</span>
+          <!-- Transitional draws: the ones that cannot show the change yet -->
+          <div v-if="transitionalDraws.length">
+            <TuiHeader
+              label="TRANSITIONAL DRAWS"
+              :dashes="4"
+            >
+              <span class="hidden sm:inline text-label text-muted normal-case">inside the {{ RBC_TURNOVER_DAYS }}-day window after a change</span>
+            </TuiHeader>
+            <div class="mt-1.5">
+              <div
+                v-for="d in transitionalDraws"
+                :key="d.date"
+                class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-2 border-b border-line-row last:border-0"
+              >
+                <span class="text-small text-muted tabular-nums w-23 shrink-0">{{ formatDate(d.date) }}</span>
+                <span class="num-display text-title text-hi">{{ fmt(d.hematocrit!) }}<span class="text-label text-muted"> %</span></span>
+                <span class="text-small text-dim">{{ d.daysAfter }} d after {{ d.change }}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+
+      <p class="px-4 sm:px-6 py-3 text-meta text-ghost border-t border-line">
+        {{ GENERAL_DISCLAIMER }}
+      </p>
+    </template>
 
     <!-- Add / Edit modal -->
     <UModal
@@ -369,6 +434,8 @@ import {
   hctDraws, hctHeadline, ironLedger, ironMgOf, phlebotomyEffects, transitionalFor, transitionalWindows
 } from '#shared/utils/hematocrit'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
+import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
+import { HEMATOCRIT_DOSSIER } from '~/data/hematocritInfo'
 import { effectiveRules } from '~/utils/adherence'
 import { CHART_ACCENT, CHART_INDIGO } from '~/utils/chartTheme'
 
@@ -380,6 +447,8 @@ useSeoMeta({ title: 'Labs · Hematocrit' })
 // Reads the same stores the labs page does; its own table is the phlebotomy log.
 
 const IRON_WINDOW_DAYS = 180
+// The ledger's caveat: in the header on a desk, under it on a phone (the header note has no room).
+const ironNote = `last ${IRON_WINDOW_DAYS} days · estimates: ${IRON_MG_PER_ML_BLOOD} mg per mL out, ${Math.round(ORAL_IRON_ABSORBED * 100)} % of oral iron absorbed`
 
 const { canEdit } = await useAuth()
 const today = useToday()
@@ -420,6 +489,11 @@ const ladderRows = computed(() => [...HCT_LADDER].reverse().map(r => ({
   reached: headline.value.current != null && headline.value.current.value >= r.at,
   here: headline.value.rung?.at === r.at
 })))
+const ladderLine = HCT_LADDER.map(r => `${r.at} ${r.label}`).join(' · ')
+
+// The compounds on the protocol that move red-cell mass — the dossier names them, the chart
+// draws their dose lines.
+const driverLine = computed(() => [...new Set(rules.value.filter(r => RBC_DRIVERS.test(r.compound)).map(r => r.compound))].join(' · '))
 
 // --- chart ---
 const chartRows = computed(() => draws.value.map(d => ({ date: d.date, hematocrit: d.hematocrit, hemoglobin: d.hemoglobin })))
@@ -468,8 +542,47 @@ const ironStats = computed(() => [
   { label: 'Iron out', value: String(ledger.value.lostMg), unit: 'mg', class: ledger.value.lostMg ? 'text-warn' : 'text-muted', note: `${ledger.value.phlebotomies} phlebotom${ledger.value.phlebotomies === 1 ? 'y' : 'ies'}` },
   { label: 'Oral iron taken', value: String(ledger.value.takenMg), unit: 'mg', class: 'text-hi', note: 'elemental, as the protocol lists it' },
   { label: 'Absorbed ≈', value: String(ledger.value.absorbedMg), unit: 'mg', class: 'text-hi', note: `at ${Math.round(ORAL_IRON_ABSORBED * 100)} % — the usual repleted-adult fraction` },
-  { label: 'Ferritin', value: latestFerritin.value ? fmt(latestFerritin.value.ferritin!) : '—', unit: 'ng/mL', class: latestFerritin.value && latestFerritin.value.ferritin! < 30 ? 'text-warn' : 'text-accent', note: latestFerritin.value ? `${formatDate(latestFerritin.value.date, 'monthDay')} · net ≈ ${ledger.value.netMg > 0 ? '+' : ''}${ledger.value.netMg} mg in the window` : 'no reading' }
+  // Ferritin itself sits in the stat row; the ledger's last tile is the balance it should explain.
+  { label: 'Net ≈', value: `${ledger.value.netMg > 0 ? '+' : ''}${ledger.value.netMg}`, unit: 'mg', class: ledger.value.netMg < 0 ? 'text-warn' : 'text-accent', note: 'absorbed − out, in the window' }
 ])
+
+// --- stat cells ---
+// The compound page's row: the reading, the rung it sits on, the iron store, the visits.
+const statCells = computed(() => {
+  const h = headline.value
+  const ferritin = latestFerritin.value
+  const lastVisit = [...phlebotomies.value].sort((a, b) => a.date.localeCompare(b.date)).at(-1)
+  return [
+    {
+      label: 'Current',
+      value: h.current ? fmt(h.current.value) : '—',
+      unit: '%',
+      class: h.current ? toneClass(h.rung?.tone) : 'text-muted',
+      note: h.current ? `${formatDate(h.current.date, 'monthDay')}${h.currentIsTransitional ? ' · transitional' : ''}` : 'no reading'
+    },
+    {
+      label: 'Rung',
+      value: h.rung ? h.rung.label.toUpperCase() : h.current ? 'CLEAR' : '—',
+      unit: '',
+      class: h.rung ? toneClass(h.rung.tone) : 'text-accent',
+      note: h.next ? `${h.next.gap} to ${h.next.rung.at} ${h.next.rung.label}` : h.current ? 'top of the ladder' : ''
+    },
+    {
+      label: 'Ferritin',
+      value: ferritin ? fmt(ferritin.ferritin!) : '—',
+      unit: 'ng/mL',
+      class: ferritin && ferritin.ferritin! < 30 ? 'text-warn' : 'text-hi',
+      note: ferritin ? formatDate(ferritin.date, 'monthDay') : 'no reading'
+    },
+    {
+      label: 'Phlebotomies',
+      value: String(phlebotomies.value.length),
+      unit: '',
+      class: 'text-hi',
+      note: lastVisit ? `last ${formatDate(lastVisit.date, 'monthDay')}` : 'none logged'
+    }
+  ]
+})
 
 // --- the log's form ---
 const SELECT_DEFAULT: PhlebotomyKind = 'donation'
