@@ -10,6 +10,15 @@
           class="text-meta tracking-[0.08em] uppercase border px-2 py-1"
           :class="STATUS_CHIP[chipKey]"
         >{{ statusLabel }}</span>
+        <!-- An isotretinoin course has its own page: cumulative dose, the lipid/liver panel,
+             the photo strip. The dossier here stays the generic cycle view. -->
+        <NuxtLink
+          v-if="cycle && cycle.compounds.some(i => i.compound === ISOTRETINOIN)"
+          to="/journal/accutane"
+          class="tui-btn"
+        >
+          COURSE PAGE →
+        </NuxtLink>
         <template v-if="isOwner && cycle">
           <!-- Committing a date is what brings a tentative plan to life, so it gets the accent
                button; the form opens straight in exact-date mode. -->
@@ -325,6 +334,7 @@
 </template>
 
 <script setup lang="ts">
+import { ISOTRETINOIN } from '#shared/utils/accutane'
 import { CHART_ACCENT, CHART_DANGER, CHART_WARN } from '~/utils/chartTheme'
 import { getCompoundColor } from '~/data/journal'
 import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'

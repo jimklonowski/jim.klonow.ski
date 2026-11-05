@@ -58,6 +58,8 @@ BILIRUBIN, TOTAL → bilirubin
 ALKALINE PHOSPHATASE → alk_phos
 AST → ast
 ALT → alt
+CK → ck
+CREATINE KINASE → ck
 VITAMIN D,25-OH,TOTAL,IA → vitamin_d
 IRON, TOTAL → iron
 IRON BINDING CAPACITY → tibc

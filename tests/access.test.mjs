@@ -44,6 +44,7 @@ const MATRIX = {
   '/journal/vaccines': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/cycles': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/cycle/3': ['owner', 'friend', 'doctor', 'demo'],
+  '/journal/accutane': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/compound/HGH': ['owner', 'friend', 'doctor', 'demo'],
   '/tools/calculator': ['owner', 'friend', 'doctor', 'demo'],
   // The daily log, the ledger and the photos are the doctor's blind spot by design.

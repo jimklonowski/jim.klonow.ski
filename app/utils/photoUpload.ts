@@ -5,7 +5,7 @@ import exifr from 'exifr'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { createPhotoThumbnail } from './photoThumbnail'
 
-function localDateStr(d: Date): string {
+export function localDateStr(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -13,11 +13,11 @@ function localDateStr(d: Date): string {
 }
 
 /**
- * The day a photo was taken: EXIF DateTimeOriginal (or CreateDate), else the file's modified
- * time. Read in the viewer's local zone, since EXIF times carry no offset and mean
- * "wall clock where the photo was taken".
+ * The instant a photo was taken: EXIF DateTimeOriginal (or CreateDate), else the file's
+ * modified time. EXIF times carry no offset and mean "wall clock where the photo was taken",
+ * so exifr hands them back as a local Date; comparing two from one session orders the shots.
  */
-export async function photoDateOf(file: File): Promise<string> {
+export async function photoTakenAt(file: File): Promise<Date> {
   let exifDate: unknown
   try {
     const tags = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])
@@ -26,7 +26,12 @@ export async function photoDateOf(file: File): Promise<string> {
   catch {
     // Not an image exifr can read (or no EXIF at all): fall through to the file time.
   }
-  return localDateStr(exifDate instanceof Date ? exifDate : new Date(file.lastModified))
+  return exifDate instanceof Date ? exifDate : new Date(file.lastModified)
+}
+
+/** The day a photo was taken, in the viewer's local zone (see photoTakenAt). */
+export async function photoDateOf(file: File): Promise<string> {
+  return localDateStr(await photoTakenAt(file))
 }
 
 /**

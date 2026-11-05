@@ -644,11 +644,19 @@
             v-if="isOwner"
             class="min-w-0"
           >
-            <!-- Same category strip as the photos page, so a photo is filed the same way from either. -->
+            <!-- Same set + category strips as the photos page, so a photo is filed the same way
+                 from either. The set opens on what this day calls for (acne while the
+                 isotretinoin course runs). -->
+            <TuiTabs
+              v-model="set"
+              :items="setTabs"
+              cols="grid-cols-2"
+              class="mb-2"
+            />
             <TuiTabs
               v-model="uploadCategory"
-              :items="PHOTO_CATEGORIES"
-              cols="grid-cols-3 md:grid-cols-6 lg:grid-cols-3"
+              :items="uploadTabs"
+              :cols="uploadCols"
             />
 
             <UFileUpload
@@ -722,16 +730,17 @@
             </p>
           </div>
 
-          <!-- Contact sheet: one square tile per photo in category order, captioned underneath.
-               For the owner an empty category keeps its slot as a dashed tile that points the
-               uploader at it, so the sheet doubles as "what's still missing today". -->
+          <!-- Contact sheet: one square tile per photo in shooting order, captioned underneath.
+               For the owner an empty slot of the set keeps its place as a dashed tile that points
+               the uploader at it, so the sheet doubles as "what's still missing today". Photos
+               the day has outside the set follow, so nothing on file is ever hidden. -->
           <div class="min-w-0">
             <div
               v-if="isOwner || dayPhotos.length"
               class="grid grid-cols-3 sm:grid-cols-6 gap-2.5"
             >
               <template
-                v-for="c in PHOTO_CATEGORIES"
+                v-for="c in sheetCategories"
                 :key="c.value"
               >
                 <figure
@@ -1012,7 +1021,20 @@ function photosFor(category: PhotoCategory) {
   return dayPhotos.value.filter(p => p.category === category)
 }
 
-const uploadCategory = ref<PhotoCategory>('chest')
+const { set, categories: setCategories, setTabs } = await usePhotoSet(() => dateParam.value)
+const uploadTabs = computed(() => setCategories.value.map(c => ({ label: photoCategoryLabel(c), value: c })))
+const uploadCols = computed(() => setCategories.value.length > 6 ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-2' : 'grid-cols-3 md:grid-cols-6 lg:grid-cols-3')
+/** The set's slots in shooting order, then any bucket this day has a photo in outside the set. */
+const sheetCategories = computed(() => {
+  const inSet = new Set<string>(setCategories.value)
+  const extra = PHOTO_CATEGORIES.filter(c => !inSet.has(c.value) && photosFor(c.value).length)
+  return [...setCategories.value.map(value => ({ value, label: photoCategoryLabel(value) })), ...extra]
+})
+
+const uploadCategory = ref<PhotoCategory>(setCategories.value[0]!)
+watch(setCategories, (cats) => {
+  if (!cats.includes(uploadCategory.value)) uploadCategory.value = cats[0]!
+})
 const pendingFile = ref<File | null>(null)
 const pendingPreviewUrl = ref('')
 const pendingDate = ref(dateParam.value)

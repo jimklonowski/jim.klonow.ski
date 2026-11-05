@@ -37,6 +37,17 @@
       />
     </div>
 
+    <!-- Which shooting set the page works in (shared/utils/photoSets.ts): the uploader files a
+         drop into its slots and the category strip below shows its buckets. Opens on the set the
+         day calls for — acne while the isotretinoin course runs. -->
+    <div class="px-4 sm:px-6 pt-4">
+      <TuiTabs
+        v-model="set"
+        :items="setTabs"
+        cols="grid-cols-2"
+      />
+    </div>
+
     <!-- Add Photos (bulk backfill — no need to visit a day's journal entry) -->
     <section
       v-if="isOwner"
@@ -46,10 +57,21 @@
         label="ADD PHOTOS"
         :dashes="11"
       >
-        <span class="text-label text-muted normal-case">date auto-detected from EXIF</span>
+        <span class="text-label text-muted normal-case">{{ setLabel }} set · {{ formatDate(sessionDate, 'monthDay') }}</span>
       </TuiHeader>
 
       <div class="mt-2 bg-raised border border-line-soft px-3.5 py-3">
+        <!-- The day's slots in shooting order: what is on file, what is queued, what is still
+             to shoot. Tapping a slot jumps the category strip below to it. -->
+        <JournalPhotoSetChecklist
+          class="mb-3"
+          :set="set"
+          :date="sessionDate"
+          :photos="photosData ?? []"
+          :queued="queuedCategories"
+          @pick="category = $event"
+        />
+
         <UFileUpload
           v-model="files"
           multiple
@@ -57,8 +79,8 @@
           layout="list"
           position="inside"
           icon="i-lucide-upload-cloud"
-          label="Drop photos here — old or new, one at a time or a whole batch"
-          description="Date is detected automatically from each photo's EXIF data"
+          :label="`Drop the ${setLabel.toLowerCase()} set here — shot in order, the slots file themselves`"
+          description="Date and order come from each photo's EXIF data; fix any slot by hand below"
           class="w-full"
           :ui="{
             base: 'bg-inset border-line-input',
@@ -153,13 +175,14 @@
       </div>
     </section>
 
-    <!-- Category selector -->
+    <!-- Category selector: the set's buckets, in shooting order -->
     <div class="px-4 sm:px-6 pt-4">
-      <!-- Six buckets: 3×2 up to md, one row above. sm would squeeze "RIGHT BICEP n" into ~106px. -->
+      <!-- Six buckets: 3×2 up to md, one row above (sm would squeeze "RIGHT BICEP n" into
+           ~106px); eight: 2×4, then 4×2 — "RIGHT UPPER ARM n" needs the width. -->
       <TuiTabs
         v-model="category"
-        :items="PHOTO_CATEGORIES.map(c => ({ label: c.label, value: c.value, count: countByCategory[c.value] ?? 0 }))"
-        cols="grid-cols-3 md:grid-cols-6"
+        :items="categoryTabs"
+        :cols="categoryCols"
       />
     </div>
 
@@ -535,12 +558,17 @@
 import { diffDays } from '#shared/utils/dates'
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { PHOTO_CATEGORIES, photoCategoryLabel } from '#shared/utils/photoCategories'
+import { assignPhotoSlots, photoSet } from '#shared/utils/photoSets'
 import type { ProgressPhoto } from '~/composables/usePhotoEntries'
 
 useSeoMeta({ title: 'Journal · Photos' })
 
 const { data: photosData, refresh, error } = await usePhotoEntries()
 const { isOwner } = await useAuth()
+// Reactive (useToday): the overnight PWA used to keep yesterday as today until a reload.
+const today = useToday()
+const { set, categories: setCategories, setTabs } = await usePhotoSet(today)
+const setLabel = computed(() => photoSet(set.value).label)
 // Weigh-ins for the timelapse caption. The journal list is usually cached already.
 const { data: journalData } = await useJournalEntries()
 const weightByDate = computed(() => {
@@ -591,7 +619,16 @@ const backfillActions = computed(() => [{
   onClick: backfillThumbnails
 }])
 
-const category = ref<PhotoCategory>('chest')
+const category = ref<PhotoCategory>(setCategories.value[0]!)
+
+// Switching sets lands on the set's first slot unless the current bucket is in both (chest).
+watch(setCategories, (cats) => {
+  if (!cats.includes(category.value)) category.value = cats[0]!
+})
+
+const categoryTabs = computed(() =>
+  setCategories.value.map(c => ({ label: photoCategoryLabel(c), value: c, count: countByCategory.value[c] ?? 0 })))
+const categoryCols = computed(() => setCategories.value.length > 6 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 md:grid-cols-6')
 
 const photosForCategory = computed(() =>
   (photosData.value ?? [])
@@ -669,20 +706,53 @@ watch(files, (newFiles, oldFiles) => {
     if (url) URL.revokeObjectURL(url)
     previewUrls.delete(f)
   }
-  for (const f of newFiles) {
-    if (fileMeta.has(f)) continue
+  const added = newFiles.filter(f => !fileMeta.has(f))
+  for (const f of added) {
     previewUrls.set(f, URL.createObjectURL(f))
-    const meta = reactive<PhotoMeta>({ date: '', category: category.value, status: 'pending' })
-    fileMeta.set(f, meta)
-    photoDateOf(f).then((d) => {
-      meta.date = d
-    })
+    // Provisional until the EXIF read lands: the row renders at once, the slot follows.
+    fileMeta.set(f, reactive<PhotoMeta>({ date: '', category: setCategories.value[0]!, status: 'pending' }))
   }
+  if (added.length) fileSlots(added)
 })
 
-function metaFor(file: File): PhotoMeta {
-  return fileMeta.get(file) ?? reactive({ date: '', category: category.value, status: 'pending' })
+/**
+ * File a drop into the set's slots by capture time (shared/utils/photoSets.ts): the whole drop
+ * is read first, since the order only exists once every shot's time is known. Slots already on
+ * file for the day, or queued from an earlier drop, are skipped.
+ */
+async function fileSlots(added: File[]) {
+  const shots = await Promise.all(added.map(async (f) => {
+    const at = await photoTakenAt(f)
+    return { date: localDateStr(at), takenAt: at.getTime() }
+  }))
+  const spokenFor = [
+    ...(photosData.value ?? []).map(p => ({ date: p.date, category: p.category })),
+    ...[...fileMeta.entries()].filter(([f, m]) => !added.includes(f) && m.date).map(([, m]) => ({ date: m.date, category: m.category }))
+  ]
+  const categories = assignPhotoSlots(set.value, shots, spokenFor)
+  added.forEach((f, i) => {
+    const meta = fileMeta.get(f)
+    if (!meta) return // removed from the list while its EXIF was still being read
+    meta.date = shots[i]!.date
+    meta.category = categories[i]!
+  })
 }
+
+function metaFor(file: File): PhotoMeta {
+  return fileMeta.get(file) ?? reactive({ date: '', category: setCategories.value[0]!, status: 'pending' })
+}
+
+/** The day the checklist counts: the day the queued drop was shot, else today. */
+const sessionDate = computed(() => {
+  const tally = new Map<string, number>()
+  for (const m of fileMeta.values()) if (m.date && m.status !== 'done') tally.set(m.date, (tally.get(m.date) ?? 0) + 1)
+  let best: string | null = null
+  for (const [d, n] of tally) if (best == null || n > tally.get(best)!) best = d
+  return best ?? today.value
+})
+
+const queuedCategories = computed(() =>
+  [...fileMeta.values()].filter(m => m.status !== 'done' && m.date === sessionDate.value).map(m => m.category))
 
 function previewUrlFor(file: File): string {
   return previewUrls.get(file) ?? ''

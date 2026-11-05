@@ -58,7 +58,10 @@ const DOCTOR_PAGES = [
   /^\/journal\/vaccines$/,
   // Planned cycles are protocol context, same policy as the supplement stack.
   /^\/journal\/cycles$/,
-  /^\/journal\/cycle\//
+  /^\/journal\/cycle\//,
+  // The isotretinoin course page: cumulative dose, the lipid/liver panel and the course ladder
+  // are clinical; its photo strip is hidden from this role by the page itself.
+  /^\/journal\/accutane$/
 ]
 
 /** The sign-in page: inside the gated prefix, but it is the way in, so never gated itself. */

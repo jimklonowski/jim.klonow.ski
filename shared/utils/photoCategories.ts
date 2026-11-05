@@ -9,7 +9,8 @@
 //
 // 2026-11-05 (the accutane plan, item 4): six more buckets for the isotretinoin course — the
 // truncal-acne regions (shoulders, upper arms) and the face from the sides. 'face' keeps its
-// value and becomes the front shot, so nothing on file moves.
+// value and becomes the front shot, so nothing on file moves. The categories group into shooting
+// SETS in shared/utils/photoSets.ts; this module stays the flat list the validators need.
 export const PHOTO_CATEGORIES = [
   { value: 'chest', label: 'Chest' },
   { value: 'left_bicep', label: 'Left Bicep' },
@@ -37,33 +38,4 @@ export function isPhotoCategory(value: unknown): value is PhotoCategory {
 /** Display label for a stored value; falls back to the raw value for anything unknown. */
 export function photoCategoryLabel(value: string): string {
   return PHOTO_CATEGORIES.find(c => c.value === value)?.label ?? value
-}
-
-// A set is a named shooting sequence: the categories, IN THE ORDER THEY ARE SHOT, that make up
-// one session. It lives only here — the photo row stores a category, never a set, because the
-// one overlap (chest) is the same shot for both and nothing needs to know which intent it was
-// taken under. The order matters: the upload page files a batch dropped under a set by EXIF
-// capture time, first file → first slot (the accutane plan, item 8).
-export const PHOTO_SETS = [
-  {
-    key: 'physique',
-    label: 'Physique',
-    categories: ['chest', 'left_bicep', 'right_bicep', 'face', 'hairline', 'crown']
-  },
-  {
-    key: 'acne',
-    label: 'Acne',
-    categories: ['chest', 'face', 'face_left', 'face_right', 'left_shoulder', 'right_shoulder', 'left_upper_arm', 'right_upper_arm']
-  }
-] as const satisfies readonly { key: string, label: string, categories: readonly PhotoCategory[] }[]
-
-export type PhotoSetKey = typeof PHOTO_SETS[number]['key']
-
-export function photoSet(key: PhotoSetKey) {
-  return PHOTO_SETS.find(s => s.key === key)!
-}
-
-/** The sets a category belongs to, in PHOTO_SETS order (chest is in both). */
-export function photoSetsOf(category: string): PhotoSetKey[] {
-  return PHOTO_SETS.filter(s => (s.categories as readonly string[]).includes(category)).map(s => s.key)
 }
