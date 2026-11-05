@@ -161,7 +161,7 @@ export const COMPOUND_GROUPS = {
   'Other': [
     'Clenbuterol', 'Finasteride', 'Dutasteride', 'Tadalafil',
     '5-Amino-1MQ', 'SLU-PP-332', 'Modafinil', 'Bromantane',
-    'Iron Bisglycinate'
+    'Iron Bisglycinate', 'Isotretinoin'
   ]
 } as const satisfies Record<string, readonly string[]>
 
@@ -203,6 +203,9 @@ export const COMPOUND_COLORS = {
   'Dutasteride': '#047857',
   'Tadalafil': '#d946ef',
   'Iron Bisglycinate': '#92400e',
+  // The accutane course (logged daily from Nov 2026): a soft orange, between the SS-31 orange
+  // and the amber of GHK-Cu, neither of which runs alongside it.
+  'Isotretinoin': '#fb923c',
   'Semaglutide': '#0891b2',
   'Tirzepatide': '#0e7490',
   'Retatrutide': '#0369a1',
