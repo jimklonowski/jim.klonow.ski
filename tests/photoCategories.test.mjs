@@ -10,11 +10,12 @@ test('every category has a unique value and label', () => {
   assert.equal(new Set(labels).size, labels.length)
   for (const v of values) assert.ok(isPhotoCategory(v), v)
   assert.equal(isPhotoCategory('back'), false)
-  assert.equal(photoCategoryLabel('face'), 'Face (front)', 'the pre-split face bucket is the front shot')
+  assert.equal(photoCategoryLabel('face'), 'Face (front)', 'the pre-split face bucket is the physique front shot')
+  assert.equal(photoCategoryLabel('acne_face'), 'Face (acne)')
   assert.equal(photoCategoryLabel('whatever'), 'whatever')
 })
 
-test('the two shooting sets are made of real categories, in shooting order, with no repeats', () => {
+test('the two shooting sets are made of real categories, in shooting order, and share none', () => {
   assert.deepEqual(PHOTO_SETS.map(s => s.key), ['physique', 'acne'])
   for (const set of PHOTO_SETS) {
     assert.equal(new Set(set.categories).size, set.categories.length, `${set.key} repeats a slot`)
@@ -23,9 +24,11 @@ test('the two shooting sets are made of real categories, in shooting order, with
   assert.equal(photoSet('physique').categories.length, 6)
   assert.equal(photoSet('acne').categories.length, 8)
   assert.ok(isPhotoSetKey('acne') && !isPhotoSetKey('ACNE'))
-  // Chest is the one shared shot; the acne-only regions belong to acne alone, and the physique
-  // arms (flexed biceps) are not the acne arms (upper arm from the side).
-  assert.deepEqual(photoSetsOf('chest'), ['physique', 'acne'])
+  // No bucket is in two sets: the acne chest and face are close-ups with their own framing, not
+  // the physique mirror shots, so a category alone says which record a photo belongs to.
+  for (const c of PHOTO_CATEGORIES) assert.ok(photoSetsOf(c.value).length <= 1, `${c.value} is in two sets`)
+  assert.deepEqual(photoSetsOf('chest'), ['physique'])
+  assert.deepEqual(photoSetsOf('acne_chest'), ['acne'])
   assert.deepEqual(photoSetsOf('left_upper_arm'), ['acne'])
   assert.deepEqual(photoSetsOf('left_bicep'), ['physique'])
   assert.deepEqual(photoSetsOf('nope'), [])
@@ -60,17 +63,20 @@ test('a dropped batch is filed by capture time into the open slots, per day', ()
   // Eight shots dropped in an arbitrary order: each lands on the slot its capture time says.
   const shots = [t(8, 7), t(8, 1), t(8, 5), t(8, 2), t(8, 3), t(8, 6), t(8, 4), t(8, 0)].map(takenAt => ({ date: '2026-11-07', takenAt }))
   assert.deepEqual(assignPhotoSlots('acne', shots, []), [
-    'right_upper_arm', 'face', 'right_shoulder', 'face_left', 'face_right', 'left_upper_arm', 'left_shoulder', 'chest'
+    'right_upper_arm', 'acne_face', 'right_shoulder', 'face_left', 'face_right', 'left_upper_arm', 'left_shoulder', 'acne_chest'
   ])
 
   // Three re-shot later the same day: the slots already on file are skipped.
-  const onFile = ['chest', 'face', 'face_left', 'face_right', 'right_upper_arm'].map(category => ({ date: '2026-11-07', category }))
+  const onFile = ['acne_chest', 'acne_face', 'face_left', 'face_right', 'right_upper_arm'].map(category => ({ date: '2026-11-07', category }))
   const again = [t(18, 2), t(18, 0), t(18, 1)].map(takenAt => ({ date: '2026-11-07', takenAt }))
   assert.deepEqual(assignPhotoSlots('acne', again, onFile), ['left_upper_arm', 'left_shoulder', 'right_shoulder'])
 
   // One more than the open slots wraps to the first slot — a guess to fix by hand, not an error.
   const extra = [...again, { date: '2026-11-07', takenAt: t(18, 3) }]
-  assert.deepEqual(assignPhotoSlots('acne', extra, onFile), ['left_upper_arm', 'left_shoulder', 'right_shoulder', 'chest'])
+  assert.deepEqual(assignPhotoSlots('acne', extra, onFile), ['left_upper_arm', 'left_shoulder', 'right_shoulder', 'acne_chest'])
+
+  // A physique chest shot the same day is another record: the acne chest slot stays open.
+  assert.deepEqual(assignPhotoSlots('acne', [{ date: '2026-11-07', takenAt: t(9, 0) }], [{ date: '2026-11-07', category: 'chest' }]), ['acne_chest'])
 
   // A backfill spanning two days is two sessions: each day starts from its own slot one.
   const twoDays = [
@@ -82,5 +88,5 @@ test('a dropped batch is filed by capture time into the open slots, per day', ()
   assert.deepEqual(assignPhotoSlots('physique', twoDays, []), ['left_bicep', 'left_bicep', 'chest', 'chest'])
 
   // Another day's photos on file don't block today's slots.
-  assert.deepEqual(assignPhotoSlots('acne', [{ date: '2026-11-21', takenAt: 1 }], onFile), ['chest'])
+  assert.deepEqual(assignPhotoSlots('acne', [{ date: '2026-11-21', takenAt: 1 }], onFile), ['acne_chest'])
 })

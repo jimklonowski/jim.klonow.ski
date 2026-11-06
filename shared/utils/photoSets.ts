@@ -1,7 +1,8 @@
 // Photo SETS (the accutane plan, items 5–8): a set is a named shooting sequence — the categories,
 // IN THE ORDER THEY ARE SHOT, that make up one session. It lives only in code; the photo row
-// stores a category, never a set, because the one overlap (chest) is the same shot for both and
-// nothing needs to know which intent it was taken under.
+// stores a category, never a set, and since 2026-11-06 no category is in two sets (the acne set
+// has its own chest and face buckets — its close-ups are not the physique mirror shots), so the
+// category alone says which record a photo belongs to.
 //
 // Two pure rules live here so the pages share them and the tests pin them:
 //   defaultPhotoSet  — which set a page opens on (the acne set while the isotretinoin course runs)
@@ -31,7 +32,7 @@ export const PHOTO_SETS = [
   {
     key: 'acne',
     label: 'Acne',
-    categories: ['chest', 'face', 'face_left', 'face_right', 'left_shoulder', 'right_shoulder', 'left_upper_arm', 'right_upper_arm'],
+    categories: ['acne_chest', 'acne_face', 'face_left', 'face_right', 'left_shoulder', 'right_shoulder', 'left_upper_arm', 'right_upper_arm'],
     compounds: ['Isotretinoin'],
     hint: 'Same spot, same light, same distance, arms relaxed — a before/after only reads when the frames match.'
   }
@@ -47,7 +48,7 @@ export function isPhotoSetKey(value: unknown): value is PhotoSetKey {
   return typeof value === 'string' && PHOTO_SETS.some(s => s.key === value)
 }
 
-/** The sets a category belongs to, in PHOTO_SETS order (chest is in both). */
+/** The sets a category belongs to, in PHOTO_SETS order — one at most, since no bucket is shared. */
 export function photoSetsOf(category: string): PhotoSetKey[] {
   return PHOTO_SETS.filter(s => (s.categories as readonly string[]).includes(category)).map(s => s.key)
 }
@@ -79,6 +80,8 @@ export interface PhotoShot {
  * an earlier drop still queued) is skipped, so re-shooting the three you missed files them
  * where they belong. More shots than open slots wrap to the set's first slot: the extras are
  * guesses to fix by hand, never a crash. Returns one category per shot, in the input order.
+ * Only the set's own categories count as taken — a physique chest shot the same day leaves the
+ * acne chest slot open.
  */
 export function assignPhotoSlots(
   setKey: PhotoSetKey,

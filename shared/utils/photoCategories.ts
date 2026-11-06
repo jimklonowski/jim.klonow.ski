@@ -7,19 +7,25 @@
 // (server/database/archive/migrate-photo-crown-2026-09-17.sql). R2 object keys embed the category the
 // photo was uploaded under and are never rewritten — the key is an opaque handle.
 //
-// 2026-11-05 (the accutane plan, item 4): six more buckets for the isotretinoin course — the
-// truncal-acne regions (shoulders, upper arms) and the face from the sides. 'face' keeps its
-// value and becomes the front shot, so nothing on file moves. The categories group into shooting
-// SETS in shared/utils/photoSets.ts; this module stays the flat list the validators need.
+// 2026-11-05 (the accutane plan, item 4): buckets for the isotretinoin course — the truncal-acne
+// regions (shoulders, upper arms) and the face from the sides. The categories group into
+// shooting SETS in shared/utils/photoSets.ts; this module stays the flat list the validators need.
+//
+// 2026-11-06: the acne set got its OWN chest and face-front buckets (acne_chest, acne_face). The
+// first design shared 'chest' and 'face' between the sets, and the first acne session's close-ups
+// landed in the physique compare and timelapse next to full-torso mirror shots — different framing,
+// different record. No bucket is in two sets any more (migration 0018 moved that session's two rows).
 export const PHOTO_CATEGORIES = [
   { value: 'chest', label: 'Chest' },
   { value: 'left_bicep', label: 'Left Bicep' },
   { value: 'right_bicep', label: 'Right Bicep' },
   { value: 'face', label: 'Face (front)' },
-  { value: 'face_left', label: 'Face (left)' },
-  { value: 'face_right', label: 'Face (right)' },
   { value: 'hairline', label: 'Hairline' },
   { value: 'crown', label: 'Crown' },
+  { value: 'acne_chest', label: 'Chest (acne)' },
+  { value: 'acne_face', label: 'Face (acne)' },
+  { value: 'face_left', label: 'Face (left)' },
+  { value: 'face_right', label: 'Face (right)' },
   { value: 'left_shoulder', label: 'Left Shoulder' },
   { value: 'right_shoulder', label: 'Right Shoulder' },
   { value: 'left_upper_arm', label: 'Left Upper Arm' },
