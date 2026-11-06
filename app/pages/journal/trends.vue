@@ -88,6 +88,19 @@
             expandable
           />
         </div>
+        <!-- The maintenance tile's working (audit #43 item 62): what went in, how the pound was
+             priced, the watch's figure beside it, and the scan period it was priced from. -->
+        <div
+          v-if="energyLines.length"
+          class="mt-2 space-y-0.5 text-small text-muted"
+        >
+          <p
+            v-for="line in energyLines"
+            :key="line"
+          >
+            {{ line }}
+          </p>
+        </div>
       </section>
 
       <!-- Health: Whoop + Apple Watch -->
@@ -201,7 +214,11 @@
 <script setup lang="ts">
 import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
-import { dayNutrition, hasFullFigures, isDayDone, isWholeDay, nutritionIsEstimated } from '#shared/utils/nutrition'
+import {
+  ENERGY_WINDOW_DAYS, KCAL_PER_LB_DEFAULT, MIN_COVERAGE, appleExpenditure, dexaCalibration, energyBalance, fmtStored,
+  scanPeriodBalance, type DayIntake
+} from '#shared/utils/energyBalance'
+import { dayNutrition, fmtKcal, hasFullFigures, isDayDone, isWholeDay, nutritionIsEstimated, nutritionWindow } from '#shared/utils/nutrition'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { fmtRate, weightTrend } from '#shared/utils/weightTrend'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
@@ -225,6 +242,7 @@ const { data: cyclesData } = await useCycles()
 const { rules: protocolRules } = await useProtocol()
 const { data: labNotes } = await useLabNotes()
 const { index: estimateIndex } = await useMealEstimates()
+const { data: dexaData } = await useDexaEntries()
 const { role } = await useAuth()
 
 const { inRange, smoothRows, notes, cutoff } = useTrendRange()
@@ -374,17 +392,105 @@ const FOOD_FIELDS = ['kcal', 'protein_g']
 // "est." on the tiles only when a charted day leans on a model figure — label figures aren't estimates.
 const foodEstimated = computed(() => inRange(entries.value).some(e => nutritionIsEstimated(dayNutrition(e, estimateIndex.value))))
 
+/** A day logged through to dinner (isWholeDay), with figures on every meal — isDayDone keeps
+ * today out until its dinner is in, which for a past day isWholeDay already covers. */
+function wholeDayNutrition(e: typeof entries.value[number]) {
+  const n = dayNutrition(e, estimateIndex.value)
+  return hasFullFigures(n) && isWholeDay(e) && isDayDone(e, today.value) ? n : null
+}
+
+// --- energy balance (audit #43 item 62) ---
+// Every whole day across the history (the windows reach back before the visible range), the
+// latest DEXA pair that prices a pound, and the balance over the 28 days ending today once its
+// dinner is in, else yesterday (nutritionWindow).
+const intakeDays = computed<DayIntake[]>(() =>
+  entries.value.flatMap((e) => {
+    const n = wholeDayNutrition(e)
+    return n ? [{ date: e.date, kcal: n.kcal }] : []
+  })
+)
+const calibration = computed(() => dexaCalibration((dexaData.value ?? []).map(s => ({
+  date: s.date, fat_lbs: s.total?.fat_mass_lbs, lean_lbs: s.total?.lean_mass_lbs
+}))))
+const energyTo = computed(() => nutritionWindow(entries.value, today.value, ENERGY_WINDOW_DAYS).to)
+const balance = computed(() => energyBalance(intakeDays.value, weightTrendAll.value.points, calibration.value, energyTo.value))
+const appleNow = computed(() => appleExpenditure(healthEntries.value, balance.value.from, balance.value.to))
+const scanPeriod = computed(() => calibration.value ? scanPeriodBalance(intakeDays.value, calibration.value) : null)
+
+const md = (d: string) => formatDate(d, 'monthDay')
+const signedLbs = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} lb`
+
+/** Why a span's days were left out — the fix differs: estimate the meals, or log through dinner. */
+function leftOut(from: string, to: string, days: number, counted: number): string {
+  let unfigured = 0
+  for (const e of entries.value) {
+    if (e.date < from || e.date > to || !isWholeDay(e)) continue
+    if (!hasFullFigures(dayNutrition(e, estimateIndex.value))) unfigured++
+  }
+  const short = Math.max(0, days - counted - unfigured)
+  const parts = [
+    unfigured ? `${unfigured} with a meal without figures` : '',
+    short ? `${short} not logged through dinner` : ''
+  ].filter(Boolean)
+  return parts.length ? ` (left out: ${parts.join(', ')})` : ''
+}
+
+/** The caption under the food tiles: the figure's working, the watch's figure, the scan period. */
+const energyLines = computed(() => {
+  const b = balance.value
+  if (!b.loggedDays) return []
+  const span = `${md(b.from)} – ${md(b.to)}`
+  const lines: string[] = []
+  if (b.status === 'few-days') {
+    lines.push(`Maintenance needs ${Math.round(MIN_COVERAGE * 100)} % of days logged through dinner with every meal figured: ${b.loggedDays} of ${b.windowDays} in ${span}${leftOut(b.from, b.to, b.windowDays, b.loggedDays)}.`)
+  }
+  else if (b.status === 'no-weight') {
+    lines.push(`Maintenance needs a weigh-in within a week before ${md(shiftDays(b.from, -1))} and before ${md(b.to)}.`)
+  }
+  else {
+    const c = calibration.value
+    const price = b.source === 'dexa'
+      ? `priced by DEXA ${md(c!.from)} → ${md(c!.to)}`
+      : b.directionMismatch
+        ? `the ${fmtKcal(KCAL_PER_LB_DEFAULT)} default — the scans moved the other way`
+        : `the ${fmtKcal(KCAL_PER_LB_DEFAULT)} default — no DEXA pair to price it`
+    lines.push(`Maintenance ≈ ${fmtKcal(b.maintenanceKcal!)} kcal/day, ${span}: intake ${fmtKcal(b.intakeKcal!)} on ${b.loggedDays} of ${b.windowDays} days, trend ${signedLbs(b.weightDelta!)} × ${fmtKcal(b.kcalPerLb)} kcal/lb (${price}) = ${fmtStored(b.storedKcalPerDay!)}.`)
+  }
+  if (appleNow.value) lines.push(`Apple active + resting energy, same days: ${fmtKcal(appleNow.value.kcal)} kcal/day (${appleNow.value.days} days with both).`)
+  const p = scanPeriod.value
+  if (p) {
+    const c = p.calibration
+    const head = `Between scans ${md(c.from)} → ${md(c.to)}: fat ${signedLbs(c.fatDelta)}, lean ${signedLbs(c.leanDelta)} = ${fmtStored(p.storedKcalPerDay)}`
+    lines.push(p.maintenanceKcal != null
+      ? `${head}; maintenance ≈ ${fmtKcal(p.maintenanceKcal)} (intake ${fmtKcal(p.intakeKcal!)} on ${p.loggedDays} of ${c.days} days).`
+      : `${head}; intake counted on ${p.loggedDays} of ${c.days} days${leftOut(shiftDays(c.from, 1), c.to, c.days, p.loggedDays)} — too few to read a maintenance.`)
+  }
+  return lines
+})
+
+// The tile's three lines, per day: the balance over the 28 days ending that day, the logged
+// intake over the same days, and the watch's figure — each only where it can be read.
+function energyOn(day: string) {
+  const b = energyBalance(intakeDays.value, weightTrendAll.value.points, calibration.value, day)
+  const apple = appleExpenditure(healthEntries.value, b.from, b.to)
+  return {
+    maintenance: b.maintenanceKcal,
+    intake_avg: b.status === 'few-days' ? null : b.intakeKcal,
+    apple_tdee: apple?.kcal ?? null
+  }
+}
+
 const foodRaw = computed(() =>
   inRange(entries.value).map((e) => {
-    const n = dayNutrition(e, estimateIndex.value)
-    // A day logged through to dinner (isWholeDay), with figures on every meal — isDayDone keeps
-    // today off the line until its dinner is in, which for a past day isWholeDay already covers.
-    const full = hasFullFigures(n) && isWholeDay(e) && isDayDone(e, today.value)
+    const n = wholeDayNutrition(e)
+    // Today's energy point waits for its dinner like its calories do.
+    const energy = isDayDone(e, today.value) ? energyOn(e.date) : { maintenance: null, intake_avg: null, apple_tdee: null }
     return {
       date: formatDate(e.date, 'monthDay'),
       day: e.date,
-      kcal: full ? Math.round(n.kcal) : null,
-      protein_g: full ? Math.round(n.protein_g) : null
+      kcal: n ? Math.round(n.kcal) : null,
+      protein_g: n ? Math.round(n.protein_g) : null,
+      ...energy
     }
   })
 )
@@ -407,6 +513,21 @@ const foodTiles = computed(() => {
       unit: foodEstimated.value ? 'g est.' : 'g',
       value: fmt(latest(rows, 'protein_g')),
       series: [{ key: 'protein_g', name: 'protein', color: CHART_ACCENT }]
+    },
+    {
+      // The figure is the balance as of today (or yesterday until dinner); the line is the same
+      // rolling 28-day balance per day, with the logged intake and the watch's figure beside it.
+      key: 'maintenance',
+      label: 'Maintenance',
+      unit: balance.value.status === 'ok'
+        ? `kcal/day · ${ENERGY_WINDOW_DAYS} d${foodEstimated.value ? ' est.' : ''}`
+        : `kcal/day · ${balance.value.loggedDays}/${ENERGY_WINDOW_DAYS} d logged`,
+      value: balance.value.maintenanceKcal != null ? fmtKcal(balance.value.maintenanceKcal) : '—',
+      series: [
+        { key: 'maintenance', name: 'Maintenance', color: CHART_ACCENT },
+        { key: 'intake_avg', name: 'Intake 28 d', color: CHART_WARN },
+        { key: 'apple_tdee', name: 'Apple', color: CHART_INDIGO }
+      ]
     }
   ]
 })
