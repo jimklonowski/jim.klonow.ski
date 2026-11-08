@@ -5,8 +5,9 @@
 // A metric arrives as { name, units, data: [{ date, qty | value, … }] }. Health Auto Export
 // aggregates per its export interval — a daily export gives one point per day, an hourly one
 // several — so the counts and energies (steps, kcal, water) are SUMMED over a date's points,
-// while readings (weight, rates, saturation, waist) keep the day's last. Units follow the
-// phone's settings, so each branch converts what it might be sent.
+// while readings (weight, rates, saturation, waist) keep the day's last, and sleep keeps the
+// day's longest session (sleepSession below). Units follow the phone's settings, so each branch
+// converts what it might be sent.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import type { Vitals } from './vitalsUpsert.ts'
@@ -70,9 +71,52 @@ function qtyOf(point: Record<string, unknown>): number | null {
 
 const stamp = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 
+interface SleepSession {
+  /** Minutes asleep; the stages' sum when there are any, else Health Auto Export's own total. */
+  total: number
+  /** Whether rem/deep/core carried the total (an Apple Watch night) or only the total did (Whoop's). */
+  staged: boolean
+  rem: number
+  deep: number
+  core: number
+  awake?: number
+  start?: string
+  end?: string
+}
+
+/**
+ * One sleep_analysis point as a session, or null when there is no sleep in it. Time asleep is the
+ * stages' sum — HealthKit's own definition (rem + core + deep) — because Health Auto Export's own
+ * `asleep` has read 0 beside correct stages. The reverse happens too: Whoop writes a night to
+ * HealthKit as one unstaged "asleep" sample, so the stages read 0 beside a correct `asleep`
+ * (2026-11-07, Apple Watch on the charger). The stages win when they hold anything; otherwise the
+ * export's total (`asleep`, or the newer `totalSleep`) is the night.
+ */
+function sleepSession(point: Record<string, unknown>): SleepSession | null {
+  const minutes = (v: unknown) => (typeof v === 'number' && v > 0 ? hoursToMin(v) : 0)
+  const rem = minutes(point.rem)
+  const deep = minutes(point.deep)
+  const core = minutes(point.core)
+  const staged = rem + deep + core > 0
+  const total = staged ? rem + deep + core : Math.max(minutes(point.asleep), minutes(point.totalSleep))
+  if (total <= 0) return null
+  return {
+    total,
+    staged,
+    rem,
+    deep,
+    core,
+    awake: typeof point.awake === 'number' ? hoursToMin(point.awake) : undefined,
+    start: stamp(point.sleepStart),
+    end: stamp(point.sleepEnd)
+  }
+}
+
 export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthExport {
   const byDate: Record<string, Vitals> = {}
   const healthByDate: Record<string, HealthMetricsIn> = {}
+  /** Minutes asleep in the session chosen for each date so far (the longest wins). */
+  const sleepChosen: Record<string, number> = {}
 
   for (const metric of metrics) {
     const { name, units, data } = metric
@@ -122,20 +166,36 @@ export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthEx
         case 'lean_body_mass':
           if (qty != null) h.lean_body_mass_lbs = round1(isKg(units) ? qty * LBS_PER_KG : qty)
           break
-        case 'sleep_analysis':
-          if (typeof point.rem === 'number') h.sleep_rem_min = hoursToMin(point.rem)
-          if (typeof point.deep === 'number') h.sleep_deep_min = hoursToMin(point.deep)
-          if (typeof point.core === 'number') h.sleep_core_min = hoursToMin(point.core)
-          if (typeof point.awake === 'number') h.sleep_awake_min = hoursToMin(point.awake)
-          // Health Auto Export's own `asleep` has read 0 beside correct stages, so total time
-          // asleep is the stages' sum — HealthKit's own definition (rem + core + deep).
-          if (h.sleep_rem_min != null || h.sleep_deep_min != null || h.sleep_core_min != null) {
-            h.sleep_total_min = (h.sleep_rem_min ?? 0) + (h.sleep_deep_min ?? 0) + (h.sleep_core_min ?? 0)
+        case 'sleep_analysis': {
+          const night = sleepSession(point)
+          // The day's LONGEST session wins, not its last: Whoop writes naps to HealthKit as their
+          // own sessions, and on 2026-11-07 a 76-minute nap arrived after the night and replaced
+          // it (0 minutes of stages, the nap's start/end). A session with no sleep in it writes
+          // nothing, so a stageless point can't zero a night already on the row.
+          if (!night || night.total <= (sleepChosen[dateStr] ?? 0)) break
+          sleepChosen[dateStr] = night.total
+          h.sleep_total_min = night.total
+          // Stage minutes only when the stages carried the night — a fallback total beside
+          // three zero stages would chart as a night with no deep or REM sleep.
+          if (night.staged) {
+            h.sleep_rem_min = night.rem
+            h.sleep_deep_min = night.deep
+            h.sleep_core_min = night.core
           }
+          else {
+            delete h.sleep_rem_min
+            delete h.sleep_deep_min
+            delete h.sleep_core_min
+          }
+          if (night.awake != null) h.sleep_awake_min = night.awake
+          else delete h.sleep_awake_min
           // When the night began and ended, as printed; bedtime regularity reads these later.
-          if (stamp(point.sleepStart)) h.sleep_start = stamp(point.sleepStart)
-          if (stamp(point.sleepEnd)) h.sleep_end = stamp(point.sleepEnd)
+          if (night.start) h.sleep_start = night.start
+          else delete h.sleep_start
+          if (night.end) h.sleep_end = night.end
+          else delete h.sleep_end
           break
+        }
 
         // --- the Apple metrics that used to be dropped (audit #43 item 56) ---
         case 'step_count':

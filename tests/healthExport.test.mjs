@@ -48,6 +48,40 @@ test('counts and energies sum over an hourly export; readings keep the day\'s la
   assert.deepEqual(healthByDate['2026-10-22'], { steps: 300 })
 })
 
+// 2026-11-07: Apple Watch on the charger, Whoop on. Whoop writes the night to HealthKit as one
+// unstaged "asleep" sample, and its nap as a second one; the stages read 0 beside both, and the
+// last point of the day (the nap) used to win — the home card read 0h00m with the nap's hours.
+const whoopNight = { rem: 0, deep: 0, core: 0, awake: 0, asleep: 7, sleepStart: '2026-11-06 20:10:00 -0600', sleepEnd: '2026-11-07 04:10:00 -0600' }
+const whoopNap = { rem: 0, deep: 0, core: 0, awake: 0.2, asleep: 1.27, sleepStart: '2026-11-07 10:07:36 -0600', sleepEnd: '2026-11-07 11:39:22 -0600' }
+const whoopNightRow = { sleep_total_min: 420, sleep_awake_min: 0, sleep_start: '2026-11-06 20:10:00 -0600', sleep_end: '2026-11-07 04:10:00 -0600' }
+
+test('a stageless night takes its total from `asleep`, with no stage minutes written', () => {
+  const { healthByDate } = parseHealthExport([metric('sleep_analysis', 'hr', on('2026-11-07', null, whoopNight))])
+  assert.deepEqual(healthByDate['2026-11-07'], whoopNightRow)
+})
+
+test('the day\'s longest sleep session wins, whichever order the points arrive in', () => {
+  const napLast = parseHealthExport([metric('sleep_analysis', 'hr', on('2026-11-07', null, whoopNight), on('2026-11-07', null, whoopNap))])
+  const napFirst = parseHealthExport([metric('sleep_analysis', 'hr', on('2026-11-07', null, whoopNap), on('2026-11-07', null, whoopNight))])
+  assert.deepEqual(napLast.healthByDate['2026-11-07'], whoopNightRow, 'the nap after the night')
+  assert.deepEqual(napFirst.healthByDate['2026-11-07'], whoopNightRow, 'the nap before the night')
+
+  // A staged Apple Watch night, then a Whoop nap on the same day: the stages stay.
+  const staged = { rem: 1.5, deep: 1, core: 4.5, awake: 0.25, sleepStart: '2026-11-06 23:12:00 -0600', sleepEnd: '2026-11-07 06:27:00 -0600' }
+  const { healthByDate } = parseHealthExport([metric('sleep_analysis', 'hr', on('2026-11-07', null, staged), on('2026-11-07', null, whoopNap))])
+  assert.deepEqual(healthByDate['2026-11-07'], {
+    sleep_total_min: 420, sleep_rem_min: 90, sleep_deep_min: 60, sleep_core_min: 270, sleep_awake_min: 15,
+    sleep_start: '2026-11-06 23:12:00 -0600', sleep_end: '2026-11-07 06:27:00 -0600'
+  })
+})
+
+test('a sleep point with nothing asleep in it writes nothing, so it can never zero a night', () => {
+  const { healthByDate } = parseHealthExport([
+    metric('sleep_analysis', 'hr', on('2026-11-07', null, whoopNight), on('2026-11-07', null, { rem: 0, deep: 0, core: 0, awake: 0.1, asleep: 0 }))
+  ])
+  assert.deepEqual(healthByDate['2026-11-07'], whoopNightRow)
+})
+
 test('the vitals still go to the journal row; a point with no date, an unknown metric and a null reading write nothing', () => {
   const { byDate, healthByDate } = parseHealthExport([
     metric('body_mass', 'kg', on('2026-10-21', 82.3)), // 181.4 lbs
