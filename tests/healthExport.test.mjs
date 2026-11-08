@@ -32,7 +32,8 @@ test('the metrics that used to be dropped land on the day, converted', () => {
     sleep_awake_min: 15,
     sleep_total_min: 420,
     sleep_start: '2026-10-20 23:12:00 -0500',
-    sleep_end: '2026-10-21 06:27:00 -0500'
+    sleep_end: '2026-10-21 06:27:00 -0500',
+    sleep_source: 'health'
   })
 })
 
@@ -53,7 +54,7 @@ test('counts and energies sum over an hourly export; readings keep the day\'s la
 // last point of the day (the nap) used to win — the home card read 0h00m with the nap's hours.
 const whoopNight = { rem: 0, deep: 0, core: 0, awake: 0, asleep: 7, sleepStart: '2026-11-06 20:10:00 -0600', sleepEnd: '2026-11-07 04:10:00 -0600' }
 const whoopNap = { rem: 0, deep: 0, core: 0, awake: 0.2, asleep: 1.27, sleepStart: '2026-11-07 10:07:36 -0600', sleepEnd: '2026-11-07 11:39:22 -0600' }
-const whoopNightRow = { sleep_total_min: 420, sleep_awake_min: 0, sleep_start: '2026-11-06 20:10:00 -0600', sleep_end: '2026-11-07 04:10:00 -0600' }
+const whoopNightRow = { sleep_total_min: 420, sleep_awake_min: 0, sleep_start: '2026-11-06 20:10:00 -0600', sleep_end: '2026-11-07 04:10:00 -0600', sleep_source: 'health' }
 
 test('a stageless night takes its total from `asleep`, with no stage minutes written', () => {
   const { healthByDate } = parseHealthExport([metric('sleep_analysis', 'hr', on('2026-11-07', null, whoopNight))])
@@ -71,7 +72,7 @@ test('the day\'s longest sleep session wins, whichever order the points arrive i
   const { healthByDate } = parseHealthExport([metric('sleep_analysis', 'hr', on('2026-11-07', null, staged), on('2026-11-07', null, whoopNap))])
   assert.deepEqual(healthByDate['2026-11-07'], {
     sleep_total_min: 420, sleep_rem_min: 90, sleep_deep_min: 60, sleep_core_min: 270, sleep_awake_min: 15,
-    sleep_start: '2026-11-06 23:12:00 -0600', sleep_end: '2026-11-07 06:27:00 -0600'
+    sleep_start: '2026-11-06 23:12:00 -0600', sleep_end: '2026-11-07 06:27:00 -0600', sleep_source: 'health'
   })
 })
 

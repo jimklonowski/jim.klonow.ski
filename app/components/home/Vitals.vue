@@ -244,10 +244,13 @@ const rows = computed(() => {
 
   const sleep = pair(metricsAsOf.value, m => m.sleep_total_min)
   if (sleep.current != null) {
+    // Whoop's night stands in when the Apple Watch had no staged night (on the charger); the
+    // hover says so, since its stages and total run a little different from the Watch's.
+    const whoopNight = metricsAsOf.value.findLast(m => m.sleep_total_min != null)?.sleep_source === 'whoop'
     out.push({
       label: 'SLEEP',
       value: fmtSleep(sleep.current),
-      title: sleep.title,
+      title: [sleep.title, whoopNight ? 'Whoop\'s night — the Apple Watch recorded no sleep' : null].filter(Boolean).join(' · ') || undefined,
       delta: sleep.prev != null
         ? delta(sleep.current, sleep.prev, 'up-good', 'm', 0)
         : undefined

@@ -6,6 +6,7 @@ import { normalizeWorkoutType } from '#shared/utils/workoutTypes'
 import { zDateRange } from '#shared/utils/schemas'
 import type { CheckpointKey } from '#shared/utils/cycles'
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
+import type { HealthMetricsEntry, SleepSource } from '#shared/types/journal'
 
 // nitro-cloudflare-dev types `context.cloudflare.env` as PlatformProxy["env"] (unknown) since it
 // isn't parameterized with our Env — cast through the generated global Env from worker-configuration.d.ts.
@@ -163,7 +164,7 @@ export function parseLabsRow(row: Record<string, unknown>) {
   }
 }
 
-export function parseHealthMetricsRow(row: Record<string, unknown>) {
+export function parseHealthMetricsRow(row: Record<string, unknown>): HealthMetricsEntry {
   return {
     date: row.date as string,
     vo2_max: (row.vo2_max as number | null) ?? null,
@@ -192,7 +193,9 @@ export function parseHealthMetricsRow(row: Record<string, unknown>) {
     whoop_spo2_pct: (row.whoop_spo2_pct as number | null | undefined) ?? null,
     whoop_resp_rate: (row.whoop_resp_rate as number | null | undefined) ?? null,
     sleep_consistency_pct: (row.sleep_consistency_pct as number | null | undefined) ?? null,
-    sleep_efficiency_pct: (row.sleep_efficiency_pct as number | null | undefined) ?? null
+    sleep_efficiency_pct: (row.sleep_efficiency_pct as number | null | undefined) ?? null,
+    // Migration 0019: which device the night came from.
+    sleep_source: (row.sleep_source as SleepSource | null | undefined) ?? null
   }
 }
 
@@ -202,15 +205,40 @@ export const HEALTH_METRIC_FIELDS = [
   'recovery_score', 'strain', 'sleep_performance_pct',
   'steps', 'active_kcal', 'basal_kcal', 'resp_rate', 'spo2_pct', 'waist_in', 'dietary_water_oz',
   'sleep_start', 'sleep_end',
-  'skin_temp_c', 'whoop_spo2_pct', 'whoop_resp_rate', 'sleep_consistency_pct', 'sleep_efficiency_pct'
+  'skin_temp_c', 'whoop_spo2_pct', 'whoop_resp_rate', 'sleep_consistency_pct', 'sleep_efficiency_pct',
+  'sleep_source'
 ] as const
 
 export type HealthMetricField = (typeof HEALTH_METRIC_FIELDS)[number]
-/** What a field holds: numbers throughout, except the two sleep stamps. */
+/** What a field holds: numbers throughout, except the two sleep stamps and the sleep source. */
 export type HealthMetricValues = Partial<Record<HealthMetricField, number | string>>
 
+/**
+ * The night as one unit — total, stages, awake, stamps and the device it came from. Both sources
+ * write it (Apple Health through the webhook, Whoop through its sync and webhook), and the whole
+ * group moves together: a writer that supplies any of it supplies all of it, with nulls for what
+ * it lacks, so a stageless session never leaves another source's stages beside its total.
+ */
+const SLEEP_GROUP: ReadonlySet<HealthMetricField> = new Set<HealthMetricField>([
+  'sleep_total_min', 'sleep_rem_min', 'sleep_deep_min', 'sleep_core_min', 'sleep_awake_min', 'sleep_start', 'sleep_end', 'sleep_source'
+])
+
+/**
+ * How much a night is worth, for choosing between the two sources (migration 0019): a staged
+ * Apple Watch night (3) over Whoop's night (2) over a stageless Apple Health session (1) — the
+ * Watch's nap on 2026-11-07, which replaced Whoop's night because it was delivered later. A row
+ * from before the column (null source) is Apple Health's. Ties are the same source re-sent or
+ * re-scored, and the newer write wins.
+ */
+const sleepRank = (t: string) => `CASE
+  WHEN ${t}.sleep_source = 'whoop' THEN 2
+  WHEN COALESCE(${t}.sleep_rem_min, 0) + COALESCE(${t}.sleep_deep_min, 0) + COALESCE(${t}.sleep_core_min, 0) > 0 THEN 3
+  WHEN ${t}.sleep_total_min IS NOT NULL THEN 1
+  ELSE 0 END`
+
 // Shared by the Apple Health webhook and the Whoop sync task - health_metrics has no manual-entry
-// UI, so whichever source has a value for a field just overwrites it (no null-only-patch needed).
+// UI, so whichever source has a value for a field just overwrites it (no null-only-patch needed)
+// — except the night, which both sources write and the rank above arbitrates.
 // One statement, not SELECT-then-INSERT: Whoop pushes sleep.updated and recovery.updated within
 // moments of each other after a night, and on a date with no row yet both deliveries used to see
 // "missing", race to INSERT, and the loser die on the PRIMARY KEY — a 502 that Whoop retried and
@@ -218,13 +246,18 @@ export type HealthMetricValues = Partial<Record<HealthMetricField, number | stri
 // concurrent writers with different fields still merge instead of clobbering each other.
 /** The health_metrics upsert for one date as a statement, or null when there is nothing to write. */
 export function healthMetricsStatement(db: D1Database, date: string, fields: HealthMetricValues): D1PreparedStatement | null {
-  const cols = HEALTH_METRIC_FIELDS.filter(f => fields[f] != null)
-  if (cols.length === 0) return null
+  const given = HEALTH_METRIC_FIELDS.filter(f => fields[f] != null)
+  if (given.length === 0) return null
+  const night = given.some(f => SLEEP_GROUP.has(f))
+  const cols = night ? HEALTH_METRIC_FIELDS.filter(f => fields[f] != null || SLEEP_GROUP.has(f)) : given
+  const wins = `(${sleepRank('excluded')}) >= (${sleepRank('health_metrics')})`
   return db.prepare(`
     INSERT INTO health_metrics (date, ${cols.join(', ')})
     VALUES (?1, ${cols.map((_, i) => `?${i + 2}`).join(', ')})
-    ON CONFLICT(date) DO UPDATE SET ${cols.map(f => `${f} = excluded.${f}`).join(', ')}
-  `).bind(date, ...cols.map(f => fields[f]!))
+    ON CONFLICT(date) DO UPDATE SET ${cols.map(f => SLEEP_GROUP.has(f)
+      ? `${f} = CASE WHEN ${wins} THEN excluded.${f} ELSE health_metrics.${f} END`
+      : `${f} = excluded.${f}`).join(', ')}
+  `).bind(date, ...cols.map(f => fields[f] ?? null))
 }
 
 export async function upsertHealthMetrics(db: D1Database, date: string, fields: HealthMetricValues): Promise<boolean> {

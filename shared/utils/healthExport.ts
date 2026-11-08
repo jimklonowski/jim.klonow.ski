@@ -11,6 +11,7 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import type { Vitals } from './vitalsUpsert.ts'
+import type { SleepSource } from '../types/journal.ts'
 
 export interface HealthExportMetric {
   name: string
@@ -37,6 +38,8 @@ export interface HealthMetricsIn {
   dietary_water_oz?: number
   sleep_start?: string
   sleep_end?: string
+  /** Always 'health' here; the upsert ranks it against Whoop's night (server/utils/db.ts). */
+  sleep_source?: SleepSource
 }
 
 export interface ParsedHealthExport {
@@ -175,6 +178,7 @@ export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthEx
           if (!night || night.total <= (sleepChosen[dateStr] ?? 0)) break
           sleepChosen[dateStr] = night.total
           h.sleep_total_min = night.total
+          h.sleep_source = 'health'
           // Stage minutes only when the stages carried the night — a fallback total beside
           // three zero stages would chart as a night with no deep or REM sleep.
           if (night.staged) {

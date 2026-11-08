@@ -51,6 +51,25 @@ test('the extras Whoop already sends land beside the scores — SpO2, skin temp,
   assert.deepEqual(metricsByDate([night, older], s => s.end, sleepMetrics)['2026-09-28'], { sleep_performance_pct: 81, sleep_consistency_pct: 77, sleep_efficiency_pct: 91.2, whoop_resp_rate: 14.8 })
 })
 
+test('a scored night carries Whoop\'s stages onto the sleep columns, light as core and slow-wave as deep (migration 0019)', () => {
+  // 2026-11-07: Apple Watch on the charger, Whoop on — 7h asleep, 59 min awake, 8:10 PM to 4:10 AM Chicago.
+  const night = {
+    start: '2026-11-07T02:10:00.000Z', end: '2026-11-07T10:10:00.000Z', nap: false, score_state: 'SCORED',
+    score: {
+      sleep_performance_percentage: 78,
+      stage_summary: { total_in_bed_time_milli: 28740000, total_awake_time_milli: 3540000, total_no_data_time_milli: 0, total_light_sleep_time_milli: 11580000, total_slow_wave_sleep_time_milli: 4740000, total_rem_sleep_time_milli: 8880000, sleep_cycle_count: 4, disturbance_count: 9 }
+    }
+  }
+  assert.deepEqual(metricsByDate([night], s => s.end, sleepMetrics)['2026-11-07'], {
+    sleep_performance_pct: 78,
+    sleep_total_min: 420, sleep_rem_min: 148, sleep_deep_min: 79, sleep_core_min: 193, sleep_awake_min: 59,
+    sleep_start: night.start, sleep_end: night.end, sleep_source: 'whoop'
+  })
+  assert.deepEqual(sleepMetrics({ ...night, nap: true }), [], 'a nap is never the night')
+  const empty = { ...night, score: { sleep_performance_percentage: 78, stage_summary: { total_light_sleep_time_milli: 0 } } }
+  assert.deepEqual(sleepMetrics(empty), [{ date: '2026-11-07', field: 'sleep_performance_pct', value: 78 }], 'no time in any stage writes no night')
+})
+
 test('strain lands on the day its cycle started', () => {
   // A Monday-morning cycle ends Tuesday morning; its strain is Monday's.
   const cycle = { start: '2026-09-28T12:00:00Z', end: '2026-09-29T11:30:00Z', score_state: 'SCORED', score: { strain: 9.4 } }

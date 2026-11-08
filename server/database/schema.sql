@@ -112,7 +112,10 @@ CREATE TABLE IF NOT EXISTS health_metrics (
   whoop_spo2_pct REAL,
   whoop_resp_rate REAL,
   sleep_consistency_pct REAL,
-  sleep_efficiency_pct REAL
+  sleep_efficiency_pct REAL,
+  -- Migration 0019: which device the night came from, 'health' (Apple Health) or 'whoop'; the
+  -- upsert ranks them (server/utils/db.ts healthMetricsStatement). NULL = Apple Health, pre-0019.
+  sleep_source TEXT
 );
 
 CREATE TABLE IF NOT EXISTS workouts (

@@ -86,6 +86,7 @@ export interface WhoopRecoveryRecord {
 export interface WhoopSleepRecord {
   id?: string
   cycle_id?: number
+  start?: string
   end?: string
   /** True for a nap. Naps carry their own (low) performance score and must not overwrite the night. */
   nap?: boolean
@@ -95,6 +96,17 @@ export interface WhoopSleepRecord {
     sleep_consistency_percentage?: number
     sleep_efficiency_percentage?: number
     respiratory_rate?: number
+    /** The night itself, in milliseconds per stage (developer.whoop.com, Sleep data model). */
+    stage_summary?: {
+      total_in_bed_time_milli?: number
+      total_awake_time_milli?: number
+      total_no_data_time_milli?: number
+      total_light_sleep_time_milli?: number
+      total_slow_wave_sleep_time_milli?: number
+      total_rem_sleep_time_milli?: number
+      sleep_cycle_count?: number
+      disturbance_count?: number
+    }
   }
 }
 
@@ -106,15 +118,22 @@ export interface WhoopCycleRecord {
   score?: { strain?: number }
 }
 
-/** The health_metrics columns Whoop feeds (the last five since migration 0016, audit #43 item 57). */
+/**
+ * The health_metrics columns Whoop feeds: the scores, the extras since migration 0016 (audit #43
+ * item 57), and since migration 0019 the night itself — Whoop's stages on the same columns Apple
+ * Health's go to, with sleep_source = 'whoop' so the upsert can rank the two (server/utils/db.ts).
+ */
 export type WhoopMetricField
   = 'recovery_score' | 'sleep_performance_pct' | 'strain'
     | 'skin_temp_c' | 'whoop_spo2_pct' | 'whoop_resp_rate' | 'sleep_consistency_pct' | 'sleep_efficiency_pct'
+    | 'sleep_total_min' | 'sleep_rem_min' | 'sleep_deep_min' | 'sleep_core_min' | 'sleep_awake_min'
+    | 'sleep_start' | 'sleep_end' | 'sleep_source'
 
 export interface WhoopMetric {
   date: string
   field: WhoopMetricField
-  value: number
+  /** A number throughout, except the night's two stamps and its source. */
+  value: number | string
 }
 
 /** A workouts row (server/utils/db.ts WorkoutUpsert), keyed `whoop:<id>`. */
@@ -222,17 +241,51 @@ export function recoveryMetric(r: WhoopRecoveryRecord): WhoopMetric | null {
   return recoveryMetrics(r).find(m => m.field === 'recovery_score') ?? null
 }
 
-// The night's performance, plus its consistency, efficiency and respiratory rate (item 57).
+// The night's performance, plus its consistency, efficiency and respiratory rate (item 57), and
+// the night itself (migration 0019).
 export function sleepMetrics(s: WhoopSleepRecord): WhoopMetric[] {
   // A nap is a second sleep record for the same day, scored against a nap's own (much
   // shorter) need — letting one land would overwrite the night's performance with ~10%.
   if (s.nap || s.score_state !== SCORED) return []
-  return scoreMetrics(whoopLocalDate(s.end), [
+  const date = whoopLocalDate(s.end)
+  const scores = scoreMetrics(date, [
     ['sleep_performance_pct', s.score?.sleep_performance_percentage],
     ['sleep_consistency_pct', s.score?.sleep_consistency_percentage],
     ['sleep_efficiency_pct', s.score?.sleep_efficiency_percentage, 1],
     ['whoop_resp_rate', s.score?.respiratory_rate, 1]
   ])
+  return date ? [...scores, ...whoopNight(date, s)] : scores
+}
+
+const minutes = (milli: unknown) => (typeof milli === 'number' && Number.isFinite(milli) ? Math.round(milli / 60000) : null)
+
+/**
+ * The night as Whoop measured it, on the columns Apple Health's night goes to: light sleep is
+ * HealthKit's "core", slow-wave its "deep". The upsert ranks it below a staged Apple Watch night
+ * and above a stageless Apple Health session (server/utils/db.ts), so it fills a night the Watch
+ * missed — on the charger on 2026-11-07 — and never replaces one the Watch recorded. Nothing
+ * is written unless the record carries at least one stage with time in it.
+ */
+function whoopNight(date: string, s: WhoopSleepRecord): WhoopMetric[] {
+  const st = s.score?.stage_summary
+  if (!st) return []
+  const rem = minutes(st.total_rem_sleep_time_milli)
+  const deep = minutes(st.total_slow_wave_sleep_time_milli)
+  const core = minutes(st.total_light_sleep_time_milli)
+  const total = (rem ?? 0) + (deep ?? 0) + (core ?? 0)
+  if (total <= 0) return []
+  const out: WhoopMetric[] = [
+    { date, field: 'sleep_total_min', value: total },
+    { date, field: 'sleep_rem_min', value: rem ?? 0 },
+    { date, field: 'sleep_deep_min', value: deep ?? 0 },
+    { date, field: 'sleep_core_min', value: core ?? 0 },
+    { date, field: 'sleep_source', value: 'whoop' }
+  ]
+  const awake = minutes(st.total_awake_time_milli)
+  if (awake != null) out.push({ date, field: 'sleep_awake_min', value: awake })
+  if (s.start) out.push({ date, field: 'sleep_start', value: s.start })
+  if (s.end) out.push({ date, field: 'sleep_end', value: s.end })
+  return out
 }
 
 export function sleepMetric(s: WhoopSleepRecord): WhoopMetric | null {
@@ -259,8 +312,8 @@ export function metricsByDate<T>(
   records: T[],
   stamp: (r: T) => string | null | undefined,
   toMetric: (r: T) => WhoopMetric | WhoopMetric[] | null,
-  into: Record<string, Partial<Record<WhoopMetricField, number>>> = {}
-): Record<string, Partial<Record<WhoopMetricField, number>>> {
+  into: Record<string, Partial<Record<WhoopMetricField, number | string>>> = {}
+): Record<string, Partial<Record<WhoopMetricField, number | string>>> {
   const sorted = [...records].sort((a, b) => String(stamp(a) ?? '').localeCompare(String(stamp(b) ?? '')))
   for (const record of sorted) {
     const out = toMetric(record)

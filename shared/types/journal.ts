@@ -143,7 +143,10 @@ export interface HealthMetricsEntry {
   spo2_pct: number | null
   waist_in: number | null
   dietary_water_oz: number | null
-  /** Health Auto Export's stamps for the night, verbatim ("2026-10-21 23:12:00 -0500"). */
+  /**
+   * When the night began and ended, as the source printed it: Health Auto Export's
+   * "2026-10-21 23:12:00 -0500", or Whoop's ISO "2026-11-07T10:10:00.000Z".
+   */
   sleep_start: string | null
   sleep_end: string | null
   /** Whoop's recovery/sleep extras (migration 0016, audit #43 item 57); null before it. */
@@ -152,7 +155,15 @@ export interface HealthMetricsEntry {
   whoop_resp_rate: number | null
   sleep_consistency_pct: number | null
   sleep_efficiency_pct: number | null
+  /**
+   * Which device the night (sleep_total_min, the stages, the stamps) came from (migration 0019):
+   * Apple Health via Health Auto Export, or the Whoop sleep record when the Watch had no staged
+   * night. Null on rows from before the column, which were all Apple Health's.
+   */
+  sleep_source: SleepSource | null
 }
+
+export type SleepSource = 'health' | 'whoop'
 
 export interface WorkoutEntry {
   id: number
