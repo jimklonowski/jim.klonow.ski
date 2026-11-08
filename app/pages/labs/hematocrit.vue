@@ -102,7 +102,7 @@
                   :class="rung.reached ? toneClass(rung.tone) : 'text-faint'"
                 >{{ rung.label }}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="block text-small text-dim leading-[1.6]">{{ rung.action }}</span>
+                  <span class="block text-small text-dim leading-[1.6]">{{ rungAction(rung, donationDeferred) }}</span>
                   <span
                     v-if="rung.here"
                     class="block text-meta text-accent mt-0.5"
@@ -110,6 +110,17 @@
                 </span>
               </div>
             </div>
+            <p
+              v-if="deferral"
+              class="mt-3 text-small text-dim leading-[1.7] border-l-2 border-warn pl-2.5"
+            >
+              <template v-if="deferral.active">
+                <span class="text-warn">No donation until {{ formatDate(deferral.until) }}:</span> isotretinoin course, plus {{ DONATION_DEFERRAL_DAYS }} days after the last capsule. Blood banks refuse donors on it because the drug in donated blood can harm a pregnant recipient's baby. Blood out before then is a therapeutic phlebotomy on a prescriber's order.
+              </template>
+              <template v-else>
+                <span class="text-warn">Isotretinoin starts {{ formatDate(deferral.start, 'monthDay') }}:</span> from then until {{ formatDate(deferral.until) }} ({{ DONATION_DEFERRAL_DAYS }} days after the last capsule) blood banks refuse donors, and blood out is a therapeutic phlebotomy on a prescriber's order.
+              </template>
+            </p>
             <p
               v-if="headline.transitional"
               class="mt-3 text-small text-dim leading-[1.7] border-l-2 border-warn pl-2.5"
@@ -349,6 +360,12 @@
                 :items="PHLEBOTOMY_KINDS"
                 class="w-full"
               />
+              <template
+                v-if="formDeferral"
+                #help
+              >
+                <span class="text-warn">Isotretinoin: no donation until {{ formatDate(formDeferral.until) }}</span>
+              </template>
             </UFormField>
           </div>
           <div class="grid grid-cols-2 gap-3">
@@ -424,6 +441,7 @@
 </template>
 
 <script setup lang="ts">
+import { DONATION_DEFERRAL_DAYS, donationDeferral } from '#shared/utils/accutane'
 import type { PlacedAnnotation } from '#shared/utils/chartAnnotations'
 import { placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
 import { cycleRules } from '#shared/utils/cycles'
@@ -431,7 +449,7 @@ import { shiftDays } from '#shared/utils/dates'
 import type { Phlebotomy, PhlebotomyKind, IronSpan } from '#shared/utils/hematocrit'
 import {
   DEFAULT_DONATION_ML, HCT_LADDER, IRON_MG_PER_ML_BLOOD, ORAL_IRON_ABSORBED, PHLEBOTOMY_KINDS, RBC_DRIVERS, RBC_TURNOVER_DAYS,
-  hctDraws, hctHeadline, ironLedger, ironMgOf, phlebotomyEffects, transitionalFor, transitionalWindows
+  hctDraws, hctHeadline, ironLedger, ironMgOf, phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
 } from '#shared/utils/hematocrit'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
@@ -467,6 +485,10 @@ const rules = computed(() => effectiveRules(cycles.value, protocolRules.value))
 const windows = computed(() => transitionalWindows(rules.value))
 const headline = computed(() => hctHeadline(draws.value, windows.value, today.value))
 const effects = computed(() => phlebotomyEffects(phlebotomies.value, draws.value))
+// An isotretinoin course rules out donation from capsule one to a month after (item 85): the
+// ladder's blood-out advice turns therapeutic and the form stops defaulting to a donation.
+const deferral = computed(() => donationDeferral(cycles.value, today.value))
+const donationDeferred = computed(() => deferral.value?.active === true)
 
 const fmt = fmtMarkerValue
 const kindLabel = (kind: PhlebotomyKind) => PHLEBOTOMY_KINDS.find(k => k.value === kind)?.label ?? kind
@@ -585,8 +607,6 @@ const statCells = computed(() => {
 })
 
 // --- the log's form ---
-const SELECT_DEFAULT: PhlebotomyKind = 'donation'
-
 interface PhlebotomyForm {
   id?: number
   date: string
@@ -597,11 +617,17 @@ interface PhlebotomyForm {
 }
 
 function emptyForm(): PhlebotomyForm {
-  return { id: undefined, date: today.value, kind: SELECT_DEFAULT, ml: '', pre_hgb: '', notes: '' }
+  return { id: undefined, date: today.value, kind: donationDeferred.value ? 'therapeutic' : 'donation', ml: '', pre_hgb: '', notes: '' }
 }
 
 const formModalRaw = ref(false)
 const form = reactive<PhlebotomyForm>(emptyForm())
+// A donation dated inside a deferral is still saved (the log is what happened), but the form says so.
+const formDeferral = computed(() => {
+  if (form.kind !== 'donation' || !form.date) return null
+  const d = donationDeferral(cycles.value, form.date)
+  return d?.active ? d : null
+})
 const formGuard = useDirtyGuard(() => form)
 const formModalOpen = formGuard.guardOpen(formModalRaw)
 

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   HCT_LADDER, RBC_TURNOVER_DAYS, hctDraws, hctHeadline, ironLedger, ironMgOf, ladderRung, nextRung,
-  phlebotomyEffects, transitionalFor, transitionalWindows
+  phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
 } from '../shared/utils/hematocrit.ts'
 import { diffDays } from '../shared/utils/dates.ts'
 
@@ -20,6 +20,17 @@ test('the ladder: 50 watch, 52 act, 54 stop; below 50 nothing; the next rung and
   assert.deepEqual(nextRung(51.7), { rung: HCT_LADDER[1], gap: 0.3 })
   assert.deepEqual(nextRung(48), { rung: HCT_LADDER[0], gap: 2 })
   assert.equal(nextRung(54), null)
+})
+
+test('while donation is deferred no rung suggests one: blood out is a therapeutic phlebotomy by order', () => {
+  const [watch, act, stop] = HCT_LADDER
+  assert.match(rungAction(act, false), /weigh a donation/)
+  for (const rung of [act, stop]) {
+    const deferred = rungAction(rung, true)
+    assert.doesNotMatch(deferred, /weigh a donation/)
+    assert.match(deferred, /therapeutic phlebotomy on a prescriber's order/)
+  }
+  assert.equal(rungAction(watch, true), watch.action, 'a rung with nothing to defer reads the same')
 })
 
 test('a dose change of an erythropoietic compound opens a 120-day transitional window; other compounds do not', () => {

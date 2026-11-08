@@ -37,7 +37,7 @@ export const HEMATOCRIT_DOSSIER: HematocritDossier = {
     {
       label: 'Phlebotomy',
       text: `A whole-blood donation takes about ${DEFAULT_DONATION_ML} mL and carries roughly ${donationIronMg} mg of iron with it; hematocrit typically drops a few points for some weeks and the next CBC shows what it bought.`,
-      note: 'Donate too often and ferritin pays the bill — the iron ledger below the chart keeps that score.'
+      note: 'Donate too often and ferritin pays the bill — the iron ledger below the chart keeps that score. Some drugs rule donation out: isotretinoin from the first capsule to a month after the last, when blood comes out only as a therapeutic phlebotomy on a prescriber\'s order.'
     },
     {
       label: 'Iron arithmetic',

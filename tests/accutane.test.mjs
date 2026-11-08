@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   COURSE_MARKERS, STALE_PHOTO_DAYS, baselineDrawDate, courseDoses, courseLabs, courseLadder, courseStats,
-  isotretinoinCycle, photoStrip, plannedMgPerDay, recheckDraw, signalSummary, weeklySeries
+  donationDeferral, isotretinoinCycle, photoStrip, plannedMgPerDay, recheckDraw, signalSummary, weeklySeries
 } from '../shared/utils/accutane.ts'
 
 const course = {
@@ -34,6 +34,23 @@ test('the course is the cycle carrying isotretinoin: active, else soonest upcomi
   assert.equal(plannedMgPerDay(course), 40)
   assert.equal(plannedMgPerDay({ ...course, compounds: [{ ...course.compounds[0], weekdays: [1, 3, 5] }] }), 17.14)
   assert.equal(plannedMgPerDay(blast), null)
+})
+
+test('donation is deferred from capsule one until 30 days after the last; a course ahead is announced, a tentative one defers nothing', () => {
+  // 41 weeks from Nov 7 ends 2027-08-20; donation is fine again 30 days on, the ladder's own date.
+  assert.deepEqual(donationDeferral([course], '2026-11-06'), { start: '2026-11-07', until: '2027-09-19', active: false })
+  assert.equal(donationDeferral([course], '2026-11-07').active, true)
+  assert.equal(donationDeferral([course], '2027-09-18').active, true, 'the last day of the month after')
+  assert.equal(donationDeferral([course], '2027-09-19'), null, 'over, and nothing ahead')
+  assert.equal(donationDeferral([blast], '2026-12-01'), null)
+  assert.equal(donationDeferral([{ ...course, start_precision: 'month' }], '2026-12-01'), null, 'a tentative course has no dates')
+  // Ended early: the month runs from the actual end.
+  assert.equal(donationDeferral([{ ...course, actual_end: '2027-03-01' }], '2027-03-30').until, '2027-03-31')
+  // Inside the first course's tail with a second already booked: the one covering the day wins.
+  const second = { ...course, id: 9, start_date: '2027-12-01', planned_weeks: 20 }
+  assert.deepEqual(donationDeferral([second, course], '2027-09-01'), { start: '2026-11-07', until: '2027-09-19', active: true })
+  assert.equal(donationDeferral([second, course], '2027-10-01').start, '2027-12-01')
+  assert.equal(donationDeferral([second, course], '2027-10-01').active, false)
 })
 
 test('the dose log is the ledger: per-day milligrams, mcg folded, other compounds ignored', () => {

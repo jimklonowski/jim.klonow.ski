@@ -43,6 +43,8 @@ export interface LadderRung {
   tone: LadderTone
   /** What the rung calls for. */
   action: string
+  /** What it calls for while blood donation is deferred (an isotretinoin course), when that differs. */
+  deferredAction?: string
 }
 
 /**
@@ -52,9 +54,26 @@ export interface LadderRung {
  */
 export const HCT_LADDER: readonly LadderRung[] = [
   { at: 50, label: 'watch', tone: 'warn', action: 'hydrate, retest in 6 weeks, hold any dose increase' },
-  { at: 52, label: 'act', tone: 'warn', action: 'dose or hCG down, book the retest, weigh a donation' },
-  { at: 54, label: 'stop', tone: 'danger', action: 'phlebotomy, dose paused until a draw reads under 52' }
+  {
+    at: 52,
+    label: 'act',
+    tone: 'warn',
+    action: 'dose or hCG down, book the retest, weigh a donation',
+    deferredAction: 'dose or hCG down, book the retest; no donation — blood out only as a therapeutic phlebotomy on a prescriber\'s order'
+  },
+  {
+    at: 54,
+    label: 'stop',
+    tone: 'danger',
+    action: 'phlebotomy, dose paused until a draw reads under 52',
+    deferredAction: 'therapeutic phlebotomy on a prescriber\'s order, dose paused until a draw reads under 52'
+  }
 ]
+
+/** The rung's action, or its deferred one while donation is off the table. */
+export function rungAction(rung: LadderRung, donationDeferred: boolean): string {
+  return donationDeferred && rung.deferredAction ? rung.deferredAction : rung.action
+}
 
 /** The highest rung a reading has reached, or null below the ladder. */
 export function ladderRung(hct: number | null | undefined): LadderRung | null {

@@ -5,7 +5,7 @@
 // tests/accutane.test.mjs pins every rule.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
-import { cycleEnd, cycleStatusOn, type Cycle } from './cycles.ts'
+import { cycleEnd, cycleStatusOn, isTentative, type Cycle } from './cycles.ts'
 import { diffDays, roundTo, shiftDays } from './dates.ts'
 
 export const ISOTRETINOIN = 'Isotretinoin'
@@ -164,6 +164,34 @@ export function courseStats(cycle: Cycle, doses: readonly CourseDose[], weightLb
     reachLower: reach(lowerMg),
     reachUpper: reach(upperMg)
   }
+}
+
+// --- the donation deferral ---
+
+export interface DonationDeferral {
+  /** The course's first day: the deferral starts with capsule one. */
+  start: string
+  /** The first day a donation is fine again, DONATION_DEFERRAL_DAYS after the last planned day. */
+  until: string
+  /** True when the date asked about falls inside [start, until); false for a course still ahead. */
+  active: boolean
+}
+
+/**
+ * The blood-donation deferral as of `date` (audit #43 item 85). Isotretinoin in donated blood can
+ * harm a pregnant recipient's fetus, so blood banks refuse donors from the first capsule until a
+ * month after the last. Returns the deferral covering `date` (the latest-ending when courses
+ * overlap), else the next course ahead, else null. A tentative course has no dates, so it defers
+ * nothing. The end is the cycle's, like the ladder's "blood donation ok" rung.
+ */
+export function donationDeferral(cycles: readonly Cycle[], date: string): DonationDeferral | null {
+  const spans = cycles
+    .filter(c => !isTentative(c) && c.compounds.some(i => i.compound === ISOTRETINOIN))
+    .map(c => ({ start: c.start_date, until: shiftDays(cycleEnd(c), DONATION_DEFERRAL_DAYS) }))
+  const covering = spans.filter(s => s.start <= date && date < s.until).sort((a, b) => b.until.localeCompare(a.until))[0]
+  if (covering) return { ...covering, active: true }
+  const ahead = spans.filter(s => s.start > date).sort((a, b) => a.start.localeCompare(b.start))[0]
+  return ahead ? { ...ahead, active: false } : null
 }
 
 // --- the ladder ---
