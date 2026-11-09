@@ -30,14 +30,15 @@
     <JournalNav />
 
     <TuiDataState
-      :error="error"
-      :empty="!error && !course"
+      :error="pageError"
+      :pending="!pageError && loading"
+      :empty="!pageError && !loading && !course"
       empty-title="No isotretinoin course on file"
       empty-description="Plan one on the Cycles page with Isotretinoin as its compound and this page fills itself from the dose log, the labs and the photos."
-      @retry="refresh"
+      @retry="retryAll"
     />
 
-    <template v-if="course && stats">
+    <template v-if="course && stats && !loading && !pageError">
       <!-- Stat cells: where the course is, what has been taken, when it lands, how steady -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-y border-line">
         <div
@@ -311,6 +312,19 @@
             >
               <span class="text-label text-muted normal-case">weekly · the 8 weeks before the start are the band</span>
             </TuiHeader>
+            <p
+              v-if="signalsError"
+              class="mt-2 text-small text-warn flex flex-wrap items-baseline gap-x-3 gap-y-1"
+            >
+              {{ workoutsError && hmError ? 'The workouts and the Whoop metrics' : workoutsError ? 'The workouts' : 'The Whoop metrics' }} didn't load, so {{ workoutsError && hmError ? 'those' : 'their' }} signals read blank here.
+              <button
+                type="button"
+                class="tui-btn"
+                @click="retrySignals"
+              >
+                ⟳ RETRY
+              </button>
+            </p>
             <div class="mt-2.5 grid grid-cols-2 xl:grid-cols-4 gap-px bg-line border border-line">
               <div
                 v-for="s in signals"
@@ -388,7 +402,14 @@ const today = useToday()
 // the strip is simply not asked for.
 const showPhotos = role.value !== 'doctor'
 
-const [{ data: cyclesData, error, refresh }, { data: journalData }, { data: labsData }, { data: plannedData }, { data: hmData }, { data: workoutsData }] = await Promise.all([
+const [
+  { data: cyclesData, error, refresh },
+  { data: journalData, error: journalError, status: journalStatus, refresh: refreshJournal },
+  { data: labsData },
+  { data: plannedData },
+  { data: hmData, error: hmError, status: hmStatus, refresh: refreshHm },
+  { data: workoutsData, error: workoutsError, status: workoutsStatus, refresh: refreshWorkouts }
+] = await Promise.all([
   useCycles(),
   useJournalEntries(),
   useLabsEntries(),
@@ -396,6 +417,22 @@ const [{ data: cyclesData, error, refresh }, { data: journalData }, { data: labs
   useHealthMetricsEntries(),
   useWorkoutsEntries()
 ])
+
+// The dose log, the metrics and the workouts are client-only lists (audit #43 item 40): on a
+// hard load they arrive after the first paint. Until they have, the page says "loading…" rather
+// than drawing "Dosed 0/N" in warn from an empty log (item 95); a dose log that fails to load is
+// the page's failure (every figure here is the log's), while failed metrics or workouts only
+// blank their signals and say so there.
+const settled = (s: string) => s === 'success' || s === 'error'
+const loading = computed(() => !settled(journalStatus.value) || !settled(hmStatus.value) || !settled(workoutsStatus.value))
+const pageError = computed(() => error.value || journalError.value)
+const signalsError = computed(() => hmError.value || workoutsError.value)
+async function retryAll() {
+  await Promise.all([refresh(), refreshJournal(), refreshHm(), refreshWorkouts()])
+}
+async function retrySignals() {
+  await Promise.all([refreshHm(), refreshWorkouts()])
+}
 const photosRes = showPhotos ? await usePhotoEntries() : null
 
 const course = computed(() => isotretinoinCycle(cyclesData.value ?? [], today.value))
