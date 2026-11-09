@@ -43,6 +43,31 @@
           />
         </UFormField>
 
+        <!-- Where this date lands against the schedule's shots, against where past draws landed
+             (item 61): a draw a day off the usual reads a different T, before anything changed. -->
+        <div
+          v-if="timingRows.length"
+          class="px-3 py-2.5 border border-line-soft bg-inset text-small leading-[1.7]"
+        >
+          <p class="text-label text-muted uppercase tracking-[0.12em]">
+            Timing vs past draws
+          </p>
+          <p
+            v-for="row in timingRows"
+            :key="row.compound"
+            :class="row.match === 'matches' ? 'text-dim' : row.match === 'no history' ? 'text-muted' : 'text-warn'"
+            :title="TIMING_CAVEAT"
+          >
+            {{ row.text }}
+          </p>
+          <p
+            v-if="usualDates.length"
+            class="text-meta text-muted mt-1"
+          >
+            On the usual day: {{ usualDates.slice(0, 3).map(d => formatDate(d, 'monthDay')).join(', ') }}
+          </p>
+        </div>
+
         <UCheckbox
           v-model="form.fasting"
           label="Fasting draw"
@@ -120,6 +145,7 @@ import { cycleCheckpoints } from '#shared/utils/cycles'
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
 import { KNOWN_LABS } from '#shared/utils/plannedDraws'
 import { diffDays } from '#shared/utils/dates'
+import { TIMING_CAVEAT, plannedTimingRows, usualDrawDates } from '#shared/utils/drawTimingView'
 
 // The add/edit form for a planned draw (see shared/utils/plannedDraws.ts). Mounted by the /labs
 // planned-draws section; the cycle dossier may open it straight into a checkpoint window.
@@ -185,6 +211,18 @@ defineExpose({ open: openForm })
 // Reactive (useToday): the modal lives for the page's life, and a window that closed overnight
 // used to still be offered.
 const today = useToday()
+
+// The schedule and the dose log, read without awaiting (stores the page already fills): the
+// date's timing against the shots, and past draws' timing to compare with. The doctor role
+// has no dose log, so the block simply stays empty for it.
+const { rules: protocolRules } = useProtocol()
+const { data: journalData } = useJournalEntries()
+const timingRows = computed(() => (form.date && open.value
+  ? plannedTimingRows(protocolRules.value, journalData.value ?? [], props.drawDates.filter(d => d !== form.labs_date), form.date)
+  : []))
+const usualDates = computed(() => (timingRows.value.some(r => r.match === 'earlier' || r.match === 'later')
+  ? usualDrawDates(protocolRules.value, journalData.value ?? [], props.drawDates, form.date)
+  : []))
 
 function checkpointFor(value: string) {
   if (value === NO_CHECKPOINT) return null

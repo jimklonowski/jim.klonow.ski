@@ -32,6 +32,16 @@
             · next <span class="text-hi font-medium">{{ formatDateTerse(nextPlanned.plan.date) }}</span>
           </template>
         </template>
+        <!-- Where the viewed draw landed on each slow-release compound's curve (item 61). -->
+        <template
+          v-for="chip in timingChips"
+          :key="chip.compound"
+        >
+          · <span
+            class="text-dim normal-case"
+            :title="`${chip.compound}: last shot ${chip.timing.lastDoseDate}, ${chip.timing.phase} — ${TIMING_CAVEAT}`"
+          >{{ chip.text }}</span>
+        </template>
       </p>
 
       <div class="flex flex-wrap items-center gap-2 ml-auto">
@@ -263,6 +273,7 @@
 import { diffDays } from '#shared/utils/dates'
 import { BIOMARKERS, isEchoFinding, isEchoOnly } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
+import { TIMING_CAVEAT, drawTimingChips } from '#shared/utils/drawTimingView'
 import { readingNoteOn } from '#shared/utils/labNotes'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
 import { nextPlannedDraw } from '#shared/utils/plannedDraws'
@@ -271,6 +282,9 @@ useSeoMeta({ title: 'Labs' })
 
 const { data, refresh, error } = await useLabsEntries()
 const { data: plannedData, refresh: refreshPlanned } = await usePlannedDraws()
+// The dose log (client-only list): the title row's "N h after T · ≈x % of peak" chips need the
+// shots before the viewed draw. Empty for the doctor role, so no chips there.
+const { data: journalData } = await useJournalEntries()
 const { isOwner } = await useAuth()
 const route = useRoute()
 const router = useRouter()
@@ -309,6 +323,8 @@ function cardEntries(key: string) {
   return BIOMARKERS[key]?.category === 'cardiac' ? visibleEntries.value : visibleDraws.value
 }
 const drawsBack = computed(() => latest.value ? drawDates.value.length - 1 - drawDates.value.indexOf(latest.value.date) : 0)
+/** The viewed draw against each slow-release compound's dosing curve (item 61). */
+const timingChips = computed(() => latest.value ? drawTimingChips(journalData.value ?? [], latest.value.date) : [])
 
 // --- planned draws ---
 // The soonest plan still waiting on results, for the title row; the section below has the rest.
