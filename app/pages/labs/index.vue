@@ -50,6 +50,12 @@
           :sources="allSources"
         />
         <NuxtLink
+          to="/labs/ledger"
+          class="tui-btn"
+        >
+          LEDGER →
+        </NuxtLink>
+        <NuxtLink
           to="/labs/hematocrit"
           class="tui-btn"
         >

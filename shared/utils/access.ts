@@ -41,6 +41,9 @@ const DOCTOR_PAGES = [
   // The hematocrit campaign — phlebotomies, the action ladder, the turnover windows — is
   // clinical context of the first order (audit #43 item 59).
   /^\/labs\/hematocrit$/,
+  // The draw ledger — protocol in force, timing since the shot, gating markers per draw — is
+  // written for the doctor's eye in the first place (audit #43 item 64).
+  /^\/labs\/ledger$/,
   /^\/journal$/,
   /^\/journal\/trends$/,
   /^\/journal\/compounds$/,

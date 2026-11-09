@@ -33,6 +33,7 @@ const MATRIX = {
   '/labs': ['owner', 'friend', 'doctor', 'demo'],
   '/labs/dexa': ['owner', 'friend', 'doctor', 'demo'],
   '/labs/hematocrit': ['owner', 'friend', 'doctor', 'demo'],
+  '/labs/ledger': ['owner', 'friend', 'doctor', 'demo'],
   '/labs/upload': ['owner'],
   '/journal': ['owner', 'friend', 'doctor', 'demo'],
   '/journal/trends': ['owner', 'friend', 'doctor', 'demo'],
