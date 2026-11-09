@@ -206,7 +206,20 @@
               <span class="hidden sm:inline text-label text-muted normal-case">blood out · the draw before against the first after</span>
             </TuiHeader>
             <p
-              v-if="!effects.length"
+              v-if="phlebError"
+              class="mt-2 text-small text-warn flex flex-wrap items-baseline gap-x-3 gap-y-1"
+            >
+              The phlebotomy log didn't load, so the visits, their marks and the iron out below are missing.
+              <button
+                type="button"
+                class="tui-btn"
+                @click="refreshPhlebs()"
+              >
+                ⟳ RETRY
+              </button>
+            </p>
+            <p
+              v-else-if="!effects.length"
               class="mt-2 text-small text-muted"
             >
               None logged.{{ canEdit ? ' Use + LOG PHLEBOTOMY after a donation or a therapeutic draw — the chart marks it and the next CBC shows what it bought.' : '' }}
@@ -470,7 +483,7 @@ const ironNote = `last ${IRON_WINDOW_DAYS} days · estimates: ${IRON_MG_PER_ML_B
 
 const { canEdit } = await useAuth()
 const today = useToday()
-const [{ data: labsData, error, refresh }, { data: phlebData, refresh: refreshPhlebs }, { rules: protocolRules, standing }, { data: cyclesData }] = await Promise.all([
+const [{ data: labsData, error, refresh }, { data: phlebData, error: phlebError, refresh: refreshPhlebs }, { rules: protocolRules, standing }, { data: cyclesData }] = await Promise.all([
   useLabsEntries(),
   usePhlebotomies(),
   useProtocol(),
@@ -518,18 +531,28 @@ const ladderLine = HCT_LADDER.map(r => `${r.at} ${r.label}`).join(' · ')
 const driverLine = computed(() => [...new Set(rules.value.filter(r => RBC_DRIVERS.test(r.compound)).map(r => r.compound))].join(' · '))
 
 // --- chart ---
-const chartRows = computed(() => draws.value.map(d => ({ date: d.date, hematocrit: d.hematocrit, hemoglobin: d.hemoglobin })))
+const phlebotomyDates = computed(() => phlebotomies.value.map(p => p.date))
+// The draws, plus an empty row on each visit day without one (item 86): the chart draws a guide
+// only on a date its rows carry, so a donation between draws had no line. connect-nulls bridges
+// the empty rows.
+const chartRows = computed(() => {
+  const rows: Array<{ date: string, hematocrit: number | null, hemoglobin: number | null }> = draws.value.map(d => ({ date: d.date, hematocrit: d.hematocrit, hemoglobin: d.hemoglobin }))
+  const drawn = new Set(rows.map(r => r.date))
+  for (const date of new Set(phlebotomyDates.value)) {
+    if (!drawn.has(date)) rows.push({ date, hematocrit: null, hemoglobin: null })
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date))
+})
 const chartCategories = {
   hematocrit: { name: 'Hct %', color: CHART_ACCENT },
   hemoglobin: { name: 'Hgb g/dL', color: CHART_INDIGO }
 }
-const phlebotomyDates = computed(() => phlebotomies.value.map(p => p.date))
 // Dose lines for the erythropoietic compounds and each turnover window as a band, placed on
-// the draw dates the chart actually has (placeAnnotations snaps and clips).
+// the dates the chart actually has (placeAnnotations snaps and clips).
 const placedAnnotations = computed<PlacedAnnotation[]>(() => placeAnnotations([
   ...ruleAnnotations(rules.value.filter(r => RBC_DRIVERS.test(r.compound))),
   ...windows.value.map(w => ({ kind: 'event' as const, from: w.from, to: w.to, text: `turnover window · ${w.change}` }))
-], draws.value.map(d => d.date)))
+], chartRows.value.map(r => r.date)))
 
 // --- transitional draws ---
 const transitionalDraws = computed(() =>
@@ -560,12 +583,17 @@ const ironSpans = computed<IronSpan[]>(() => {
 })
 const ledger = computed(() => ironLedger(phlebotomies.value, ironSpans.value, shiftDays(today.value, -(IRON_WINDOW_DAYS - 1)), today.value))
 const latestFerritin = computed(() => [...draws.value].reverse().find(d => d.ferritin != null) ?? null)
+// Without the log (a failed fetch) the blood-out side is unknown, not zero (item 87).
 const ironStats = computed(() => [
-  { label: 'Iron out', value: String(ledger.value.lostMg), unit: 'mg', class: ledger.value.lostMg ? 'text-warn' : 'text-muted', note: `${ledger.value.phlebotomies} phlebotom${ledger.value.phlebotomies === 1 ? 'y' : 'ies'}` },
+  phlebError.value
+    ? { label: 'Iron out', value: '—', unit: 'mg', class: 'text-muted', note: 'log not loaded' }
+    : { label: 'Iron out', value: String(ledger.value.lostMg), unit: 'mg', class: ledger.value.lostMg ? 'text-warn' : 'text-muted', note: `${ledger.value.phlebotomies} phlebotom${ledger.value.phlebotomies === 1 ? 'y' : 'ies'}` },
   { label: 'Oral iron taken', value: String(ledger.value.takenMg), unit: 'mg', class: 'text-hi', note: 'elemental, as the protocol lists it' },
   { label: 'Absorbed ≈', value: String(ledger.value.absorbedMg), unit: 'mg', class: 'text-hi', note: `at ${Math.round(ORAL_IRON_ABSORBED * 100)} % — the usual repleted-adult fraction` },
   // Ferritin itself sits in the stat row; the ledger's last tile is the balance it should explain.
-  { label: 'Net ≈', value: `${ledger.value.netMg > 0 ? '+' : ''}${ledger.value.netMg}`, unit: 'mg', class: ledger.value.netMg < 0 ? 'text-warn' : 'text-accent', note: 'absorbed − out, in the window' }
+  phlebError.value
+    ? { label: 'Net ≈', value: '—', unit: 'mg', class: 'text-muted', note: 'needs the phlebotomy log' }
+    : { label: 'Net ≈', value: `${ledger.value.netMg > 0 ? '+' : ''}${ledger.value.netMg}`, unit: 'mg', class: ledger.value.netMg < 0 ? 'text-warn' : 'text-accent', note: 'absorbed − out, in the window' }
 ])
 
 // --- stat cells ---
@@ -598,10 +626,10 @@ const statCells = computed(() => {
     },
     {
       label: 'Phlebotomies',
-      value: String(phlebotomies.value.length),
+      value: phlebError.value ? '—' : String(phlebotomies.value.length),
       unit: '',
-      class: 'text-hi',
-      note: lastVisit ? `last ${formatDate(lastVisit.date, 'monthDay')}` : 'none logged'
+      class: phlebError.value ? 'text-muted' : 'text-hi',
+      note: phlebError.value ? 'log not loaded' : lastVisit ? `last ${formatDate(lastVisit.date, 'monthDay')}` : 'none logged'
     }
   ]
 })
@@ -650,8 +678,14 @@ const { run: savePhlebotomy, pending: saving } = useSaveAction(async () => {
   formModalOpen.value = false
 }, { success: () => (form.id ? 'Phlebotomy updated' : 'Phlebotomy logged') })
 
-const { run: confirmDelete } = useSaveAction(async (p: Phlebotomy) => {
+// The confirm sits outside the save action, inventory's pattern: inside it, Cancel returned
+// normally and toasted "deleted" (item 87).
+async function confirmDelete(p: Phlebotomy) {
   if (!confirm(`Delete the ${kindLabel(p.kind).toLowerCase()} on ${p.date}?`)) return
+  await deletePhlebotomy(p)
+}
+
+const { run: deletePhlebotomy } = useSaveAction(async (p: Phlebotomy) => {
   await $fetch('/api/labs/phlebotomies/delete', { method: 'POST', body: { id: p.id } })
   await refreshPhlebs()
 }, { success: () => 'Phlebotomy deleted' })
