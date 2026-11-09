@@ -366,6 +366,7 @@ import {
   baselineDrawDate, courseDoses, courseLabs, courseLadder, courseStats, isotretinoinCycle, photoStrip, plannedMgPerDay,
   recheckDraw, signalSummary, weeklySeries, type CourseMarkerRow
 } from '#shared/utils/accutane'
+import { cycleEnd } from '#shared/utils/cycles'
 import { shiftDays } from '#shared/utils/dates'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { photoCategoryLabel } from '#shared/utils/photoCategories'
@@ -478,7 +479,7 @@ const courseRungs = computed(() => rungs.value.filter(r => r.tier === 'course'))
 const typicalRungs = computed(() => rungs.value.filter(r => r.tier === 'typical'))
 
 // --- labs ---
-const labRows = computed(() => (course.value ? courseLabs(labs.value, course.value.start_date) : []).map(r => ({
+const labRows = computed(() => (course.value ? courseLabs(labs.value, course.value.start_date, cycleEnd(course.value)) : []).map(r => ({
   ...r,
   label: BIOMARKERS[r.key]?.label ?? r.key,
   unit: BIOMARKERS[r.key]?.unit ?? ''

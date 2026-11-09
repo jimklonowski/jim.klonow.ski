@@ -47,10 +47,11 @@ export const EXPECTED_DIRECTION: Record<CourseMarker, 1 | -1> = {
 
 /**
  * The cycle that IS the course: the one carrying isotretinoin — active first, then the soonest
- * upcoming, then the most recently ended. Null when none is planned.
+ * upcoming, then the most recently ended. Null when none is planned. A tentative course (a month
+ * or quarter, no start day) is passed over: it has no dates to derive anything from (item 92).
  */
 export function isotretinoinCycle(cycles: readonly Cycle[], today: string): Cycle | null {
-  const courses = cycles.filter(c => c.compounds.some(i => i.compound === ISOTRETINOIN))
+  const courses = cycles.filter(c => !isTentative(c) && c.compounds.some(i => i.compound === ISOTRETINOIN))
   const by = (status: 'active' | 'upcoming' | 'done') => courses.filter(c => cycleStatusOn(c, today) === status)
   return by('active').sort((a, b) => b.start_date.localeCompare(a.start_date))[0]
     ?? by('upcoming').sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
@@ -126,7 +127,8 @@ export function courseStats(cycle: Cycle, doses: readonly CourseDose[], weightLb
   const status = cycleStatusOn(cycle, today)
   const last = today < end ? today : end
   const daysElapsed = today < start ? 0 : diffDays(start, last) + 1
-  const onCourse = doses.filter(d => d.date >= start && d.date <= today)
+  // Inside the course only: a capsule logged after the last planned day is not this course's.
+  const onCourse = doses.filter(d => d.date >= start && d.date <= last)
   const cumulativeMg = roundTo(onCourse.reduce((s, d) => s + d.mg, 0), 2)
   const kg = weightLbs != null && weightLbs > 0 ? roundTo(weightLbs / LBS_PER_KG, 1) : null
   const lowerMg = kg != null ? Math.round(kg * COURSE_TARGET_MG_PER_KG.lower) : null
@@ -140,11 +142,12 @@ export function courseStats(cycle: Cycle, doses: readonly CourseDose[], weightLb
       running += d.mg
       if (running >= targetMg) return d.date
     }
-    if (paceMgPerDay <= 0) return null
-    const from = today < start ? start : today
-    // From tomorrow at the pace; today's dose, if any, is already in the total.
+    // Nothing to project once the course is over: the total is what it is.
+    if (paceMgPerDay <= 0 || today > end) return null
     const daysLeft = Math.ceil((targetMg - running) / paceMgPerDay)
-    return shiftDays(from, Math.max(daysLeft, today < start ? 0 : 1))
+    // Before the start, day one is capsule one, so the Nth dosed day is start + N − 1; once
+    // running, the count starts tomorrow — today's dose, if any, is already in the total.
+    return today < start ? shiftDays(start, Math.max(daysLeft - 1, 0)) : shiftDays(today, Math.max(daysLeft, 1))
   }
 
   return {
@@ -340,14 +343,15 @@ export interface CourseMarkerRow {
 
 type LabDraw = { date: string, markers: Record<string, number | null | undefined> }
 
-/** Each course marker's baseline and on-course readings. */
-export function courseLabs(labs: readonly LabDraw[], start: string): CourseMarkerRow[] {
+/** Each course marker's baseline and on-course readings — on-course ends with the course's last
+ * day when `end` is given; a draw after it is recovery, not the drug's effect. */
+export function courseLabs(labs: readonly LabDraw[], start: string, end: string | null = null): CourseMarkerRow[] {
   const sorted = [...labs].sort((a, b) => a.date.localeCompare(b.date))
   const lookbackFrom = shiftDays(start, -COURSE_BASELINE_LOOKBACK_DAYS)
   return COURSE_MARKERS.map((key) => {
     const readings = sorted.flatMap(d => (d.markers[key] != null && Number.isFinite(d.markers[key]) ? [{ date: d.date, value: d.markers[key] as number }] : []))
     const baseline = readings.filter(r => r.date < start && r.date >= lookbackFrom).at(-1) ?? null
-    const onCourse = readings.filter(r => r.date >= start)
+    const onCourse = readings.filter(r => r.date >= start && (end == null || r.date <= end))
     const latest = onCourse.at(-1) ?? null
     const delta = baseline && latest ? roundTo(latest.value - baseline.value, 1) : null
     const asExpected = delta == null || delta === 0 ? null : Math.sign(delta) === EXPECTED_DIRECTION[key]

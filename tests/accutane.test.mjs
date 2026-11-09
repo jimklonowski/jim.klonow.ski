@@ -31,6 +31,7 @@ test('the course is the cycle carrying isotretinoin: active, else soonest upcomi
   const later = { ...course, id: 9, start_date: '2028-01-01' }
   assert.equal(isotretinoinCycle([later, course], '2026-11-20')?.id, 4, 'the active one beats a later plan')
   assert.equal(isotretinoinCycle([later, course], '2027-12-01')?.id, 9, 'after the first ends, the upcoming one')
+  assert.equal(isotretinoinCycle([{ ...course, start_precision: 'quarter' }], '2026-11-20'), null, 'a tentative course has no dates to run on')
   assert.equal(plannedMgPerDay(course), 40)
   assert.equal(plannedMgPerDay({ ...course, compounds: [{ ...course.compounds[0], weekdays: [1, 3, 5] }] }), 17.14)
   assert.equal(plannedMgPerDay(blast), null)
@@ -75,10 +76,12 @@ test('cumulative, mg/kg, pace and the projected target days follow the log, not 
   assert.equal(before.lowerMg, 11595)
   assert.equal(before.upperMg, 17006)
   assert.equal(before.paceMgPerDay, 40)
-  // 11595 / 40 = 289.9 → 290 days from the start.
-  assert.equal(before.reachLower, '2027-08-24')
-  // 17006 / 40 = 425.2 → 426 days.
-  assert.equal(before.reachUpper, '2028-01-07')
+  // 11595 / 40 = 289.9 → the 290th dosed day, capsule one being day one: start + 289.
+  assert.equal(before.reachLower, '2027-08-23')
+  // 17006 / 40 = 425.2 → the 426th day: start + 425.
+  assert.equal(before.reachUpper, '2028-01-06')
+  // A tiny target: 1 lb → 75 mg, two 40 mg days, so day two — start + 1, not start + 2.
+  assert.equal(courseStats(course, [], 1, '2026-11-05', 40).reachLower, '2026-11-08')
 
   // Ten days in, two missed: cumulative is what was taken; the pace is the logged mean.
   const log = courseDoses(['07', '08', '09', '10', '11', '14', '15', '16'].map(d => dose(`2026-11-${d}`)))
@@ -115,6 +118,17 @@ test('cumulative, mg/kg, pace and the projected target days follow the log, not 
   assert.equal(noWeight.kg, null)
   assert.equal(noWeight.reachLower, null)
   assert.equal(noWeight.cumulativeMg, 320)
+
+  // After the last planned day: a capsule logged past it is not this course's, and there is no
+  // projection left to make (item 92).
+  const short = { ...course, planned_weeks: 1 }
+  const over = courseStats(short, courseDoses(['07', '08', '09', '13', '14', '20'].map(d => dose(`2026-11-${d}`))), 170.5, '2026-11-25', 40)
+  assert.equal(over.status, 'done')
+  assert.equal(over.daysElapsed, 7)
+  assert.equal(over.dosedDays, 4, 'Nov 13 is the last day and counts; Nov 14 and Nov 20 fall after it')
+  assert.equal(over.cumulativeMg, 160)
+  assert.equal(over.lastDoseDate, '2026-11-13')
+  assert.equal(over.reachLower, null)
 })
 
 test('the ladder has a course tier dated by the data and a typical tier pinned to the calendar', () => {
@@ -197,6 +211,11 @@ test('the labs panel diffs each marker against the latest pre-course reading ins
   assert.equal(ck.asExpected, null)
   assert.equal(baselineDrawDate(labs, '2026-11-07'), '2026-10-17')
   assert.equal(baselineDrawDate(labs, '2027-06-01'), null, 'an on-course draw is nobody\'s baseline')
+  // With the course's end given, a later draw is recovery and stays out of the on-course column.
+  const ended = courseLabs(labs, '2026-11-07', '2027-01-15').find(r => r.key === 'triglycerides')
+  assert.deepEqual(ended.latest, { date: '2026-12-15', value: 140 })
+  assert.equal(ended.onCourse.length, 1)
+  assert.equal(ended.delta, 69)
 })
 
 test('the first recheck is a draw WITH the course markers inside weeks 3–10, else the earliest open plan, else a failed plan to report', () => {
