@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  HCT_LADDER, RBC_TURNOVER_DAYS, hctDraws, hctHeadline, ironLedger, ironMgOf, ladderRung, nextRung,
+  HCT_LADDER, RBC_TURNOVER_DAYS, hctDraws, hctHeadline, ironLedger, ironMgOf, ironSpansFrom, ladderRung, nextRung,
   phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
 } from '../shared/utils/hematocrit.ts'
 import { diffDays } from '../shared/utils/dates.ts'
@@ -134,8 +134,49 @@ test('the iron ledger: 500 mL out is ~250 mg; oral iron counts at 15 % absorbed;
   assert.equal(l.takenMg, 6125)
   assert.equal(l.absorbedMg, 919)
   assert.equal(l.netMg, 419)
+})
+
+test('a dose label reads as elemental iron: salts by their iron fraction, counts multiplied, no mg → nothing', () => {
   assert.equal(ironMgOf('50 mg'), 50)
   assert.equal(ironMgOf('75mg'), 75)
+  assert.equal(ironMgOf('2 x 25 mg'), 50)
+  assert.equal(ironMgOf('325 mg ferrous sulfate'), 65, 'ferrous sulfate is a fifth iron')
+  assert.equal(ironMgOf('324 mg ferrous gluconate'), 39)
+  assert.equal(ironMgOf('324 mg ferrous fumarate'), 107)
+  assert.equal(ironMgOf('ferrous sulfate 325 mg (65 mg elemental)'), 325, 'the first mg figure wins, elemental said → as is')
+  assert.equal(ironMgOf('65 mg elemental (as ferrous sulfate)'), 65)
+  assert.equal(ironMgOf('25 mg bisglycinate'), 25, 'a chelate label states the iron itself')
   assert.equal(ironMgOf('2 IU'), null)
+  assert.equal(ironMgOf('1 capsule'), null)
   assert.equal(ironMgOf(null), null)
+})
+
+test('iron spans come from every iron item whatever its kind or category, at each version\'s cadence, plus iron cycles', () => {
+  const items = [
+    { id: 1, name: 'Iron Bisglycinate', kind: 'standing' }, // the demo's: category supplement, filed among the stack rows
+    { id: 2, name: 'Iron (ferrous gluconate)', kind: 'logged' },
+    { id: 3, name: 'Iron', kind: 'as_needed' },
+    { id: 4, name: 'Magnesium', kind: 'standing' }
+  ]
+  const v = (id, item_id, from_date, to_date, dose_label, weekdays, note = null) => ({ id, item_id, from_date, to_date, dose_label, weekdays, note })
+  const versions = [
+    v(1, 1, '2026-09-01', null, '25 mg', null, 'empty stomach + vitamin C, M/W/F'),
+    v(2, 2, '2026-10-01', '2026-10-31', '324 mg ferrous gluconate', '[1,3,5]'),
+    v(3, 2, '2026-11-01', null, '324 mg ferrous gluconate', '[0,1,2,3,4,5,6]'),
+    v(4, 3, '2026-01-01', null, '50 mg', null),
+    v(5, 4, '2026-01-01', null, '400 mg', '[0,1,2,3,4,5,6]'),
+    v(6, 1, null, '2026-08-31', '1 capsule', null) // no mg figure: nothing to count
+  ]
+  const round = {
+    id: 7, name: 'Vorck round #2', start_date: '2026-10-19', planned_weeks: 1, planned_days: 7,
+    compounds: [{ compound: 'Iron Bisglycinate', dose: 225, unit: 'mg', weekdays: [0, 1, 2, 3, 4, 5, 6], fromWeek: 1, toWeek: 1 }]
+  }
+  const spans = ironSpansFrom(items, versions, [round])
+  assert.deepEqual(spans.map(s => [s.label, s.from, s.to, s.mgPerDay]), [
+    ['Iron Bisglycinate 25 mg · no fixed days, counted daily', '2026-09-01', null, 25],
+    ['Iron (ferrous gluconate) 324 mg ferrous gluconate ×3/wk', '2026-10-01', '2026-10-31', 16.71],
+    ['Iron (ferrous gluconate) 324 mg ferrous gluconate', '2026-11-01', null, 39],
+    ['Vorck round #2 (225 mg)', '2026-10-19', '2026-10-25', 225]
+  ])
+  assert.deepEqual(ironSpansFrom([], [], []), [])
 })

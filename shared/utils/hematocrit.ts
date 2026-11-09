@@ -6,8 +6,10 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { ruleAnnotations } from './chartAnnotations.ts'
+import { cycleRules, type Cycle } from './cycles.ts'
 import { diffDays, roundTo, shiftDays } from './dates.ts'
 import type { ProtocolRule } from './protocolRules.ts'
+import { BEFORE_RECORDS, parseWeekdays, type ProtocolItemRow, type ProtocolVersionRow } from './protocolStore.ts'
 
 export type PhlebotomyKind = 'donation' | 'therapeutic'
 
@@ -252,8 +254,58 @@ export function ironLedger(phlebotomies: Phlebotomy[], spans: IronSpan[], from: 
   return { from, to, days: diffDays(from, to) + 1, lostMg: roundTo(lostMg, 0), takenMg, absorbedMg, netMg: roundTo(absorbedMg - lostMg, 0), sources, phlebotomies: inRange.length }
 }
 
-/** The elemental mg in a dose label like "50 mg" / "75mg"; null for anything else. */
+/**
+ * Elemental iron by weight in the common salts (item 89): a "325 mg ferrous sulfate" tablet is
+ * 65 mg of iron. A label naming no salt, or saying "elemental", is read as the iron itself —
+ * bisglycinate, carbonyl and polysaccharide labels state it that way.
+ */
+export const IRON_SALT_FRACTIONS: ReadonlyArray<readonly [RegExp, number]> = [
+  [/ferrous\s+sulf/i, 0.2],
+  [/ferrous\s+gluconate/i, 0.12],
+  [/ferrous\s+fumarate/i, 0.33]
+]
+
+/** The elemental mg in a dose label: "50 mg", "2 x 25 mg", "325 mg ferrous sulfate" → 65; null
+ * for anything without a mg figure. */
 export function ironMgOf(doseLabel: string | null | undefined): number | null {
-  const m = /^\s*([\d.]+)\s*mg\b/i.exec(doseLabel ?? '')
-  return m ? Number(m[1]) : null
+  const text = doseLabel ?? ''
+  const m = /(?:^|\s|\()(?:(\d+)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*mg\b/i.exec(text)
+  if (!m) return null
+  const mg = Number(m[2]) * (m[1] ? Number(m[1]) : 1)
+  if (/elemental/i.test(text)) return mg
+  const salt = IRON_SALT_FRACTIONS.find(([re]) => re.test(text))
+  return salt ? Math.round(mg * salt[1]) : mg
+}
+
+/**
+ * Every oral iron source as spans: each dated version of every protocol item named iron — of
+ * any kind but as-needed and any category, since a supplement-category standing item is filed
+ * among the stack rows, not the standing meds (item 89: the ledger used to read only those) —
+ * at its weekday cadence, plus each iron cycle's rows (a loading round). A version with no
+ * fixed days is counted daily and says so in its label.
+ */
+export function ironSpansFrom(
+  items: ReadonlyArray<Pick<ProtocolItemRow, 'id' | 'name' | 'kind'>>,
+  versions: ReadonlyArray<Pick<ProtocolVersionRow, 'item_id' | 'from_date' | 'to_date' | 'dose_label' | 'weekdays'>>,
+  cycles: readonly Cycle[]
+): IronSpan[] {
+  const spans: IronSpan[] = []
+  for (const item of items) {
+    if (!/iron/i.test(item.name) || item.kind === 'as_needed') continue
+    for (const v of versions.filter(v => v.item_id === item.id)) {
+      const mg = ironMgOf(v.dose_label)
+      if (mg == null) continue
+      const days = parseWeekdays(v.weekdays)
+      const perWeek = days?.length ?? 7
+      const cadence = days == null ? ' · no fixed days, counted daily' : perWeek < 7 ? ` ×${perWeek}/wk` : ''
+      spans.push({ label: `${item.name} ${v.dose_label}${cadence}`, from: v.from_date ?? BEFORE_RECORDS, to: v.to_date, mgPerDay: roundTo((mg * perWeek) / 7, 2) })
+    }
+  }
+  for (const c of cycles) {
+    for (const r of cycleRules(c)) {
+      const mg = /iron/i.test(r.compound) ? ironMgOf(r.doseLabel) : null
+      if (mg != null) spans.push({ label: `${c.name} (${r.doseLabel})`, from: r.from, to: r.to ?? null, mgPerDay: roundTo((mg * r.weekdays.length) / 7, 2) })
+    }
+  }
+  return spans
 }

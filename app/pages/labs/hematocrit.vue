@@ -319,7 +319,7 @@
               v-else
               class="mt-2 text-meta text-faint leading-[1.6]"
             >
-              No oral iron on the protocol in the window — a standing iron item or an iron cycle would count here.
+              No oral iron on the protocol in the window — an iron item on /journal/protocol or an iron cycle would count here.
             </p>
           </div>
 
@@ -462,12 +462,11 @@
 import { DONATION_DEFERRAL_DAYS, donationDeferral } from '#shared/utils/accutane'
 import type { PlacedAnnotation } from '#shared/utils/chartAnnotations'
 import { placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
-import { cycleRules } from '#shared/utils/cycles'
 import { shiftDays } from '#shared/utils/dates'
-import type { Phlebotomy, PhlebotomyKind, IronSpan } from '#shared/utils/hematocrit'
+import type { Phlebotomy, PhlebotomyKind } from '#shared/utils/hematocrit'
 import {
   DEFAULT_DONATION_ML, HCT_LADDER, IRON_MG_PER_ML_BLOOD, ORAL_IRON_ABSORBED, PHLEBOTOMY_KINDS, RBC_DRIVERS, RBC_TURNOVER_DAYS,
-  hctDraws, hctHeadline, ironLedger, ironMgOf, phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
+  hctDraws, hctHeadline, ironLedger, ironSpansFrom, phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
 } from '#shared/utils/hematocrit'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
@@ -488,10 +487,13 @@ const ironNote = `last ${IRON_WINDOW_DAYS} days · estimates: ${IRON_MG_PER_ML_B
 
 const { canEdit } = await useAuth()
 const today = useToday()
-const [{ data: labsData, error, refresh }, { data: phlebData, error: phlebError, refresh: refreshPhlebs }, { rules: protocolRules, standing }, { data: cyclesData }] = await Promise.all([
+const [{ data: labsData, error, refresh }, { data: phlebData, error: phlebError, refresh: refreshPhlebs }, { rules: protocolRules }, { data: protocolRows }, { data: cyclesData }] = await Promise.all([
   useLabsEntries(),
   usePhlebotomies(),
   useProtocol(),
+  // The raw items + versions: the iron ledger reads every iron item whatever its kind or
+  // category, and the mapped schedule files a supplement-category item without its dates.
+  useProtocolItems(),
   useCycles()
 ])
 
@@ -571,21 +573,9 @@ const transitionalDraws = computed(() =>
 )
 
 // --- iron ---
-// The standing iron item on the protocol and every iron cycle's rows (a Vorck round) as spans.
-const ironSpans = computed<IronSpan[]>(() => {
-  const spans: IronSpan[] = []
-  for (const s of standing.value) {
-    const mg = /iron/i.test(s.compound) ? ironMgOf(s.label) : null
-    if (mg != null) spans.push({ label: `${s.compound} ${s.label} (standing)`, from: s.from, to: s.to, mgPerDay: mg })
-  }
-  for (const c of cycles.value) {
-    for (const r of cycleRules(c)) {
-      const mg = /iron/i.test(r.compound) ? ironMgOf(r.doseLabel) : null
-      if (mg != null) spans.push({ label: `${c.name} (${r.doseLabel})`, from: r.from, to: r.to ?? null, mgPerDay: mg * r.weekdays.length / 7 })
-    }
-  }
-  return spans
-})
+// Every iron item on the protocol (each dated version at its cadence) and every iron cycle's
+// rows (a Vorck round) as spans.
+const ironSpans = computed(() => ironSpansFrom(protocolRows.value?.items ?? [], protocolRows.value?.versions ?? [], cycles.value))
 const ledger = computed(() => ironLedger(phlebotomies.value, ironSpans.value, shiftDays(today.value, -(IRON_WINDOW_DAYS - 1)), today.value))
 const latestFerritin = computed(() => [...draws.value].reverse().find(d => d.ferritin != null) ?? null)
 // Without the log (a failed fetch) the blood-out side is unknown, not zero (item 87).
