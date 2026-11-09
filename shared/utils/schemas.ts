@@ -383,6 +383,18 @@ export const zPhlebotomySave = z.object({
   notes: zOptText(2000)
 })
 
+// A marker goal (audit #43 item 60): a trend comparator carries no target, a threshold one must.
+export const zMarkerGoalSave = z.object({
+  id: zId.optional(),
+  marker: z.string().trim().min(1).max(64).regex(/^[a-z0-9_]+$/),
+  comparator: z.enum(['below', 'at_most', 'above', 'at_least', 'falling', 'rising']),
+  target: z.preprocess(blankAsAbsent, z.number().nullish()).transform(v => v ?? null),
+  by_date: z.preprocess(blankAsAbsent, zIsoDate.nullish()).transform(v => v ?? null),
+  cycle_id: z.preprocess(blankAsAbsent, zId.nullish()).transform(v => v ?? null),
+  stated: zIsoDate,
+  note: zOptText(500)
+}).refine(g => (g.comparator === 'falling' || g.comparator === 'rising') || g.target != null, { message: 'A threshold goal needs a target', path: ['target'] })
+
 // The key is checked against PROFILE_FIELDS in the handler (a select field also checks its
 // options there); '' or a missing value clears the fact. A number is accepted and stored as its
 // string: a number input emits one, and the card modal's post of `9` for the water cup was a 400

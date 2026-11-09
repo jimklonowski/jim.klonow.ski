@@ -251,7 +251,7 @@ const WEEKLY_WINDOW_WEEKS = 20
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone; `protocol` the request's
  * schedule (protocolFor), which decides which compounds count as standing for the trend anchors. */
 export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData): Promise<string> {
-  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates] = await Promise.all([
+  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates, goals] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
@@ -269,7 +269,10 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     // Blood taken out on purpose (audit #43 item 59): the reason a hematocrit fell, and iron lost.
     phlebotomyContext(db, today),
     // Meal figures (library, hand entries, model estimates) for the meals in the day and week lines.
-    loadEstimateIndex(db)
+    loadEstimateIndex(db),
+    // The dated marker goals and their verdicts (audit #43 item 60): "is Primo a go?" is answered
+    // from these, not inferred.
+    markerGoalsContext(db, today, protocol)
   ])
   const health = (healthRes.results ?? []) as Array<Record<string, unknown>>
   const workouts = mergeWorkouts((workoutsRes.results ?? []).map(parseWorkoutRow)) as unknown as Array<Record<string, unknown>>
@@ -299,6 +302,7 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     profile,
     supplements,
     cyclesCtx,
+    goals,
     vaccines,
     eventContext(today, PROTOCOL_EVENTS),
     plannedDraws,

@@ -68,7 +68,9 @@ const IDENT = /^\w+$/
  */
 export const RESTORE_PARENTS: Record<string, string[]> = {
   ask_messages: ['ask_threads'],
-  protocol_versions: ['protocol_items']
+  protocol_versions: ['protocol_items'],
+  // A goal may gate a cycle (ON DELETE SET NULL): the cycle row has to exist first.
+  marker_goals: ['cycles']
 }
 
 /** Table order for the INSERT phase: alphabetical, then every parent hoisted before its children. */

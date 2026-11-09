@@ -77,6 +77,17 @@
             :class="vitalsLine.class"
           >{{ vitalsLine.text }}</span>
         </div>
+        <div
+          v-if="goalsLine"
+          class="flex gap-2.5"
+        >
+          <span class="text-ghost shrink-0">├</span>
+          <NuxtLink
+            :to="dossier"
+            class="min-w-0 hover:text-accent"
+            :class="goalsLine.class"
+          >{{ goalsLine.text }}</NuxtLink>
+        </div>
         <div class="flex gap-2.5">
           <span class="text-ghost shrink-0">└</span>
           <span
@@ -108,6 +119,18 @@
             class="min-w-0"
             :class="drawLine.class"
           >{{ drawLine.text }}</span>
+        </div>
+        <!-- The gating goals' verdict (audit #43 item 60): the go/no-go the pre-flight is for. -->
+        <div
+          v-if="goalsLine"
+          class="flex gap-2.5"
+        >
+          <span class="text-ghost shrink-0">├</span>
+          <NuxtLink
+            :to="dossier"
+            class="min-w-0 hover:text-accent"
+            :class="goalsLine.class"
+          >{{ goalsLine.text }}</NuxtLink>
         </div>
         <div
           v-for="(line, i) in planLines"
@@ -172,6 +195,8 @@ import {
 } from '#shared/utils/cycles'
 import { diffDays } from '#shared/utils/dates'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
+import { caveatCompoundOn } from '#shared/utils/labNotes'
+import { VERDICT_WORD, cycleGoalSummary, goalLabel, goalVerdict, goalsForCycle } from '#shared/utils/markerGoals'
 
 // The one-glance cycle strip for the home dashboard's protocol column. Three states:
 // pre-flight for an upcoming cycle (baseline draw + gating markers), progress + due-status
@@ -212,6 +237,29 @@ const nameParts = computed(() => {
   const name = cycle.value?.name ?? ''
   const m = /^(.*?)\s*(\[[^\]]*\])$/.exec(name)
   return m && m[1] ? { main: m[1], note: m[2] } : { main: name, note: null }
+})
+
+// The marker goals that gate this cycle and their verdict (audit #43 item 60). Read like the
+// labs cards read their caveats: without awaiting, from stores every page already fills.
+const { data: goalsData } = useMarkerGoals()
+const { rules: protocolRules, standing: protocolStanding } = useProtocol()
+const { data: labNotes } = useLabNotes()
+const goalsLine = computed(() => {
+  if (!cycle.value) return null
+  const goals = goalsForCycle(goalsData.value ?? [], cycle.value.id)
+  if (!goals.length) return null
+  const caveats = labNotes.value?.caveats ?? {}
+  const spans = [...protocolRules.value, ...protocolStanding.value]
+  const verdicts = goals.map(g => goalVerdict(g, props.draws, today.value, d => caveatCompoundOn(caveats, g.marker, d, spans)))
+  const s = cycleGoalSummary(verdicts)
+  const blocker = verdicts.find(v => v.status === 'not-met')
+  const detail = blocker
+    ? `${goalLabel(blocker.goal, BIOMARKERS[blocker.goal.marker])} not met`
+    : s.open ? `${s.open} undecided` : 'every goal met'
+  return {
+    text: `goals ${VERDICT_WORD[s.verdict]} · ${s.met}/${s.total} met · ${detail}`,
+    class: s.verdict === 'go' ? 'text-accent' : s.verdict === 'no-go' ? 'text-danger' : 'text-muted'
+  }
 })
 
 /** Newest draw on file — the baseline candidate for a cycle with no dated window. */

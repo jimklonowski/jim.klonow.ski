@@ -103,10 +103,13 @@ export default defineEventHandler(async (event) => {
   // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
   // renders it as of the draw date.
   const protocol = await protocolFor(event)
+  // The dated marker goals with their verdicts as of this draw (item 60) — the frame the
+  // summary reads the gating markers in, computed here so the model reports it, not re-judges it.
+  const goalsBlock = await markerGoalsContext(db, date, protocol)
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, markerLines, readingNotes, qualitativeBlock
+    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()

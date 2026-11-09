@@ -137,6 +137,74 @@
           goal: {{ cycle.goal }}
         </p>
 
+        <!-- Marker goals (audit #43 item 60): the dated targets this cycle waits on, each with its
+             verdict from the draws on file, rolled up to GO / NO-GO / UNDECIDED. -->
+        <section v-if="goalVerdicts.length || isOwner">
+          <TuiHeader
+            label="GOALS ── gating markers"
+            :dashes="0"
+          >
+            <span
+              v-if="goalVerdicts.length"
+              class="text-micro tracking-[0.08em] normal-case"
+              :class="VERDICT_CLASS[goalSummary.verdict]"
+            >{{ VERDICT_WORD[goalSummary.verdict] }} · {{ goalSummary.met }} met · {{ goalSummary.notMet }} not met<template v-if="goalSummary.open"> · {{ goalSummary.open }} undecided</template></span>
+          </TuiHeader>
+          <div
+            v-if="goalVerdicts.length"
+            class="mt-2"
+          >
+            <div
+              v-for="v in goalVerdicts"
+              :key="v.goal.id"
+              class="flex items-baseline gap-x-2.5 gap-y-1 flex-wrap py-1.5 border-b border-line-row last:border-0 group"
+              :title="v.reason"
+            >
+              <span
+                class="text-label tracking-[0.08em] w-24 shrink-0"
+                :class="STATUS_CLASS[v.status]"
+              >{{ STATUS_WORD[v.status] }}</span>
+              <span class="text-small text-hi">{{ goalLabel(v.goal, BIOMARKERS[v.goal.marker]) }}</span>
+              <span
+                v-if="v.goal.cycle_id == null"
+                class="text-meta text-faint"
+              >standing</span>
+              <span class="text-meta text-muted min-w-0">{{ v.reason }}</span>
+              <span
+                v-if="isOwner"
+                class="ml-auto flex items-baseline gap-2 shrink-0"
+              >
+                <button
+                  type="button"
+                  class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"
+                  :aria-label="`Edit the goal ${goalLabel(v.goal, BIOMARKERS[v.goal.marker])}`"
+                  @click="openGoal(v.goal)"
+                >edit</button>
+                <button
+                  type="button"
+                  class="text-meta text-faint hover:text-danger cursor-pointer tui-row-action"
+                  :aria-label="`Delete the goal ${goalLabel(v.goal, BIOMARKERS[v.goal.marker])}`"
+                  @click="confirmDeleteGoal(v.goal)"
+                >✕</button>
+              </span>
+            </div>
+          </div>
+          <p
+            v-else
+            class="mt-2 text-small text-muted"
+          >
+            No marker goal gates this cycle yet — add one ("hematocrit seen falling", "estradiol under 100 pg/mL by a date") and each draw gets a verdict against it here and on the home strip.
+          </p>
+          <button
+            v-if="isOwner"
+            type="button"
+            class="tui-btn mt-2.5"
+            @click="openGoal(null)"
+          >
+            + GOAL
+          </button>
+        </section>
+
         <!-- Planned timeline: one bar per compound across the cycle's weeks -->
         <section>
           <TuiHeader
@@ -330,6 +398,115 @@
       ref="cycleForm"
       @saved="refresh"
     />
+
+    <!-- Add / edit a marker goal -->
+    <UModal
+      v-model:open="goalModalOpen"
+      :title="goalForm.id ? 'Edit Goal' : 'Add Goal'"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <UFormField
+              label="Marker"
+              required
+            >
+              <USelectMenu
+                v-model="goalForm.marker"
+                :items="MARKER_ITEMS"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="Should be"
+              required
+            >
+              <USelect
+                v-model="goalForm.comparator"
+                :items="COMPARATOR_ITEMS"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField
+              label="Target"
+              :required="!goalIsTrend"
+              :help="goalIsTrend ? 'A trend goal has no number: the latest reading against the one before it, once a draw lands after the goal was set' : `In the marker's unit${BIOMARKERS[goalForm.marker]?.unit ? ` (${BIOMARKERS[goalForm.marker]!.unit})` : ''}`"
+            >
+              <UInput
+                v-model.number="goalForm.target"
+                type="number"
+                inputmode="decimal"
+                step="any"
+                :disabled="goalIsTrend"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="By"
+              help="Optional deadline; a miss past it says so"
+            >
+              <UInput
+                v-model="goalForm.by_date"
+                type="date"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField
+              label="Gates"
+            >
+              <USelect
+                v-model="goalForm.scope"
+                :items="SCOPE_ITEMS"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="Set on"
+              required
+              help="A trend counts only draws after this day"
+            >
+              <UInput
+                v-model="goalForm.stated"
+                type="date"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <UFormField
+            label="Why"
+            help="One line; goes to the AI with the verdict"
+          >
+            <UInput
+              v-model="goalForm.note"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              class="tui-btn"
+              @click="goalModalOpen = false"
+            >
+              CANCEL
+            </button>
+            <UButton
+              :loading="savingGoal"
+              :disabled="!goalValid"
+              @click="saveGoal"
+            >
+              Save
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -348,6 +525,11 @@ import { diffDays, shiftDays } from '#shared/utils/dates'
 import { checkpointPlan, planInWindow } from '#shared/utils/plannedDraws'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
+import { caveatCompoundOn } from '#shared/utils/labNotes'
+import type { GoalComparator, GoalStatus, MarkerGoal } from '#shared/utils/markerGoals'
+import {
+  GOAL_COMPARATORS, STATUS_WORD, VERDICT_WORD, cycleGoalSummary, goalLabel, goalVerdict, goalsForCycle, isTrendGoal
+} from '#shared/utils/markerGoals'
 import { adherencePctClass } from '~/utils/adherence'
 
 const route = useRoute()
@@ -358,6 +540,12 @@ const { data: journalData } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: healthData } = await useHealthMetricsEntries()
 const { data: plannedData } = await usePlannedDraws()
+// The marker goals and what a verdict needs beside the draws: the caveats (which medication
+// skews which marker) and the protocol's spans (when it ran) — a reading drawn on one is
+// confounded and decides nothing (audit #43 item 60).
+const { data: goalsData, refresh: refreshGoals } = await useMarkerGoals()
+const { rules: protocolRules, standing: protocolStanding } = await useProtocol()
+const { data: labNotes } = await useLabNotes()
 
 const cycleForm = useTemplateRef('cycleForm')
 
@@ -582,6 +770,84 @@ function gatingChips(drawDate: string, baselineDate: string | null): GatingChip[
   }
   return chips
 }
+
+// --- marker goals ---
+const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value])
+const goalVerdicts = computed(() => {
+  if (!cycle.value) return []
+  const caveats = labNotes.value?.caveats ?? {}
+  return goalsForCycle(goalsData.value ?? [], cycle.value.id)
+    .map(g => goalVerdict(g, draws.value, today.value, date => caveatCompoundOn(caveats, g.marker, date, caveatSpans.value)))
+})
+const goalSummary = computed(() => cycleGoalSummary(goalVerdicts.value))
+const STATUS_CLASS: Record<GoalStatus, string> = { 'met': 'text-accent', 'not-met': 'text-danger', 'insufficient': 'text-muted', 'confounded': 'text-warn' }
+const VERDICT_CLASS: Record<string, string> = { 'go': 'text-accent', 'no-go': 'text-danger', 'undecided': 'text-muted' }
+
+const MARKER_ITEMS = Object.entries(BIOMARKERS).map(([value, m]) => ({ label: m.label, value })).sort((a, b) => a.label.localeCompare(b.label))
+const COMPARATOR_ITEMS = GOAL_COMPARATORS.map(c => ({ label: c.label, value: c.value }))
+const SCOPE_ITEMS = [
+  { label: 'This cycle', value: 'cycle' },
+  { label: 'Standing — gates every cycle', value: 'standing' }
+]
+
+interface GoalForm {
+  id?: number
+  marker: string
+  comparator: GoalComparator
+  target: number | ''
+  by_date: string
+  scope: 'cycle' | 'standing'
+  stated: string
+  note: string
+}
+
+function emptyGoal(): GoalForm {
+  return { id: undefined, marker: 'hematocrit', comparator: 'falling', target: '', by_date: '', scope: 'cycle', stated: today.value, note: '' }
+}
+
+const goalModalRaw = ref(false)
+const goalForm = reactive<GoalForm>(emptyGoal())
+const goalGuard = useDirtyGuard(() => goalForm)
+const goalModalOpen = goalGuard.guardOpen(goalModalRaw)
+const goalIsTrend = computed(() => isTrendGoal(goalForm.comparator))
+const goalValid = computed(() => !!goalForm.marker && !!goalForm.stated && (goalIsTrend.value || goalForm.target !== ''))
+
+function openGoal(g: MarkerGoal | null) {
+  Object.assign(goalForm, emptyGoal(), g
+    ? { id: g.id, marker: g.marker, comparator: g.comparator, target: g.target ?? '', by_date: g.by_date ?? '', scope: g.cycle_id == null ? 'standing' : 'cycle', stated: g.stated, note: g.note ?? '' }
+    : {})
+  goalGuard.markClean()
+  goalModalOpen.value = true
+}
+
+const { run: saveGoal, pending: savingGoal } = useSaveAction(async () => {
+  await $fetch('/api/journal/goals/save', {
+    method: 'POST',
+    body: {
+      id: goalForm.id,
+      marker: goalForm.marker,
+      comparator: goalForm.comparator,
+      target: goalIsTrend.value ? null : goalForm.target,
+      by_date: goalForm.by_date || null,
+      cycle_id: goalForm.scope === 'cycle' ? cycle.value?.id ?? null : null,
+      stated: goalForm.stated,
+      note: goalForm.note || null
+    }
+  })
+  await refreshGoals()
+  goalGuard.markClean()
+  goalModalOpen.value = false
+}, { success: () => (goalForm.id ? 'Goal updated' : 'Goal added') })
+
+// The confirm sits outside the save action (a Cancel inside it would still toast).
+async function confirmDeleteGoal(g: MarkerGoal) {
+  if (!confirm(`Delete the goal "${goalLabel(g, BIOMARKERS[g.marker])}"?`)) return
+  await deleteGoal(g)
+}
+const { run: deleteGoal } = useSaveAction(async (g: MarkerGoal) => {
+  await $fetch('/api/journal/goals/delete', { method: 'POST', body: { id: g.id } })
+  await refreshGoals()
+}, { success: () => 'Goal deleted' })
 
 const nextCheckpointLabel = computed(() => {
   if (tentativeStart.value) return 'baseline draw · before you start'

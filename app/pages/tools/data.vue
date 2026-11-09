@@ -149,6 +149,7 @@ const TABLE_LABELS: Record<string, string> = {
   vaccinations: 'Vaccine',
   phlebotomies: 'Phlebotomy',
   cycles: 'Cycle',
+  marker_goals: 'Marker goal',
   planned_draws: 'Planned draw',
   progress_photos: 'Photo',
   profile: 'Profile',
