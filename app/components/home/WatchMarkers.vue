@@ -186,7 +186,7 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((key) => {
     asOf: `as of ${formatDate(latest.date, 'monthDay')}`,
     // What the tile says (the value, its status, the reference, the date) — a reader used to get
     // only the marker's name and where the link goes.
-    aria: `${label}: ${fmt(latest.value)} ${meta.unit}${latest.censored ? ' (a ceiling)' : ''}, ${statusWord}; ${foot}; as of ${formatDate(latest.date, 'monthDay')} — open its history on the labs page`
+    aria: `${label}: ${fmt(latest.value)} ${meta.unit}${latest.censored ? ' (a ceiling)' : ''}, ${statusWord}; ${foot}; as of ${formatDate(latest.date, 'monthDay')} — ${key === 'hematocrit' ? 'open the hematocrit control panel' : 'open its history on the labs page'}`
   }]
 }))
 </script>

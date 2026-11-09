@@ -39,13 +39,14 @@
 
     <TuiDataState
       :error="error"
-      :empty="!draws.length"
+      :empty="!draws.length && !phlebotomies.length"
       empty-title="No CBC on file yet"
       empty-description="Upload a panel with a hematocrit and the campaign lands here."
       @retry="refresh"
     />
 
-    <template v-if="draws.length">
+    <!-- Visits logged before any CBC still have a page: the log, the iron ledger and the form. -->
+    <template v-if="draws.length || phlebotomies.length">
       <!-- Stat cells, the compound page's row: the reading, its rung, the iron store, the visits -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border-y border-line">
         <div
@@ -182,7 +183,14 @@
                 <span class="text-ember">│</span> dose change · <span class="text-faint">▒</span> turnover window · <span class="text-muted">┊</span> phlebotomy
               </span>
             </TuiHeader>
+            <p
+              v-if="!draws.length"
+              class="mt-2 text-small text-muted"
+            >
+              No CBC on file yet — the chart draws once a panel with a hematocrit lands; the visits below are logged against nothing until then.
+            </p>
             <AreaChart
+              v-else
               :data="chartRows"
               :categories="chartCategories"
               :height="200"

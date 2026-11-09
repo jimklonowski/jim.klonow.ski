@@ -14,7 +14,7 @@
              the photo strip. The dossier here stays the generic cycle view. -->
         <NuxtLink
           v-if="cycle && cycle.compounds.some(i => i.compound === ISOTRETINOIN)"
-          to="/journal/accutane"
+          :to="{ path: '/journal/accutane', query: { cycle: cycle.id } }"
           class="tui-btn"
         >
           COURSE PAGE →

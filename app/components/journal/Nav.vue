@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { canAccessPage } from '#shared/utils/access'
-import { isotretinoinCycle } from '#shared/utils/accutane'
+import { PROCEDURE_DEFERRAL_DAYS, isotretinoinCycle } from '#shared/utils/accutane'
 import { cycleEnd, cycleStatusOn } from '#shared/utils/cycles'
 import { diffDays } from '#shared/utils/dates'
 
@@ -32,8 +32,9 @@ const ALL_TABS = [
   { label: 'Compounds', to: '/journal/compounds' },
   { label: 'Protocol', to: '/journal/protocol' },
   { label: 'Cycles', to: '/journal/cycles' },
-  // The course page is a tab only while there is a course: planned, running, or ended within
-  // the last eight weeks (the recovery draw's window). Nothing on file → no eleventh tab.
+  // The course page is a tab only while there is a course: planned, running, or ended with its
+  // last ladder rung (procedures OK, 180 days after the last capsule) still ahead. Nothing on
+  // file → no eleventh tab.
   { label: 'Accutane', to: '/journal/accutane', course: true },
   { label: 'Workouts', to: '/journal/workouts' },
   { label: 'Entries', to: '/journal/entries' },
@@ -41,8 +42,6 @@ const ALL_TABS = [
   { label: 'Photos', to: '/journal/photos' },
   { label: 'Vaccines', to: '/journal/vaccines' }
 ]
-
-const COURSE_TAB_AFTER_END_DAYS = 56
 
 const route = useRoute()
 const { role } = await useAuth()
@@ -53,7 +52,7 @@ const { data: cyclesData } = await useCycles()
 const courseTab = computed(() => {
   const c = isotretinoinCycle(cyclesData.value ?? [], today.value)
   if (!c) return false
-  return cycleStatusOn(c, today.value) !== 'done' || diffDays(cycleEnd(c), today.value) <= COURSE_TAB_AFTER_END_DAYS
+  return cycleStatusOn(c, today.value) !== 'done' || diffDays(cycleEnd(c), today.value) <= PROCEDURE_DEFERRAL_DAYS
 })
 
 const tabs = computed(() =>

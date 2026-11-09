@@ -34,7 +34,7 @@
       :pending="!pageError && loading"
       :empty="!pageError && !loading && !course"
       empty-title="No isotretinoin course on file"
-      empty-description="Plan one on the Cycles page with Isotretinoin as its compound and this page fills itself from the dose log, the labs and the photos."
+      :empty-description="canEdit ? 'Plan one on the Cycles page with Isotretinoin as its compound and this page fills itself from the dose log, the labs and the photos.' : 'None is planned.'"
       @retry="retryAll"
     />
 
@@ -71,11 +71,11 @@
            own picture drawn from the log instead of their counter. -->
       <div class="px-4 sm:px-6 py-3.5 border-b border-line">
         <div class="flex items-baseline justify-between gap-3 text-meta text-muted">
-          <span><span class="text-hi num-display">{{ stats.cumulativeMg.toLocaleString() }}</span> mg logged<template v-if="stats.mgPerKg != null"> · <span class="text-hi num-display">{{ stats.mgPerKg }}</span> mg/kg at {{ stats.kg }} kg</template></span>
+          <span><span class="text-hi num-display">{{ stats.cumulativeMg.toLocaleString('en-US') }}</span> mg logged<template v-if="stats.mgPerKg != null"> · <span class="text-hi num-display">{{ stats.mgPerKg }}</span> mg/kg at {{ stats.kg }} kg</template></span>
           <span
             v-if="stats.upperMg"
             class="hidden sm:inline"
-          >{{ COURSE_TARGET_MG_PER_KG.lower }} mg/kg · {{ stats.lowerMg!.toLocaleString() }} mg &nbsp;│&nbsp; {{ COURSE_TARGET_MG_PER_KG.upper }} mg/kg · {{ stats.upperMg.toLocaleString() }} mg</span>
+          >{{ COURSE_TARGET_MG_PER_KG.lower }} mg/kg · {{ stats.lowerMg!.toLocaleString('en-US') }} mg &nbsp;│&nbsp; {{ COURSE_TARGET_MG_PER_KG.upper }} mg/kg · {{ stats.upperMg.toLocaleString('en-US') }} mg</span>
         </div>
         <div
           class="relative mt-2 h-2.5 bg-inset border border-line-soft"
@@ -380,7 +380,7 @@ import {
   baselineDrawDate, courseDoses, courseLabs, courseLadder, courseStats, isotretinoinCycle, photoStrip, plannedMgPerDay,
   recheckDraw, signalSummary, weeklySeries, type CourseMarkerRow
 } from '#shared/utils/accutane'
-import { cycleEnd } from '#shared/utils/cycles'
+import { cycleEnd, cycleProgress, isTentative } from '#shared/utils/cycles'
 import { shiftDays } from '#shared/utils/dates'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { photoCategoryLabel } from '#shared/utils/photoCategories'
@@ -396,8 +396,9 @@ useSeoMeta({ title: 'Journal · Accutane' })
 // the acne photo set the record, and the self-collecting streams the context. Nothing is stored
 // here; shared/utils/accutane.ts holds the arithmetic.
 
-const { role } = await useAuth()
+const { role, canEdit } = await useAuth()
 const today = useToday()
+const route = useRoute()
 // The photos list refuses the doctor role (the photos are that role's blind spot by design), so
 // the strip is simply not asked for.
 const showPhotos = role.value !== 'doctor'
@@ -435,7 +436,14 @@ async function retrySignals() {
 }
 const photosRes = showPhotos ? await usePhotoEntries() : null
 
-const course = computed(() => isotretinoinCycle(cyclesData.value ?? [], today.value))
+// The course asked for by `?cycle=<id>` (a cycle page's COURSE PAGE → link, so an older course
+// opens itself, not the current one), else the current course.
+const course = computed(() => {
+  const cycles = cyclesData.value ?? []
+  const asked = Number(route.query.cycle)
+  const picked = cycles.find(c => c.id === asked && !isTentative(c) && c.compounds.some(i => i.compound === ISOTRETINOIN))
+  return picked ?? isotretinoinCycle(cycles, today.value)
+})
 const entries = computed(() => journalData.value ?? [])
 const doses = computed(() => courseDoses(entries.value))
 const latestWeight = computed(() => [...entries.value].filter(e => e.weight_lbs != null).sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.weight_lbs ?? null)
@@ -457,7 +465,7 @@ const headerMeta = computed(() => {
 // --- stat cells ---
 const statCells = computed(() => {
   const s = stats.value!
-  const totalWeeks = Math.ceil((Date.parse(s.end) - Date.parse(s.start)) / 86_400_000 / 7)
+  const { totalWeeks } = cycleProgress(course.value!, today.value)
   return [
     {
       label: s.status === 'upcoming' ? 'Starts' : 'Day',
@@ -468,7 +476,7 @@ const statCells = computed(() => {
     },
     {
       label: 'Cumulative',
-      value: s.cumulativeMg.toLocaleString(),
+      value: s.cumulativeMg.toLocaleString('en-US'),
       unit: 'mg',
       class: s.cumulativeMg ? 'text-hi' : 'text-muted',
       note: s.mgPerKg != null ? `${s.mgPerKg} mg/kg · ${s.pctOfLower} % of the lower target` : 'log a weight for the mg/kg side'

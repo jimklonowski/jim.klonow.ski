@@ -190,7 +190,7 @@ const rows = computed(() => {
       value: wt.latest.value.toFixed(1),
       unit: 'lbs',
       title: [
-        wt.latest.date < asOf.value ? `last reading ${formatDate(wt.latest.date, 'monthDay')}` : 'scale this morning',
+        wt.latest.date < asOf.value ? `last reading ${formatDate(wt.latest.date, 'monthDay')}` : isToday.value ? 'scale this morning' : 'scale that morning',
         `trend ${wt.trend.toFixed(1)}`,
         rate != null ? `${fmtRate(rate)} over 14 days (${wt.ratePoints} weigh-ins, ${wt.confidence})` : `${wt.ratePoints} weigh-in${wt.ratePoints === 1 ? '' : 's'} in 14 days — four make a rate`
       ].join(' · '),
