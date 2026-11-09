@@ -433,6 +433,9 @@ export interface WeekPoint {
   index: number
   value: number | null
   n: number
+  /** A running count: the week has days left, so its sum can't be set beside full weeks (item 94).
+   * Only ever true for `sum` — a mean over a few days is still a level. */
+  partial: boolean
 }
 
 /**
@@ -444,7 +447,10 @@ export function weeklySeries(points: ReadonlyArray<{ date: string, value: number
   const firstIndex = -weeksBefore
   const lastIndex = today < start ? -1 : Math.floor(diffDays(start, today) / 7)
   const weeks: WeekPoint[] = []
-  for (let i = firstIndex; i <= lastIndex; i++) weeks.push({ from: shiftDays(start, i * 7), index: i, value: null, n: 0 })
+  for (let i = firstIndex; i <= lastIndex; i++) {
+    const from = shiftDays(start, i * 7)
+    weeks.push({ from, index: i, value: null, n: 0, partial: agg === 'sum' && shiftDays(from, 6) > today })
+  }
   const sums = new Map<number, number>()
   for (const p of points) {
     if (p.value == null || !Number.isFinite(p.value)) continue
@@ -474,7 +480,10 @@ export interface SignalSummary {
   markIndex: number | null
 }
 
-export function signalSummary(weeks: readonly WeekPoint[]): SignalSummary {
+export function signalSummary(allWeeks: readonly WeekPoint[]): SignalSummary {
+  // A week still running is left out everywhere: a Monday's one session is not a drop from
+  // last week's four.
+  const weeks = allWeeks.filter(w => !w.partial)
   const pre = weeks.filter(w => w.index < 0 && w.value != null).map(w => w.value!)
   const baseline = pre.length ? roundTo(pre.reduce((s, v) => s + v, 0) / pre.length, 1) : null
   const current = [...weeks].reverse().find(w => w.index >= 0 && w.value != null)?.value ?? null

@@ -301,12 +301,30 @@ test('a stream folds into course-relative weeks with a baseline band, and the su
   assert.equal(s.markIndex, 8)
   assert.deepEqual(s.values, [170, 170, 170, 170, 170, 170, 170, 173, 171, 171, 169])
 
-  // Counts sum; before the start there is no week 0 and no mark.
+  // Counts sum; before the start there is no week 0 and no mark. Week −1 still has a day to run,
+  // so its count is partial.
   const workouts = weeklySeries([{ date: '2026-10-31', value: 1 }, { date: '2026-11-02', value: 1 }], start, '2026-11-05', 'sum')
   assert.equal(workouts.at(-1).index, -1)
   assert.equal(workouts.at(-1).value, 2)
+  assert.equal(workouts.at(-1).partial, true)
   const ws = signalSummary(workouts)
   assert.equal(ws.markIndex, null)
   assert.equal(ws.current, null)
   assert.deepEqual(signalSummary(weeklySeries([], start, '2026-11-22')).values, [])
+  assert.ok(weeks.every(w => !w.partial), 'a mean is a level: never partial')
+
+  // Item 94: on a Wednesday the running week's one session is not "current" — the last complete
+  // week is, and the sparkline stops there too.
+  const sessions = ['2026-10-26', '2026-10-28', '2026-10-30', '2026-11-02', '2026-11-04', '2026-11-07', '2026-11-09', '2026-11-11', '2026-11-15']
+    .map(date => ({ date, value: 1 }))
+  const wk = weeklySeries(sessions, start, '2026-11-18', 'sum')
+  assert.deepEqual(wk.slice(-3).map(w => [w.index, w.value, w.partial]), [[-1, 2, false], [0, 3, false], [1, 1, true]])
+  const sum = signalSummary(wk)
+  assert.equal(sum.current, 3, 'week 0, the last complete week')
+  assert.equal(sum.baseline, 2.5, 'weeks −2 and −1')
+  assert.equal(sum.delta, 0.5)
+  assert.equal(sum.values.length, wk.length - 1, 'the running week is not drawn')
+  assert.equal(sum.markIndex, 8)
+  // Sunday, the week's last day: complete, so it counts.
+  assert.equal(weeklySeries(sessions, start, '2026-11-20', 'sum').at(-1).partial, false)
 })
