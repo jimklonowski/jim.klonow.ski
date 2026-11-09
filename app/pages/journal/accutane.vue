@@ -122,13 +122,13 @@
               >
                 <span
                   class="num-display text-small w-14 shrink-0 tabular-nums"
-                  :class="rung.state === 'done' ? 'text-accent' : rung.state === 'here' ? 'text-warn' : 'text-muted'"
+                  :class="rung.state === 'done' ? 'text-accent' : rung.state === 'here' ? 'text-warn' : rung.state === 'missed' ? 'text-danger' : 'text-muted'"
                 >{{ rung.date ? formatDate(rung.date, 'monthDay') : '—' }}</span>
                 <span class="min-w-0 flex-1">
                   <span
                     class="block text-small uppercase tracking-[0.08em]"
-                    :class="rung.state === 'done' ? 'text-accent' : rung.state === 'here' ? 'text-warn' : 'text-dim'"
-                  >{{ rung.state === 'done' ? '✓ ' : rung.state === 'here' ? '◀ ' : '' }}{{ rung.label }}</span>
+                    :class="rung.state === 'done' ? 'text-accent' : rung.state === 'here' ? 'text-warn' : rung.state === 'missed' ? 'text-danger' : 'text-dim'"
+                  >{{ rung.state === 'done' ? '✓ ' : rung.state === 'here' ? '◀ ' : rung.state === 'missed' ? '✕ ' : '' }}{{ rung.label }}</span>
                   <span class="block text-meta text-muted leading-[1.6]">{{ rung.detail }}</span>
                 </span>
               </div>
@@ -370,6 +370,7 @@ import { shiftDays } from '#shared/utils/dates'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { photoCategoryLabel } from '#shared/utils/photoCategories'
 import { photoSet } from '#shared/utils/photoSets'
+import { plannedDrawStates } from '#shared/utils/plannedDraws'
 import { BIOMARKERS } from '~/data/biomarkers'
 import { COMPOUND_INFO, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 
@@ -466,9 +467,11 @@ const baselineDate = computed(() => course.value ? baselineDrawDate(labs.value, 
 const recheck = computed(() => {
   const c = course.value
   if (!c) return null
-  // The cycle's own planned draws first; any other planned draw in the window still counts.
-  const planned = (plannedData.value ?? []).filter(p => p.cycle_id === c.id || p.cycle_id == null).map(p => p.date)
-  return recheckDraw(labs.value.map(l => l.date), planned, c.start_date)
+  // The cycle's own planned draws and any unassigned one, with their standing (a plan past its
+  // date with no draw reads missed, and the ladder says so instead of "planned").
+  const plans = (plannedData.value ?? []).filter(p => p.cycle_id === c.id || p.cycle_id == null)
+  const states = plannedDrawStates(plans, labs.value.map(l => l.date), today.value).map(s => ({ date: s.plan.date, status: s.status }))
+  return recheckDraw(labs.value, states, c.start_date)
 })
 const rungs = computed(() => stats.value ? courseLadder(stats.value, today.value, baselineDate.value, recheck.value) : [])
 const courseRungs = computed(() => rungs.value.filter(r => r.tier === 'course'))

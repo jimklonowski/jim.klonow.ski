@@ -7,6 +7,7 @@
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { cycleEnd, cycleStatusOn, isTentative, type Cycle } from './cycles.ts'
 import { diffDays, roundTo, shiftDays } from './dates.ts'
+import { OVERDUE_DAYS, type PlannedDrawStatus } from './plannedDraws.ts'
 
 export const ISOTRETINOIN = 'Isotretinoin'
 
@@ -197,7 +198,8 @@ export function donationDeferral(cycles: readonly Cycle[], date: string): Donati
 // --- the ladder ---
 
 export type RungTier = 'course' | 'typical'
-export type RungState = 'done' | 'here' | 'upcoming'
+/** `missed`: the rung can no longer be completed as written (item 91) — it never takes "here". */
+export type RungState = 'done' | 'here' | 'upcoming' | 'missed'
 
 export interface CourseRung {
   key: string
@@ -211,8 +213,11 @@ export interface CourseRung {
 
 export interface RecheckDraw {
   date: string
-  /** True once a lab draw is on file for it, false while it is only planned. */
+  /** True once a lab draw with the course markers is on file for it, false while it is only planned. */
   onFile: boolean
+  /** The plan's standing when not on file: booked ahead, due today, past its date, missed (no
+   * draw within OVERDUE_DAYS), or done by a draw that carried none of the course markers. */
+  planStatus?: PlannedDrawStatus
 }
 
 /** The first recheck: weeks 3–10 of the course (the lipid and liver moves show by week 4–8). */
@@ -227,21 +232,47 @@ export const RECHECK_WINDOW_DAYS = { from: 14, to: 70 } as const
 export function courseLadder(stats: CourseStats, today: string, baselineDrawDate: string | null, recheck: RecheckDraw | null): CourseRung[] {
   const { start, end } = stats
   const done = (date: string | null) => date != null && date <= today
-  const course: Array<Omit<CourseRung, 'tier' | 'state'> & { done: boolean }> = [
+  // A baseline is a draw BEFORE capsule one: once the course has started, none can be taken.
+  const baselineMissed = baselineDrawDate == null && today >= start
+  // The recheck window; a plan missed inside it, or one fulfilled by a draw without the course
+  // markers, or the window gone by with nothing, can't be completed as written.
+  const windowPassed = today > shiftDays(start, RECHECK_WINDOW_DAYS.to)
+  const recheckPlanFailed = recheck != null && !recheck.onFile && (recheck.planStatus === 'missed' || recheck.planStatus === 'done')
+  const recheckMissed = recheck?.onFile !== true && (recheckPlanFailed || (recheck == null && windowPassed))
+  const recheckDetail = recheck?.onFile
+    ? 'lipids and liver, on file'
+    : recheck?.planStatus === 'done'
+      ? 'that draw carried no lipids or liver — book them'
+      : recheck?.planStatus === 'missed'
+        ? `planned, no draw within ${OVERDUE_DAYS} days — book again`
+        : recheck?.planStatus === 'overdue'
+          ? 'planned — overdue, no draw on file yet'
+          : recheck
+            ? 'planned — lipids, liver, CBC, CK'
+            : windowPassed
+              ? 'weeks 3–10 passed without lipids and liver — book them now'
+              : 'weeks 4–8 — book lipids, liver, CBC and CK'
+  const course: Array<Omit<CourseRung, 'tier' | 'state'> & { done: boolean, missed?: boolean }> = [
     {
       key: 'baseline',
       label: 'baseline draw',
-      detail: baselineDrawDate ? 'lipids and liver before capsule one, on file' : `none on file — a draw in the ${COURSE_BASELINE_LOOKBACK_DAYS} days before the start counts`,
+      detail: baselineDrawDate
+        ? 'lipids and liver before capsule one, on file'
+        : baselineMissed
+          ? `none in the ${COURSE_BASELINE_LOOKBACK_DAYS} days before the start — the first recheck is the earliest reading now`
+          : `none on file — a draw in the ${COURSE_BASELINE_LOOKBACK_DAYS} days before the start counts`,
       date: baselineDrawDate,
-      done: baselineDrawDate != null
+      done: baselineDrawDate != null,
+      missed: baselineMissed
     },
     { key: 'start', label: 'capsule one', detail: `${stats.paceMgPerDay ? `${stats.currentMgPerDay ?? stats.paceMgPerDay} mg a day` : 'dose as logged'}`, date: start, done: done(start) },
     {
       key: 'recheck',
       label: 'first recheck',
-      detail: recheck ? (recheck.onFile ? 'lipids and liver, on file' : 'planned — lipids, liver, CBC, CK') : 'weeks 4–8 — book lipids, liver, CBC and CK',
+      detail: recheckDetail,
       date: recheck?.date ?? null,
-      done: recheck?.onFile === true
+      done: recheck?.onFile === true,
+      missed: recheckMissed
     },
     {
       key: 'lower',
@@ -261,14 +292,15 @@ export function courseLadder(stats: CourseStats, today: string, baselineDrawDate
     { key: 'donation', label: 'blood donation ok', detail: `${DONATION_DEFERRAL_DAYS} days after the last dose`, date: shiftDays(end, DONATION_DEFERRAL_DAYS), done: today > shiftDays(end, DONATION_DEFERRAL_DAYS) },
     { key: 'procedures', label: 'wax · laser ok', detail: `${PROCEDURE_DEFERRAL_DAYS} days after the last dose — the skin scars easily until then`, date: shiftDays(end, PROCEDURE_DEFERRAL_DAYS), done: today > shiftDays(end, PROCEDURE_DEFERRAL_DAYS) }
   ]
+  // "Here" is the first rung still open — a missed one is passed over, not sat on.
   let hereTaken = false
   const courseRungs: CourseRung[] = course.map((r) => {
-    let state: RungState = r.done ? 'done' : 'upcoming'
-    if (!r.done && !hereTaken) {
+    let state: RungState = r.done ? 'done' : r.missed ? 'missed' : 'upcoming'
+    if (state === 'upcoming' && !hereTaken) {
       state = 'here'
       hereTaken = true
     }
-    const { done: _done, ...rest } = r
+    const { done: _done, missed: _missed, ...rest } = r
     return { ...rest, tier: 'course', state }
   })
 
@@ -323,27 +355,36 @@ export function courseLabs(labs: readonly LabDraw[], start: string): CourseMarke
   })
 }
 
+/** A draw carrying any marker the course watches — the only kind that can be its baseline or
+ * its recheck (item 90: a hormone-only panel or an echo in the window is not the recheck). */
+export function hasCourseMarkers(draw: LabDraw): boolean {
+  return COURSE_MARKERS.some(k => draw.markers[k] != null)
+}
+
 /** The day the pre-course panel was drawn: the latest lookback draw carrying any course marker. */
 export function baselineDrawDate(labs: readonly LabDraw[], start: string): string | null {
   const lookbackFrom = shiftDays(start, -COURSE_BASELINE_LOOKBACK_DAYS)
   return [...labs]
-    .filter(d => d.date < start && d.date >= lookbackFrom && COURSE_MARKERS.some(k => d.markers[k] != null))
+    .filter(d => d.date < start && d.date >= lookbackFrom && hasCourseMarkers(d))
     .sort((a, b) => a.date.localeCompare(b.date))
     .at(-1)?.date ?? null
 }
 
 /**
- * The first recheck: a lab draw inside the recheck window if one is on file, else the earliest
- * planned draw inside it (the cycle's own, or any), else null.
+ * The first recheck: the earliest draw with the course markers inside the recheck window if
+ * one is on file; else the earliest planned draw inside it still open (booked, today, overdue);
+ * else the latest plan inside it that failed (missed, or done by a draw without the markers),
+ * so the ladder can say so; else null.
  */
-export function recheckDraw(labDates: readonly string[], plannedDates: readonly string[], start: string): RecheckDraw | null {
+export function recheckDraw(labs: readonly LabDraw[], planned: ReadonlyArray<{ date: string, status: PlannedDrawStatus }>, start: string): RecheckDraw | null {
   const from = shiftDays(start, RECHECK_WINDOW_DAYS.from)
   const to = shiftDays(start, RECHECK_WINDOW_DAYS.to)
   const inWindow = (d: string) => d >= from && d <= to
-  const onFile = [...labDates].filter(inWindow).sort()[0]
+  const onFile = labs.filter(d => inWindow(d.date) && hasCourseMarkers(d)).map(d => d.date).sort()[0]
   if (onFile) return { date: onFile, onFile: true }
-  const planned = [...plannedDates].filter(inWindow).sort()[0]
-  return planned ? { date: planned, onFile: false } : null
+  const plans = planned.filter(p => inWindow(p.date)).sort((a, b) => a.date.localeCompare(b.date))
+  const pick = plans.find(p => p.status !== 'missed' && p.status !== 'done') ?? plans.at(-1)
+  return pick ? { date: pick.date, onFile: false, planStatus: pick.status } : null
 }
 
 // --- the photos ---

@@ -143,10 +143,33 @@ test('the ladder has a course tier dated by the data and a typical tier pinned t
   assert.equal(byL.recheck.state, 'done')
   assert.equal(byL.labs.state, 'done')
   assert.equal(byL.improve.state, 'here')
-  // No baseline and no recheck: the rungs say what to do rather than vanish.
+  // No baseline and no recheck on day two: a baseline can't be drawn any more, so it reads
+  // missed (never "here") and "here" moves on to the recheck, which says what to book (item 91).
   const bare = courseLadder(stats, '2026-11-08', null, null)
-  assert.equal(bare.find(r => r.key === 'baseline').state, 'here')
+  assert.equal(bare.find(r => r.key === 'baseline').state, 'missed')
+  assert.match(bare.find(r => r.key === 'baseline').detail, /earliest reading now/)
+  assert.equal(bare.find(r => r.key === 'recheck').state, 'here')
   assert.match(bare.find(r => r.key === 'recheck').detail, /book/)
+  assert.equal(bare.filter(r => r.tier === 'course' && r.state === 'here').length, 1)
+  // Before the start a missing baseline is still "here": there is time to draw one.
+  const pre = courseLadder(courseStats(course, [], 170.5, '2026-11-01', 40), '2026-11-01', null, null)
+  assert.equal(pre.find(r => r.key === 'baseline').state, 'here')
+  assert.equal(pre.filter(r => r.tier === 'course' && r.state === 'here').length, 1)
+  // Week 13 with no recheck at all: the window has gone by — missed, and "here" sits on 150 mg/kg.
+  const late = courseLadder(stats, '2027-02-01', '2026-10-17', null)
+  const byLate = Object.fromEntries(late.map(r => [r.key, r]))
+  assert.equal(byLate.recheck.state, 'missed')
+  assert.match(byLate.recheck.detail, /passed without/)
+  assert.equal(byLate.lower.state, 'here')
+  // A plan missed inside the window; a plan done by a draw without the course markers; an
+  // overdue plan is still the live rung.
+  assert.equal(courseLadder(stats, '2027-01-05', '2026-10-17', { date: '2026-12-15', onFile: false, planStatus: 'missed' }).find(r => r.key === 'recheck').state, 'missed')
+  const noLipids = courseLadder(stats, '2027-01-05', '2026-10-17', { date: '2026-12-15', onFile: false, planStatus: 'done' }).find(r => r.key === 'recheck')
+  assert.equal(noLipids.state, 'missed')
+  assert.match(noLipids.detail, /no lipids or liver/)
+  const overdue = courseLadder(stats, '2026-12-20', '2026-10-17', { date: '2026-12-15', onFile: false, planStatus: 'overdue' }).find(r => r.key === 'recheck')
+  assert.equal(overdue.state, 'here')
+  assert.match(overdue.detail, /overdue/)
 })
 
 test('the labs panel diffs each marker against the latest pre-course reading inside the lookback', () => {
@@ -176,11 +199,21 @@ test('the labs panel diffs each marker against the latest pre-course reading ins
   assert.equal(baselineDrawDate(labs, '2027-06-01'), null, 'an on-course draw is nobody\'s baseline')
 })
 
-test('the first recheck is a draw on file inside weeks 3–10, else the earliest planned one', () => {
+test('the first recheck is a draw WITH the course markers inside weeks 3–10, else the earliest open plan, else a failed plan to report', () => {
+  const lipids = date => ({ date, markers: { triglycerides: 100, ldl: 110 } })
+  const hormones = date => ({ date, markers: { testosterone_total: 800, estradiol: 30 } })
+  const plan = (date, status = 'upcoming') => ({ date, status })
   assert.equal(recheckDraw([], [], '2026-11-07'), null)
-  assert.deepEqual(recheckDraw([], ['2026-12-15', '2026-12-01'], '2026-11-07'), { date: '2026-12-01', onFile: false })
-  assert.deepEqual(recheckDraw(['2026-10-17', '2026-12-20'], ['2026-12-15'], '2026-11-07'), { date: '2026-12-20', onFile: true })
-  assert.equal(recheckDraw(['2026-11-10'], [], '2026-11-07'), null, 'day three is too early to be the recheck')
+  assert.deepEqual(recheckDraw([], [plan('2026-12-15'), plan('2026-12-01')], '2026-11-07'), { date: '2026-12-01', onFile: false, planStatus: 'upcoming' })
+  assert.deepEqual(recheckDraw([lipids('2026-10-17'), lipids('2026-12-20')], [plan('2026-12-15')], '2026-11-07'), { date: '2026-12-20', onFile: true })
+  assert.equal(recheckDraw([lipids('2026-11-10')], [], '2026-11-07'), null, 'day three is too early to be the recheck')
+  // Item 90: a hormone-only panel or an echo inside the window is not the recheck.
+  assert.deepEqual(recheckDraw([hormones('2026-12-10')], [plan('2026-12-15')], '2026-11-07'), { date: '2026-12-15', onFile: false, planStatus: 'upcoming' })
+  assert.equal(recheckDraw([hormones('2026-12-10'), { date: '2026-12-12', markers: {} }], [], '2026-11-07'), null)
+  // An open plan beats a missed one; a lone failed plan is handed back so the ladder can say so.
+  assert.deepEqual(recheckDraw([], [plan('2026-12-01', 'missed'), plan('2027-01-10', 'overdue')], '2026-11-07'), { date: '2027-01-10', onFile: false, planStatus: 'overdue' })
+  assert.deepEqual(recheckDraw([], [plan('2026-12-01', 'missed')], '2026-11-07'), { date: '2026-12-01', onFile: false, planStatus: 'missed' })
+  assert.deepEqual(recheckDraw([hormones('2026-12-01')], [plan('2026-12-01', 'done')], '2026-11-07'), { date: '2026-12-01', onFile: false, planStatus: 'done' })
 })
 
 test('the photo strip knows each region\'s newest shot and when the last session was', () => {
