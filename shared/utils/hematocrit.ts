@@ -144,21 +144,36 @@ export interface PhlebotomyEffect {
   phlebotomy: Phlebotomy
   /** The last hematocrit reading on or before the visit. */
   before: { date: string, value: number } | null
-  /** The first hematocrit reading after it. */
+  /** The first hematocrit reading after it — after the group's last visit when it shares one. */
   after: { date: string, value: number } | null
-  /** after − before, one decimal; null without both. */
+  /** after − before, one decimal; null without both. A shared group's combined change. */
   hctDelta: number | null
+  /** The other visits with no Hct draw between them and this one: the delta is theirs together. */
+  sharedWith: string[]
 }
 
-/** What each visit bought: the Hct draw before it against the first draw after. */
+/**
+ * What each visit bought: the Hct draw before it against the first draw after. Visits with no
+ * draw between them are one group (item 88): no reading can split the drop between them, so
+ * each carries the group's before, after and combined delta, and names the others it shares
+ * with — never one drop credited twice. A draw on a visit's own day counts as before it.
+ */
 export function phlebotomyEffects(phlebotomies: Phlebotomy[], draws: HctDraw[]): PhlebotomyEffect[] {
   const hct = draws.filter((d): d is HctDraw & { hematocrit: number } => d.hematocrit != null)
-  return [...phlebotomies].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id).map((p) => {
-    const b = hct.filter(d => d.date <= p.date).at(-1) ?? null
-    const a = hct.find(d => d.date > p.date) ?? null
+  const drawBetween = (from: string, to: string) => hct.some(d => d.date > from && d.date <= to)
+  const groups: Phlebotomy[][] = []
+  for (const p of [...phlebotomies].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
+    const group = groups.at(-1)
+    if (group && !drawBetween(group.at(-1)!.date, p.date)) group.push(p)
+    else groups.push([p])
+  }
+  return groups.flatMap((group) => {
+    const b = hct.filter(d => d.date <= group[0]!.date).at(-1) ?? null
+    const a = hct.find(d => d.date > group.at(-1)!.date) ?? null
     const before = b ? { date: b.date, value: b.hematocrit } : null
     const after = a ? { date: a.date, value: a.hematocrit } : null
-    return { phlebotomy: p, before, after, hctDelta: before && after ? roundTo(after.value - before.value, 1) : null }
+    const hctDelta = before && after ? roundTo(after.value - before.value, 1) : null
+    return group.map(p => ({ phlebotomy: p, before, after, hctDelta, sharedWith: group.filter(o => o !== p).map(o => o.date) }))
   })
 }
 

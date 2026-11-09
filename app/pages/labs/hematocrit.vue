@@ -249,6 +249,11 @@
                   :class="e.hctDelta != null && e.hctDelta < 0 ? 'text-accent' : 'text-dim'"
                 >Hct {{ e.before ? fmt(e.before.value) : '—' }} → {{ e.after ? fmt(e.after.value) : 'no draw yet' }}{{ e.hctDelta != null ? ` (${e.hctDelta > 0 ? '+' : ''}${e.hctDelta})` : '' }}</span>
                 <span
+                  v-if="e.sharedWith.length"
+                  class="text-small text-faint"
+                  :title="`No hematocrit draw between these visits, so ${e.after ? 'that change belongs to them together' : 'the next draw will read them together'}`"
+                >together with {{ e.sharedWith.map(d => formatDate(d, 'monthDay')).join(', ') }}</span>
+                <span
                   v-if="e.phlebotomy.notes"
                   class="text-small text-faint"
                 >{{ e.phlebotomy.notes }}</span>

@@ -84,16 +84,36 @@ test('what a phlebotomy bought: the reading before it against the first after', 
   const draws = hctDraws([
     { date: '2026-09-09', markers: { hematocrit: 51.7 } },
     { date: '2026-10-17', markers: { hematocrit: 51.7 } },
-    { date: '2026-12-01', markers: { hematocrit: 48.9 } }
+    { date: '2026-12-01', markers: { hematocrit: 48.9 } },
+    { date: '2027-01-20', markers: { hematocrit: 47.5 } }
   ])
   const p = (id, date, over = {}) => ({ id, date, kind: 'donation', ml: 500, pre_hgb: null, notes: null, created_at: 'x', ...over })
-  const effects = phlebotomyEffects([p(2, '2026-11-20'), p(1, '2026-10-17')], draws)
-  assert.deepEqual(effects.map(e => [e.phlebotomy.id, e.before?.value, e.after?.value, e.hctDelta]), [
-    [1, 51.7, 48.9, -2.8], // same-day draw counts as "before"
-    [2, 51.7, 48.9, -2.8]
+  const row = e => [e.phlebotomy.id, e.before?.value, e.after?.value, e.hctDelta, e.sharedWith]
+  // One visit between two draws: its own change; a same-day draw counts as "before".
+  assert.deepEqual(phlebotomyEffects([p(1, '2026-10-17')], draws).map(row), [[1, 51.7, 48.9, -2.8, []]])
+  // Two visits with no draw between them: one combined −2.8, named as shared — not −2.8 twice.
+  assert.deepEqual(phlebotomyEffects([p(2, '2026-11-20'), p(1, '2026-10-17')], draws).map(row), [
+    [1, 51.7, 48.9, -2.8, ['2026-11-20']],
+    [2, 51.7, 48.9, -2.8, ['2026-10-17']]
   ])
-  assert.equal(phlebotomyEffects([p(3, '2026-12-15')], draws)[0].after, null)
-  assert.equal(phlebotomyEffects([p(3, '2026-12-15')], draws)[0].hctDelta, null)
+  // A draw between them splits them: each its own before and after.
+  assert.deepEqual(phlebotomyEffects([p(1, '2026-10-17'), p(2, '2026-12-05')], draws).map(row), [
+    [1, 51.7, 48.9, -2.8, []],
+    [2, 48.9, 47.5, -1.4, []]
+  ])
+  // A draw on the later visit's own day is "before" that visit, so it splits them too.
+  assert.deepEqual(phlebotomyEffects([p(1, '2026-10-17'), p(2, '2026-12-01')], draws).map(row), [
+    [1, 51.7, 48.9, -2.8, []],
+    [2, 48.9, 47.5, -1.4, []]
+  ])
+  // Three in a row, the last still waiting for its draw: grouped, no delta yet.
+  const waiting = phlebotomyEffects([p(3, '2027-02-01'), p(4, '2027-03-01'), p(5, '2027-04-01')], draws)
+  assert.deepEqual(waiting.map(row), [
+    [3, 47.5, undefined, null, ['2027-03-01', '2027-04-01']],
+    [4, 47.5, undefined, null, ['2027-02-01', '2027-04-01']],
+    [5, 47.5, undefined, null, ['2027-02-01', '2027-03-01']]
+  ])
+  assert.equal(phlebotomyEffects([p(3, '2027-02-15')], draws)[0].after, null)
 })
 
 test('the iron ledger: 500 mL out is ~250 mg; oral iron counts at 15 % absorbed; spans clip to the window', () => {
