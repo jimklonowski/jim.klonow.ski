@@ -5,7 +5,7 @@
 // tests/accutane.test.mjs pins every rule.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
-import { cycleEnd, cycleStatusOn, isTentative, type Cycle } from './cycles.ts'
+import { BASELINE_LOOKBACK_DAYS, cycleEnd, cycleStatusOn, isTentative, type Cycle } from './cycles.ts'
 import { diffDays, roundTo, shiftDays } from './dates.ts'
 import { OVERDUE_DAYS, type PlannedDrawStatus } from './plannedDraws.ts'
 
@@ -17,10 +17,8 @@ export const COURSE_TARGET_MG_PER_KG = { lower: 150, upper: 220 } as const
 export const RESEARCH_TARGET_MG_PER_KG = { lower: 120, upper: 150 } as const
 
 export const LBS_PER_KG = 2.20462
-/** A pre-course draw this old still reads as the baseline the on-course lipids are diffed against.
- *  (Named apart from cycles.ts's BASELINE_LOOKBACK_DAYS: shared/utils is auto-imported, and two
- *  exports of one name silently drop one of them.) */
-export const COURSE_BASELINE_LOOKBACK_DAYS = 90
+// The baseline lookback is cycles.ts's BASELINE_LOOKBACK_DAYS — one rule for the course, the
+// cycle dossier and the prompts (item 93).
 /** The acne photo set wants a session at least this often; older and the strip's chip goes amber. */
 export const STALE_PHOTO_DAYS = 14
 /**
@@ -262,8 +260,8 @@ export function courseLadder(stats: CourseStats, today: string, baselineDrawDate
       detail: baselineDrawDate
         ? 'lipids and liver before capsule one, on file'
         : baselineMissed
-          ? `none in the ${COURSE_BASELINE_LOOKBACK_DAYS} days before the start — the first recheck is the earliest reading now`
-          : `none on file — a draw in the ${COURSE_BASELINE_LOOKBACK_DAYS} days before the start counts`,
+          ? `none in the ${BASELINE_LOOKBACK_DAYS} days before the start — the first recheck is the earliest reading now`
+          : `none on file — a draw in the ${BASELINE_LOOKBACK_DAYS} days before the start counts`,
       date: baselineDrawDate,
       done: baselineDrawDate != null,
       missed: baselineMissed
@@ -347,7 +345,7 @@ type LabDraw = { date: string, markers: Record<string, number | null | undefined
  * day when `end` is given; a draw after it is recovery, not the drug's effect. */
 export function courseLabs(labs: readonly LabDraw[], start: string, end: string | null = null): CourseMarkerRow[] {
   const sorted = [...labs].sort((a, b) => a.date.localeCompare(b.date))
-  const lookbackFrom = shiftDays(start, -COURSE_BASELINE_LOOKBACK_DAYS)
+  const lookbackFrom = shiftDays(start, -BASELINE_LOOKBACK_DAYS)
   return COURSE_MARKERS.map((key) => {
     const readings = sorted.flatMap(d => (d.markers[key] != null && Number.isFinite(d.markers[key]) ? [{ date: d.date, value: d.markers[key] as number }] : []))
     const baseline = readings.filter(r => r.date < start && r.date >= lookbackFrom).at(-1) ?? null
@@ -367,7 +365,7 @@ export function hasCourseMarkers(draw: LabDraw): boolean {
 
 /** The day the pre-course panel was drawn: the latest lookback draw carrying any course marker. */
 export function baselineDrawDate(labs: readonly LabDraw[], start: string): string | null {
-  const lookbackFrom = shiftDays(start, -COURSE_BASELINE_LOOKBACK_DAYS)
+  const lookbackFrom = shiftDays(start, -BASELINE_LOOKBACK_DAYS)
   return [...labs]
     .filter(d => d.date < start && d.date >= lookbackFrom && hasCourseMarkers(d))
     .sort((a, b) => a.date.localeCompare(b.date))

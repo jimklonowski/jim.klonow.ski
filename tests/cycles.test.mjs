@@ -154,7 +154,7 @@ test('checkpoints: windows, baseline picks the freshest pre-start draw', () => {
   const states = checkpointStates(c, ['2026-07-20', '2026-08-30', '2026-11-02'], '2026-11-10')
   const byKey = Object.fromEntries(states.map(s => [s.key, s]))
 
-  assert.equal(byKey.baseline.drawDate, '2026-08-30') // latest inside the 45d window
+  assert.equal(byKey.baseline.drawDate, '2026-08-30') // latest inside the 90d window (Jul 20 is inside too, but older)
   assert.equal(byKey.baseline.state, 'done')
   assert.equal(byKey.mid.drawDate, '2026-11-02') // mid ≈ day 56 → window covers Oct 30–Nov 19
   assert.equal(byKey.end.state, 'upcoming')

@@ -80,8 +80,14 @@ export type CycleRule = ProtocolRule
  * Keys match app/data/biomarkers.ts. */
 export const GATING_MARKERS = ['hdl', 'ldl', 'alt', 'ast', 'hematocrit', 'ferritin', 'estradiol']
 
-/** How stale a draw may be and still read as a cycle's pre-start baseline. */
-export const BASELINE_LOOKBACK_DAYS = 45
+/**
+ * How stale a draw may be and still read as a pre-start baseline — for a cycle's checkpoints,
+ * the dossier, the prompts and the isotretinoin course alike (audit #43 item 93: the course used
+ * 90 and the rest 45, so one page said "baseline on file" while another said there was none).
+ * 90: draws run six to eight weeks apart, and the markers a baseline is diffed for move on the
+ * scale of weeks, not days.
+ */
+export const BASELINE_LOOKBACK_DAYS = 90
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
