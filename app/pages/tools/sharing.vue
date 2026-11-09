@@ -228,6 +228,87 @@
       />
     </section>
 
+    <!-- Calendar feed (audit #43 item 58): the one link a phone's calendar subscribes to -->
+    <section class="px-4 sm:px-6 pb-4">
+      <div class="bg-raised border border-line-soft px-3.5 py-3">
+        <TuiHeader
+          label="CALENDAR FEED"
+          :dashes="6"
+        >
+          <span class="text-label text-muted normal-case">subscribe once · updates itself</span>
+        </TuiHeader>
+        <p class="mt-2 text-small leading-[1.7] text-dim">
+          Planned draws with an alarm the evening before and their prep days, cycle checkpoint
+          windows, the course's dated steps, booster due dates and the CBC six weeks after a
+          phlebotomy, as all-day events. Titles are generic ("Lab draw", "Booster due") because a
+          subscribed calendar syncs on to whatever the phone shares calendars with; the detail is
+          in each event's notes.
+        </p>
+        <p
+          v-if="calendarError"
+          class="mt-2.5 text-small text-danger"
+        >
+          Couldn't load the feed link.
+          <button
+            type="button"
+            class="text-accent hover:text-accent-hover cursor-pointer"
+            @click="() => refreshCalendar()"
+          >
+            retry ⟳
+          </button>
+        </p>
+        <p
+          v-else-if="calendar && !calendar.configured"
+          class="mt-2.5 text-small text-warn leading-[1.7]"
+        >
+          Not switched on: set the <code class="text-hi">CALENDAR_TOKEN</code> secret (see
+          <code class="text-hi">.env.example</code>) and the subscribe link appears here.
+        </p>
+        <div
+          v-else-if="calendar?.webcal"
+          class="flex flex-col sm:flex-row sm:items-center gap-3 mt-2.5 pt-3 border-t border-line-soft"
+        >
+          <!-- Scan on the phone: iOS and Android both open a webcal:// link in the calendar app. -->
+          <svg
+            v-if="calendarQr"
+            class="shrink-0 w-40 h-40 self-center sm:self-auto"
+            :viewBox="`0 0 ${calendarQr.size} ${calendarQr.size}`"
+            shape-rendering="crispEdges"
+            role="img"
+            aria-label="QR code for the calendar feed"
+          >
+            <rect
+              :width="calendarQr.size"
+              :height="calendarQr.size"
+              fill="#e6f2ec"
+            />
+            <path
+              :d="calendarQr.path"
+              fill="#070a09"
+            />
+          </svg>
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <code class="flex-1 min-w-0 truncate text-small text-hi">{{ calendar.webcal }}</code>
+              <button
+                type="button"
+                class="tui-btn shrink-0"
+                @click="copyCalendar"
+              >
+                {{ calendarCopied ? '✓ COPIED' : 'COPY' }}
+              </button>
+            </div>
+            <p class="mt-1.5 text-meta text-muted leading-[1.6]">
+              On the phone: Settings → Calendar → Accounts → Add Subscribed Calendar, or scan the
+              code. The link holds the token, so treat it like a password — rotating
+              <code>CALENDAR_TOKEN</code> cuts off every subscribed calendar at once. Calendars
+              re-fetch every few hours; a new draw booked here shows up on the next refresh.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Owner sessions -->
     <section class="px-4 sm:px-6 pb-6">
       <div class="bg-raised border border-line-soft px-3.5 py-3">
@@ -288,15 +369,34 @@ const toast = useToast()
 // The link as a QR code: one SVG path with a 1×1 square per dark module, plus a 4-module quiet
 // zone (the spec's minimum). Medium error correction survives a scuffed phone screen.
 const QR_QUIET_ZONE = 4
-const createdQr = computed(() => {
-  if (!createdLink.value) return null
-  const { data, size } = encode(createdLink.value, { ecc: 'M', border: QR_QUIET_ZONE })
+function qrOf(text: string | null | undefined) {
+  if (!text) return null
+  const { data, size } = encode(text, { ecc: 'M', border: QR_QUIET_ZONE })
   let path = ''
   data.forEach((row, y) => row.forEach((dark, x) => {
     if (dark) path += `M${x} ${y}h1v1h-1z`
   }))
   return { size, path }
-})
+}
+const createdQr = computed(() => qrOf(createdLink.value))
+
+// The calendar feed's subscribe link (owner-only endpoint; the token is a Worker secret).
+const { data: calendar, error: calendarError, refresh: refreshCalendar } = await useAsyncData('calendar-url', () => useRequestFetch()<{ configured: boolean, url: string | null, webcal: string | null }>('/api/calendar/url'))
+const calendarQr = computed(() => qrOf(calendar.value?.webcal))
+const calendarCopied = ref(false)
+async function copyCalendar() {
+  if (!calendar.value?.webcal) return
+  try {
+    await navigator.clipboard.writeText(calendar.value.webcal)
+    calendarCopied.value = true
+    setTimeout(() => {
+      calendarCopied.value = false
+    }, 2000)
+  }
+  catch {
+    toast.add({ title: 'Copy it by hand', description: 'The clipboard was blocked; the link is shown above.', color: 'warning' })
+  }
+}
 
 const { data, error: invitesError, refresh } = await useAsyncData('invites', () => useRequestFetch()<Invite[]>('/api/auth/invites'))
 

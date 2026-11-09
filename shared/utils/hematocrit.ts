@@ -33,6 +33,8 @@ export const PHLEBOTOMY_KINDS: Array<{ value: PhlebotomyKind, label: string }> =
 
 /** What a whole-blood donation removes when no volume was recorded. */
 export const DEFAULT_DONATION_ML = 500
+/** A CBC this long after a phlebotomy shows what it bought (the calendar feed books it). */
+export const PHLEBOTOMY_RETEST_DAYS = 42
 
 // --- the ladder ---
 
