@@ -59,6 +59,12 @@ const RETA_START = 300
 const TESA_NAD_START = 200
 const BPC_START = 150
 const BPC_END = 108
+// The isotretinoin course (audit #43 item 99): started four weeks ago so the course page lands in
+// its lipid window with a recheck still to book, 40 mg a day, planned to 30 weeks. The persona's
+// one blood donation sits between the two newest draws — the "hematocrit back inside, the
+// donation worked" line in the digests was written for it.
+const COURSE_START = 27
+const DONATION_OFFSET = 60
 
 // Weight: 212 -> ~186 with a slow diet-only start, GLP-1 acceleration, one holiday bump.
 function weightAt(o) {
@@ -126,6 +132,10 @@ for (let o = TOTAL_DAYS - 1; o >= 0; o--) {
   }
   if (o <= BPC_START && o >= BPC_END && !chance(0.05)) {
     addDose('21:30', 'BPC-157', 250, 'mcg', 'abdomen')
+  }
+  // The course: a capsule with breakfast, one day forgotten so the Dosed cell has something to say.
+  if (o <= COURSE_START && !chance(0.04)) {
+    addDose('08:30', 'Isotretinoin', 40, 'mg', null)
   }
   dosesByOffset.set(o, peptides)
 
@@ -417,7 +427,8 @@ const protocolItemRows = [
   [2, 'Retatrutide', 'logged', 'injectable', 1, 0, 'Weekly GLP-1, titrated 2 → 4 → 6 mg over the first twelve weeks; appetite and the weight trend hang off it.', null, 20, protocolCreated],
   [3, 'Tesamorelin', 'logged', 'injectable', 1, 0, 'Five nights on, two off, before bed.', null, 30, protocolCreated],
   [4, 'NAD+', 'logged', 'injectable', 1, 0, 'Three mornings a week.', null, 40, protocolCreated],
-  [5, 'BPC-157', 'logged', 'injectable', 1, 0, null, 'a six-week run for a shoulder that settled down; not restarted', 50, protocolCreated]
+  [5, 'BPC-157', 'logged', 'injectable', 1, 0, null, 'a six-week run for a shoulder that settled down; not restarted', 50, protocolCreated],
+  [6, 'Isotretinoin', 'logged', 'oral', 0, 0, 'Dermatology course for truncal acne, planned to a cumulative 150 mg/kg; expect triglycerides and LDL up and HDL down in weeks 4–8 — the drug, not the diet.', null, 60, `${D(COURSE_START)}T14:00:00Z`]
 ]
 const protocolVersionRows = [
   [1, D(TRT_START), null, '70 mg', W([1, 4]), null, protocolCreated],
@@ -426,7 +437,23 @@ const protocolVersionRows = [
   [2, D(216), null, '6 mg', W([0]), null, protocolCreated],
   [3, D(TESA_NAD_START), null, '1 mg', W([1, 2, 3, 4, 5]), null, protocolCreated],
   [4, D(TESA_NAD_START), null, '100 mg', W([1, 3, 5]), null, protocolCreated],
-  [5, D(BPC_START), D(BPC_END), '250 mcg', DAILY_JSON, null, protocolCreated]
+  [5, D(BPC_START), D(BPC_END), '250 mcg', DAILY_JSON, null, protocolCreated],
+  [6, D(COURSE_START), null, '40 mg', DAILY_JSON, 'with breakfast', `${D(COURSE_START)}T14:00:00Z`]
+]
+
+// --- cycles + phlebotomies (audit #43 item 99) -------------------------------------------------
+
+// The course as a cycle row is what makes /journal/accutane, the Accutane nav tab, the home
+// cycle strip and the calendar feed's course rungs light up in the sandbox. Explicit id so a
+// planned draw could point at it; compounds is the week-relative plan (shared/utils/cycles.ts).
+const cycleRows = [
+  [1, 'Isotretinoin Course', 'Clear the chest and shoulders for good — plan to 150 mg/kg, stretch to 220 if the lipids allow.', D(COURSE_START), 'day', 30, null, null,
+    [{ compound: 'Isotretinoin', dose: 40, unit: 'mg', weekdays: [0, 1, 2, 3, 4, 5, 6], fromWeek: 1, toWeek: 30 }], null, `${D(COURSE_START + 3)}T14:00:00Z`]
+]
+// One whole-blood donation between the two newest draws (hematocrit 51.4 → 50.8), so the
+// hematocrit panel's log, effect row and iron ledger have a visit to show.
+const phlebotomyRows = [
+  [D(DONATION_OFFSET), 'donation', 500, 16.4, 'Red Cross drive at work. Easy stick, no deferral questions.', `${D(DONATION_OFFSET)}T18:30:00Z`]
 ]
 // The stack as standing items — the same mapping migration 0013 applies to the supplements table:
 // a known spelling becomes a weekday set, anything else stays as the version's note.
@@ -627,7 +654,8 @@ const vaccinationRows = [
 // One draw booked a couple of weeks out, so the home strip's NEXT DRAW block and the /labs
 // section have something to show, and the plan the most recent draw fulfilled (labs_date set),
 // so the folded history row demonstrates the upload link. A negative offset is a future date,
-// as with vial expiries. No cycle checkpoint: the demo persona plans no cycles.
+// as with vial expiries. The booked draw lands in the course's recheck window (days 14–70), so the
+// course page's recheck rung reads "planned"; it is not tied to a cycle checkpoint.
 const LAST_DRAW = DRAWS.at(-1)
 const plannedDrawRows = [
   [D(-12), 'Quest', 'CBC + CMP + lipids + total/free testosterone + estradiol', 1, 'Testosterone on the current dose\nLipids after six weeks of the fiber and omega-3 add', null, null, null, `${D(16)}T15:00:00.000Z`],
@@ -730,6 +758,17 @@ const seed = {
       cols: ['item_id', 'from_date', 'to_date', 'dose_label', 'weekdays', 'note', 'created_at'],
       jsonCols: [],
       rows: protocolVersionRows
+    },
+    // The course as a cycle (id explicit; nothing seeded points at it yet) and the one donation.
+    cycles: {
+      cols: ['id', 'name', 'goal', 'start_date', 'start_precision', 'planned_weeks', 'planned_days', 'actual_end', 'compounds', 'notes', 'created_at'],
+      jsonCols: ['compounds'],
+      rows: cycleRows
+    },
+    phlebotomies: {
+      cols: ['date', 'kind', 'ml', 'pre_hgb', 'notes', 'created_at'],
+      jsonCols: [],
+      rows: phlebotomyRows
     },
     vials: {
       cols: ['compound', 'supplier', 'vial_amount', 'vial_unit', 'quantity', 'status', 'opened_date', 'bac_water_ml', 'lot', 'expiry', 'cost', 'notes', 'created_at'],

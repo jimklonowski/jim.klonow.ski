@@ -8,8 +8,7 @@ import { PHOTO_SETS, defaultPhotoSet, photoSet, type PhotoSetKey } from '#shared
  * Opens on the set the day calls for — the acne set while the isotretinoin course is active on
  * `date`, else physique — and re-defaults only when that answer changes (a new day on screen, a
  * course planned or ended), so a manual switch holds until then. Watching the cycles list itself
- * reset the pick on every refresh of it (audit #43 item 96). The demo sandbox has no cycles, so it
- * always opens on physique.
+ * reset the pick on every refresh of it (audit #43 item 96).
  */
 export async function usePhotoSet(date: MaybeRefOrGetter<string>) {
   const { data: cycles } = await useCycles()

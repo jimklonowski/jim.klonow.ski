@@ -1,12 +1,11 @@
 import type { Cycle, CyclePlanItem, StartPrecision } from '#shared/utils/cycles'
 
 // Readable by every authenticated role: a planned cycle is protocol context, same policy as
-// the supplement stack. Demo gets an empty list rather than a query — the sandbox DB has no
-// cycles table, and the demo persona's drifting dose dates would make planned-vs-actual read
-// as constant failure anyway (same reasoning as the hidden adherence panel).
+// the supplement stack. The demo sandbox answers from its own cycles table like any other role
+// (audit #43 item 99): the seed carries the persona's isotretinoin course, whose daily capsules
+// score as on schedule whatever day the seed is anchored to.
 export default defineEventHandler(async (event): Promise<Cycle[]> => {
-  const auth = requireLabsAuth(event)
-  if (auth.role === 'demo') return []
+  requireLabsAuth(event)
 
   // Missing table (migration not applied yet) reads as "no cycles", not a 500 — every consumer
   // of this list (home strip, adherence merge, calendar) degrades cleanly. Any other error is a

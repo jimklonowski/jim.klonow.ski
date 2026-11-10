@@ -46,7 +46,7 @@ const ALL_TABS = [
 const route = useRoute()
 const { role } = await useAuth()
 const today = useToday()
-// The cycles list is already cached by every page that reads it; the demo sandbox has none.
+// The cycles list is already cached by every page that reads it.
 const { data: cyclesData } = await useCycles()
 
 const courseTab = computed(() => {
