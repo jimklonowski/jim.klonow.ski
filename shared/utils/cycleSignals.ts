@@ -219,7 +219,9 @@ export function signalShorthand(s: CycleSignal): string {
 /** The compounds whose dose moves the vitals: a change to one of these re-anchors the watch. */
 export const CORE_COMPOUNDS = /testosterone|hcg|hgh|somatropin|growth hormone/i
 
-export interface ProtocolChange {
+// Not `ProtocolChange`: shared/utils is auto-imported and trends.ts already exports that name —
+// a second one is silently dropped (the build warns "Duplicated imports").
+export interface CoreChange {
   /** YYYY-MM-DD the change took effect. */
   from: string
   /** As the charts label it: "hCG 300→250 IU Tue+Fri", "T start 100 mg". */
@@ -230,7 +232,7 @@ export interface ProtocolChange {
  * The newest dose change, start or stop of a core compound on or before `today` (the chart's
  * dose lines, chartAnnotations' ruleAnnotations), or null when the schedule has none dated.
  */
-export function latestCoreChange(rules: readonly ProtocolRule[], today: string): ProtocolChange | null {
+export function latestCoreChange(rules: readonly ProtocolRule[], today: string): CoreChange | null {
   const changes = ruleAnnotations(rules.filter(r => CORE_COMPOUNDS.test(r.compound)))
     .filter(a => a.kind === 'dose' && a.from <= today)
     .sort((a, b) => a.from.localeCompare(b.from))
@@ -239,7 +241,7 @@ export function latestCoreChange(rules: readonly ProtocolRule[], today: string):
 }
 
 export interface ProtocolChangeWatch {
-  change: ProtocolChange
+  change: CoreChange
   /** Days since the change as of `today`. */
   days: number
   signals: CycleSignal[]
