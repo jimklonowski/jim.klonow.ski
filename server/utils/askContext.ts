@@ -251,7 +251,7 @@ const WEEKLY_WINDOW_WEEKS = 20
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone; `protocol` the request's
  * schedule (protocolFor), which decides which compounds count as standing for the trend anchors. */
 export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData): Promise<string> {
-  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates, goals, accutane] = await Promise.all([
+  const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates, goals, accutane, protocolChange] = await Promise.all([
     journalRows(db),
     labLines(db),
     dexaLines(db),
@@ -274,7 +274,10 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     // from these, not inferred.
     markerGoalsContext(db, today, protocol),
     // The isotretinoin course as it stands (item 97): cumulative mg, mg/kg, the lipid window.
-    accutaneContext(db, today)
+    accutaneContext(db, today),
+    // The vitals since the latest core dose change (item 67): "what did the hCG cut do?" is
+    // answered from these numbers, not re-derived from the log.
+    loadCycles(db).then(cycles => protocolChangeContext(db, today, mergeRules(protocol.rules, cycles)))
   ])
   const health = (healthRes.results ?? []) as Array<Record<string, unknown>>
   const workouts = mergeWorkouts((workoutsRes.results ?? []).map(parseWorkoutRow)) as unknown as Array<Record<string, unknown>>
@@ -304,6 +307,7 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     profile,
     supplements,
     cyclesCtx,
+    protocolChange,
     accutane,
     goals,
     vaccines,

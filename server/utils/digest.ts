@@ -121,7 +121,7 @@ export async function generateDigest(
   // context the dose log doesn't carry (vitamins/meds are taken daily but not logged; a cycle's
   // timing frames every trend on it; a vaccine or a travel weekend explains a bad-looking few
   // days; a draw booked for Friday explains the biotin and iron going quiet on Tuesday).
-  const [supplements, cyclesCtx, vaccines, plannedDraws, goals, accutane, phlebotomies] = await Promise.all([
+  const [supplements, cyclesCtx, vaccines, plannedDraws, goals, accutane, phlebotomies, protocolChange] = await Promise.all([
     supplementContext(db, end, protocol),
     cycleContext(db, end, cycles),
     vaccineContext(db, end),
@@ -132,9 +132,12 @@ export async function generateDigest(
     accutaneContext(db, end, cycles),
     // Blood taken out on purpose, and the donation deferral (item 100): a hematocrit that fell in
     // the period fell for that, and the recap must not credit the protocol or suggest donating.
-    phlebotomyContext(db, end)
+    phlebotomyContext(db, end),
+    // The vitals since the latest core dose change (item 67), precomputed so the recap narrates
+    // the same numbers the protocol page shows.
+    protocolChangeContext(db, end, rules)
   ])
-  const regimen = [supplements, cyclesCtx, accutane, phlebotomies, goals, vaccines, plannedDraws, eventContext(end, PROTOCOL_EVENTS)].filter(Boolean).join('\n\n')
+  const regimen = [supplements, cyclesCtx, protocolChange, accutane, phlebotomies, goals, vaccines, plannedDraws, eventContext(end, PROTOCOL_EVENTS)].filter(Boolean).join('\n\n')
 
   const facts = built.lines.join('\n')
   const prompt = kind === 'weekly' ? weeklyDigestPrompt(start, end, facts, regimen, protocol) : dailyDigestPrompt(end, facts, regimen, protocol)

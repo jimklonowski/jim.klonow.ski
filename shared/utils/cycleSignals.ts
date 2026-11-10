@@ -16,9 +16,11 @@
 import type { Cycle } from './cycles'
 // Explicit .ts extension: runtime values, and the plain-node test runner can't resolve the
 // import extensionless the way Vite does.
-import { cycleEnd, cycleStatusOn } from './cycles.ts'
-import { roundTo, shiftDays } from './dates.ts'
+import { ruleAnnotations } from './chartAnnotations.ts'
+import { cycleEnd } from './cycles.ts'
+import { diffDays, roundTo, shiftDays } from './dates.ts'
 import { METRIC_NOISE_FLOOR, MIN_WINDOW_POINTS } from './metricNoise.ts'
+import type { ProtocolRule } from './protocolRules.ts'
 import { RATE_FLAG_LBS_WK, RATE_WATCH_LBS_WK, weightTrend } from './weightTrend.ts'
 
 /** Structural shapes of journal_entries / health_metrics rows — the app types and raw D1 rows
@@ -106,9 +108,23 @@ export function computeCycleSignals(
   journal: SignalJournalRow[],
   health: SignalHealthRow[]
 ): CycleSignal[] {
-  const start = cycle.start_date
-  const status = cycleStatusOn(cycle, today)
-  const asOf = cycleEnd(cycle) < today ? cycleEnd(cycle) : today
+  return computeSignalsFrom(cycle.start_date, today, journal, health, cycleEnd(cycle))
+}
+
+/**
+ * The same watch anchored on any dated change (item 67 anchors it on the latest core protocol
+ * change): the 4 weeks before `start` against the last 2 weeks up to `today`, or up to `end`
+ * once that has passed. Before `start` only the forming baseline is reported.
+ */
+export function computeSignalsFrom(
+  start: string,
+  today: string,
+  journal: SignalJournalRow[],
+  health: SignalHealthRow[],
+  end: string | null = null
+): CycleSignal[] {
+  const status = start > today ? 'upcoming' : 'active'
+  const asOf = end != null && end < today ? end : today
 
   const baseFrom = shiftDays(start, -BASELINE_DAYS)
   const baseTo = shiftDays(start, -1)
@@ -196,4 +212,69 @@ export function activeSignals(signals: CycleSignal[]): CycleSignal[] {
 export function signalShorthand(s: CycleSignal): string {
   const sign = (s.delta ?? 0) > 0 ? '+' : ''
   return `${s.label} ${sign}${s.delta} ${s.unit}`
+}
+
+// --- the protocol-change watch (item 67) ---
+
+/** The compounds whose dose moves the vitals: a change to one of these re-anchors the watch. */
+export const CORE_COMPOUNDS = /testosterone|hcg|hgh|somatropin|growth hormone/i
+
+export interface ProtocolChange {
+  /** YYYY-MM-DD the change took effect. */
+  from: string
+  /** As the charts label it: "hCG 300→250 IU Tue+Fri", "T start 100 mg". */
+  text: string
+}
+
+/**
+ * The newest dose change, start or stop of a core compound on or before `today` (the chart's
+ * dose lines, chartAnnotations' ruleAnnotations), or null when the schedule has none dated.
+ */
+export function latestCoreChange(rules: readonly ProtocolRule[], today: string): ProtocolChange | null {
+  const changes = ruleAnnotations(rules.filter(r => CORE_COMPOUNDS.test(r.compound)))
+    .filter(a => a.kind === 'dose' && a.from <= today)
+    .sort((a, b) => a.from.localeCompare(b.from))
+  const last = changes.at(-1)
+  return last ? { from: last.from, text: last.text } : null
+}
+
+export interface ProtocolChangeWatch {
+  change: ProtocolChange
+  /** Days since the change as of `today`. */
+  days: number
+  signals: CycleSignal[]
+}
+
+/** A change older than this is no longer watched: by then a 4-week baseline from before it
+ * describes a different body, and a "since" line stops being a change watch. */
+export const CHANGE_WATCH_DAYS = 180
+
+/**
+ * The passive vitals watch since the latest core protocol change — the cycle watch's model with
+ * the change as the anchor, so "since hCG 250 IU: weight −1.2, SBP −6" has a deterministic
+ * answer between cycles too. Null without a dated change, or once the change is older than
+ * CHANGE_WATCH_DAYS.
+ */
+export function protocolChangeWatch(rules: readonly ProtocolRule[], today: string, journal: SignalJournalRow[], health: SignalHealthRow[]): ProtocolChangeWatch | null {
+  const change = latestCoreChange(rules, today)
+  if (!change) return null
+  const days = diffDays(change.from, today)
+  if (days > CHANGE_WATCH_DAYS) return null
+  return { change, days, signals: computeSignalsFrom(change.from, today, journal, health) }
+}
+
+/** One line for a strip, a page or a prompt: "▲ Systolic BP +7 mmHg · Weight +2.8 lbs" or
+ * "steady: Weight, Resting HR", or '' when nothing has enough data yet. */
+export function signalsLine(signals: CycleSignal[]): { text: string, tone: 'danger' | 'warn' | 'accent' | 'muted' } | null {
+  const measured = signals.filter(s => s.state === 'steady' || s.state === 'watch' || s.state === 'flagged')
+  if (!measured.length) return null
+  const act = activeSignals(signals)
+  if (!act.length) return { text: `steady: ${measured.map(s => s.label).join(', ')}`, tone: 'muted' }
+  const adverse = act.filter(s => s.adverse)
+  const shown = adverse.length ? adverse : act
+  const steady = measured.filter(s => s.state === 'steady')
+  return {
+    text: `${adverse.length ? '▲ ' : ''}${shown.map(signalShorthand).join(' · ')}${steady.length ? ` · steady: ${steady.map(s => s.label).join(', ')}` : ''}`,
+    tone: adverse.some(s => s.state === 'flagged') ? 'danger' : adverse.length ? 'warn' : 'accent'
+  }
 }

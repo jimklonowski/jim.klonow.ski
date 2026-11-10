@@ -30,6 +30,36 @@
       Nothing on the protocol yet.{{ canEdit ? ' Use + ADD to put the first compound or supplement on it.' : '' }}
     </p>
 
+    <!-- The passive vitals watch since the latest core dose change (item 67): the cycle
+         dossier's model with the change as the anchor, so a dose cut between cycles still gets
+         its "since" line. -->
+    <section
+      v-if="changeWatch"
+      class="mx-4 sm:mx-6 mt-4 border border-line-soft bg-raised px-3.5 py-3"
+      data-change-watch
+    >
+      <TuiHeader
+        :label="`SINCE ${changeWatch.change.text.toUpperCase()}`"
+        :dashes="6"
+      >
+        <span class="text-label text-muted">{{ formatDate(changeWatch.change.from, 'monthDay') }} · {{ changeWatch.days }} day{{ changeWatch.days === 1 ? '' : 's' }}</span>
+      </TuiHeader>
+      <p
+        v-if="changeLine"
+        class="mt-2 text-small"
+        :class="changeLineClass"
+        :title="`Last 2 weeks against the 4 weeks before the change, noise-thresholded — the cycle dossier's passive vitals watch, anchored on the change`"
+      >
+        {{ changeLine.text }}
+      </p>
+      <p
+        v-else
+        class="mt-2 text-small text-faint"
+      >
+        Not enough logged vitals on both sides of the change yet.
+      </p>
+    </section>
+
     <!-- The groups flow into columns from lg (two, three from 2xl — Jim's 2040px screen), each
          group kept whole: one full-width column put the dose 1,800px from its name and the 28
          rows two screens tall, and a 5xl cap just left the right half of the page empty. The
@@ -429,8 +459,10 @@
 </template>
 
 <script setup lang="ts">
+import { protocolChangeWatch, signalsLine } from '#shared/utils/cycleSignals'
 import { cadenceOf as cadenceText } from '#shared/utils/protocolRules'
 import { parseWeekdays, type ProtocolItemRow, type ProtocolVersionRow } from '#shared/utils/protocolStore'
+import { effectiveRules } from '~/utils/adherence'
 import type { PROTOCOL_CATEGORIES, PROTOCOL_KINDS } from '#shared/utils/schemas'
 import { localToday } from '#shared/utils/time'
 
@@ -446,6 +478,18 @@ useSeoMeta({ title: 'Journal · Protocol' })
 
 const { canEdit } = await useAuth()
 const { data, refresh, error } = await useProtocolItems()
+
+// The change watch (item 67): the mapped schedule with planned cycles folded in gives the
+// anchor; the journal and the strap give the vitals. The two lists are client-only, so the
+// block fills in after mount.
+const { rules: protocolRules } = useProtocol()
+const { data: cyclesData } = useCycles()
+const { data: journalData } = useJournalEntries()
+const { data: healthData } = useHealthMetricsEntries()
+const today = useToday()
+const changeWatch = computed(() => protocolChangeWatch(effectiveRules(cyclesData.value ?? [], protocolRules.value), today.value, journalData.value ?? [], healthData.value ?? []))
+const changeLine = computed(() => (changeWatch.value ? signalsLine(changeWatch.value.signals) : null))
+const changeLineClass = computed(() => ({ danger: 'text-danger', warn: 'text-warn', accent: 'text-accent', muted: 'text-muted' })[changeLine.value?.tone ?? 'muted'])
 
 const DAILY = [0, 1, 2, 3, 4, 5, 6]
 

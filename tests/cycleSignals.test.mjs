@@ -2,8 +2,47 @@
 // rate escalation, and the good-direction cap. Same zero-framework runner as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { activeSignals, computeCycleSignals, signalShorthand } from '../shared/utils/cycleSignals.ts'
+import { activeSignals, computeCycleSignals, computeSignalsFrom, latestCoreChange, protocolChangeWatch, signalShorthand, signalsLine } from '../shared/utils/cycleSignals.ts'
 import { shiftDays } from '../shared/utils/dates.ts'
+
+test('the protocol-change watch (item 67): anchored on the newest core dose change, the cycle model otherwise', () => {
+  const rule = (compound, from, to, doseLabel, weekdays = [1, 4]) => ({ compound, doseLabel, weekdays, from, to })
+  const rules = [
+    rule('Testosterone Cypionate', '2026-01-01', '2026-08-23', '100 mg'),
+    rule('Testosterone Cypionate', '2026-08-24', null, '75 mg'),
+    rule('hCG', '2026-01-01', '2026-10-23', '300 IU', [0, 2, 5]),
+    rule('hCG', '2026-10-24', null, '250 IU', [2, 5]),
+    rule('BPC-157', '2026-11-01', null, '250 mcg', [0, 1, 2, 3, 4, 5, 6]) // not core: never the anchor
+  ]
+  assert.deepEqual(latestCoreChange(rules, '2026-11-10'), { from: '2026-10-24', text: 'hCG 300→250 IU Tue+Fri' })
+  assert.deepEqual(latestCoreChange(rules, '2026-09-01'), { from: '2026-08-24', text: 'T 100→75 mg' }, 'as of an earlier day, the earlier change')
+  assert.equal(latestCoreChange([rules[4]], '2026-11-10'), null)
+  // SBP 130 across the four weeks before Oct 24, 122 across the two weeks before Nov 10.
+  const rows = [
+    ...Array.from({ length: 28 }, (_, i) => ({ date: shiftDays('2026-09-26', i), bp_systolic: 130, weight_lbs: 170 })),
+    ...Array.from({ length: 14 }, (_, i) => ({ date: shiftDays('2026-10-28', i), bp_systolic: 122, weight_lbs: 170.4 }))
+  ]
+  const watch = protocolChangeWatch(rules, '2026-11-10', rows, [])
+  assert.equal(watch.days, 17)
+  assert.equal(watch.change.text, 'hCG 300→250 IU Tue+Fri')
+  const sbp = watch.signals.find(s => s.key === 'bp_systolic')
+  assert.deepEqual([sbp.baseline, sbp.current, sbp.delta], [130, 122, -8])
+  assert.equal(sbp.adverse, false, 'down is the good direction for BP')
+  assert.equal(watch.signals.find(s => s.key === 'weight').state, 'steady')
+  const line = signalsLine(watch.signals)
+  assert.equal(line.text, 'Systolic BP -8 mmHg · steady: Weight')
+  assert.equal(line.tone, 'accent')
+  assert.equal(signalsLine([]), null)
+  assert.equal(protocolChangeWatch([], '2026-11-10', rows, []), null)
+  // As of Oct 20 the anchor is the Aug 24 T cut (a change ahead is never the anchor), and no
+  // rows sit around it: no data. The anchor model itself reports a forming baseline before start.
+  assert.equal(protocolChangeWatch(rules, '2026-10-20', rows, []).change.text, 'T 100→75 mg')
+  // A change older than the horizon is no longer a watch (the demo persona's year-old TRT start).
+  assert.equal(protocolChangeWatch(rules, '2027-04-22', rows, []).days, 180, 'Oct 24 + 180 days still watched')
+  assert.equal(protocolChangeWatch(rules, '2027-04-22', rows, []).change.text, 'hCG 300→250 IU Tue+Fri')
+  assert.equal(protocolChangeWatch(rules, '2027-04-23', rows, []), null, 'day 181: expired')
+  assert.equal(computeSignalsFrom('2026-10-24', '2026-10-20', rows, []).find(s => s.key === 'bp_systolic').state, 'baseline')
+})
 
 // 2026-09-14 is a Monday. Cycle runs 16 weeks unless ended.
 function cycle(overrides = {}) {
