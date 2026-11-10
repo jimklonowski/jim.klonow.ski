@@ -211,7 +211,10 @@ export interface ReadingTag {
  */
 export function readingTags(marker: string, date: string, windows: readonly TransitionalWindow[], phlebotomies: readonly Phlebotomy[]): ReadingTag[] {
   const tags: ReadingTag[] = []
-  const after = (from: string) => { const n = diffDays(from, date); return `${n} day${n === 1 ? '' : 's'} after` }
+  const after = (from: string) => {
+    const n = diffDays(from, date)
+    return `${n} day${n === 1 ? '' : 's'} after`
+  }
   if (RBC_MASS_MARKERS.has(marker)) {
     const w = transitionalFor(date, windows)
     if (w) tags.push({ kind: 'transitional', short: 'transitional', text: `${after(w.from)} ${w.change} — red cells turn over on a ~${RBC_TURNOVER_DAYS}-day cycle, so this reading cannot yet show that change's full effect` })
