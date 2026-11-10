@@ -29,6 +29,10 @@ export const STALE_PHOTO_DAYS = 14
 export const PHOTO_BASELINE_LOOKBACK_DAYS = 3
 /** No blood donation during the course or for this long after the last dose. */
 export const DONATION_DEFERRAL_DAYS = 30
+/** The projection's pace is the mean over this many recent course days (item 98). */
+export const PACE_WINDOW_DAYS = 14
+/** The lipid and liver moves show in this window of the course (weeks 4–8). */
+export const LIPID_WINDOW_WEEKS = { from: 4, to: 8 } as const
 /** Waxing, dermabrasion and laser wait this long after the last dose — the skin scars easily. */
 export const PROCEDURE_DEFERRAL_DAYS = 180
 
@@ -106,8 +110,12 @@ export interface CourseStats {
   upperMg: number | null
   /** 0–100+, cumulative against the lower target. */
   pctOfLower: number | null
-  /** Milligrams a day the projection runs on: the logged mean, or the plan before any dose. */
+  /** Milligrams a day the projection runs on: the mean over the last PACE_WINDOW_DAYS of the
+   * course (the dose as it stands, a lapse included), or the plan before any dose (item 98: the
+   * whole-course mean lagged a 40 → 80 mg step for weeks and dated every target too late). */
   paceMgPerDay: number
+  /** How many days that pace was read over. */
+  paceWindowDays: number
   /** When the running total reached, or at this pace will reach, each target. */
   reachLower: string | null
   reachUpper: string | null
@@ -131,7 +139,12 @@ export function courseStats(cycle: Cycle, doses: readonly CourseDose[], weightLb
   const kg = weightLbs != null && weightLbs > 0 ? roundTo(weightLbs / LBS_PER_KG, 1) : null
   const lowerMg = kg != null ? Math.round(kg * COURSE_TARGET_MG_PER_KG.lower) : null
   const upperMg = kg != null ? Math.round(kg * COURSE_TARGET_MG_PER_KG.upper) : null
-  const paceMgPerDay = onCourse.length && daysElapsed > 0 ? roundTo(cumulativeMg / daysElapsed, 1) : (planned ?? 0)
+  // The pace is the recent dose, not the course mean: the last PACE_WINDOW_DAYS up to today
+  // (fewer at the start), skipped days counting as zero.
+  const paceWindowDays = Math.min(PACE_WINDOW_DAYS, Math.max(daysElapsed, 0))
+  const paceFrom = shiftDays(last, -(paceWindowDays - 1))
+  const recentMg = onCourse.filter(d => d.date >= paceFrom).reduce((s, d) => s + d.mg, 0)
+  const paceMgPerDay = onCourse.length && paceWindowDays > 0 ? roundTo(recentMg / paceWindowDays, 1) : (planned ?? 0)
 
   const reach = (targetMg: number | null): string | null => {
     if (targetMg == null) return null
@@ -163,12 +176,33 @@ export function courseStats(cycle: Cycle, doses: readonly CourseDose[], weightLb
     upperMg,
     pctOfLower: lowerMg ? roundTo((cumulativeMg / lowerMg) * 100, 1) : null,
     paceMgPerDay,
+    paceWindowDays,
     reachLower: reach(lowerMg),
     reachUpper: reach(upperMg)
   }
 }
 
 // --- the donation deferral ---
+
+// --- the course as a lab caveat ---
+
+/**
+ * The spans over which isotretinoin skews the lipid and liver markers (item 97), beside the
+ * protocol row's own dates: every dated course from capsule one until DONATION_DEFERRAL_DAYS
+ * after its last planned day, and the dose log itself from the first logged capsule to the last
+ * plus the same tail — so a course logged before its protocol row existed, or one that ran past
+ * the row, still stars its draws. Shape = labNotes' CaveatSpan.
+ */
+export function courseCaveatSpans(cycles: readonly Cycle[], entries: ReadonlyArray<{ date: string, peptides?: ReadonlyArray<DoseRow> | null }>): Array<{ compound: string, from: string, to: string | null }> {
+  const spans: Array<{ compound: string, from: string, to: string | null }> = []
+  for (const c of cycles) {
+    if (isTentative(c) || !c.compounds.some(i => i.compound === ISOTRETINOIN)) continue
+    spans.push({ compound: ISOTRETINOIN, from: c.start_date, to: shiftDays(cycleEnd(c), DONATION_DEFERRAL_DAYS) })
+  }
+  const doses = courseDoses(entries)
+  if (doses.length) spans.push({ compound: ISOTRETINOIN, from: doses[0]!.date, to: shiftDays(doses.at(-1)!.date, DONATION_DEFERRAL_DAYS) })
+  return spans
+}
 
 export interface DonationDeferral {
   /** The course's first day: the deferral starts with capsule one. */

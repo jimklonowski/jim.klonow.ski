@@ -195,6 +195,7 @@ import {
 } from '#shared/utils/cycles'
 import { diffDays } from '#shared/utils/dates'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
+import { courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn } from '#shared/utils/labNotes'
 import { VERDICT_WORD, cycleGoalSummary, goalLabel, goalVerdict, goalsForCycle } from '#shared/utils/markerGoals'
 
@@ -249,7 +250,7 @@ const goalsLine = computed(() => {
   const goals = goalsForCycle(goalsData.value ?? [], cycle.value.id)
   if (!goals.length) return null
   const caveats = labNotes.value?.caveats ?? {}
-  const spans = [...protocolRules.value, ...protocolStanding.value]
+  const spans = [...protocolRules.value, ...protocolStanding.value, ...courseCaveatSpans(props.cycles, props.entries)]
   const verdicts = goals.map(g => goalVerdict(g, props.draws, today.value, d => caveatCompoundOn(caveats, g.marker, d, spans)))
   const s = cycleGoalSummary(verdicts)
   const blocker = verdicts.find(v => v.status === 'not-met')

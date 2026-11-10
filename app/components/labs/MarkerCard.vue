@@ -178,6 +178,7 @@
 import { STATUS_COLORS } from '~/utils/chartTheme'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus, statusLabel } from '~/data/biomarkers'
+import { courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import type { ReadingNote } from '#shared/utils/labNotes'
 
@@ -241,7 +242,11 @@ const hasRange = computed(() => meta.value.refMin !== undefined || meta.value.re
 // themselves come from /api/labs/notes (useLabNotes): none before it answers, none in the demo.
 const { rules: protocolRules, standing: protocolStanding } = useProtocol()
 const { data: labNotes } = useLabNotes()
-const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value])
+// The isotretinoin course stars its draws from the cycle row and the dose log too (item 97), not
+// only from the protocol row's dates.
+const { data: cyclesData } = useCycles()
+const { data: journalData } = useJournalEntries()
+const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value, ...courseCaveatSpans(cyclesData.value ?? [], journalData.value ?? [])])
 const caveats = computed(() => labNotes.value?.caveats ?? {})
 const caveat = computed(() => caveats.value[props.biomarkerKey])
 const caveatCompound = computed(() =>

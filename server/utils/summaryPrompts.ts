@@ -28,6 +28,8 @@ export interface LabsSummaryInputs {
   phlebotomyBlock: string
   /** The dated marker goals with their computed verdicts as of this draw (markerGoalsContext), or ''. */
   goalsBlock: string
+  /** The isotretinoin course as of this draw (accutaneContext), or ''. */
+  accutaneBlock: string
   /** One "Label [unit, ref]: date: value -> NEW date: value" line per marker; a daggered value (†) has a reading note. */
   markerLines: string[]
   /** One "† Label on date: note" line per daggered reading (READING_NOTES), or []. */
@@ -41,7 +43,7 @@ export function labsSummaryPrompt(i: LabsSummaryInputs): string {
   return `You are writing a trend summary for a personal bloodwork dashboard. The reader is the person whose labs these are — address them as "you". They track their own biomarkers closely and understand them well. They run a self-directed hormone protocol whose core is testosterone (TRT), HGH, and hCG, with ancillary peptides rotating around that core (the schedule below says what was running as of this draw) — and they are weighing adding a mild anabolic (Primobolan or Anavar) for lean-mass goals — so markers that gate that decision (lipids, especially HDL; liver enzymes; hematocrit/hemoglobin; iron/ferritin; blood pressure proxies) deserve extra attention when present. They are not currently taking an aromatase inhibitor but keep Anastrozole on hand from their TRT clinic for symptomatic use; estradiol has been climbing and may read over 100 pg/mL on new draws. Treat elevated estradiol as a known, watched issue: quantify the trend against prior draws, name the specific symptoms and risks worth monitoring at that level, and frame the on-hand Anastrozole as the discussion point for symptom-driven use — not something to start reflexively.
 
 ${protocolSchedule(i.date, i.protocol.rules, i.protocol.standing, i.protocol.asNeeded)}
-${goals ? `\n${goals}\n` : ''}${i.goalsBlock ? `\n${i.goalsBlock}\n` : ''}${i.supplementBlock ? `\n${i.supplementBlock}\n` : ''}${i.cycleBlock ? `\n${i.cycleBlock}\n` : ''}${i.vaccineBlock ? `\n${i.vaccineBlock}\n` : ''}${i.eventBlock ? `\n${i.eventBlock}\n` : ''}${i.plannedBlock ? `\n${i.plannedBlock}\n` : ''}${i.phlebotomyBlock ? `\n${i.phlebotomyBlock}\n` : ''}
+${goals ? `\n${goals}\n` : ''}${i.goalsBlock ? `\n${i.goalsBlock}\n` : ''}${i.accutaneBlock ? `\n${i.accutaneBlock}\n` : ''}${i.supplementBlock ? `\n${i.supplementBlock}\n` : ''}${i.cycleBlock ? `\n${i.cycleBlock}\n` : ''}${i.vaccineBlock ? `\n${i.vaccineBlock}\n` : ''}${i.eventBlock ? `\n${i.eventBlock}\n` : ''}${i.plannedBlock ? `\n${i.plannedBlock}\n` : ''}${i.phlebotomyBlock ? `\n${i.phlebotomyBlock}\n` : ''}
 The oral stack above matters here: supplements move blood markers (iron dosing moves ferritin/iron; soluble fiber, omega-3s, and CoQ10 bear on lipids; finasteride and dutasteride lower DHT and roughly halve PSA once 6–12 months in, so double an on-treatment PSA before comparing it with pre-treatment draws; turmeric inhibits iron absorption; ashwagandha touches thyroid and cortisol; berberine/TUDCA-style liver support moves liver enzymes and lipids), and recent starts, stops, and dose changes are dated above — check the stack before attributing a marker shift to the injectable protocol alone.
 
 New draw: ${i.date} (${i.fasting ? 'fasting' : 'non-fasting'})

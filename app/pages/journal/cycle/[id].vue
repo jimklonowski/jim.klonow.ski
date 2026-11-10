@@ -511,7 +511,7 @@
 </template>
 
 <script setup lang="ts">
-import { ISOTRETINOIN } from '#shared/utils/accutane'
+import { ISOTRETINOIN, courseCaveatSpans } from '#shared/utils/accutane'
 import { CHART_ACCENT, CHART_DANGER, CHART_WARN } from '~/utils/chartTheme'
 import { getCompoundColor } from '~/data/journal'
 import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'
@@ -772,7 +772,7 @@ function gatingChips(drawDate: string, baselineDate: string | null): GatingChip[
 }
 
 // --- marker goals ---
-const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value])
+const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value, ...courseCaveatSpans(data.value ?? [], entries.value)])
 const goalVerdicts = computed(() => {
   if (!cycle.value) return []
   const caveats = labNotes.value?.caveats ?? {}

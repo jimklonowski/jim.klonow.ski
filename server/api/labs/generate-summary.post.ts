@@ -106,10 +106,12 @@ export default defineEventHandler(async (event) => {
   // The dated marker goals with their verdicts as of this draw (item 60) — the frame the
   // summary reads the gating markers in, computed here so the model reports it, not re-judges it.
   const goalsBlock = await markerGoalsContext(db, date, protocol)
+  // The isotretinoin course as of this draw (item 97): cumulative mg, mg/kg, the lipid window.
+  const accutaneBlock = await accutaneContext(db, date)
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, markerLines, readingNotes, qualitativeBlock
+    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, accutaneBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()

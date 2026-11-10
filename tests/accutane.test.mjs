@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  COURSE_MARKERS, STALE_PHOTO_DAYS, baselineDrawDate, courseDoses, courseLabs, courseLadder, courseStats,
+  COURSE_MARKERS, STALE_PHOTO_DAYS, baselineDrawDate, courseCaveatSpans, courseDoses, courseLabs, courseLadder, courseStats,
   donationDeferral, isotretinoinCycle, photoStrip, plannedMgPerDay, recheckDraw, signalSummary, weeklySeries
 } from '../shared/utils/accutane.ts'
 
@@ -52,6 +52,17 @@ test('donation is deferred from capsule one until 30 days after the last; a cour
   assert.deepEqual(donationDeferral([second, course], '2027-09-01'), { start: '2026-11-07', until: '2027-09-19', active: true })
   assert.equal(donationDeferral([second, course], '2027-10-01').start, '2027-12-01')
   assert.equal(donationDeferral([second, course], '2027-10-01').active, false)
+})
+
+test('the course stars the lipid markers from capsule one to a month past the end — from the cycle row and from the dose log alike', () => {
+  const spans = courseCaveatSpans([course, blast], [dose('2026-11-07'), dose('2026-11-20')])
+  assert.deepEqual(spans, [
+    { compound: 'Isotretinoin', from: '2026-11-07', to: '2027-09-19' },
+    { compound: 'Isotretinoin', from: '2026-11-07', to: '2026-12-20' }
+  ])
+  assert.deepEqual(courseCaveatSpans([{ ...course, start_precision: 'quarter' }], []), [], 'a tentative course and an empty log star nothing')
+  // A course logged with no cycle row at all still stars its draws.
+  assert.equal(courseCaveatSpans([], [dose('2026-11-07')]).length, 1)
 })
 
 test('the dose log is the ledger: per-day milligrams, mcg folded, other compounds ignored', () => {
@@ -104,6 +115,22 @@ test('cumulative, mg/kg, pace and the projected target days follow the log, not 
   assert.equal(titrated.currentMgPerDay, 80)
   assert.equal(titrated.cumulativeMg, 200)
   assert.equal(titrated.paceMgPerDay, 50)
+  assert.equal(titrated.paceWindowDays, 4)
+
+  // Item 98: the pace is the last two weeks' dose, not the course mean. Thirty days at 40 then
+  // fourteen at 80: the mean would say 52.7 and date every target weeks late; the pace says 80.
+  const stepped = []
+  for (let i = 0; i < 44; i++) stepped.push(dose(new Date(Date.UTC(2026, 10, 7 + i)).toISOString().slice(0, 10), i < 30 ? 40 : 80))
+  const onEighty = courseStats(course, courseDoses(stepped), 170.5, '2026-12-20', 40)
+  assert.equal(onEighty.daysElapsed, 44)
+  assert.equal(onEighty.cumulativeMg, 2320)
+  assert.equal(onEighty.paceMgPerDay, 80)
+  assert.equal(onEighty.paceWindowDays, 14)
+  // (11595 − 2320) / 80 = 115.9 → 116 days after Dec 20.
+  assert.equal(onEighty.reachLower, '2027-04-15')
+  // A lapse inside the window lowers the pace: two skipped days in the last fourteen.
+  const lapsed = courseStats(course, courseDoses(stepped.filter(d => !['2026-12-18', '2026-12-19'].includes(d.date))), 170.5, '2026-12-20', 40)
+  assert.equal(lapsed.paceMgPerDay, 68.6)
 
   // A target already reached is dated by the day the running total crossed it.
   const heavy = Array.from({ length: 300 }, (_, i) => ({ date: `2027-0${1 + Math.floor(i / 100)}-${String((i % 100) + 1).padStart(2, '0')}`, mg: 40 }))

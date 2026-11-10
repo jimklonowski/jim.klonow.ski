@@ -121,15 +121,17 @@ export async function generateDigest(
   // context the dose log doesn't carry (vitamins/meds are taken daily but not logged; a cycle's
   // timing frames every trend on it; a vaccine or a travel weekend explains a bad-looking few
   // days; a draw booked for Friday explains the biotin and iron going quiet on Tuesday).
-  const [supplements, cyclesCtx, vaccines, plannedDraws, goals] = await Promise.all([
+  const [supplements, cyclesCtx, vaccines, plannedDraws, goals, accutane] = await Promise.all([
     supplementContext(db, end, protocol),
     cycleContext(db, end, cycles),
     vaccineContext(db, end),
     plannedDrawContext(db, end),
     // The dated marker goals with their verdicts as of the period's end (audit #43 item 60).
-    markerGoalsContext(db, end, protocol, cycles)
+    markerGoalsContext(db, end, protocol, cycles),
+    // The isotretinoin course as of the period's end (item 97).
+    accutaneContext(db, end, cycles)
   ])
-  const regimen = [supplements, cyclesCtx, goals, vaccines, plannedDraws, eventContext(end, PROTOCOL_EVENTS)].filter(Boolean).join('\n\n')
+  const regimen = [supplements, cyclesCtx, accutane, goals, vaccines, plannedDraws, eventContext(end, PROTOCOL_EVENTS)].filter(Boolean).join('\n\n')
 
   const facts = built.lines.join('\n')
   const prompt = kind === 'weekly' ? weeklyDigestPrompt(start, end, facts, regimen, protocol) : dailyDigestPrompt(end, facts, regimen, protocol)

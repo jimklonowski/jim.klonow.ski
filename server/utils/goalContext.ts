@@ -1,3 +1,4 @@
+import { ISOTRETINOIN, courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn } from '#shared/utils/labNotes'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 import type { GoalDraw, MarkerGoal } from '#shared/utils/markerGoals'
@@ -25,8 +26,9 @@ export async function loadMarkerGoals(db: D1Database): Promise<MarkerGoal[]> {
   }
 }
 
-/** The blood draws on or before `asOf` as the verdicts read them, each with its reading notes. */
-async function loadGoalDraws(db: D1Database, asOf: string): Promise<GoalDraw[]> {
+/** The blood draws on or before `asOf` as the verdicts read them, each with its reading notes
+ * (echo-only rows dropped). Shared with accutaneContext. */
+export async function loadBloodDraws(db: D1Database, asOf: string): Promise<GoalDraw[]> {
   const { results } = await db.prepare('SELECT date, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
   return ((results ?? []) as Array<{ date: string, markers: string | null, qualitative: string | null }>)
     .map(r => ({ date: r.date, markers: JSON.parse(r.markers || '{}') as Record<string, number | null>, qualitative: JSON.parse(r.qualitative || '[]') }))
@@ -37,8 +39,16 @@ async function loadGoalDraws(db: D1Database, asOf: string): Promise<GoalDraw[]> 
 export async function markerGoalsContext(db: D1Database, asOf: string, protocol: ProtocolData, preloadedCycles?: Cycle[]): Promise<string> {
   const goals = await loadMarkerGoals(db)
   if (!goals.length) return ''
-  const [draws, cycles] = await Promise.all([loadGoalDraws(db, asOf), preloadedCycles ?? loadCycles(db)])
-  const spans = [...protocol.rules, ...protocol.standing]
+  const [draws, cycles, doseRes] = await Promise.all([
+    loadBloodDraws(db, asOf),
+    preloadedCycles ?? loadCycles(db),
+    // The isotretinoin dose log: the course stars its draws from the log and the cycle row too
+    // (item 97), not only from the protocol row's dates.
+    db.prepare(`SELECT date, peptides FROM journal_entries WHERE peptides LIKE '%${ISOTRETINOIN}%' ORDER BY date ASC`).all()
+  ])
+  const courseLog = ((doseRes.results ?? []) as Array<{ date: string, peptides: string | null }>)
+    .map(r => ({ date: r.date, peptides: JSON.parse(r.peptides || '[]') as Array<{ compound: string, dose: number | null, unit?: string | null }> }))
+  const spans = [...protocol.rules, ...protocol.standing, ...courseCaveatSpans(cycles, courseLog)]
   const verdictOf = (g: MarkerGoal) => goalVerdict(g, draws, asOf, date => caveatCompoundOn(MARKER_CAVEATS, g.marker, date, spans))
   const line = (g: MarkerGoal) => goalLine(verdictOf(g), BIOMARKERS[g.marker])
 
