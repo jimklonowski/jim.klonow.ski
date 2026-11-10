@@ -186,6 +186,7 @@
           :entries="entries"
           :index="estimateIndex"
           :target="proteinTarget"
+          :target-note="proteinTargetNoteText"
           :water="water"
           :soda-days="sodaDays"
           :can-edit="canEdit"
@@ -376,7 +377,7 @@ import { REPO_URL } from '#shared/utils/site'
 import { wardrobeOf } from '#shared/utils/tickerWardrobe'
 import { groupDoses } from '#shared/utils/doseGroups'
 import { dayNutrition, type EstimateIndex } from '#shared/utils/nutrition'
-import { profileNumber } from '#shared/utils/profile'
+import { proteinTargetFor, proteinTargetNote } from '#shared/utils/proteinTarget'
 import { iuEquivalentLabel } from '#shared/utils/peptideCalc'
 import type { PeptideEntry } from '~/data/journal'
 
@@ -423,12 +424,15 @@ const addWater = () => {
 const estimates = isFullAccess.value ? await useMealEstimates() : null
 const profile = isFullAccess.value ? await useProfile() : null
 const estimateIndex = computed<EstimateIndex>(() => estimates?.index.value ?? new Map())
-const proteinTarget = computed(() => profile ? profileNumber(profile.data.value, 'protein_target_g', 0) || null : null)
 const {
   hasSession, entries, draws, healthMetrics, latestDraw, latestDexa, previousDexa, dexaScans,
   allWorkouts, todayEntry, sodasToday, flagged, flagCounts,
   error: overviewError, pending: overviewPending, refresh: refreshOverview
 } = useOverview(role)
+// A fixed figure, else g/lb lean × the latest scan (item 63); the meter's title says which.
+const proteinTargetInfo = computed(() => (profile ? proteinTargetFor(profile.data.value, dexaScans.value ?? []) : null))
+const proteinTarget = computed(() => proteinTargetInfo.value?.grams ?? null)
+const proteinTargetNoteText = computed(() => (proteinTargetInfo.value ? proteinTargetNote(proteinTargetInfo.value, proteinTargetInfo.value.scanDate ? formatDate(proteinTargetInfo.value.scanDate, 'monthDay') : '') : null))
 
 // --- the shown day ---
 // The day the left column is scrubbed to (null = today). HomeVitals draws the ‹ › on the same

@@ -195,8 +195,10 @@ const props = defineProps<{
   /** Every journal entry, for the trailing-week average. */
   entries: JournalEntry[]
   index: EstimateIndex
-  /** The profile's protein_target_g, or null when none is set. */
+  /** The daily protein target (shared/utils/proteinTarget.ts), or null when none is set. */
   target: number | null
+  /** Which rule gave it ("1 g/lb × 148.2 lb lean · DEXA Sep 12" / "set by hand"), for the title. */
+  targetNote?: string | null
   /** The shown day's water against the goal, or null when the role has none. */
   water: { oz: string, ozRaw: number, goal: number, pct: number, met: boolean, pours: number } | null
   /** Sodas per day for the 7 days ending on the shown day, oldest first; null when not shown. */
@@ -263,7 +265,7 @@ const protein = computed(() => {
   const grams = d.estimated > 0 ? Math.round(d.protein_g) : null
   const target = props.target
   const unit = `${target ? `/ ${target} g` : 'g'}${floor ? ' +' : ''}`
-  const title = floor ? 'A meal has no figures yet — this is a floor' : undefined
+  const title = [floor ? 'A meal has no figures yet — this is a floor' : null, target && props.targetNote ? `Target ${props.targetNote}` : null].filter(Boolean).join(' · ') || undefined
   if (grams == null) return { value: '—', unit, pct: null, met: false, valueClass: 'text-muted', title }
   const pct = target ? Math.round((grams / target) * 100) : null
   const met = pct != null && pct >= 100
@@ -300,6 +302,6 @@ const avgTitle = computed(() => {
   const to = w.to === props.date
     ? (isToday.value ? 'today' : formatDate(w.to, 'monthDay'))
     : (isToday.value ? 'yesterday' : formatDate(w.to, 'monthDay'))
-  return `Days with every meal estimated, ${formatDate(w.from, 'monthDay')} – ${to} · ${avg.value.days} day${avg.value.days === 1 ? '' : 's'}${props.target ? ` · protein target ${props.target} g` : ''}`
+  return `Days with every meal estimated, ${formatDate(w.from, 'monthDay')} – ${to} · ${avg.value.days} day${avg.value.days === 1 ? '' : 's'}${props.target ? ` · protein target ${props.target} g${props.targetNote ? ` (${props.targetNote})` : ''}` : ''}`
 })
 </script>

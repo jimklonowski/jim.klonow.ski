@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { PROFILE_FIELDS, profileFieldsFor, profileNumber } from '../shared/utils/profile.ts'
 
-const TRACKER_KEYS = ['water_goal_oz', 'cup_oz', 'protein_target_g']
+const TRACKER_KEYS = ['water_goal_oz', 'cup_oz', 'protein_target_g', 'protein_per_lb_lean']
 
 test('the doctor sees clinical facts only; every tracker setting is withheld', () => {
   const keys = profileFieldsFor('doctor').map(f => f.key)

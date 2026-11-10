@@ -162,7 +162,11 @@
         <span
           class="text-hi"
           :class="proteinTarget && avg.protein_g >= proteinTarget ? 'text-accent' : ''"
-        >{{ avg.protein_g }}</span> g protein<template v-if="proteinTarget"> / {{ proteinTarget }} g</template>
+        >{{ avg.protein_g }}</span> g protein<template v-if="proteinTarget"> / {{ proteinTarget }} g<span
+          v-if="target?.source === 'lean'"
+          class="text-faint"
+          :title="targetNote"
+        > (from lean)</span></template>
         <span class="text-faint">· {{ avg.days }} day{{ avg.days === 1 ? '' : 's' }}{{ avg.estimated ? ' est.' : '' }}</span>
       </span>
       <span
@@ -206,11 +210,11 @@
       v-if="targetOpen && isOwner"
       class="mt-3 pt-3 border-t border-line-soft"
     >
-      <div class="flex items-end gap-2.5">
+      <div class="flex items-end gap-2.5 flex-wrap">
         <!-- "TARGET", not "PROTEIN TARGET": the long label wrapped at phone width. -->
         <UFormField
           label="TARGET (g / day)"
-          class="flex-1"
+          class="flex-1 min-w-28"
         >
           <UInput
             v-model.number="targetDraft"
@@ -219,7 +223,23 @@
             :min="PROTEIN_TARGET.min"
             :max="PROTEIN_TARGET.max"
             step="1"
-            placeholder="150"
+            :placeholder="leanTarget ? String(leanTarget.grams) : '150'"
+            class="w-full"
+          />
+        </UFormField>
+        <!-- Or a rule: grams per pound of DEXA lean mass, so the target follows the body (item 63). -->
+        <UFormField
+          label="OR g / lb LEAN"
+          class="flex-1 min-w-28"
+        >
+          <UInput
+            v-model.number="perLbDraft"
+            type="number"
+            inputmode="decimal"
+            :min="PROTEIN_PER_LB.min"
+            :max="PROTEIN_PER_LB.max"
+            step="0.1"
+            placeholder="0.8"
             class="w-full"
           />
         </UFormField>
@@ -229,11 +249,11 @@
           :disabled="savingTarget || !targetDirty || !targetValid"
           @click="saveTarget"
         >
-          {{ savingTarget ? 'SAVING…' : proteinTarget && targetDraft === '' ? 'CLEAR TARGET' : 'SAVE TARGET' }}
+          {{ savingTarget ? 'SAVING…' : targetDraft === '' && perLbDraft === '' && proteinTarget ? 'CLEAR TARGET' : 'SAVE TARGET' }}
         </button>
       </div>
       <p class="mt-1 text-micro text-faint">
-        The 7-day average above and the home page's PROTEIN row read against it. Clear it to turn the comparison off.
+        The 7-day average above and the home page's PROTEIN row read against it. A fixed target wins; clear it and the g/lb rule takes over, following the latest DEXA scan{{ latestLean ? ` (${Number(latestLean.lean.toFixed(1))} lb lean on ${formatDate(latestLean.date, 'monthDay')}${perLbPreview ? ` → ${perLbPreview} g` : ''})` : ' — none with a lean figure is on file yet' }}. Clear both to turn the comparison off.
       </p>
     </div>
   </section>
@@ -251,7 +271,8 @@ import {
   MEAL_SLOTS, MEAL_SLOT_LABELS, MEAL_SLOT_PLACEHOLDERS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals, mealHistoryBySlot,
   nutritionAverage, nutritionIsEstimated, nutritionWindow, resolveMealText, slotForTime, unestimatedMeals, type MealSlot
 } from '#shared/utils/nutrition'
-import { PROFILE_FIELDS, profileNumber } from '#shared/utils/profile'
+import { PROFILE_FIELDS } from '#shared/utils/profile'
+import { proteinTargetFor, proteinTargetNote } from '#shared/utils/proteinTarget'
 
 const props = withDefaults(defineProps<{
   readonly?: boolean
@@ -263,6 +284,8 @@ const { isOwner } = await useAuth()
 const { data } = await useJournalEntries()
 const { data: profileData, refresh: refreshProfile } = await useProfile()
 const { index, estimate } = await useMealEstimates()
+// The scans, for the per-lb-lean target rule (item 63); on the SSR payload like the labs list.
+const { data: dexaData } = await useDexaEntries()
 
 const today = useToday()
 const entries = computed(() => data.value ?? [])
@@ -271,7 +294,10 @@ const todaySodas = computed(() => todayEntry.value?.sodas ?? [])
 const day = computed(() => dayNutrition(todayEntry.value, index.value))
 const dayEstimated = computed(() => nutritionIsEstimated(day.value))
 
-const proteinTarget = computed(() => profileNumber(profileData.value, 'protein_target_g', 0) || null)
+// The target: a fixed figure, else g/lb lean × the latest scan (shared/utils/proteinTarget.ts).
+const target = computed(() => proteinTargetFor(profileData.value, dexaData.value ?? []))
+const proteinTarget = computed(() => target.value?.grams ?? null)
+const targetNote = computed(() => (target.value ? `Target ${proteinTargetNote(target.value, target.value.scanDate ? formatDate(target.value.scanDate, 'monthDay') : '')}` : ''))
 // Seven days ending yesterday until today's dinner is logged, then ending today — today's running
 // total is shown above, it must not also count as a whole day here.
 const avg = computed(() => nutritionAverage(entries.value, index.value, today.value, 7))
@@ -416,29 +442,58 @@ async function writeSlot(slot: MealSlot, text: string, matched: boolean) {
 // The profile row the average is compared against, edited from the ▾ beside it. Bounds come from
 // the field definition so the input refuses what the server would. The draft follows the saved
 // value until edited, as the water settings do, so a refresh elsewhere doesn't wipe typing.
+// Two profile rows: the fixed grams and the g/lb-lean rule (item 63). Each draft follows its
+// stored value until edited; one SAVE writes whichever changed.
 const PROTEIN_TARGET = PROFILE_FIELDS.find(f => f.key === 'protein_target_g')!
+const PROTEIN_PER_LB = PROFILE_FIELDS.find(f => f.key === 'protein_per_lb_lean')!
+const stored = (key: string): number | '' => {
+  const n = Number(profileData.value?.[key] ?? '')
+  return profileData.value?.[key] && Number.isFinite(n) && n > 0 ? n : ''
+}
 const targetOpen = ref(false)
-const targetDraft = ref<number | ''>(proteinTarget.value ?? '')
-watch(proteinTarget, (v) => {
-  if (!targetDirty.value) targetDraft.value = v ?? ''
+const targetDraft = ref<number | ''>(stored(PROTEIN_TARGET.key))
+const perLbDraft = ref<number | ''>(stored(PROTEIN_PER_LB.key))
+// When the profile refetches, a draft still sitting on the value it was seeded from follows the
+// new one; a draft the owner has typed in stays. Compared against the value LAST seen, not the
+// current one — against the current one a fresh value always looked like an edit.
+const seen = { target: targetDraft.value, perLb: perLbDraft.value }
+watch(profileData, () => {
+  const next = { target: stored(PROTEIN_TARGET.key), perLb: stored(PROTEIN_PER_LB.key) }
+  if (targetDraft.value === seen.target) targetDraft.value = next.target
+  if (perLbDraft.value === seen.perLb) perLbDraft.value = next.perLb
+  Object.assign(seen, next)
 })
-const targetDirty = computed(() => targetDraft.value !== (proteinTarget.value ?? ''))
-// '' is valid as a clear; a number must sit within the field's bounds.
-const targetValid = computed(() =>
-  targetDraft.value === ''
-  || (typeof targetDraft.value === 'number' && targetDraft.value >= (PROTEIN_TARGET.min ?? 1) && targetDraft.value <= (PROTEIN_TARGET.max ?? Infinity))
-)
+const targetDirty = computed(() => targetDraft.value !== stored(PROTEIN_TARGET.key) || perLbDraft.value !== stored(PROTEIN_PER_LB.key))
+// '' is valid as a clear; a number must sit within its field's bounds.
+const within = (v: number | '', f: typeof PROTEIN_TARGET) => v === '' || (typeof v === 'number' && v >= (f.min ?? 1) && v <= (f.max ?? Infinity))
+const targetValid = computed(() => within(targetDraft.value, PROTEIN_TARGET) && within(perLbDraft.value, PROTEIN_PER_LB))
 const savingTarget = ref(false)
+// What the rule would give, for the help line and the fixed input's placeholder.
+const latestLean = computed(() => {
+  const s = [...(dexaData.value ?? [])].filter(x => x.total?.lean_mass_lbs).sort((a, b) => a.date.localeCompare(b.date)).at(-1)
+  return s ? { date: s.date, lean: s.total.lean_mass_lbs! } : null
+})
+const leanTarget = computed(() => proteinTargetFor({ protein_per_lb_lean: String(perLbDraft.value || profileData.value?.protein_per_lb_lean || '') }, dexaData.value ?? []))
+const perLbPreview = computed(() => (typeof perLbDraft.value === 'number' && latestLean.value ? Math.round(perLbDraft.value * latestLean.value.lean) : null))
 
 async function saveTarget() {
   if (!targetDirty.value || !targetValid.value) return
   savingTarget.value = true
-  const cleared = targetDraft.value === ''
+  const writes = [[PROTEIN_TARGET, targetDraft.value], [PROTEIN_PER_LB, perLbDraft.value]] as const
+  const cleared = targetDraft.value === '' && perLbDraft.value === ''
   try {
-    await $fetch('/api/journal/profile', { method: 'POST', body: { key: PROTEIN_TARGET.key, value: cleared ? '' : String(targetDraft.value) } })
+    for (const [field, draft] of writes) {
+      if (draft === stored(field.key)) continue
+      await $fetch('/api/journal/profile', { method: 'POST', body: { key: field.key, value: draft === '' ? '' : String(draft) } })
+    }
     await refreshProfile()
     targetOpen.value = false
-    toast.add({ title: cleared ? 'Protein target cleared' : `Protein target set to ${targetDraft.value} g`, color: 'success', icon: 'i-lucide-check' })
+    const title = cleared
+      ? 'Protein target cleared'
+      : targetDraft.value !== ''
+        ? `Protein target set to ${targetDraft.value} g`
+        : `Protein target: ${perLbDraft.value} g per lb lean${leanTarget.value ? ` → ${leanTarget.value.grams} g today` : ' (no DEXA lean on file yet)'}`
+    toast.add({ title, color: 'success', icon: 'i-lucide-check' })
   }
   catch (err) {
     toast.add({ title: 'Could not save the protein target', description: extractErrorMessage(err, 'Unknown error'), color: 'error' })

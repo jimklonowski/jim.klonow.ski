@@ -40,8 +40,12 @@ export const PROFILE_FIELDS: ProfileField[] = [
   { key: 'water_goal_oz', label: 'Water goal', kind: 'number', min: 8, max: 400, unit: 'oz', hint: 'per day', tracker: true },
   { key: 'cup_oz', label: 'Water cup', kind: 'number', min: 1, max: 128, unit: 'oz', hint: 'what one + CUP tap logs — less than the cup\'s size once it\'s full of ice', tracker: true },
   // The hub's food card reads the 7-day protein average against this (shared/utils/nutrition.ts)
-  // and the home page's PROTEIN row today's grams; set from JournalFoodToday's ▾ panel.
-  { key: 'protein_target_g', label: 'Protein target', kind: 'number', min: 20, max: 500, unit: 'g', hint: 'per day, for the food card', tracker: true }
+  // and the home page's PROTEIN row today's grams; set from JournalFoodToday's ▾ panel. A fixed
+  // figure here overrides the per-lb rule below (shared/utils/proteinTarget.ts).
+  { key: 'protein_target_g', label: 'Protein target', kind: 'number', min: 20, max: 500, unit: 'g', hint: 'per day, for the food card', tracker: true },
+  // Grams of protein per pound of DEXA lean mass (audit #43 item 63): the target then follows
+  // the latest scan instead of a number typed once. 0.7–1 g/lb lean is the usual lifting range.
+  { key: 'protein_per_lb_lean', label: 'Protein per lb lean', kind: 'number', min: 0.3, max: 2, unit: 'g/lb', hint: 'per pound of DEXA lean mass; a fixed target overrides it', tracker: true }
 ]
 
 /**
