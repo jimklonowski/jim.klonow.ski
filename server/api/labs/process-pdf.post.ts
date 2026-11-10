@@ -34,6 +34,7 @@ Rules:
 - For values like ">X", use X
 - Units: convert to the unit the site stores. ABSOLUTE NEUTROPHILS/LYMPHOCYTES/MONOCYTES/EOSINOPHILS/BASOPHILS are stored in cells/uL — if the report gives them in K/uL, x10E3/uL, x10^3/uL or thousand/uL, multiply by 1000 (1.6 K/uL → 1600). WHITE BLOOD CELL COUNT and PLATELET COUNT are stored in K/uL; RED BLOOD CELL COUNT in M/uL
 - Lab names vary between labs ("Neutrophils Absolute", "Neut Abs" and "ANC" are all ABSOLUTE NEUTROPHILS) — match by meaning, not exact wording, but never invent a marker the report doesn't contain
+- Estradiol has two keys by assay: a result labelled ultrasensitive, sensitive, LC/MS/MS or LC-MS/MS (Quest "Estradiol, Ultrasensitive LC/MS/MS", order code 30289) is ESTRADIOL, ULTRASENSITIVE; a plain "Estradiol" by immunoassay is ESTRADIOL. Never put one under the other's key
 - Only include markers actually present in the report
 - markers: one { key, value } entry per numeric result, key being one of the exact key names below
 - qualitative is for any test result that is NOT a plain number — genetic/mutation analyses, antibody positive/negative, presence/absence findings, or any other categorical result. Use the report's own test name for "name" and its exact reported result (e.g. "Negative", "Heterozygous", "Detected") for "result". Leave the list empty if there are no such results.
@@ -45,6 +46,7 @@ INSULIN → insulin
 UREA NITROGEN (BUN) → bun
 CREATININE → creatinine
 EGFR → egfr
+CYSTATIN C → cystatin_c
 SODIUM → sodium
 POTASSIUM → potassium
 CHLORIDE → chloride
@@ -69,12 +71,16 @@ TESTOSTERONE, TOTAL → testosterone_total
 TESTOSTERONE, FREE → testosterone_free
 SEX HORMONE BINDING GLOBULIN → shbg
 ESTRADIOL → estradiol
+ESTRADIOL, ULTRASENSITIVE → estradiol_sensitive
+DIHYDROTESTOSTERONE (DHT) → dht
 FSH → fsh
 LH → lh
 PROLACTIN → prolactin
 DHEA SULFATE → dhea_sulfate
 CORTISOL, TOTAL → cortisol
 TSH → tsh
+T4, FREE → t4_free
+T3, FREE → t3_free
 IGF 1 → igf1
 CHOLESTEROL, TOTAL → cholesterol
 HDL CHOLESTEROL → hdl

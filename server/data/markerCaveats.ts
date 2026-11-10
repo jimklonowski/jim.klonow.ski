@@ -25,6 +25,15 @@ export const MARKER_CAVEATS: Record<string, MarkerCaveat> = {
     compounds: ['Finasteride', 'Dutasteride'],
     note: 'Starred readings were taken while on a 5-alpha-reductase inhibitor. Finasteride and dutasteride roughly halve PSA once 6–12 months in (less during the first months), so double an on-treatment value before comparing it with the untreated range or with earlier readings — and treat any rise from the on-treatment low as meaningful even while the number stays small.'
   },
+  // DHT is what a 5-ARI is for (item 65): a low reading on it is the drug, not a deficiency.
+  dht: {
+    compounds: ['Finasteride', 'Dutasteride'],
+    note: 'Starred readings were taken while on a 5-alpha-reductase inhibitor. Finasteride lowers DHT by about two thirds and dutasteride by over 90 %, so a reading under the range on either is the intended effect — compare it with other on-treatment readings, and read a rise toward the pre-treatment level as the drug wearing off or a missed stretch, not as recovery.'
+  },
+  // Growth hormone speeds the T4 → T3 conversion (item 65): on HGH free T3 drifts up and free T4
+  // down with TSH unchanged — an expected pattern, not a thyroid problem.
+  t4_free: { compounds: ['HGH', 'Somatropin'], note: 'Starred readings were taken while on growth hormone, which speeds the conversion of T4 to T3 in the tissues: free T4 drifts down and free T3 up while TSH stays put. That pattern on HGH is the drug, not a failing thyroid — compare on-treatment readings with each other, and only read a low free T4 as thyroid trouble if TSH is rising with it.' },
+  t3_free: { compounds: ['HGH', 'Somatropin'], note: 'Starred readings were taken while on growth hormone, which speeds the conversion of T4 to T3: free T3 sits high-normal or above while TSH stays put. That is the expected pattern on HGH rather than hyperthyroidism — read it with free T4 and TSH, and compare on-treatment readings with each other.' },
   triglycerides: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
   ldl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
   hdl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
@@ -54,16 +63,28 @@ export const READING_NOTES: Record<string, ReadingNote[]> = {
     }
   ],
   // Two estradiol assays exist on the same sample whenever the Whoop Advanced Labs panel (standard
-  // immunoassay) is paired with the Jason Health ultrasensitive LC/MS/MS add-on, and the value on
-  // file is whichever report was uploaded last (save-json merges per key, last upload wins).
+  // immunoassay) is paired with the Jason Health ultrasensitive LC/MS/MS add-on. Since item 65
+  // the add-on has its own key (estradiol_sensitive) and the extractor files it there; the two
+  // draws before that were split by server/database/fix-estradiol-assays-2026-11-10.sql. These
+  // notes say the pair exists, so neither card's reader mistakes one series for the other.
   estradiol: [
     {
       date: '2026-08-15',
-      note: 'Ultrasensitive LC/MS/MS estradiol (Quest order code 30289) from a separate same-day add-on. The Whoop Advanced Labs panel drawn from the same sample ran the standard immunoassay and read 85; the add-on was uploaded last, so this is the value on file. Compare it only with other ultrasensitive readings.'
+      note: 'Standard immunoassay estradiol from the Whoop Advanced Labs panel. The same sample was also run by ultrasensitive LC/MS/MS (106), which is on the Estradiol (sensitive) card — the two assays are never compared with each other.'
     },
     {
       date: '2026-10-17',
-      note: 'Two estradiol assays were run on this sample: the Whoop Advanced Labs panel\'s standard immunoassay (157) and a separate ultrasensitive LC/MS/MS add-on (126). The value on file is whichever report was uploaded last. The ultrasensitive 126 is the one to trend — against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20% — and the immunoassay 157 must never be set against the LC/MS/MS series. If 157 is the value shown, the add-on report has not been uploaded yet and any change computed from it is cross-assay; say so rather than quantify it.'
+      note: 'Standard immunoassay estradiol from the Whoop Advanced Labs panel. The same sample was also run by ultrasensitive LC/MS/MS (126), on the Estradiol (sensitive) card; that series is the one to act on, and the two are never compared with each other.'
+    }
+  ],
+  estradiol_sensitive: [
+    {
+      date: '2026-08-15',
+      note: 'Ultrasensitive LC/MS/MS estradiol (Quest order code 30289), a same-day add-on. The panel\'s standard immunoassay on the same sample read 85 (on the Estradiol card); compare this value only with other ultrasensitive readings.'
+    },
+    {
+      date: '2026-10-17',
+      note: 'Ultrasensitive LC/MS/MS estradiol, a same-day add-on. Against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20 %. The panel\'s standard immunoassay on the same sample read 157 (on the Estradiol card) and must never be set against this series.'
     }
   ]
 }
