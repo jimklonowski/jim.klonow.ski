@@ -185,8 +185,9 @@ const form = reactive<PlannedDrawForm>(emptyForm())
 const formGuard = useDirtyGuard(() => form)
 const modalOpen = formGuard.guardOpen(open)
 
-/** Open blank, prefilled from a plan, or blank with a date / checkpoint preset (the dossier's "book it"). */
-function openForm(plan?: PlannedDraw, preset?: { date?: string, cycle_id?: number, checkpoint_key?: CheckpointKey }) {
+/** Open blank, prefilled from a plan, or blank with a preset: a date / checkpoint (the dossier's
+ * "book it") or a panel and purpose (the due markers' "book these", item 66). */
+function openForm(plan?: PlannedDraw, preset?: { date?: string, cycle_id?: number, checkpoint_key?: CheckpointKey, panel?: string, purpose?: string }) {
   Object.assign(form, emptyForm())
   if (plan) {
     Object.assign(form, {
@@ -202,6 +203,8 @@ function openForm(plan?: PlannedDraw, preset?: { date?: string, cycle_id?: numbe
   }
   if (preset?.date) form.date = preset.date
   if (preset?.cycle_id != null && preset.checkpoint_key) form.checkpoint = `${preset.cycle_id}:${preset.checkpoint_key}`
+  if (preset?.panel) form.panel = preset.panel
+  if (preset?.purpose) form.purpose = preset.purpose
   formGuard.markClean()
   open.value = true
 }

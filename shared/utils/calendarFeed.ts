@@ -16,6 +16,7 @@ import { checkpointStates, cycleEnd, cycleStatusOn, isTentative, type Cycle } fr
 import { shiftDays } from './dates.ts'
 import { PHLEBOTOMY_RETEST_DAYS, type Phlebotomy } from './hematocrit.ts'
 import { drawLabel, plannedDrawStates, prepReminders, purposeLines, type PlannedDraw } from './plannedDraws.ts'
+import { RETEST_RULES, cadenceText, markersDue } from './retest.ts'
 import { vaccineCoverage, type Vaccination } from './vaccines.ts'
 
 /** One all-day event. `end` is exclusive, iCalendar's convention; omitted means one day. */
@@ -188,6 +189,23 @@ export function calendarEvents(inputs: CalendarInputs, today: string, uidDomain:
       summary: 'CBC retest',
       description: `${PHLEBOTOMY_RETEST_DAYS / 7} weeks after the ${p.date} phlebotomy — hematocrit, hemoglobin, ferritin`,
       alarm: { trigger: MORNING_ALARM, text: 'CBC retest due: six weeks since the phlebotomy' }
+    })
+  }
+
+  // --- markers past their retest cadence with no draw booked (item 66) ---
+  // One event per marker (a stable UID per key, so a re-sync moves it rather than doubling it),
+  // dated the due day or today once overdue. A booked draw near the due date covers it, so the
+  // draw's own event stands in. The marker's key, not its reading, names the event: a calendar
+  // syncs on to whatever the phone shares.
+  for (const d of markersDue(inputs.labs, inputs.plans, today)) {
+    if (d.planned) continue
+    const rule = RETEST_RULES[d.key]!
+    out.push({
+      uid: uid('retest', d.key),
+      start: d.due < today ? today : d.due,
+      summary: d.inDays < 0 ? 'Lab retest overdue' : 'Lab retest due',
+      description: `${d.key.replace(/_/g, ' ')} — last drawn ${d.last.date}, ${cadenceText(rule, d.flagged)}${d.inDays < 0 ? `, due ${d.due}` : ''}`,
+      alarm: { trigger: MORNING_ALARM, text: d.inDays < 0 ? 'A lab retest is overdue: book the draw' : 'A lab retest is due: book the draw' }
     })
   }
 

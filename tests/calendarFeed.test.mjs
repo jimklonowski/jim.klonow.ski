@@ -120,6 +120,22 @@ test('boosters due ahead and the CBC six weeks after a phlebotomy, dropped once 
   assert.deepEqual(events.map(e => e.start), [...events.map(e => e.start)].sort())
 })
 
+test('a marker past its retest cadence with nothing booked gets an event; a nearby booking covers it (item 66)', () => {
+  // Hct 50.1 on Oct 17 is flagged (≥ 50): 42 days → Nov 28, ahead of TODAY. LDL/trig unflagged: 180 days, out of the horizon.
+  const events = calendarEvents({ ...empty, labs: [lipids('2026-10-17')] }, TODAY, 'x.test')
+  const by = byUid(events)
+  assert.deepEqual([by['retest-hematocrit@x.test'].start, by['retest-hematocrit@x.test'].summary], ['2026-11-28', 'Lab retest due'])
+  assert.match(by['retest-hematocrit@x.test'].description, /^hematocrit — last drawn 2026-10-17, 42-day cadence while 50 or over$/)
+  assert.ok(!by['retest-ldl@x.test'])
+  // Overdue: dated today and marked.
+  const late = byUid(calendarEvents({ ...empty, labs: [lipids('2026-09-01')] }, TODAY, 'x.test'))['retest-hematocrit@x.test']
+  assert.deepEqual([late.start, late.summary], [TODAY, 'Lab retest overdue'])
+  assert.match(late.description, /due 2026-10-13$/)
+  // A draw booked within two weeks after the due date covers it: the draw is the event.
+  const booked = byUid(calendarEvents({ ...empty, labs: [lipids('2026-10-17')], plans: [plan(1, '2026-12-05')] }, TODAY, 'x.test'))
+  assert.ok(!booked['retest-hematocrit@x.test'] && booked['draw-1@x.test'])
+})
+
 test('the iCalendar text: CRLF, folded at 75 octets, escaped, all-day with an exclusive end, alarms attached', () => {
   const long = 'x'.repeat(100)
   assert.equal(foldIcsLine(long).split('\r\n').length, 2)

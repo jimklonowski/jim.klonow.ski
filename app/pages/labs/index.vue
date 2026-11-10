@@ -103,6 +103,7 @@
       class="mx-4 sm:mx-6 mt-4"
       :plans="plannedDraws"
       :draw-dates="drawDates"
+      :draws="draws"
       :is-owner="isOwner"
       @refresh="refreshPlanned"
     />

@@ -128,6 +128,42 @@
       No draw planned{{ isOwner ? ' — "+ plan a draw" books the next one: the date, the lab, the panel, and what it should answer.' : '.' }}
     </p>
 
+    <!-- Markers past (or within a month of) their retest cadence (item 66): each with the
+         reading its clock started at, and whether a booked draw covers it. -->
+    <div
+      v-if="due.length"
+      class="mt-3"
+      data-due
+    >
+      <p class="tui-label text-micro">
+        markers due
+      </p>
+      <div class="flex flex-col gap-0.5 mt-1 text-small">
+        <div
+          v-for="(d, i) in due"
+          :key="d.key"
+          class="flex gap-2.5 min-w-0 flex-wrap"
+          :title="d.text"
+        >
+          <span class="text-ghost shrink-0">{{ i === due.length - 1 ? '└' : '├' }}</span>
+          <span class="text-hi">{{ d.label }}</span>
+          <span class="text-muted">last {{ formatDate(d.last.date, 'monthDay') }} ({{ d.lastText }})</span>
+          <span
+            class="ml-auto shrink-0"
+            :class="d.chip.class"
+          >{{ d.chip.text }}</span>
+        </div>
+      </div>
+      <button
+        v-if="isOwner && unbooked.length"
+        type="button"
+        class="mt-1.5 text-label text-accent hover:text-accent-hover cursor-pointer"
+        @click="bookDue"
+      >
+        + book {{ unbooked.length === due.length ? 'these' : `the ${unbooked.length} unbooked` }} →
+      </button>
+    </div>
+
     <!-- Everything else: later bookings, fulfilled plans, missed ones. Newest first. -->
     <div
       v-if="others.length"
@@ -194,16 +230,21 @@ import type { PlannedDraw, PlannedDrawState, PrepReminder } from '#shared/utils/
 import { countdownLabel, drawLabel, nextOpen, plannedDrawStates, prepReminders, purposeLines } from '#shared/utils/plannedDraws'
 import { cycleCheckpoints } from '#shared/utils/cycles'
 import { diffDays } from '#shared/utils/dates'
+import { fmtMarkerValue } from '#shared/utils/markerValue'
+import { RETEST_RULES, cadenceText, markersDue, suggestedDrawDate, type RetestDraw } from '#shared/utils/retest'
+import { BIOMARKERS, CATEGORY_LABELS } from '~/data/biomarkers'
 
 // The /labs planned-draws section: the next open plan in full (countdown, what it answers, the
 // dated prep), the rest folded under a count. The page owns the list and the draw dates; this
 // component owns the cycles it needs for the modal's checkpoint picker.
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   plans: PlannedDraw[]
   /** Every draw on file, any order. */
   drawDates: string[]
   isOwner: boolean
-}>()
+  /** The blood draws with their markers, for the retest clocks (item 66); none → no due list. */
+  draws?: RetestDraw[]
+}>(), { draws: () => [] })
 const emit = defineEmits<{ refresh: [] }>()
 
 // No await: useAsyncData registers the fetch for SSR itself, and the list is shared with the
@@ -257,6 +298,41 @@ const footLine = computed(() => {
   }
   return parts.join(' · ')
 })
+
+// --- markers due (item 66) ---
+// Each ruled marker whose clock has run down (or will within the month), with the reading it
+// started at; the chip says overdue / due in N / booked. The owner's "book these" opens the modal
+// with the date, a panel from the markers' categories and one purpose line per marker.
+const dueRaw = computed(() => markersDue(props.draws, props.plans, today.value))
+const due = computed(() => dueRaw.value.map((d) => {
+  const meta = BIOMARKERS[d.key]
+  const label = meta?.label ?? d.key
+  const chip = d.planned
+    ? { text: `booked ${formatDate(d.planned.date, 'monthDay')}`, class: 'text-accent' }
+    : d.inDays < 0
+      ? { text: `${-d.inDays} day${d.inDays === -1 ? '' : 's'} overdue`, class: 'text-warn' }
+      : { text: d.inDays === 0 ? 'due today' : `due in ${d.inDays} day${d.inDays === 1 ? '' : 's'}`, class: 'text-muted' }
+  return {
+    key: d.key,
+    label,
+    last: d.last,
+    lastText: `${fmtMarkerValue(d.last.value)}${meta?.unit ? ` ${meta.unit}` : ''}`,
+    chip,
+    text: `${label}: ${cadenceText(RETEST_RULES[d.key]!, d.flagged)} from the ${d.last.date} reading → due ${d.due}`,
+    planned: d.planned
+  }
+}))
+const unbooked = computed(() => due.value.filter(d => !d.planned))
+
+function bookDue() {
+  const rows = unbooked.value
+  const categories = [...new Set(rows.map(d => BIOMARKERS[d.key]?.category).filter(Boolean))] as Array<keyof typeof CATEGORY_LABELS>
+  modal.value?.open(undefined, {
+    date: suggestedDrawDate(dueRaw.value, today.value) ?? undefined,
+    panel: categories.map(c => CATEGORY_LABELS[c]).join(' + '),
+    purpose: rows.map(d => `${d.label}: last ${d.lastText} on ${formatDate(d.last.date, 'monthDay')}`).join('\n')
+  })
+}
 
 function statusChip(s: PlannedDrawState): { text: string, class: string } {
   if (s.status === 'done') return { text: `done ✓ ${s.drawDate ? formatDate(s.drawDate, 'monthDay') : ''}`.trim(), class: 'text-accent' }
