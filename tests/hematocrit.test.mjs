@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  HCT_LADDER, RBC_TURNOVER_DAYS, hctDraws, hctHeadline, ironLedger, ironMgOf, ironSpansFrom, ladderRung, nextRung,
-  phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
+  HCT_LADDER, PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, hctDraws, hctHeadline, ironLedger, ironMgOf, ironSpansFrom, ladderRung, nextRung,
+  phlebotomyEffects, readingTags, rungAction, transitionalFor, transitionalWindows
 } from '../shared/utils/hematocrit.ts'
 import { diffDays } from '../shared/utils/dates.ts'
 
@@ -78,6 +78,38 @@ test('the headline: the last reading, its rung, the window today sits in, and wh
   assert.equal(settled.current.value, 49)
   assert.equal(settled.currentIsTransitional, false)
   assert.equal(hctHeadline([], windows, '2026-11-04').current, null)
+})
+
+test('reading tags: a red-cell marker inside a turnover window is transitional; a CBC or ferritin within 8 weeks of a visit is post-phlebotomy', () => {
+  const windows = [{ from: '2026-08-24', to: '2026-12-21', change: 'T 100→75 mg' }]
+  const visit = { id: 1, date: '2026-10-17', kind: 'donation', ml: 500, pre_hgb: null, notes: null, created_at: 'x' }
+  const kinds = tags => tags.map(t => t.kind)
+  // Inside the window, no visit yet: transitional, with the day count.
+  const sep = readingTags('hematocrit', '2026-09-09', windows, [visit])
+  assert.deepEqual(kinds(sep), ['transitional'])
+  assert.match(sep[0].text, /^16 days after T 100→75 mg — red cells turn over on a ~120-day cycle/)
+  assert.match(readingTags('hematocrit', '2026-08-25', windows, [])[0].text, /^1 day after T/)
+  // The visit's own day is before it (phlebotomyEffects' rule): no post-phlebotomy tag.
+  assert.deepEqual(kinds(readingTags('hematocrit', '2026-10-17', windows, [visit])), ['transitional'])
+  // Six weeks on, still inside the window: both, the visit's tag naming the kind and the days.
+  const dec = readingTags('hematocrit', '2026-11-28', windows, [visit])
+  assert.deepEqual(kinds(dec), ['transitional', 'post-phlebotomy'])
+  assert.match(dec[1].text, /^42 days after the 2026-10-17 blood donation — a lower reading here is the blood taken out/)
+  // Ferritin never wears the turnover tag, does wear the visit's, with its own wording.
+  const fer = readingTags('ferritin', '2026-11-28', windows, [visit])
+  assert.deepEqual(kinds(fer), ['post-phlebotomy'])
+  assert.match(fer[0].text, /iron that left with the blood/)
+  assert.match(readingTags('hemoglobin', '2026-11-28', windows, [{ ...visit, kind: 'therapeutic' }])[1].text, /therapeutic phlebotomy/)
+  // The last day of the effect window counts; the day after does not. Past the window: nothing.
+  assert.deepEqual(kinds(readingTags('hematocrit', '2026-12-12', windows, [visit])), ['transitional', 'post-phlebotomy'])
+  assert.equal(diffDays('2026-10-17', '2026-12-12'), PHLEBOTOMY_EFFECT_DAYS)
+  assert.deepEqual(kinds(readingTags('hematocrit', '2026-12-13', windows, [visit])), ['transitional'])
+  assert.deepEqual(readingTags('hematocrit', '2027-01-20', windows, [visit]), [])
+  // The nearest earlier visit is the one named when two qualify.
+  const two = readingTags('hematocrit', '2026-11-28', [], [visit, { ...visit, id: 2, date: '2026-11-20' }])
+  assert.match(two[0].text, /8 days after the 2026-11-20/)
+  // Other markers never wear either.
+  assert.deepEqual(readingTags('estradiol', '2026-11-28', windows, [visit]), [])
 })
 
 test('what a phlebotomy bought: the reading before it against the first after', () => {

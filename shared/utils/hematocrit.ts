@@ -115,7 +115,7 @@ export interface TransitionalWindow {
  * stays whole because its rows share the compound). A draw inside one is "transitional": flat
  * or still rising is the expected reading, not a failure of the change.
  */
-export function transitionalWindows(rules: ProtocolRule[]): TransitionalWindow[] {
+export function transitionalWindows(rules: readonly ProtocolRule[]): TransitionalWindow[] {
   return ruleAnnotations(rules.filter(r => RBC_DRIVERS.test(r.compound)))
     .filter(a => a.kind === 'dose')
     .map(a => ({ from: a.from, to: shiftDays(a.from, RBC_TURNOVER_DAYS - 1), change: a.text }))
@@ -123,7 +123,7 @@ export function transitionalWindows(rules: ProtocolRule[]): TransitionalWindow[]
 }
 
 /** The window a date falls in — the latest change when several overlap — or null. */
-export function transitionalFor(date: string, windows: TransitionalWindow[]): TransitionalWindow | null {
+export function transitionalFor(date: string, windows: readonly TransitionalWindow[]): TransitionalWindow | null {
   return [...windows].reverse().find(w => date >= w.from && date <= w.to) ?? null
 }
 
@@ -179,6 +179,52 @@ export function phlebotomyEffects(phlebotomies: Phlebotomy[], draws: HctDraw[]):
     const hctDelta = before && after ? roundTo(after.value - before.value, 1) : null
     return group.map(p => ({ phlebotomy: p, before, after, hctDelta, sharedWith: group.filter(o => o !== p).map(o => o.date) }))
   })
+}
+
+// --- reading tags (item 101) ---
+
+/**
+ * Hemoglobin and hematocrit climb back from a 500 mL draw-off over about this long (iron-replete
+ * men recover in four to six weeks; longer when ferritin is low). A CBC inside this window reads
+ * the hole the visit made, not where the protocol has the marker.
+ */
+export const PHLEBOTOMY_EFFECT_DAYS = 56
+
+/** The markers a dose change of an erythropoietic compound moves — the turnover window's. */
+export const RBC_MASS_MARKERS: ReadonlySet<string> = new Set(['hematocrit', 'hemoglobin', 'rbc'])
+/** The markers a phlebotomy moves: red-cell mass and the iron that left with it. */
+export const PHLEBOTOMY_MARKERS: ReadonlySet<string> = new Set([...RBC_MASS_MARKERS, 'ferritin'])
+
+export interface ReadingTag {
+  kind: 'transitional' | 'post-phlebotomy'
+  /** The chip: "transitional" / "post-phlebotomy". */
+  short: string
+  /** The explanation, for a title or a note line. */
+  text: string
+}
+
+/**
+ * Why a reading of `marker` on `date` may not mean what it says: inside a turnover window after a
+ * dose change (red-cell markers only), or within PHLEBOTOMY_EFFECT_DAYS after a phlebotomy (those
+ * and ferritin). A draw on the visit's own day is before it, as phlebotomyEffects reads it. The
+ * card, the ledger and the labs history rows all wear these; /labs/hematocrit has the long form.
+ */
+export function readingTags(marker: string, date: string, windows: readonly TransitionalWindow[], phlebotomies: readonly Phlebotomy[]): ReadingTag[] {
+  const tags: ReadingTag[] = []
+  const after = (from: string) => { const n = diffDays(from, date); return `${n} day${n === 1 ? '' : 's'} after` }
+  if (RBC_MASS_MARKERS.has(marker)) {
+    const w = transitionalFor(date, windows)
+    if (w) tags.push({ kind: 'transitional', short: 'transitional', text: `${after(w.from)} ${w.change} — red cells turn over on a ~${RBC_TURNOVER_DAYS}-day cycle, so this reading cannot yet show that change's full effect` })
+  }
+  if (PHLEBOTOMY_MARKERS.has(marker)) {
+    const p = [...phlebotomies].filter(p => p.date < date && diffDays(p.date, date) <= PHLEBOTOMY_EFFECT_DAYS).sort((a, b) => a.date.localeCompare(b.date)).at(-1)
+    if (p) {
+      const what = p.kind === 'donation' ? 'blood donation' : 'therapeutic phlebotomy'
+      const moved = marker === 'ferritin' ? 'a lower ferritin here is the iron that left with the blood' : 'a lower reading here is the blood taken out'
+      tags.push({ kind: 'post-phlebotomy', short: 'post-phlebotomy', text: `${after(p.date)} the ${p.date} ${what} — ${moved}, not a change in the protocol` })
+    }
+  }
+  return tags
 }
 
 export interface HctHeadline {

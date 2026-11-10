@@ -19,6 +19,12 @@
           class="shrink-0 text-nano leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
           :title="`Taken while on ${caveatCompound} — see the note inside`"
         >on {{ caveatCompound }}</span>
+        <span
+          v-for="t in currentTags"
+          :key="t.kind"
+          class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
+          :title="t.text"
+        >{{ t.short }}</span>
       </span>
       <span
         class="text-meta shrink-0"
@@ -145,7 +151,15 @@
               class="flex items-center justify-between gap-3 px-2 py-1.5 text-small"
               :class="i % 2 ? 'bg-inset' : ''"
             >
-              <span class="text-muted">{{ row.dateLabel }}</span>
+              <span class="flex items-center gap-1.5 min-w-0">
+                <span class="text-muted">{{ row.dateLabel }}</span>
+                <span
+                  v-for="t in row.tags"
+                  :key="t.kind"
+                  class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
+                  :title="t.text"
+                >{{ t.short }}</span>
+              </span>
               <span class="flex items-baseline gap-2">
                 <span class="text-hi">{{ row.value }}<span
                   v-if="row.flagged"
@@ -168,6 +182,12 @@
           >
             No readings recorded yet.
           </p>
+          <p
+            v-if="tagLegend"
+            class="mt-2 text-meta text-faint leading-[1.6]"
+          >
+            {{ tagLegend }}
+          </p>
         </div>
       </div>
     </template>
@@ -181,6 +201,8 @@ import { BIOMARKERS, getStatus, statusLabel } from '~/data/biomarkers'
 import { courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import type { ReadingNote } from '#shared/utils/labNotes'
+import { PHLEBOTOMY_EFFECT_DAYS, PHLEBOTOMY_MARKERS, RBC_MASS_MARKERS, RBC_TURNOVER_DAYS, readingTags, transitionalWindows } from '#shared/utils/hematocrit'
+import { effectiveRules } from '~/utils/adherence'
 
 const props = defineProps<{
   biomarkerKey: string
@@ -252,6 +274,17 @@ const caveat = computed(() => caveats.value[props.biomarkerKey])
 const caveatCompound = computed(() =>
   carriedFrom.value ? caveatCompoundOn(caveats.value, props.biomarkerKey, carriedFrom.value, caveatSpans.value) : null
 )
+
+// Reading tags (item 101): a red-cell marker inside the turnover window after a dose change, or
+// any CBC/ferritin reading within weeks of a phlebotomy, says so on the card and in every history
+// row — the control panel's two caveats, carried to where the number is read. The windows come
+// from the schedule with planned cycles folded in, as /labs/hematocrit builds them; the visits
+// from the phlebotomy log (every role may read it). Both lists stay empty for other markers.
+const tagged = PHLEBOTOMY_MARKERS.has(props.biomarkerKey) || RBC_MASS_MARKERS.has(props.biomarkerKey)
+const { data: phlebData } = usePhlebotomies()
+const windows = computed(() => (tagged ? transitionalWindows(effectiveRules(cyclesData.value ?? [], protocolRules.value)) : []))
+const tagsOn = (date: string) => (tagged ? readingTags(props.biomarkerKey, date, windows.value, phlebData.value ?? []) : [])
+const currentTags = computed(() => (carriedFrom.value ? tagsOn(carriedFrom.value) : []))
 
 // Assay caveat (the censored 2026-09-09 immunoassay testosterone): belongs to one draw rather
 // than to a medication, so it follows the reading on screen the way the badge above does.
@@ -333,10 +366,20 @@ const history = computed(() =>
       color: STATUS_COLORS[s],
       label: statusLabel(value, meta.value),
       flagged: caveatCompoundOn(caveats.value, props.biomarkerKey, e.date, caveatSpans.value) != null,
-      noted: readingNoteOn(e, props.biomarkerKey) != null
+      noted: readingNoteOn(e, props.biomarkerKey) != null,
+      tags: tagsOn(e.date)
     }
   })
 )
+
+// One line under the readings naming the tags they wear; nothing when none does.
+const tagLegend = computed(() => {
+  const kinds = new Set(history.value.flatMap(r => r.tags.map(t => t.kind)))
+  const parts: string[] = []
+  if (kinds.has('transitional')) parts.push(`transitional · inside the ~${RBC_TURNOVER_DAYS}-day red-cell turnover window after a dose change, so the change's full effect isn't in it yet`)
+  if (kinds.has('post-phlebotomy')) parts.push(`post-phlebotomy · within ${PHLEBOTOMY_EFFECT_DAYS / 7} weeks of blood taken out, so it reads the hole the visit made`)
+  return parts.length ? `${parts.join('. ')}. The control panel has each window and visit.` : ''
+})
 
 const showCaveat = computed(() =>
   !!caveat.value && (caveatCompound.value != null || history.value.some(r => r.flagged))

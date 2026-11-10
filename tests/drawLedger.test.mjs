@@ -56,3 +56,18 @@ test('one row per draw, newest first: timing chips, and each marker with its cha
   assert.equal(sep.fasting, false)
   assert.deepEqual(ledgerRows([], journal, rules), [])
 })
+
+test('each Hct/ferritin cell carries its reading tags: the turnover window after the T cut, and a phlebotomy before the draw (item 101)', () => {
+  const visit = { id: 1, date: '2026-09-20', kind: 'donation', ml: 500, pre_hgb: null, notes: null, created_at: 'x' }
+  const [oct, sep, aug] = ledgerRows(draws, journal, rules, [visit])
+  // Aug 15 is before the Aug 24 cut: no tag. Sep 9 is 16 days into the window.
+  assert.deepEqual(aug.cells.hematocrit.tags, [])
+  assert.deepEqual(sep.cells.hematocrit.tags.map(t => t.kind), ['transitional'])
+  // Oct 17: inside the window and 27 days after the visit — both; ferritin only the visit's.
+  assert.deepEqual(oct.cells.hematocrit.tags.map(t => t.kind), ['transitional', 'post-phlebotomy'])
+  assert.deepEqual(oct.cells.ferritin.tags.map(t => t.kind), ['post-phlebotomy'])
+  assert.deepEqual(oct.cells.estradiol.tags, [], 'a hormone cell never wears one')
+  assert.deepEqual(sep.cells.estradiol.tags, [], 'an empty cell has none')
+  // Without the log the ledger still builds, tags from the windows alone.
+  assert.deepEqual(ledgerRows(draws, journal, rules)[0].cells.hematocrit.tags.map(t => t.kind), ['transitional'])
+})

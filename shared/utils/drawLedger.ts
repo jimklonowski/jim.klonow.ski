@@ -6,6 +6,7 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { COMPOUND_SHORT, drawTimingChips, type TimingChip } from './drawTimingView.ts'
+import { readingTags, transitionalWindows, type Phlebotomy, type ReadingTag } from './hematocrit.ts'
 import { isCensored, readingNoteOn, type NotedDraw } from './labNotes.ts'
 import { PK_MODELS } from './pk.ts'
 import type { pkDosesFor } from './pk.ts'
@@ -46,6 +47,8 @@ export interface MarkerCell {
   delta: number | null
   /** The previous reading's date, for the title. */
   since: string | null
+  /** Why the value may not mean what it says (a turnover window, a recent phlebotomy) — item 101. */
+  tags: ReadingTag[]
 }
 
 export interface LedgerRow {
@@ -85,9 +88,10 @@ export function protocolOn(rules: readonly ProtocolRule[], date: string): Protoc
 }
 
 /** The ledger, newest draw first. Deltas are against the previous usable reading of the same marker. */
-export function ledgerRows(draws: readonly LedgerDraw[], journal: readonly LoggedDay[], rules: readonly ProtocolRule[]): LedgerRow[] {
+export function ledgerRows(draws: readonly LedgerDraw[], journal: readonly LoggedDay[], rules: readonly ProtocolRule[], phlebotomies: readonly Phlebotomy[] = []): LedgerRow[] {
   const sorted = [...draws].sort((a, b) => a.date.localeCompare(b.date))
   const last: Partial<Record<LedgerMarker, { value: number, date: string }>> = {}
+  const windows = transitionalWindows(rules)
   const rows: LedgerRow[] = []
   for (const d of sorted) {
     const cells = {} as Record<LedgerMarker, MarkerCell>
@@ -102,7 +106,8 @@ export function ledgerRows(draws: readonly LedgerDraw[], journal: readonly Logge
         censored,
         noted: readingNoteOn(d, key) != null,
         delta: usable && prev ? Number((value - prev.value).toFixed(1)) : null,
-        since: usable && prev ? prev.date : null
+        since: usable && prev ? prev.date : null,
+        tags: value != null ? readingTags(key, d.date, windows, phlebotomies) : []
       }
       if (usable) last[key] = { value, date: d.date }
     }

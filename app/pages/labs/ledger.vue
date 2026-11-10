@@ -106,12 +106,15 @@
           >{{ cellText(row.original.cells[key]) }}<span
             v-if="row.original.cells[key].noted && !row.original.cells[key].censored"
             class="text-warn"
-          > *</span></span>
+          > *</span><span
+            v-if="row.original.cells[key].tags.length"
+            class="text-muted"
+          > {{ tagGlyphs(row.original.cells[key]) }}</span></span>
         </template>
       </UTable>
 
       <p class="px-4 sm:px-6 py-3 text-meta text-faint leading-[1.6]">
-        Change in parentheses is against the previous usable reading of that marker. † a value at the assay's ceiling, a bound rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
+        Change in parentheses is against the previous usable reading of that marker. † a value at the assay's ceiling, a bound rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). {{ TAG_GLYPH.transitional }} a red-cell reading inside the ~{{ RBC_TURNOVER_DAYS }}-day turnover window after a dose change, which cannot yet show that change's full effect. {{ TAG_GLYPH['post-phlebotomy'] }} a reading within {{ PHLEBOTOMY_EFFECT_DAYS / 7 }} weeks of a blood donation or therapeutic phlebotomy, which reads the blood taken out. Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
       </p>
       <p class="px-4 sm:px-6 pb-3 text-meta text-ghost">
         {{ GENERAL_DISCLAIMER }}
@@ -124,6 +127,7 @@
 import type { TableColumn } from '@nuxt/ui'
 import { LEDGER_MARKERS, cellText, ledgerRows, type LedgerMarker, type LedgerRow, type MarkerCell } from '#shared/utils/drawLedger'
 import { TIMING_CAVEAT } from '#shared/utils/drawTimingView'
+import { PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, type ReadingTag } from '#shared/utils/hematocrit'
 import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 
@@ -133,15 +137,21 @@ useSeoMeta({ title: 'Labs · Draw ledger' })
 // timing and the gating markers with deltas — a doctor-readable table, printable, no AI.
 // shared/utils/drawLedger.ts holds the arithmetic. The dose log is a client-only list and the
 // doctor role has none, so that column reads "—" for it.
-const [{ data: labsData, error, refresh }, { data: journalData }, { rules }] = await Promise.all([
+const [{ data: labsData, error, refresh }, { data: journalData }, { rules }, { data: phlebData }] = await Promise.all([
   useLabsEntries(),
   useJournalEntries(),
-  useProtocol()
+  useProtocol(),
+  // Each Hct/ferritin cell says when it sits in a turnover window or just after a phlebotomy (item 101).
+  usePhlebotomies()
 ])
 
 // Blood draws only: an echo-only row is a scan, not a draw.
 const draws = computed(() => (labsData.value ?? []).filter(e => !isEchoOnly(e)))
-const rows = computed(() => ledgerRows(draws.value, journalData.value ?? [], rules.value))
+const rows = computed(() => ledgerRows(draws.value, journalData.value ?? [], rules.value, phlebData.value ?? []))
+
+// Printable superscripts for the two reading tags; the footer spells them out.
+const TAG_GLYPH: Record<ReadingTag['kind'], string> = { 'transitional': 'ᵗ', 'post-phlebotomy': 'ᵖ' }
+const tagGlyphs = (cell: MarkerCell) => cell.tags.map(t => TAG_GLYPH[t.kind]).join('')
 
 const columns: TableColumn<LedgerRow>[] = [
   { id: 'date', header: 'Draw' },
@@ -163,6 +173,7 @@ function cellTitle(key: LedgerMarker, cell: MarkerCell): string | undefined {
   const parts = [BIOMARKERS[key]?.label ?? key]
   if (cell.censored) parts.push('at the assay ceiling — a bound, not a measurement')
   else if (cell.since) parts.push(`change since the ${cell.since} draw`)
+  for (const t of cell.tags) parts.push(`${t.short}: ${t.text}`)
   return parts.join(' · ')
 }
 
