@@ -56,6 +56,13 @@
           LEDGER →
         </NuxtLink>
         <NuxtLink
+          to="/labs/report"
+          class="tui-btn"
+          title="One printable page for a clinician: protocol in force, out-of-range markers, hematocrit, vitals, next draw, immunizations"
+        >
+          REPORT →
+        </NuxtLink>
+        <NuxtLink
           to="/labs/hematocrit"
           class="tui-btn"
         >

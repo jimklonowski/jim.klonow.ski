@@ -44,6 +44,8 @@ const DOCTOR_PAGES = [
   // The draw ledger — protocol in force, timing since the shot, gating markers per draw — is
   // written for the doctor's eye in the first place (audit #43 item 64).
   /^\/labs\/ledger$/,
+  // The one-page clinical summary — written for the visit itself (audit #43 item 73).
+  /^\/labs\/report$/,
   /^\/journal$/,
   /^\/journal\/trends$/,
   /^\/journal\/compounds$/,
