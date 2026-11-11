@@ -15,12 +15,12 @@ export default defineEventHandler(async (event) => {
   // earlier correction, or nothing — goes in the log, so a slip of the keyboard is one undo away.
   const before = await auditBefore(event, 'meal_estimates', key)
   const now = new Date().toISOString()
-  await db.prepare(MEAL_ESTIMATE_MANUAL_UPSERT).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now).run()
+  await db.prepare(MEAL_ESTIMATE_MANUAL_UPSERT).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now, body.sodium_mg, body.fiber_g).run()
   await recordAudit(event, {
     table: 'meal_estimates',
     key,
     before,
-    summary: `figures for "${body.text.trim()}": ${body.kcal} kcal · ${body.protein_g}P / ${body.carbs_g}C / ${body.fat_g}F`
+    summary: `figures for "${body.text.trim()}": ${body.kcal} kcal · ${body.protein_g}P / ${body.carbs_g}C / ${body.fat_g}F${body.sodium_mg != null ? ` · ${body.sodium_mg} mg sodium` : ''}${body.fiber_g != null ? ` · ${body.fiber_g} g fibre` : ''}`
   })
 
   const [estimate] = await estimatesForKeys(db, [key])

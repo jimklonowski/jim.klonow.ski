@@ -15,8 +15,8 @@
         <p class="leading-none mt-0.5">
           <span
             class="num-display text-head"
-            :class="todaySodas.length ? 'text-warn' : 'text-accent'"
-          >{{ todaySodas.length }}</span><span class="text-micro text-muted"> today</span>
+            :class="sodaCount ? 'text-warn' : 'text-accent'"
+          >{{ sodaCount }}</span><span class="text-micro text-muted"> today</span>
         </p>
       </div>
 
@@ -96,7 +96,7 @@
       <div class="flex items-baseline justify-between gap-3 mt-1.5 text-label">
         <span class="text-muted">{{ startLabel }}</span>
         <span class="text-muted">
-          <span :class="todaySodas.length ? 'text-warn' : 'text-accent'">{{ todaySodas.length }} today</span>{{ weekSummary }}<span :class="trendClass">{{ trendArrow }}</span>
+          <span :class="sodaCount ? 'text-warn' : 'text-accent'">{{ sodaCount }} today</span>{{ weekSummary }}<span :class="trendClass">{{ trendArrow }}</span>
         </span>
       </div>
     </template>
@@ -111,7 +111,7 @@
         <UInputMenu
           v-model="customDrink"
           mode="autocomplete"
-          :items="SODA_DRINKS"
+          :items="DRINK_NAMES"
           open-on-click
           placeholder="Dr Pepper"
           class="w-full"
@@ -143,6 +143,19 @@
       </div>
     </div>
 
+    <!-- Caffeine from the day's drinks (item 70): the total, when the last of it was, and how
+         much landed after 14:00 — the part that costs sleep. -->
+    <p
+      v-if="caffeine"
+      class="mt-2 text-meta text-muted"
+      data-caffeine
+    >
+      caffeine <span class="text-hi">{{ caffeine.mg }}</span> mg · last {{ caffeine.last }}<span
+        v-if="caffeine.late"
+        class="text-warn"
+      > · {{ caffeine.late }} mg after {{ LATE_CAFFEINE_HOUR }}:00</span>
+    </p>
+
     <div
       v-if="todaySodas.length"
       class="mt-3 pt-2.5 border-t border-line-soft"
@@ -155,6 +168,12 @@
       >
         <span class="text-faint shrink-0">{{ s.time }}</span>
         <span class="text-hi truncate">{{ sodaLabel(s) }}</span>
+        <!-- Not a soda (a sports drink, a coffee): logged here, kept off the soda count. -->
+        <span
+          v-if="!isSodaEntry(s)"
+          class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
+          :title="hydrates(s.drink) ? 'Not counted as a soda; its ounces count toward the water goal' : 'Not counted as a soda'"
+        >{{ DRINK_KIND_LABELS[drinkInfo(s.drink).kind] }}</span>
         <!-- A tap the outbox is still sending has no server index to remove by; it is marked
              instead, and the ✕ comes back once it lands. -->
         <span
@@ -180,8 +199,9 @@
 // Soda tracker (a habit nudge, not a vital): quick-add of the last-logged drink, a custom form,
 // today's list, and a 30-day bar. Extracted from the journal page, which carried all of this
 // inline. Writes go through /api/journal/soda and are reflected into the shared journal store.
-import { SODA_DRINKS, SODA_SIZES } from '~/data/journal'
+import { SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
+import { DRINK_GROUPS, DRINK_KIND_LABELS, LATE_CAFFEINE_HOUR, drinkInfo, drinkTotals, hydrates, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { lastSoda as lastSodaOf, quickAddLabel as quickAddLabelOf } from '#shared/utils/soda'
 import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
@@ -213,9 +233,17 @@ function daysFromToday(delta: number) {
   return shiftDays(today.value, delta)
 }
 
+// The day's whole drink list (the rows below); the count and the strip are its sodas alone.
 const todaySodas = computed<SodaEntry[]>(() =>
   entries.value.find(e => e.date === today.value)?.sodas ?? []
 )
+const sodaCount = computed(() => sodasOnly(todaySodas.value).length)
+// Every catalogued drink, sodas first — the custom form logs a Gatorade or a coffee here too.
+const DRINK_NAMES = DRINK_GROUPS.flatMap(g => g.names)
+const caffeine = computed(() => {
+  const t = drinkTotals(todaySodas.value)
+  return t.caffeine_mg > 0 && t.lastCaffeine ? { mg: t.caffeine_mg, last: t.lastCaffeine, late: lateCaffeineMg(todaySodas.value) } : null
+})
 
 // The last drink and the quick-add's label come from shared/utils/soda.ts — the home page's
 // + SODA button reads the same two, so they can't disagree.
@@ -315,7 +343,7 @@ const BAR_MIN_PCT = 6
 const days = computed(() => {
   const counts = new Map<string, number>()
   for (const e of entries.value) {
-    const n = (e.sodas ?? []).length
+    const n = sodasOnly(e.sodas).length
     if (n) counts.set(e.date, n)
   }
   const series = trailingDays(today.value, WINDOW_DAYS).map(date => ({ date, count: counts.get(date) ?? 0 }))
@@ -337,7 +365,7 @@ function countBetween(fromDaysAgo: number, toDaysAgo: number) {
   const to = daysFromToday(-toDaysAgo)
   return entries.value
     .filter(e => e.date >= from && e.date <= to)
-    .reduce((n, e) => n + (e.sodas?.length ?? 0), 0)
+    .reduce((n, e) => n + sodasOnly(e.sodas).length, 0)
 }
 
 const weekCount = computed(() => countBetween(6, 0))

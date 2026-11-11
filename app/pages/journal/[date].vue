@@ -460,8 +460,10 @@
           </section>
 
           <section>
+            <!-- Any drink goes here, not only sodas (shared/utils/drinks.ts): a sports drink stays
+                 off the soda count and adds its ounces to the water total. -->
             <TuiHeader
-              label="SODA"
+              label="DRINKS"
               :dashes="20"
             >
               <button
@@ -502,7 +504,7 @@
                   <UInputMenu
                     v-model="soda.drink"
                     mode="autocomplete"
-                    :items="SODA_DRINKS"
+                    :items="DRINK_NAMES"
                     open-on-click
                     placeholder="Dr Pepper"
                     class="w-full"
@@ -529,7 +531,7 @@
                     v-if="canEdit"
                     type="button"
                     class="text-small text-faint hover:text-danger cursor-pointer"
-                    :aria-label="`Remove soda ${i + 1}`"
+                    :aria-label="`Remove drink ${i + 1}`"
                     @click="removeSoda(i)"
                   >
                     ✕
@@ -541,7 +543,7 @@
               v-else
               class="mt-2.5 text-small text-muted"
             >
-              No sodas logged.
+              No drinks logged.
             </p>
           </section>
 
@@ -552,9 +554,10 @@
             >
               <span class="flex items-center gap-3 text-meta">
                 <span
-                  v-if="form.water.length"
+                  v-if="waterOzTotal"
                   class="text-muted"
-                >{{ waterTotals(form.water).oz }} oz</span>
+                  title="The pours below plus the day's sports drinks"
+                >{{ waterOzTotal }} oz</span>
                 <button
                   v-if="canEdit"
                   type="button"
@@ -885,9 +888,10 @@
 </template>
 
 <script setup lang="ts">
-import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_DRINKS, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, copyDoses, doseDefaults, lastSoda, withoutBlankRows } from '~/data/journal'
+import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, copyDoses, doseDefaults, lastSoda, withoutBlankRows } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
-import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting, waterTotals } from '#shared/utils/water'
+import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting } from '#shared/utils/water'
+import { DRINK_GROUPS, hydrationOz } from '#shared/utils/drinks'
 import {
   MEAL_SLOTS, MEAL_SLOT_LABELS, MEAL_SLOT_PLACEHOLDERS, dayNutrition, fmtKcal, fmtMacros, isSnackSlot, knownMeals,
   mealHistoryBySlot as mealHistoryBySlotOf, nutritionIsEstimated, resolveMealText, type MealSlot
@@ -1119,8 +1123,8 @@ function entrySummary(e: NonNullable<typeof allEntries.value>[number]): string {
   return [
     e.peptides?.length ? n(e.peptides.length, 'dose') : null,
     e.weight_lbs != null ? `weight ${e.weight_lbs}` : null,
-    e.sodas?.length ? n(e.sodas.length, 'soda') : null,
-    e.water?.length ? `${waterTotals(e.water).oz} oz water` : null,
+    e.sodas?.length ? n(e.sodas.length, 'drink') : null,
+    hydrationOz(e) ? `${hydrationOz(e)} oz water` : null,
     e.notes?.trim() ? 'notes' : null
   ].filter(Boolean).join(', ') || 'vitals only'
 }
@@ -1217,6 +1221,9 @@ watch(existingEntry, () => {
  * its chip (and an explicit AI option) for the owner.
  */
 const foodTotals = computed(() => dayNutrition({ food: form.food, sodas: form.sodas }, estimateIndex.value))
+// The drink picker's names (sodas first) and the day's water with its sports drinks counted in.
+const DRINK_NAMES = DRINK_GROUPS.flatMap(g => g.names)
+const waterOzTotal = computed(() => hydrationOz({ water: form.water, sodas: form.sodas }))
 const foodEstimated = computed(() => nutritionIsEstimated(foodTotals.value))
 
 /** Every meal with figures, for pairing a re-worded entry with the one it means (see resolveMealText). */

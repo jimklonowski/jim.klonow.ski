@@ -187,6 +187,34 @@
                 class="w-full"
               />
             </UFormField>
+            <!-- Optional (item 71): blank means "no figure", and the day's sodium then reads as a floor. -->
+            <UFormField
+              label="Sodium (mg)"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="draft.sodium_mg"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                step="10"
+                placeholder="optional"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="Fibre (g)"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model.number="draft.fiber_g"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                placeholder="optional"
+                class="w-full"
+              />
+            </UFormField>
           </div>
           <p class="text-micro text-faint">
             Label figures from the package or the chain's nutrition page are best. What you enter
@@ -251,7 +279,7 @@ const suggestion = computed(() => (estimate.value ? null : suggestMeal(props.tex
 const chipText = computed(() => {
   const e = estimate.value
   if (!e) return ''
-  return `${isLabelFigure(e) ? '' : '≈ '}${fmtKcal(e.kcal)} kcal · ${fmtMacros(e)}`
+  return `${isLabelFigure(e) ? '' : '≈ '}${fmtKcal(e.kcal)} kcal · ${fmtMacros(e)}${e.sodium_mg != null ? ` · ${fmtKcal(e.sodium_mg)} mg Na` : ''}`
 })
 const sourceMark = computed(() => {
   const e = estimate.value
@@ -297,7 +325,7 @@ const formText = ref('')
 /** A figure label never wraps onto a second line — the four inputs must share one baseline. */
 const FIELD_UI = { label: 'whitespace-nowrap' }
 const saving = ref(false)
-const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: number | '', fat_g: number | '' }>({ kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
+const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: number | '', fat_g: number | '', sodium_mg: number | '', fiber_g: number | '' }>({ kcal: '', protein_g: '', carbs_g: '', fat_g: '', sodium_mg: '', fiber_g: '' })
 
 function openForm(text: string | null = null) {
   formText.value = text ?? props.text ?? ''
@@ -306,11 +334,15 @@ function openForm(text: string | null = null) {
   draft.protein_g = e?.protein_g ?? ''
   draft.carbs_g = e?.carbs_g ?? ''
   draft.fat_g = e?.fat_g ?? ''
+  draft.sodium_mg = e?.sodium_mg ?? ''
+  draft.fiber_g = e?.fiber_g ?? ''
   formOpen.value = true
 }
 
 const draftValid = computed(() =>
   [draft.kcal, draft.protein_g, draft.carbs_g, draft.fat_g].every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0)
+  // The two optional figures: blank, or a non-negative number.
+  && [draft.sodium_mg, draft.fiber_g].every(v => v === '' || (typeof v === 'number' && Number.isFinite(v) && v >= 0))
 )
 
 async function saveFigures() {
@@ -322,7 +354,9 @@ async function saveFigures() {
       kcal: Math.round(draft.kcal as number),
       protein_g: draft.protein_g as number,
       carbs_g: draft.carbs_g as number,
-      fat_g: draft.fat_g as number
+      fat_g: draft.fat_g as number,
+      sodium_mg: draft.sodium_mg === '' ? null : draft.sodium_mg,
+      fiber_g: draft.fiber_g === '' ? null : draft.fiber_g
     })
     formOpen.value = false
     toast.add({ title: 'Figures saved', color: 'success', icon: 'i-lucide-check' })

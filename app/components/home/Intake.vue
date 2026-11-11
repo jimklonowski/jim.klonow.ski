@@ -289,7 +289,9 @@ const kcalText = computed(() => {
 })
 const kcalTitle = computed(() => {
   const parts: string[] = []
-  if (props.day.sodaKcal) parts.push(`includes ${fmtKcal(props.day.sodaKcal)} kcal of soda`)
+  if (props.day.sodaKcal) parts.push(`includes ${fmtKcal(props.day.sodaKcal)} kcal of drinks`)
+  if (props.day.sodium_mg) parts.push(`sodium ${fmtKcal(props.day.sodium_mg)} mg${props.day.sodiumMissing ? '+' : ''}`)
+  if (props.day.caffeine_mg) parts.push(`caffeine ${props.day.caffeine_mg} mg`)
   if (props.day.missing.length) parts.push(`${props.day.missing.length} meal${props.day.missing.length === 1 ? '' : 's'} without figures — the total is a floor`)
   return parts.join(' · ') || undefined
 })

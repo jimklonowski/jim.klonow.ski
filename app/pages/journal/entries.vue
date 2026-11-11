@@ -181,7 +181,7 @@
 <script setup lang="ts">
 import { eachDay, shiftDays } from '#shared/utils/dates'
 import { sodaTotals } from '#shared/utils/soda'
-import { waterTotals } from '#shared/utils/water'
+import { hydrationOz, sodasOnly } from '#shared/utils/drinks'
 import { getCompoundColor } from '~/data/journal'
 
 useSeoMeta({ title: 'Journal · Entries' })
@@ -289,9 +289,10 @@ const pageRows = computed(() =>
       compounds: [...new Set((e.peptides ?? []).map(p => p.compound))].filter(Boolean).slice(0, 6),
       recon: (e.reconstitutions ?? []).length,
       photos: photoCounts.value[e.date] ?? 0,
-      sodas: (e.sodas ?? []).length,
-      sodaOz: sodaTotals(e.sodas ?? []).oz,
-      waterOz: waterTotals(e.water).oz,
+      // Sodas alone; the other drinks in the list add to the water column instead (drinks.ts).
+      sodas: sodasOnly(e.sodas).length,
+      sodaOz: sodaTotals(sodasOnly(e.sodas)).oz,
+      waterOz: hydrationOz(e),
       workouts: workoutCounts.value[e.date] ?? 0,
       flags: flagsFor(e, fasting)
     }

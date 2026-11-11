@@ -72,7 +72,7 @@ export function useOverview(role: Ref<Role | null>) {
   // home page's "today" stayed yesterday on an open tab until a reload.
   const today = useToday()
   const todayEntry = computed(() => entries.value.find(e => e.date === today.value) ?? null)
-  const sodasToday = computed(() => todayEntry.value?.sodas?.length ?? 0)
+  const sodasToday = computed(() => sodasOnly(todayEntry.value?.sodas).length)
 
   /** Doses logged today, earliest first. Falls back to the newest entry's doses when today is blank. */
   const dosesToday = computed<PeptideEntry[]>(() => {

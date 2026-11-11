@@ -144,10 +144,21 @@
       v-if="todaySodas.length"
       class="mt-2 text-meta text-muted"
     >
-      + {{ todaySodas.length }} soda{{ todaySodas.length === 1 ? '' : 's' }} ≈ {{ fmtKcal(day.sodaKcal) }} kcal<span
+      + {{ todaySodas.length }} drink{{ todaySodas.length === 1 ? '' : 's' }} ≈ {{ fmtKcal(day.sodaKcal) }} kcal<span
         v-if="day.sodaUnsized"
         class="text-faint"
       > (+{{ day.sodaUnsized }} unsized)</span>
+    </p>
+
+    <!-- Sodium, fibre and caffeine for the day (items 70 + 71): sodium and fibre from the meals
+         that carry a figure plus the drinks, each a floor ("+") while a meal has none. -->
+    <p
+      v-if="extrasLine"
+      class="mt-1 text-meta text-muted"
+      :title="extrasTitle"
+      data-extras
+    >
+      {{ extrasLine }}
     </p>
 
     <!-- The week: average over the days whose meals are all estimated, against the protein
@@ -293,6 +304,23 @@ const todayEntry = computed(() => entries.value.find(e => e.date === today.value
 const todaySodas = computed(() => todayEntry.value?.sodas ?? [])
 const day = computed(() => dayNutrition(todayEntry.value, index.value))
 const dayEstimated = computed(() => nutritionIsEstimated(day.value))
+// "sodium 2,140 mg+ · fibre 18 g+ · caffeine 150 mg" — whichever the day has anything of.
+const extrasLine = computed(() => {
+  const d = day.value
+  const parts: string[] = []
+  if (d.sodium_mg) parts.push(`sodium ${fmtKcal(d.sodium_mg)} mg${d.sodiumMissing ? '+' : ''}`)
+  if (d.fiber_g) parts.push(`fibre ${Math.round(d.fiber_g)} g${d.fiberMissing ? '+' : ''}`)
+  if (d.caffeine_mg) parts.push(`caffeine ${d.caffeine_mg} mg`)
+  return parts.join(' · ')
+})
+const extrasTitle = computed(() => {
+  const d = day.value
+  const notes: string[] = []
+  if (d.sodiumMissing) notes.push(`${d.sodiumMissing} meal${d.sodiumMissing === 1 ? '' : 's'} without a sodium figure — the total is a floor`)
+  if (d.fiberMissing) notes.push(`${d.fiberMissing} without a fibre figure`)
+  notes.push('drinks counted from their label figures')
+  return notes.join(' · ')
+})
 
 // The target: a fixed figure, else g/lb lean × the latest scan (shared/utils/proteinTarget.ts).
 const target = computed(() => proteinTargetFor(profileData.value, dexaData.value ?? []))

@@ -196,7 +196,10 @@ export const zMealCorrect = z.object({
   kcal: z.number().int().min(0).max(10_000),
   protein_g: z.number().min(0).max(1_000),
   carbs_g: z.number().min(0).max(2_000),
-  fat_g: z.number().min(0).max(1_000)
+  fat_g: z.number().min(0).max(1_000),
+  // Optional (item 71): blank = no figure, stored NULL.
+  sodium_mg: z.preprocess(blankAsAbsent, z.number().min(0).max(20_000).nullish()).transform(v => v ?? null),
+  fiber_g: z.preprocess(blankAsAbsent, z.number().min(0).max(200).nullish()).transform(v => v ?? null)
 })
 
 // --- water (quick-add widget) --- same shape as the soda pair; `oz` is the one required field.

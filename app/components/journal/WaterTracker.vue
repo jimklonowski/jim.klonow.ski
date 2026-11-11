@@ -198,6 +198,7 @@
 // through /api/journal/water and are reflected into the shared journal store, so the entry form,
 // the ledger and the status line all move with each tap.
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, WATER_MAX_OZ_PER_ENTRY, fmtOzValue, waterProgress, waterSetting, waterTotals } from '#shared/utils/water'
+import { hydrationOz } from '#shared/utils/drinks'
 import type { WaterEntry } from '~/data/journal'
 import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
@@ -222,7 +223,9 @@ const today = useToday()
 const todayWater = computed<WaterEntry[]>(() =>
   entries.value.find(e => e.date === today.value)?.water ?? []
 )
-const todayOz = computed(() => waterTotals(todayWater.value).oz)
+// The pours plus the day's sports drinks (shared/utils/drinks.ts hydrationOz): a Gatorade logged
+// in the drink list counts toward the goal.
+const todayOz = computed(() => hydrationOz(entries.value.find(e => e.date === today.value)))
 const progress = computed(() => waterProgress(todayOz.value, goalOz.value))
 const metGoal = computed(() => todayOz.value >= goalOz.value)
 const lastPour = computed(() => [...todayWater.value].sort((a, b) => a.time.localeCompare(b.time)).at(-1) ?? null)
@@ -355,8 +358,8 @@ const BAR_MIN_PCT = 6
 const days = computed(() => {
   const byDate = new Map<string, { oz: number, count: number }>()
   for (const e of entries.value) {
-    const t = waterTotals(e.water)
-    if (t.count) byDate.set(e.date, t)
+    const oz = hydrationOz(e)
+    if (oz) byDate.set(e.date, { oz, count: waterTotals(e.water).count })
   }
   const series = trailingDays(today.value, WINDOW_DAYS).map((date) => {
     const t = byDate.get(date)

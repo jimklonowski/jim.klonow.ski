@@ -16,6 +16,9 @@ export interface LibraryItem {
   protein_g: number
   carbs_g: number
   fat_g: number
+  /** Sodium (mg) and fibre (g) off the same label, when it has been read (item 71); absent = not yet entered, never zero. */
+  sodium_mg?: number
+  fiber_g?: number
   /** What the figures describe, as it reads on the label. */
   portion: string
   /** Where the figures came from, and anything that had to be adjusted or assumed. */
@@ -724,13 +727,19 @@ function toEstimate(meal: LibraryMeal): Omit<MealEstimate, 'key'> {
   let protein = 0
   let carbs = 0
   let fat = 0
+  // Sodium and fibre (item 71) sum only when every part's label carries the figure: a partial
+  // sum would read as the whole meal's.
+  let sodium: number | null = 0
+  let fiber: number | null = 0
   const portions: string[] = []
   for (const [item, n] of meal.parts) {
-    const it = ITEMS[item]
+    const it: LibraryItem = ITEMS[item]
     kcal += it.kcal * n
     protein += it.protein_g * n
     carbs += it.carbs_g * n
     fat += it.fat_g * n
+    sodium = sodium != null && it.sodium_mg != null ? sodium + it.sodium_mg * n : null
+    fiber = fiber != null && it.fiber_g != null ? fiber + it.fiber_g * n : null
     portions.push(`${n !== 1 ? `${Math.round(n * 100) / 100} × ` : ''}${it.portion}`)
   }
   return {
@@ -739,6 +748,8 @@ function toEstimate(meal: LibraryMeal): Omit<MealEstimate, 'key'> {
     protein_g: round1(protein),
     carbs_g: round1(carbs),
     fat_g: round1(fat),
+    sodium_mg: sodium != null ? Math.round(sodium) : null,
+    fiber_g: fiber != null ? round1(fiber) : null,
     confidence: 'high',
     assumptions: `${portions.join(' + ')}${meal.note ? ` — ${meal.note}` : ''}`,
     source: 'library',

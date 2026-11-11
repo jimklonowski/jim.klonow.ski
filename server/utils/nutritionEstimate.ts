@@ -28,10 +28,12 @@ const ESTIMATE_SCHEMA = {
           protein_g: { type: 'number' },
           carbs_g: { type: 'number' },
           fat_g: { type: 'number' },
+          sodium_mg: { type: 'integer' },
+          fiber_g: { type: 'number' },
           confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
           assumptions: { type: 'string' }
         },
-        required: ['text', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'confidence', 'assumptions'],
+        required: ['text', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'sodium_mg', 'fiber_g', 'confidence', 'assumptions'],
         additionalProperties: false
       }
     }
@@ -46,6 +48,8 @@ interface EstimateItem {
   protein_g: number
   carbs_g: number
   fat_g: number
+  sodium_mg: number
+  fiber_g: number
   confidence: EstimateConfidence
   assumptions: string
 }
@@ -61,7 +65,8 @@ Rules:
 - Snack-sized text ("sourdough snack", "beef sticks", "mozzarella sticks") = a snack portion, not a meal.
 - confidence: "high" for chain or packaged items with published figures, "medium" for home meals and generic items, "low" for vague or unusual text.
 - assumptions: one short clause naming the portion you assumed (e.g. "2 slices Costco cheese pizza"); an empty string when the text left nothing to assume.
-- kcal to the nearest 10; grams as whole numbers.
+- sodium_mg: the sodium in milligrams, from the chain's or package's published figure where there is one; restaurant and packaged food runs high (a fast-food burger meal is 1,200–1,800 mg), plain home-cooked food low unless the text names a salty sauce. fiber_g: dietary fibre in grams.
+- kcal to the nearest 10; grams as whole numbers; sodium to the nearest 10 mg.
 
 Meals:
 ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
@@ -91,6 +96,9 @@ export function parseEstimateRow(r: Record<string, unknown>): MealEstimate {
     protein_g: Number(r.protein_g),
     carbs_g: Number(r.carbs_g),
     fat_g: Number(r.fat_g),
+    // NULL = no figure (rows from before migration 0023, or a hand entry that left it blank).
+    sodium_mg: r.sodium_mg != null ? Number(r.sodium_mg) : null,
+    fiber_g: r.fiber_g != null ? Number(r.fiber_g) : null,
     confidence: (r.confidence as EstimateConfidence) ?? 'medium',
     assumptions: (r.assumptions as string | null) ?? null,
     source: r.source === 'manual' ? 'manual' : 'ai',
@@ -183,6 +191,9 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Es
       protein_g: Math.max(0, Math.round(item.protein_g * 10) / 10),
       carbs_g: Math.max(0, Math.round(item.carbs_g * 10) / 10),
       fat_g: Math.max(0, Math.round(item.fat_g * 10) / 10),
+      // Sodium and fibre are extras: a non-number leaves the figure out rather than failing the meal.
+      sodium_mg: Number.isFinite(item.sodium_mg) ? Math.max(0, Math.round(item.sodium_mg)) : null,
+      fiber_g: Number.isFinite(item.fiber_g) ? Math.max(0, Math.round(item.fiber_g * 10) / 10) : null,
       confidence: item.confidence ?? 'medium',
       assumptions: item.assumptions?.trim() || null,
       source: 'ai',
@@ -195,7 +206,7 @@ export async function estimateMeals(db: D1Database, texts: string[]): Promise<Es
   if (rows.length) {
     // A manual row that appeared since the SELECT above stays manual.
     await db.batch(rows.map(r => db.prepare(MEAL_ESTIMATE_AI_UPSERT)
-      .bind(r.key, r.text, r.kcal, r.protein_g, r.carbs_g, r.fat_g, r.confidence, r.assumptions, r.model, hash, now)))
+      .bind(r.key, r.text, r.kcal, r.protein_g, r.carbs_g, r.fat_g, r.confidence, r.assumptions, r.model, hash, now, r.sodium_mg ?? null, r.fiber_g ?? null)))
   }
   return { estimates: [...cached, ...rows], unmatched }
 }

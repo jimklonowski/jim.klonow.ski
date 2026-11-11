@@ -55,7 +55,7 @@ export function useTickerDay(s: TickerDaySources) {
 
   // --- today, as the pet experiences it -------------------------------------------------------
   const todayEntry = computed(() => entryOn(entries.value, today.value))
-  const sodasToday = computed(() => (todayEntry.value?.sodas ?? []).length)
+  const sodasToday = computed(() => sodasOnly(todayEntry.value?.sodas).length)
   const sodasThisWeek = computed(() => sodasInWeek(entries.value, today.value))
   // Meals and walks fall back ONE day when today is still empty (tickerDay.ts mealDayOf / walkDayOf).
   const mealDay = computed(() => mealDayOf(entries.value, today.value))

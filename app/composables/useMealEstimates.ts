@@ -61,7 +61,7 @@ export async function useMealEstimates() {
     }
   }
 
-  async function correct(body: { text: string, kcal: number, protein_g: number, carbs_g: number, fat_g: number }): Promise<void> {
+  async function correct(body: { text: string, kcal: number, protein_g: number, carbs_g: number, fat_g: number, sodium_mg?: number | null, fiber_g?: number | null }): Promise<void> {
     const { estimate: row } = await $fetch<{ estimate: MealEstimate }>('/api/journal/meals/correct', { method: 'POST', body })
     if (row) merge([row])
   }

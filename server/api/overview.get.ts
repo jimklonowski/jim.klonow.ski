@@ -1,9 +1,9 @@
 import { isFullAccessRole } from '#shared/utils/access'
 import { LOGGED_DAY_SQL, loggedStreakFromDates } from '#shared/utils/journalLog'
 import { localToday } from '#shared/utils/time'
-import { waterTotals } from '#shared/utils/water'
 import type { OverviewSummary } from '#shared/types/overview'
 import { MEASURED_MARKERS_SQL, currentReadings } from '#shared/utils/labsTimeline'
+import { hydrationOz, sodasOnly, type DrinkLike } from '#shared/utils/drinks'
 import { isBoundReading, type Readings } from '#shared/utils/labReadings'
 import { computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 import { isCensoredOn } from '../data/markerCaveats'
@@ -79,6 +79,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     markers: computeMarkers(d.markers, d.fasting, k => (!demo && isCensoredOn(k, d.date)) || isBoundReading(d, k))
   }))))
 
+  const todayDrinks = JSON.parse((todayRow?.sodas as string) || '[]') as DrinkLike[]
   const pdfKeys = new Set<string>()
   for (const r of sourcesRes?.results ?? []) {
     for (const key of JSON.parse((r.sources as string) || '[]') as string[]) pdfKeys.add(key)
@@ -98,8 +99,9 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     streak: loggedStreakFromDates(loggedDates, today),
     latestEntryDate: (latestRes?.results?.[0]?.date as string | null | undefined) ?? null,
     latestRhr: (rhrRes?.results?.[0]?.rhr as number | null | undefined) ?? null,
-    sodasToday: auth.role === 'doctor' ? null : (JSON.parse((todayRow?.sodas as string) || '[]') as unknown[]).length,
-    waterOzToday: auth.role === 'doctor' ? null : waterTotals(JSON.parse((todayRow?.water as string) || '[]') as Array<{ oz?: number }>).oz,
+    // Sodas alone on the count; the sports drinks in the same list add their ounces to the water.
+    sodasToday: auth.role === 'doctor' ? null : sodasOnly(todayDrinks).length,
+    waterOzToday: auth.role === 'doctor' ? null : hydrationOz({ water: JSON.parse((todayRow?.water as string) || '[]') as Array<{ oz?: number }>, sodas: todayDrinks }),
     latestDraw,
     current,
     measured: (measuredRes?.results ?? []).map(r => r.key as string),

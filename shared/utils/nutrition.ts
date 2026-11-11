@@ -13,7 +13,7 @@
 // that the owner asks for explicitly — never automatically. Label figures are read as figures;
 // a model estimate is read as what it is (restaurant portions vary and the text names no
 // weights, so expect ±20–30 % per meal) and every surface marks it "est.".
-import { sodaKcalTotals } from './soda.ts'
+import { drinkTotals } from './drinks.ts'
 import { shiftDays } from './dates.ts'
 // (Not re-exported: shared/utils is auto-imported, and a name exported from two files makes Nuxt
 // warn and pick one — import mealKey / splitQuantity from './mealKey.ts' directly.)
@@ -100,6 +100,9 @@ export interface MealEstimate {
   protein_g: number
   carbs_g: number
   fat_g: number
+  /** Sodium, mg, and fibre, g (migration 0023, item 71): null on figures saved before them or entered without. */
+  sodium_mg?: number | null
+  fiber_g?: number | null
   confidence: EstimateConfidence
   /** The portion the model assumed, one short clause; null when nothing was assumed. */
   assumptions: string | null
@@ -150,6 +153,8 @@ export function scaleEstimate(e: MealEstimate, n: number, text: string, label?: 
     protein_g: round1(e.protein_g * n),
     carbs_g: round1(e.carbs_g * n),
     fat_g: round1(e.fat_g * n),
+    sodium_mg: e.sodium_mg != null ? Math.round(e.sodium_mg * n) : null,
+    fiber_g: e.fiber_g != null ? round1(e.fiber_g * n) : null,
     assumptions: `${label ?? `${n} ×`} ${e.text}${e.assumptions ? ` (${e.assumptions})` : ''}`
   }
 }
@@ -334,6 +339,11 @@ function composeEstimate(text: string, lookup: Lookup): MealEstimate | null {
   const source: EstimateSource = estimates.some(e => e.source === 'ai') ? 'ai' : estimates.some(e => e.source === 'manual') ? 'manual' : 'library'
   const confidence = estimates.reduce<EstimateConfidence>((c, e) => (CONFIDENCE_RANK[e.confidence] < CONFIDENCE_RANK[c] ? e.confidence : c), 'high')
   const latest = (pick: (e: MealEstimate) => string) => estimates.map(pick).sort().at(-1)!
+  // Sodium and fibre sum only when every part carries the figure: a partial sum would read as the whole.
+  const sumIfAll = (pick: (e: MealEstimate) => number | null | undefined) =>
+    estimates.every(e => pick(e) != null) ? estimates.reduce((s, e) => s + pick(e)!, 0) : null
+  const sodium = sumIfAll(e => e.sodium_mg)
+  const fiber = sumIfAll(e => e.fiber_g)
   return {
     key: mealKey(text),
     text,
@@ -341,6 +351,8 @@ function composeEstimate(text: string, lookup: Lookup): MealEstimate | null {
     protein_g: round1(totals.protein_g),
     carbs_g: round1(totals.carbs_g),
     fat_g: round1(totals.fat_g),
+    sodium_mg: sodium != null ? Math.round(sodium) : null,
+    fiber_g: fiber != null ? round1(fiber) : null,
     confidence,
     assumptions: estimates.map(e => `${e.text} ${fmtKcal(e.kcal)}`).join(' + '),
     source,
@@ -375,9 +387,18 @@ export interface DayNutrition extends MacroTotals {
   estimated: number
   /** Meal texts with no estimate yet — the day's total is a floor while this is non-empty. */
   missing: string[]
-  /** Calories from sodas whose size carried a volume (shared/utils/soda.ts); counted in `kcal`. */
+  /** Calories from the logged drinks whose size carried a volume (shared/utils/drinks.ts); counted in `kcal`. */
   sodaKcal: number
   sodaUnsized: number
+  /** Caffeine from the logged drinks, mg (item 70). */
+  caffeine_mg: number
+  /** Sodium from the meals that carry a figure plus the drinks, mg (item 71) — a floor while sodiumMissing > 0. */
+  sodium_mg: number
+  /** Logged meals with no sodium figure (including meals with no figures at all). */
+  sodiumMissing: number
+  /** Fibre from the meals that carry a figure, g — a floor while fiberMissing > 0. */
+  fiber_g: number
+  fiberMissing: number
   /** Every logged meal estimated and no unsized soda: the total is as good as it gets. */
   complete: boolean
 }
@@ -406,19 +427,38 @@ export function dayNutrition(entry: DayLike | null | undefined, index: EstimateI
     totals.carbs_g += m.estimate.carbs_g
     totals.fat_g += m.estimate.fat_g
   }
-  const soda = sodaKcalTotals(entry?.sodas ?? [])
-  totals.kcal += soda.kcal
-  // Soda is sugar: ~26 g carbs per 100 kcal, nothing else.
-  totals.carbs_g += Math.round(soda.kcal * 0.26)
+  // The drink list (sodas, sports drinks, coffee…): label figures from the catalogue
+  // (shared/utils/drinks.ts). A drink's carbs are its sugar.
+  const drinks = drinkTotals(entry?.sodas)
+  totals.kcal += drinks.kcal
+  totals.carbs_g += drinks.sugar_g
   const estimated = meals.length - missing.length
+  // Sodium and fibre (item 71): summed over the meals whose figures carry them, plus the drinks'
+  // sodium; a meal with figures but neither is counted, so the totals read as floors.
+  let sodium = drinks.sodium_mg
+  let fiber = 0
+  let sodiumMissing = 0
+  let fiberMissing = 0
+  for (const m of meals) {
+    if (!m.estimate) continue
+    if (m.estimate.sodium_mg != null) sodium += m.estimate.sodium_mg
+    else sodiumMissing++
+    if (m.estimate.fiber_g != null) fiber += m.estimate.fiber_g
+    else fiberMissing++
+  }
   return {
     ...totals,
     meals,
     estimated,
     missing,
-    sodaKcal: soda.kcal,
-    sodaUnsized: soda.unsized,
-    complete: meals.length > 0 && missing.length === 0 && soda.unsized === 0
+    sodaKcal: drinks.kcal,
+    sodaUnsized: drinks.unsized,
+    caffeine_mg: drinks.caffeine_mg,
+    sodium_mg: Math.round(sodium),
+    sodiumMissing: sodiumMissing + missing.length,
+    fiber_g: Math.round(fiber * 10) / 10,
+    fiberMissing: fiberMissing + missing.length,
+    complete: meals.length > 0 && missing.length === 0 && drinks.unsized === 0
   }
 }
 

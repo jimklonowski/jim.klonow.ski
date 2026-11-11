@@ -5,6 +5,7 @@ import { roundTo, shiftDays } from '#shared/utils/dates'
 import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
+import { LATE_CAFFEINE_HOUR, drinkTotals, hydrationOz, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
 import { bpLabel } from '#shared/utils/bloodPressure'
 import { TREND_LOOKBACK_DAYS, describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
@@ -84,8 +85,10 @@ function foodSummary(entries: JournalRow[], estimates: EstimateIndex) {
 
 /** Days of a range that logged any water, and the oz/day over just those days — unlogged days are unknown, not zero. */
 function waterSummary(entries: JournalRow[]): { days: number, oz: number, perDay: number } {
-  const days = entries.filter(e => (e.water?.length ?? 0) > 0).length
-  const { oz } = waterTotals(entries.flatMap(e => e.water ?? []))
+  // A day's water is its pours plus its sports drinks (shared/utils/drinks.ts hydrationOz).
+  const logged = entries.filter(e => hydrationOz(e) > 0)
+  const days = logged.length
+  const oz = Math.round(logged.reduce((s, e) => s + hydrationOz(e), 0) * 10) / 10
   return { days, oz, perDay: days ? Math.round(oz / days) : 0 }
 }
 
@@ -151,7 +154,8 @@ function sodaSummary(entries: JournalRow[]): SodaTotals & { breakdown: string } 
   const byDrink = new Map<string, { label: string, n: number }>()
   const all: SodaEntry[] = []
   for (const e of entries) {
-    for (const s of e.sodas ?? []) {
+    // Sodas only: the drink list also holds sports drinks and coffee (otherDrinksLine has those).
+    for (const s of sodasOnly(e.sodas)) {
       all.push(s)
       const label = (s.drink ?? 'unspecified').trim() || 'unspecified'
       const key = label.toLowerCase()
@@ -169,6 +173,33 @@ function sodaLine(s: SodaTotals & { breakdown: string }, days = 1): string {
   const oz = fmtSodaOz(s)
   const perDay = days > 1 && s.oz ? `, ~${Math.round(s.oz / days)} oz/day` : ''
   return `${s.count}${oz ? `, ${oz}${perDay}` : ''} (${s.breakdown})`
+}
+
+// "Gatorade 20oz bottle x2, Coffee 16oz cup" — the logged drinks that are not sodas, or ''.
+function otherDrinksLine(entries: JournalRow[]): string {
+  const counts = new Map<string, number>()
+  for (const e of entries) {
+    for (const s of e.sodas ?? []) {
+      if (isSodaEntry(s)) continue
+      const label = [s.drink?.trim() || 'drink', s.size?.trim()].filter(Boolean).join(' ')
+      counts.set(label, (counts.get(label) ?? 0) + 1)
+    }
+  }
+  return [...counts].map(([label, n]) => n > 1 ? `${label} x${n}` : label).join(', ')
+}
+
+// "Caffeine: 150 mg from drinks, last at 16:20, 109 mg after 14:00" for one day; over a range
+// the daily average and how many days had late caffeine. '' when the drinks carried none.
+function caffeineLine(entries: JournalRow[]): string {
+  const days = entries.map(e => ({ t: drinkTotals(e.sodas), late: lateCaffeineMg(e.sodas) })).filter(d => d.t.caffeine_mg > 0)
+  if (!days.length) return ''
+  if (entries.length === 1) {
+    const { t, late } = days[0]!
+    return `Caffeine: ${t.caffeine_mg} mg from logged drinks, last at ${t.lastCaffeine}${late ? `, ${late} mg of it after ${LATE_CAFFEINE_HOUR}:00 (late caffeine costs sleep)` : ''}`
+  }
+  const total = days.reduce((s, d) => s + d.t.caffeine_mg, 0)
+  const lateDays = days.filter(d => d.late > 0).length
+  return `Caffeine: ~${Math.round(total / days.length)} mg/day from logged drinks over ${days.length} day${days.length === 1 ? '' : 's'}${lateDays ? `, with caffeine after ${LATE_CAFFEINE_HOUR}:00 on ${lateDays} of them` : ''}`
 }
 
 // Dated journal notes as one fact-sheet line; notes are freeform so newlines are flattened
@@ -255,9 +286,16 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
 
   const sodas = sodaSummary(journal)
   if (sodas.count) lines.push(`Sodas: ${sodaLine(sodas)}`)
+  const others = otherDrinksLine(journal)
+  if (others) lines.push(`Other drinks (not sodas): ${others}`)
+  const caffeine = caffeineLine(journal)
+  if (caffeine) lines.push(caffeine)
 
-  const water = waterTotals(entry?.water)
-  if (water.count) lines.push(`Water: ${fmtWaterOz(water.oz)} over ${water.count} pour${water.count === 1 ? '' : 's'}`)
+  // Pours plus the day's sports drinks, which count toward the water goal.
+  const pours = waterTotals(entry?.water)
+  const water = { count: pours.count, oz: hydrationOz(entry) }
+  const sportsOz = drinkTotals(entry?.sodas).hydratingOz
+  if (water.oz) lines.push(`Water: ${fmtWaterOz(water.oz)}${pours.count ? ` over ${pours.count} pour${pours.count === 1 ? '' : 's'}` : ''}${sportsOz ? ` (incl. ${sportsOz} oz of sports drink)` : ''}`)
 
   // The meals as typed, then the day's total — a floor while any meal has no figures.
   const mealSlots = MEAL_SLOTS.filter(s => entry?.food?.[s]?.trim())
@@ -268,10 +306,19 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     const allLabel = nutrition.meals.every(m => !m.estimate || m.estimate.source !== 'ai')
     const figures = nutrition.estimated
       ? ` ${allLabel ? 'Label figures' : 'Est.'} ≈ ${Math.round(nutrition.kcal)} kcal, ${Math.round(nutrition.protein_g)} g protein, ${Math.round(nutrition.carbs_g)} g carbs, ${Math.round(nutrition.fat_g)} g fat`
-      + `${nutrition.sodaKcal ? ` (incl. ~${nutrition.sodaKcal} kcal from soda)` : ''}`
+      + `${nutrition.sodaKcal ? ` (incl. ~${nutrition.sodaKcal} kcal from drinks)` : ''}`
       + `${missing ? `; ${missing} meal${missing === 1 ? '' : 's'} without figures yet, so this is a floor` : ''}.`
       : ''
     lines.push(`Meals: ${list}.${figures}`)
+  }
+  // Sodium and fibre (item 71): meals that carry a figure plus the drinks' sodium; a floor
+  // while any logged meal has none.
+  if (nutrition.sodium_mg || nutrition.fiber_g) {
+    const parts = [
+      nutrition.sodium_mg ? `sodium ≈ ${nutrition.sodium_mg} mg${nutrition.sodiumMissing ? ` (a floor: ${nutrition.sodiumMissing} meal${nutrition.sodiumMissing === 1 ? '' : 's'} without a sodium figure)` : ''}` : '',
+      nutrition.fiber_g ? `fibre ≈ ${Math.round(nutrition.fiber_g)} g${nutrition.fiberMissing ? ' (a floor)' : ''}` : ''
+    ].filter(Boolean)
+    lines.push(`Sodium and fibre: ${parts.join('; ')}. The 2,300 mg/day sodium guideline is the reference; only compare a complete figure against it.`)
   }
 
   const notes = noteLines(journal)
@@ -406,6 +453,10 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
 
   const sodas = sodaSummary(journal)
   lines.push(sodas.count ? `Sodas: ${sodaLine(sodas, 7)}` : 'Sodas: none logged')
+  const others = otherDrinksLine(journal)
+  if (others) lines.push(`Other drinks (not sodas): ${others}`)
+  const caffeine = caffeineLine(journal)
+  if (caffeine) lines.push(caffeine)
 
   const water = waterSummary(journal)
   lines.push(water.days

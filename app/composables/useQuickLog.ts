@@ -1,6 +1,7 @@
 import type { SodaEntry, WaterEntry } from '#shared/types/journal'
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, waterSetting, waterTotals } from '#shared/utils/water'
 import { lastSoda as lastSodaOf, quickAddLabel } from '#shared/utils/soda'
+import { hydrationOz, sodasOnly } from '#shared/utils/drinks'
 import { patchJournalDay } from '~/utils/journalPatch'
 import { isNoResponse, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
@@ -29,17 +30,22 @@ export async function useQuickLog() {
   /** The same split in two — "DR PEPPER" and "12oz can" — for a button that drops the size on a phone. */
   const sodaDrink = computed(() => quickAddLabel({ drink: lastSoda.value?.drink }))
   const sodaSize = computed(() => lastSoda.value?.size ?? '')
-  const sodasToday = computed(() => (todayEntry.value?.sodas ?? []).length)
+  // Sodas only: the drink list also holds sports drinks and coffee (shared/utils/drinks.ts).
+  const sodasToday = computed(() => sodasOnly(todayEntry.value?.sodas).length)
   /** Sodas on any day — the home SODA meter's week ends on the day the column is scrubbed to. */
-  const sodasOn = (date: string) => (entries.value.find(e => e.date === date)?.sodas ?? []).length
+  const sodasOn = (date: string) => sodasOnly(entries.value.find(e => e.date === date)?.sodas).length
 
   // --- water: the profile's cup size and daily goal (the home page's WATER meter reads the goal) ---
   const cupOz = computed(() => waterSetting(profileData.value, 'cup_oz', WATER_DEFAULT_CUP_OZ))
   const goalOz = computed(() => waterSetting(profileData.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ))
-  const waterOzToday = computed(() => waterTotals(todayEntry.value?.water).oz)
+  // Ounces include the day's sports drinks (hydrationOz); pours are the water taps alone.
+  const waterOzToday = computed(() => hydrationOz(todayEntry.value))
   const watersToday = computed(() => waterTotals(todayEntry.value?.water).count)
   /** Ounces and pours on any day — the home WATER meter reads the day the vitals card is scrubbed to. */
-  const waterOn = (date: string) => waterTotals(entries.value.find(e => e.date === date)?.water)
+  const waterOn = (date: string) => {
+    const entry = entries.value.find(e => e.date === date)
+    return { count: waterTotals(entry?.water).count, oz: hydrationOz(entry) }
+  }
 
   // The shared local mirror (app/utils/journalPatch.ts) — the same one the widgets use.
   const patchToday = (patch: Partial<{ sodas: SodaEntry[], water: WaterEntry[] }>) => patchJournalDay(data, today.value, patch)
@@ -63,7 +69,7 @@ export async function useQuickLog() {
       })
       patchToday({ sodas })
       // The status line moves too, but a tap deserves a word of its own (audit #42 item 38).
-      toast.add({ title: `Logged ${sodaLabel.value}`, description: `${sodas.length} soda${sodas.length === 1 ? '' : 's'} today`, color: 'success', icon: 'i-lucide-check' })
+      toast.add({ title: `Logged ${sodaLabel.value}`, description: `${sodasOnly(sodas).length} soda${sodasOnly(sodas).length === 1 ? '' : 's'} today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
     }
     catch (err) {
@@ -90,7 +96,7 @@ export async function useQuickLog() {
         body: { date, time, oz, id }
       })
       patchToday({ water })
-      toast.add({ title: `Logged ${oz} oz of water`, description: `${waterTotals(water).oz} oz today`, color: 'success', icon: 'i-lucide-check' })
+      toast.add({ title: `Logged ${oz} oz of water`, description: `${hydrationOz({ water, sodas: todayEntry.value?.sodas })} oz today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
     }
     catch (err) {

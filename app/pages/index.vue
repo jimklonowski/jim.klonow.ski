@@ -500,8 +500,9 @@ const shownNutrition = computed(() => isToday.value ? todayNutrition.value : day
 // patches, so the row moves on the spot; read-only full-access roles (no buttons) read the same
 // journal list straight off the overview.
 const entryOn = (date: string) => entries.value.find(e => e.date === date)
-const waterOn = (date: string) => quickLog ? quickLog.waterOn(date) : waterTotals(entryOn(date)?.water)
-const sodasOn = (date: string) => quickLog ? quickLog.sodasOn(date) : (entryOn(date)?.sodas?.length ?? 0)
+// Sodas alone on the meter; the day's sports drinks add their ounces to the water (drinks.ts).
+const waterOn = (date: string) => quickLog ? quickLog.waterOn(date) : { count: waterTotals(entryOn(date)?.water).count, oz: hydrationOz(entryOn(date)) }
+const sodasOn = (date: string) => quickLog ? quickLog.sodasOn(date) : sodasOnly(entryOn(date)?.sodas).length
 /**
  * The WATER meter: the shown day's pours against the profile's CURRENT goal (goal changes aren't
  * versioned). Follows the column's ‹ › (Jim 2026-10-28: "see previous water intakes").

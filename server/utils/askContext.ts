@@ -5,7 +5,7 @@
 // questions can be answered without shipping 1,200 journal rows into the prompt.
 import { profileLabel } from '#shared/utils/profile'
 import { fmtSodaOz, sodaTotals } from '#shared/utils/soda'
-import { waterTotals } from '#shared/utils/water'
+import { drinkTotals, hydrationOz, isSodaEntry, sodasOnly } from '#shared/utils/drinks'
 import { bpAverageLabel, bpLabel } from '#shared/utils/bloodPressure'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, hasFullFigures, isWholeDay, type EstimateIndex } from '#shared/utils/nutrition'
 import type { JournalRow, SodaEntry, Vial } from '#shared/types/journal'
@@ -22,18 +22,24 @@ const avg = mean
 
 // "3 sodas (~27 oz)" — ounces alongside the count, since two mini cans read as "two" but are
 // less soda than one 20 oz bottle (shared/utils/soda.ts).
-function sodaText(sodas: SodaEntry[], noun: string): string {
-  const t = sodaTotals(sodas)
+// The drink list holds more than sodas (shared/utils/drinks.ts): the count is its sodas alone,
+// then the other drinks by name and the caffeine the lot carried.
+function sodaText(drinks: SodaEntry[], noun: string): string {
+  const t = sodaTotals(sodasOnly(drinks))
   const oz = fmtSodaOz(t)
-  return `${t.count} ${noun}${oz ? ` (${oz})` : ''}`
+  const others = drinks.filter(s => !isSodaEntry(s)).map(s => [s.drink?.trim() || 'drink', s.size?.trim()].filter(Boolean).join(' '))
+  const caffeine = drinkTotals(drinks).caffeine_mg
+  return `${t.count} ${noun}${oz ? ` (${oz})` : ''}${others.length ? `, other drinks: ${others.join(' + ')}` : ''}${caffeine ? `, caffeine ${caffeine} mg` : ''}`
 }
 
 // "water ~84 oz/day (5 days logged)" — averaged over the days that logged any, since a day with
 // no taps is unknown rather than zero. null when the window has none.
 function waterText(entries: JournalRow[]): string | null {
-  const days = entries.filter(e => (e.water?.length ?? 0) > 0).length
+  // Pours plus sports drinks, which count toward the water goal (hydrationOz).
+  const logged = entries.filter(e => hydrationOz(e) > 0)
+  const days = logged.length
   if (!days) return null
-  const { oz } = waterTotals(entries.flatMap(e => e.water ?? []))
+  const oz = logged.reduce((s, e) => s + hydrationOz(e), 0)
   return `water ~${Math.round(oz / days)} oz/day (${days} day${days === 1 ? '' : 's'} logged)`
 }
 
@@ -220,7 +226,7 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
         h?.sleep_total_min != null ? `sleep ${h.sleep_total_min}min` : null,
         doses ? `doses: ${doses}` : 'no doses',
         e.sodas?.length ? sodaText(e.sodas, 'soda') : null,
-        e.water?.length ? `water ${waterTotals(e.water).oz} oz` : null,
+        hydrationOz(e) ? `water ${hydrationOz(e)} oz` : null,
         mealsText(e, estimates),
         e.notes?.trim() ? `note: "${e.notes.trim().replace(/\s*\n+\s*/g, ' / ').slice(0, 200)}"` : null
       ].filter(Boolean)

@@ -8,6 +8,7 @@ import { isLoggedDay } from './journalLog.ts'
 import { tallySchedule } from './protocolRules.ts'
 import type { ProtocolRule } from './protocolRules.ts'
 import { RECOVERY_RED_MAX, isPeakRecovery } from './recovery.ts'
+import { sodasOnly } from './drinks.ts'
 import { sodaOunces } from './soda.ts'
 import { MANE_TIERS, TIER_DAYS } from './tickerWardrobe.ts'
 import type { Milestone } from './tickerWardrobe.ts'
@@ -77,7 +78,7 @@ export function sodasInWeek(entries: JournalEntry[], today: string): number {
   const from = shiftDays(today, -6)
   return entries
     .filter(e => e.date >= from && e.date <= today)
-    .reduce((s, e) => s + (e.sodas?.length ?? 0), 0)
+    .reduce((s, e) => s + sodasOnly(e.sodas).length, 0)
 }
 
 /**
@@ -481,7 +482,7 @@ export interface DropGerms {
 export function dropGermsOf(entries: JournalEntry[], today: string): DropGerms {
   const from = shiftDays(today, -(CRUSHER_WINDOW_DAYS - 1))
   let sodas = 0
-  for (const e of entries) if (e.date >= from && e.date <= today) sodas += (e.sodas ?? []).length
+  for (const e of entries) if (e.date >= from && e.date <= today) sodas += sodasOnly(e.sodas).length
   const germs = dropGermsFor(sodas, 1)
   const title = sodas ? `${germs} germs · ${sodas} soda${sodas === 1 ? '' : 's'} this month` : `${germs} germs · a clean month`
   return { germs, sodas, title }

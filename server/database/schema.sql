@@ -44,7 +44,10 @@ CREATE TABLE IF NOT EXISTS meal_estimates (
   model TEXT,
   prompt_hash TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  -- Migration 0023 (audit #43 item 71): NULL = no figure, never zero.
+  sodium_mg REAL,
+  fiber_g REAL
 );
 
 CREATE TABLE IF NOT EXISTS labs_entries (
