@@ -83,6 +83,13 @@
                 <span class="text-label text-muted">{{ relativeTime(d.created_at) }}</span>
               </TuiHeader>
 
+              <!-- The week's numbers as a fixed table, before the prose (item 79). -->
+              <DigestScorecard
+                v-if="d.type === 'weekly'"
+                :start="d.period_start"
+                :end="d.period_end"
+              />
+
               <div class="mt-2.5 text-row leading-[1.7] text-dim digest-prose">
                 <Markdown :value="d.summary" />
               </div>
