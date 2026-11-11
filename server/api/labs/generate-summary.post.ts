@@ -124,6 +124,8 @@ export default defineEventHandler(async (event) => {
     birthDate: birthRow?.value ?? null,
     fiveAriFrom: d => spans.find(s => FIVE_ARI.test(s.compound) && ruleActiveOn(s, d))?.from ?? null
   })
+  // The hand-entered drug-gene notes (item 78).
+  const pgxBlock = await pgxContext(db)
   const calcsBlock = calcs.length
     ? `Clinical calculators as of this draw (deterministic — report these figures as given, do not recompute them):\n${calcs.map(c => c.value != null ? `- ${c.label}: ${c.value}${c.unit ? ` ${c.unit}` : ''} — ${c.reading} (${c.inputs})` : `- ${c.label}: not computable — ${c.missing}`).join('\n')}`
     : ''
@@ -135,7 +137,7 @@ export default defineEventHandler(async (event) => {
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, accutaneBlock, calcsBlock, markerLines, readingNotes, qualitativeBlock
+    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, accutaneBlock, calcsBlock, pgxBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()

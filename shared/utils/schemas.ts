@@ -395,6 +395,16 @@ export const zMarkerGoalSave = z.object({
   note: zOptText(500)
 }).refine(g => (g.comparator === 'falling' || g.comparator === 'rising') || g.target != null, { message: 'A threshold goal needs a target', path: ['target'] })
 
+// A drug-gene note (audit #43 item 78): free text, bounded; the lists are short names and keys.
+export const zPgxNoteSave = z.object({
+  id: zId.optional(),
+  gene: zText(40).min(1),
+  genotype: zOptText(120),
+  compounds: z.array(zText(80).min(1)).max(20).default([]),
+  markers: z.array(z.string().trim().max(64).regex(/^[a-z0-9_]+$/)).max(20).default([]),
+  note: zText(1000).min(1)
+})
+
 // The key is checked against PROFILE_FIELDS in the handler (a select field also checks its
 // options there); '' or a missing value clears the fact. A number is accepted and stored as its
 // string: a number input emits one, and the card modal's post of `9` for the water cup was a 400

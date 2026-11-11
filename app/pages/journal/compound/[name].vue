@@ -26,6 +26,21 @@
       @retry="refresh"
     />
 
+    <!-- Drug-gene notes that bear on this compound (item 78): hand-entered on /journal/protocol -->
+    <div
+      v-if="pgx.length"
+      class="px-4 sm:px-6 py-3 border-b border-line"
+      data-pgx-compound
+    >
+      <p
+        v-for="n in pgx"
+        :key="n.id"
+        class="text-small leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
+      >
+        <span class="text-hi">{{ pgxHeading(n) }}</span> — {{ n.note }}
+      </p>
+    </div>
+
     <!-- Stat cells -->
     <div
       v-if="onDays.length"
@@ -338,6 +353,7 @@ import type { PeptideEntry } from '~/data/journal'
 import { getCompoundInfo, GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { calcUnits, convertUnitFor, iuEquivalentLabel } from '#shared/utils/peptideCalc'
 import type { DoseUnit } from '#shared/types/journal'
+import { pgxHeading, pgxNotesForCompound } from '#shared/utils/pgx'
 import { PK_MODELS, exposureSeries, pkDosesFor } from '#shared/utils/pk'
 
 const route = useRoute()
@@ -350,6 +366,9 @@ const compoundName = computed(() => decodeURIComponent(route.params.name as stri
 useSeoMeta({ title: () => compoundName.value })
 const compoundColor = computed(() => getCompoundColor(compoundName.value))
 const info = computed(() => getCompoundInfo(compoundName.value))
+// The drug-gene notes naming this compound (item 78).
+const { data: pgxData } = usePgxNotes()
+const pgx = computed(() => pgxNotesForCompound(pgxData.value ?? [], compoundName.value))
 
 const { data, refresh, error } = await useJournalEntries()
 const { data: labsData } = await useLabsEntries()

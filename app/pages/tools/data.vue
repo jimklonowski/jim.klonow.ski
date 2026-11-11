@@ -150,6 +150,7 @@ const TABLE_LABELS: Record<string, string> = {
   phlebotomies: 'Phlebotomy',
   cycles: 'Cycle',
   marker_goals: 'Marker goal',
+  pgx_notes: 'Drug-gene note',
   planned_draws: 'Planned draw',
   progress_photos: 'Photo',
   profile: 'Profile',

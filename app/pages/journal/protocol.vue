@@ -129,6 +129,14 @@
                 title="Logged in the journal and scored against the schedule"
               >logged</span>
 
+              <!-- A drug-gene note bears on this compound (item 78) -->
+              <span
+                v-for="n in pgxNotesForCompound(pgxNotes, row.item.name)"
+                :key="n.id"
+                class="shrink-0 text-meta text-warn border border-warn px-1.5 py-0.5"
+                :title="`${pgxHeading(n)}: ${n.note}`"
+              >{{ n.gene }}</span>
+
               <span
                 v-if="row.dose"
                 class="ml-auto shrink-0 text-row text-muted sm:order-2"
@@ -248,6 +256,12 @@
         </div>
       </section>
     </div>
+
+    <!-- Drug-gene notes (item 78): the list and its editor; each matching row above wears a chip. -->
+    <JournalPgxNotes
+      class="px-4 sm:px-6 pb-6 max-w-4xl"
+      :can-edit="canEdit"
+    />
 
     <!-- Add / edit an item -->
     <UModal
@@ -460,6 +474,7 @@
 
 <script setup lang="ts">
 import { protocolChangeWatch, signalsLine } from '#shared/utils/cycleSignals'
+import { pgxHeading, pgxNotesForCompound } from '#shared/utils/pgx'
 import { cadenceOf as cadenceText } from '#shared/utils/protocolRules'
 import { parseWeekdays, type ProtocolItemRow, type ProtocolVersionRow } from '#shared/utils/protocolStore'
 import { effectiveRules } from '~/utils/adherence'
@@ -490,6 +505,10 @@ const today = useToday()
 const changeWatch = computed(() => protocolChangeWatch(effectiveRules(cyclesData.value ?? [], protocolRules.value), today.value, journalData.value ?? [], healthData.value ?? []))
 const changeLine = computed(() => (changeWatch.value ? signalsLine(changeWatch.value.signals) : null))
 const changeLineClass = computed(() => ({ danger: 'text-danger', warn: 'text-warn', accent: 'text-accent', muted: 'text-muted' })[changeLine.value?.tone ?? 'muted'])
+
+// The drug-gene notes (item 78): a row whose compound a note names wears the gene as a chip.
+const { data: pgxData } = usePgxNotes()
+const pgxNotes = computed(() => pgxData.value ?? [])
 
 const DAILY = [0, 1, 2, 3, 4, 5, 6]
 
