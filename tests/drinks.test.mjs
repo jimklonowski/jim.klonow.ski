@@ -60,3 +60,41 @@ test('the soda quick-add repeats the last SODA, not the Gatorade logged after it
   assert.equal(lastSoda(entries).drink, 'Dr Pepper')
   assert.equal(lastSoda([entries[1]]), null)
 })
+
+// --- the owner's own label figures (drink_labels, migration 0024) ---
+
+test('a label replaces the table\'s figures at any size; the kind still comes from the name', async () => {
+  const { indexDrinkLabels, drinkSource, drinkKey } = await import('../shared/utils/drinks.ts')
+  const { dayNutrition, indexEstimates } = await import('../shared/utils/nutrition.ts')
+  const label = (name, serving_oz, kcal, caffeine_mg, sodium_mg, sugar_g) => ({ key: drinkKey(name), name, serving_oz, kcal, caffeine_mg, sodium_mg, sugar_g })
+  // Dr Pepper's table row is 150 / 41 / 55 / 40 per 12 oz; the "label" here is for a 20 oz bottle.
+  const labels = indexDrinkLabels([label('Dr Pepper', 20, 240, 68, 100, 64), label('Liquid Death', 16.9, 0, 0, 0, 0)])
+
+  assert.equal(drinkKey('  Dr   PEPPER '), 'dr pepper')
+  assert.equal(drinkSource('dr pepper', labels), 'label')
+  assert.equal(drinkSource('Coke', labels), 'table')
+  assert.equal(drinkSource('Some Local Cola', labels), 'typical')
+  assert.equal(drinkSource('Dr Pepper'), 'table', 'no labels → the table')
+
+  assert.deepEqual(drinkFigures('Dr Pepper', '20oz bottle', labels), { oz: 20, kcal: 240, caffeine_mg: 68, sodium_mg: 100, sugar_g: 64 }, 'the container itself reads exactly as printed')
+  assert.deepEqual(drinkFigures('Dr Pepper', '12oz can', labels), { oz: 12, kcal: 144, caffeine_mg: 41, sodium_mg: 60, sugar_g: 38 }, 'another size is scaled from the label')
+  assert.equal(drinkFigures('Dr Pepper', '12oz can').kcal, 150, 'without the labels the table still answers')
+  assert.equal(drinkFigures('Coke', '12oz can', labels).kcal, 140, 'an unlabelled drink is untouched')
+
+  // An unknown name is a soda by its name, label or not: the count does not move.
+  assert.equal(drinkInfo('Liquid Death', labels).kind, 'soda')
+  assert.equal(drinkFigures('Liquid Death', '16.9oz bottle', labels).kcal, 0)
+
+  const day = [{ time: '15:00', drink: 'Dr Pepper', size: '20oz bottle' }, { time: '09:00', drink: 'Coke', size: '12oz can' }]
+  assert.equal(drinkTotals(day, labels).caffeine_mg, 68 + 34)
+  assert.equal(lateCaffeineMg(day, labels), 68)
+  assert.equal(lateCaffeineMg(day), 68, 'the table happens to agree on a 20 oz Dr Pepper')
+
+  // The labels ride on the estimate index, so a day's nutrition total reads them.
+  const withLabels = dayNutrition({ food: {}, sodas: day }, indexEstimates([], labels))
+  const without = dayNutrition({ food: {}, sodas: day }, indexEstimates([]))
+  assert.equal(withLabels.sodaKcal, 240 + 140)
+  assert.equal(without.sodaKcal, 250 + 140)
+  assert.equal(withLabels.sodium_mg, 100 + 45)
+  assert.equal(indexEstimates([]).drinks, undefined, 'no labels → a plain index')
+})

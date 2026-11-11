@@ -1,5 +1,6 @@
 import { indexEstimates, lookupEstimate, type MealEstimate } from '#shared/utils/nutrition'
 import { mealKey } from '#shared/utils/mealKey'
+import { indexDrinkLabels } from '#shared/utils/drinks'
 
 // The meal-estimate cache as the pages see it: one shared list (useListResource, so every chip
 // on a page reads the same store), an index by key, and the two owner writes — estimate texts
@@ -12,10 +13,14 @@ export async function useMealEstimates() {
   // Everything that needs the Nuxt instance goes BEFORE the await: a plain async function has
   // no <script setup> async-context restore, so useState after it is NUXT_E1001 (a 500 on SSR).
   const inFlight = useState<string[]>('meal-estimates-in-flight', () => [])
+  // The owner's drink labels ride on the index, so every day total built from it sums a
+  // labelled drink from its label (shared/utils/nutrition.ts EstimateIndex).
+  const drinkLabels = useDrinkLabels()
   await resource
+  await drinkLabels
   const { data, refresh, error } = resource
 
-  const index = computed(() => indexEstimates(data.value ?? []))
+  const index = computed(() => indexEstimates(data.value ?? [], indexDrinkLabels(drinkLabels.data.value)))
 
   /** The figures for a meal text from any source — hand entry, code library, model — or null. */
   function lookup(text: string | null | undefined): MealEstimate | null {

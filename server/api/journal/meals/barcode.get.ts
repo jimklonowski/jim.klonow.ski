@@ -1,12 +1,12 @@
 import { normalizeBarcode, offFigures, type OffFigures, type OffProduct } from '#shared/utils/openFoodFacts'
 
 // A barcode → the product's label figures from Open Food Facts (audit #43 item 81), to PREFILL
-// the hand-entry form: nothing is stored here, and what the owner saves after checking it is a
+// the hand-entry form (a meal's figures, or a drink's label): nothing is stored here, and what the owner saves after checking it is a
 // 'manual' row like any other. Owner-only: it is the owner's form, and it makes an outbound
 // request. Only the barcode leaves the site — no session, no meal text.
 
 const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product'
-const FIELDS = 'code,product_name,brands,serving_size,nutriments'
+const FIELDS = 'code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutriments'
 
 export default defineEventHandler(async (event): Promise<{ found: boolean, code: string, figures: OffFigures | null }> => {
   requireOwner(event)

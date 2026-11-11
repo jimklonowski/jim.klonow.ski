@@ -357,6 +357,21 @@ CREATE TABLE IF NOT EXISTS pgx_notes (
   created_at TEXT NOT NULL
 );
 
+-- The owner's own label figures for a drink (migration 0024; shared/utils/drinks.ts): the
+-- built-in drink table was written from memory, so a drink whose can has been read carries a row
+-- here and every figure reads it instead. The figures are for one container of serving_oz.
+CREATE TABLE IF NOT EXISTS drink_labels (
+  key TEXT PRIMARY KEY,          -- the drink's name, trimmed and lowercased (drinkKey)
+  name TEXT NOT NULL,            -- as the owner logs it
+  serving_oz REAL NOT NULL,      -- the container the figures describe, fl oz
+  kcal REAL NOT NULL,
+  caffeine_mg REAL NOT NULL,
+  sodium_mg REAL NOT NULL,
+  sugar_g REAL NOT NULL,
+  barcode TEXT,                  -- the UPC/EAN it was looked up by, when it was
+  updated_at TEXT NOT NULL
+);
+
 -- Share invites: owner-minted links (/share/<id>) that grant read-only role sessions.
 -- Redemption is gated by expires_at/max_uses; setting revoked=1 (or deleting the row) also
 -- invalidates every session cookie minted from the invite — the auth middleware re-checks

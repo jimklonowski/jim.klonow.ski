@@ -155,6 +155,7 @@ const TABLE_LABELS: Record<string, string> = {
   progress_photos: 'Photo',
   profile: 'Profile',
   meal_estimates: 'Meal figures',
+  drink_labels: 'Drink label',
   ask_threads: 'Ask conversation'
 }
 

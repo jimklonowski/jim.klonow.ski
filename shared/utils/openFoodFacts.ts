@@ -16,6 +16,9 @@ export interface OffProduct {
   product_name?: string
   brands?: string
   serving_size?: string
+  /** The serving as a number, in serving_quantity_unit ('ml' for a drink, 'g' for food). */
+  serving_quantity?: number | string
+  serving_quantity_unit?: string
   nutriments?: Record<string, number | string | undefined>
 }
 
@@ -33,9 +36,33 @@ export interface OffFigures {
   /** null when the product carries neither sodium nor salt. */
   sodium_mg: number | null
   fiber_g: number | null
+  // For a drink's label form (drink_labels): the sugar, the caffeine when the product lists it
+  // (most don't), and the serving as fluid ounces when it is a volume.
+  sugar_g: number | null
+  caffeine_mg: number | null
+  serving_oz: number | null
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
+const ML_PER_FL_OZ = 29.5735
+
+/**
+ * A serving's volume in fl oz, or null when it is not a volume: "12 fl oz (355 ml)" → 12,
+ * "355 ml" → 12, "0.5 L" → 16.9, else the numeric serving when its unit is ml. A weight
+ * ("1 stick (32 g)") is null — a bare "oz" is not read as fluid.
+ */
+export function servingFlOz(product: OffProduct | null | undefined): number | null {
+  const text = product?.serving_size ?? ''
+  const flOz = /(\d+(?:\.\d+)?)\s*fl\.?\s*oz/i.exec(text)
+  if (flOz) return round1(Number(flOz[1]))
+  const ml = /(\d+(?:\.\d+)?)\s*ml\b/i.exec(text)
+  if (ml) return round1(Number(ml[1]) / ML_PER_FL_OZ)
+  const l = /(\d+(?:\.\d+)?)\s*l\b/i.exec(text)
+  if (l) return round1(Number(l[1]) * 1000 / ML_PER_FL_OZ)
+  const q = Number(product?.serving_quantity)
+  if (product?.serving_quantity_unit?.toLowerCase() === 'ml' && Number.isFinite(q) && q > 0) return round1(q / ML_PER_FL_OZ)
+  return null
+}
 
 /**
  * The product's figures per serving when it has them, else per 100 g; null when it has no
@@ -56,6 +83,9 @@ export function offFigures(product: OffProduct | null | undefined): OffFigures |
   if (kcal == null) return null
   const sodiumG = num(`sodium${s}`) ?? (num(`salt${s}`) != null ? num(`salt${s}`)! / 2.5 : null)
   const fiber = num(`fiber${s}`)
+  const sugar = num(`sugars${s}`)
+  // Open Food Facts keeps caffeine in grams, like sodium.
+  const caffeineG = num(`caffeine${s}`)
   const name = [product?.product_name?.trim(), product?.brands?.split(',')[0]?.trim()].filter(Boolean).join(' — ') || `barcode ${product?.code ?? ''}`.trim()
   return {
     name,
@@ -66,6 +96,9 @@ export function offFigures(product: OffProduct | null | undefined): OffFigures |
     carbs_g: round1(num(`carbohydrates${s}`) ?? 0),
     fat_g: round1(num(`fat${s}`) ?? 0),
     sodium_mg: sodiumG != null ? Math.round(sodiumG * 1000) : null,
-    fiber_g: fiber != null ? round1(fiber) : null
+    fiber_g: fiber != null ? round1(fiber) : null,
+    sugar_g: sugar != null ? round1(sugar) : null,
+    caffeine_mg: caffeineG != null ? Math.round(caffeineG * 1000) : null,
+    serving_oz: basis === 'serving' ? servingFlOz(product) : null
   }
 }

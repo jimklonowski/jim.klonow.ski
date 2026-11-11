@@ -36,6 +36,8 @@ export const AUDIT_KEYS = {
   // A hand-entered figure for a meal (correct.post.ts): the one meal_estimates write a person
   // makes; model rows are regenerable and not logged.
   meal_estimates: 'key',
+  // The owner's own label figures for a drink (migration 0024).
+  drink_labels: 'key',
   // A saved /ask conversation (audit #43 item 44). Its turns are not a table of their own here:
   // the delete folds them into the thread's before-image as `messages`, and restoring the thread
   // re-inserts them (restoreAudit) — a conversation came back whole or not at all.

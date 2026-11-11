@@ -103,6 +103,52 @@
         </div>
       </section>
 
+      <!-- Drivers: a cause beside its effect — sodium and the next morning's systolic, caffeine
+           after 14:00 and that night's sleep (shared/utils/drivers.ts). Each effect is charted
+           on its cause's day, so a pair of tiles lines up; the lines beneath compare the two
+           groups of days once each holds enough of them. -->
+      <section
+        v-if="driverTiles.length || driverLines.length"
+        data-drivers
+      >
+        <TuiHeader
+          label="DRIVERS ── a cause beside its effect"
+          :dashes="0"
+        >
+          <span class="text-micro text-muted normal-case">associations over the days in range, not causes</span>
+        </TuiHeader>
+
+        <div
+          v-if="driverTiles.length"
+          class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 mt-2.5"
+        >
+          <JournalMetricTile
+            v-for="tile in driverTiles"
+            :key="tile.key"
+            :label="tile.label"
+            :unit="tile.unit"
+            :value="tile.value"
+            :series="tile.series"
+            :rows="driverRows"
+            :raw-rows="driverRaw"
+            :annotations="annotations"
+            :show-notes="annotationsAvailable"
+            :connect="tile.connect"
+            :format="tile.format"
+            expandable
+          />
+        </div>
+        <div class="mt-2 space-y-0.5 text-small text-muted">
+          <p
+            v-for="line in driverLines"
+            :key="line.key"
+            :data-driver="line.key"
+          >
+            <span class="text-dim">{{ line.head }}</span> {{ line.text }}
+          </p>
+        </div>
+      </section>
+
       <!-- Health: Whoop + Apple Watch -->
       <section>
         <TuiHeader
@@ -214,6 +260,8 @@
 <script setup lang="ts">
 import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
+import { LATE_CAFFEINE_HOUR, lateCaffeineMg } from '#shared/utils/drinks'
+import { MIN_GROUP, caffeinePoints, median, sleepByNight, sodiumPoints, splitAt, wholeDaySodium } from '#shared/utils/drivers'
 import {
   ENERGY_WINDOW_DAYS, KCAL_PER_LB_DEFAULT, MIN_COVERAGE, appleExpenditure, dexaCalibration, energyBalance, fmtStored,
   scanPeriodBalance, type DayIntake
@@ -532,6 +580,80 @@ const foodTiles = computed(() => {
   ]
 })
 
+// --- drivers group ---
+// One row per journal day in range. The effect sits on its CAUSE's day: `sys_next` is the next
+// day's systolic, `sleep_night` the sleep of the night that followed — so the tiles of a pair
+// share an x axis. Sodium is charted only for a whole-figure day (wholeDaySodium); a floor is
+// not a figure.
+const DRIVER_FIELDS = ['sodium_mg', 'sys_next', 'late_caffeine_mg', 'sleep_night']
+const nightSleep = computed(() => sleepByNight(healthEntries.value))
+const systolicByDay = computed(() => new Map(entries.value.flatMap(e => (e.bp_systolic != null ? [[e.date, e.bp_systolic] as const] : []))))
+
+const driverRaw = computed(() =>
+  inRange(entries.value).map(e => ({
+    date: formatDate(e.date, 'monthDay'),
+    day: e.date,
+    sodium_mg: wholeDaySodium(e, estimateIndex.value),
+    sys_next: systolicByDay.value.get(shiftDays(e.date, 1)) ?? null,
+    // A day still under way has not had its late caffeine yet.
+    late_caffeine_mg: e.date < today.value ? lateCaffeineMg(e.sodas, estimateIndex.value.drinks) : null,
+    sleep_night: nightSleep.value.get(e.date) ?? null
+  }))
+)
+const driverRows = computed(() => smoothRows(driverRaw.value, DRIVER_FIELDS))
+
+const driverTiles = computed(() => {
+  const rows = driverRows.value
+  const has = (field: string) => rows.filter(r => (r as Record<string, unknown>)[field] != null).length >= 2
+  const tiles: Array<{ key: string, label: string, unit: string, value: string, series: Array<{ key: string, name: string, color: string }>, connect?: boolean, format?: (v: number) => string }> = []
+  // A pair is shown whole or not at all: the cause without its effect is just another tile.
+  if (has('sodium_mg') && has('sys_next')) {
+    tiles.push(
+      { key: 'sodium_mg', label: 'Sodium', unit: 'mg/day · whole days', value: fmtKcal(latest(rows, 'sodium_mg') ?? 0), series: [{ key: 'sodium_mg', name: 'sodium', color: CHART_WARN }], connect: true },
+      { key: 'sys_next', label: 'Systolic', unit: 'mmHg · next morning', value: fmt(latest(rows, 'sys_next')), series: [{ key: 'sys_next', name: 'sys, next day', color: CHART_DANGER }], connect: true }
+    )
+  }
+  if (has('late_caffeine_mg') && has('sleep_night') && rows.some(r => (r.late_caffeine_mg ?? 0) > 0)) {
+    const sleep = latest(rows, 'sleep_night')
+    tiles.push(
+      { key: 'late_caffeine_mg', label: 'Late caffeine', unit: `mg after ${LATE_CAFFEINE_HOUR}:00`, value: fmt(latest(rows, 'late_caffeine_mg')), series: [{ key: 'late_caffeine_mg', name: 'late caffeine', color: CHART_EMBER }] },
+      { key: 'sleep_night', label: 'Sleep', unit: 'that night', value: sleep == null ? '—' : formatDuration(sleep), series: [{ key: 'sleep_night', name: 'sleep', color: CHART_INDIGO }], format: formatDuration }
+    )
+  }
+  return tiles
+})
+
+// The comparisons, over the days in range. Sodium splits at the range's own median (most days
+// sit above any fixed limit, which would leave one side empty); caffeine splits at "any".
+const driverLines = computed(() => {
+  const lines: Array<{ key: string, head: string, text: string }> = []
+  const days = inRange(entries.value)
+  const n = (count: number) => `${count} day${count === 1 ? '' : 's'}`
+
+  const sodium = sodiumPoints(days, estimateIndex.value)
+  if (sodium.length) {
+    const s = splitAt(sodium, median(sodium.map(p => p.x)) ?? 0)
+    const text = s.enough
+      ? `${Math.round(s.above.mean!)} mmHg after days above ${fmtKcal(s.threshold)} mg (${n(s.above.n)}), ${Math.round(s.below.mean!)} after days at or below (${n(s.below.n)}) · ${signed(s.diff!, 0)} mmHg.`
+      : `${n(sodium.length)} pair a whole sodium figure with a reading the next morning — ${MIN_GROUP} on each side of the median are needed to compare. Sodium counts only on days where every meal carries a figure.`
+    lines.push({ key: 'sodium', head: 'Sodium → next-morning systolic:', text })
+  }
+
+  const caffeine = caffeinePoints(days.filter(e => e.date < today.value), healthEntries.value, estimateIndex.value)
+  if (caffeine.some(p => p.x > 0)) {
+    const s = splitAt(caffeine, 0)
+    const text = s.enough
+      ? `${formatDuration(Math.round(s.above.mean!))} on nights after any (${n(s.above.n)}), ${formatDuration(Math.round(s.below.mean!))} after none (${n(s.below.n)}) · ${s.diff! >= 0 ? '+' : '−'}${formatDuration(Math.round(Math.abs(s.diff!)))}.`
+      : `${n(s.above.n)} with any and ${n(s.below.n)} without have a night on file — ${MIN_GROUP} of each are needed to compare.`
+    lines.push({ key: 'caffeine', head: `Caffeine after ${LATE_CAFFEINE_HOUR}:00 → that night's sleep:`, text })
+  }
+  return lines
+})
+
+function signed(v: number, digits = 1) {
+  return `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(digits)}`
+}
+
 // --- health group ---
 // Per-metric line colors: green for the "more is better" fitness markers, indigo for sleep,
 // warn for strain (a load number with no good direction).
@@ -616,16 +738,20 @@ const sleepCategories = computed(() =>
   Object.fromEntries(SLEEP_STAGES.map(s => [s.key, { name: s.name, color: s.color }]))
 )
 
-const sleepRows = computed(() =>
-  inRange(healthEntries.value)
+const sleepRows = computed(() => {
+  const nights = inRange(healthEntries.value)
     .filter(e => SLEEP_STAGES.some(s => (e as unknown as Record<string, number | null>)[s.key] != null))
+  // A range that crosses a year carries the year in its labels: two "Mar 20" bars on one axis
+  // made the stacked chart throw ("duplicate Mar 20 / deep") on the all-time range.
+  const style = new Set(nights.map(e => e.date.slice(0, 4))).size > 1 ? 'short' : 'monthDay'
+  return nights
     .map(e => ({
-      date: formatDate(e.date, 'monthDay'),
+      date: formatDate(e.date, style),
       ...Object.fromEntries(
         SLEEP_STAGES.map(s => [s.key, (e as unknown as Record<string, number | null>)[s.key] ?? 0])
       )
     }))
-)
+})
 
 function asleepMinutes(params: Array<{ seriesName?: string, value?: number | string }>) {
   return params

@@ -13,7 +13,7 @@
 // that the owner asks for explicitly — never automatically. Label figures are read as figures;
 // a model estimate is read as what it is (restaurant portions vary and the text names no
 // weights, so expect ±20–30 % per meal) and every surface marks it "est.".
-import { drinkTotals } from './drinks.ts'
+import { drinkTotals, type DrinkLabels } from './drinks.ts'
 import { shiftDays } from './dates.ts'
 // (Not re-exported: shared/utils is auto-imported, and a name exported from two files makes Nuxt
 // warn and pick one — import mealKey / splitQuantity from './mealKey.ts' directly.)
@@ -124,10 +124,17 @@ export interface MealPortion {
   whole?: number
 }
 
-export type EstimateIndex = Map<string, MealEstimate>
+/**
+ * The figures a day is summed from: the meal estimates by key, and — riding along, so every
+ * caller of dayNutrition gets them without a second argument — the owner's own drink labels
+ * (shared/utils/drinks.ts). A bare `new Map()` is a valid index with no labels.
+ */
+export type EstimateIndex = Map<string, MealEstimate> & { drinks?: DrinkLabels }
 
-export function indexEstimates(rows: MealEstimate[] | null | undefined): EstimateIndex {
-  return new Map((rows ?? []).map(r => [r.key, r]))
+export function indexEstimates(rows: MealEstimate[] | null | undefined, drinks?: DrinkLabels | null): EstimateIndex {
+  const index: EstimateIndex = new Map((rows ?? []).map(r => [r.key, r]))
+  if (drinks?.size) index.drinks = drinks
+  return index
 }
 
 /** The LABEL figures for exactly this key — a hand entry (the most recent intent), else the code library — or null. */
@@ -429,7 +436,7 @@ export function dayNutrition(entry: DayLike | null | undefined, index: EstimateI
   }
   // The drink list (sodas, sports drinks, coffee…): label figures from the catalogue
   // (shared/utils/drinks.ts). A drink's carbs are its sugar.
-  const drinks = drinkTotals(entry?.sodas)
+  const drinks = drinkTotals(entry?.sodas, index.drinks)
   totals.kcal += drinks.kcal
   totals.carbs_g += drinks.sugar_g
   const estimated = meals.length - missing.length

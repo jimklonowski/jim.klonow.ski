@@ -190,8 +190,8 @@ function otherDrinksLine(entries: JournalRow[]): string {
 
 // "Caffeine: 150 mg from drinks, last at 16:20, 109 mg after 14:00" for one day; over a range
 // the daily average and how many days had late caffeine. '' when the drinks carried none.
-function caffeineLine(entries: JournalRow[]): string {
-  const days = entries.map(e => ({ t: drinkTotals(e.sodas), late: lateCaffeineMg(e.sodas) })).filter(d => d.t.caffeine_mg > 0)
+function caffeineLine(entries: JournalRow[], estimates: EstimateIndex): string {
+  const days = entries.map(e => ({ t: drinkTotals(e.sodas, estimates.drinks), late: lateCaffeineMg(e.sodas, estimates.drinks) })).filter(d => d.t.caffeine_mg > 0)
   if (!days.length) return ''
   if (entries.length === 1) {
     const { t, late } = days[0]!
@@ -288,7 +288,7 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   if (sodas.count) lines.push(`Sodas: ${sodaLine(sodas)}`)
   const others = otherDrinksLine(journal)
   if (others) lines.push(`Other drinks (not sodas): ${others}`)
-  const caffeine = caffeineLine(journal)
+  const caffeine = caffeineLine(journal, estimates)
   if (caffeine) lines.push(caffeine)
 
   // Pours plus the day's sports drinks, which count toward the water goal.
@@ -455,7 +455,7 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   lines.push(sodas.count ? `Sodas: ${sodaLine(sodas, 7)}` : 'Sodas: none logged')
   const others = otherDrinksLine(journal)
   if (others) lines.push(`Other drinks (not sodas): ${others}`)
-  const caffeine = caffeineLine(journal)
+  const caffeine = caffeineLine(journal, estimates)
   if (caffeine) lines.push(caffeine)
 
   const water = waterSummary(journal)

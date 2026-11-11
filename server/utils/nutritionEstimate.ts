@@ -78,12 +78,14 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
  * is and not as "no figures" across every digest and ask sheet (audit #42 item 31).
  */
 export async function loadEstimateIndex(db: D1Database): Promise<EstimateIndex> {
+  // The owner's drink labels ride on the index (shared/utils/nutrition.ts EstimateIndex).
+  const drinks = await loadDrinkLabels(db)
   try {
     const { results } = await db.prepare('SELECT * FROM meal_estimates').all<Record<string, unknown>>()
-    return indexEstimates((results ?? []).map(parseEstimateRow))
+    return indexEstimates((results ?? []).map(parseEstimateRow), drinks)
   }
   catch (err) {
-    if (isMissingTable(err)) return new Map()
+    if (isMissingTable(err)) return indexEstimates([], drinks)
     throw err
   }
 }

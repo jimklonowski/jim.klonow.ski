@@ -24,11 +24,11 @@ const avg = mean
 // less soda than one 20 oz bottle (shared/utils/soda.ts).
 // The drink list holds more than sodas (shared/utils/drinks.ts): the count is its sodas alone,
 // then the other drinks by name and the caffeine the lot carried.
-function sodaText(drinks: SodaEntry[], noun: string): string {
+function sodaText(drinks: SodaEntry[], noun: string, estimates: EstimateIndex): string {
   const t = sodaTotals(sodasOnly(drinks))
   const oz = fmtSodaOz(t)
   const others = drinks.filter(s => !isSodaEntry(s)).map(s => [s.drink?.trim() || 'drink', s.size?.trim()].filter(Boolean).join(' '))
-  const caffeine = drinkTotals(drinks).caffeine_mg
+  const caffeine = drinkTotals(drinks, estimates.drinks).caffeine_mg
   return `${t.count} ${noun}${oz ? ` (${oz})` : ''}${others.length ? `, other drinks: ${others.join(' + ')}` : ''}${caffeine ? `, caffeine ${caffeine} mg` : ''}`
 }
 
@@ -200,7 +200,7 @@ function weeklyLines(journal: JournalRow[], health: Array<Record<string, unknown
       avg(h.map(e => e.recovery_score as number | null)) != null ? `recovery ${roundTo(avg(h.map(e => e.recovery_score as number | null))!)}%` : null,
       avg(h.map(e => e.sleep_total_min as number | null)) != null ? `sleep ${Math.round(avg(h.map(e => e.sleep_total_min as number | null))!)}min` : null,
       `${wo.length} workouts`,
-      sodaText(j.flatMap(e => e.sodas ?? []), 'sodas'),
+      sodaText(j.flatMap(e => e.sodas ?? []), 'sodas', estimates),
       waterText(j),
       foodText(j, estimates)
     ].filter(Boolean)
@@ -225,7 +225,7 @@ function dailyLines(journal: JournalRow[], health: Array<Record<string, unknown>
         h?.recovery_score != null ? `recovery ${h.recovery_score}%` : null,
         h?.sleep_total_min != null ? `sleep ${h.sleep_total_min}min` : null,
         doses ? `doses: ${doses}` : 'no doses',
-        e.sodas?.length ? sodaText(e.sodas, 'soda') : null,
+        e.sodas?.length ? sodaText(e.sodas, 'soda', estimates) : null,
         hydrationOz(e) ? `water ${hydrationOz(e)} oz` : null,
         mealsText(e, estimates),
         e.notes?.trim() ? `note: "${e.notes.trim().replace(/\s*\n+\s*/g, ' / ').slice(0, 200)}"` : null

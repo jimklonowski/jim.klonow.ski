@@ -171,7 +171,7 @@ export function weeklyScorecard(i: ScorecardInputs): ScoreRow[] {
     detail: st.count ? `${st.oz ? `~${st.oz} oz · ` : ''}${new Set(journal.filter(e => sodasOnly(e.sodas).length).map(e => e.date)).size} of ${days.length} days` : 'a clean week',
     tone: st.count ? 'warn' : 'ok'
   })
-  const cafDays = journal.map(e => ({ mg: drinkTotals(e.sodas).caffeine_mg, late: lateCaffeineMg(e.sodas) })).filter(d => d.mg > 0)
+  const cafDays = journal.map(e => ({ mg: drinkTotals(e.sodas, i.estimates.drinks).caffeine_mg, late: lateCaffeineMg(e.sodas, i.estimates.drinks) })).filter(d => d.mg > 0)
   if (cafDays.length) {
     const lateDays = cafDays.filter(d => d.late > 0).length
     rows.push({

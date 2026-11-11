@@ -202,6 +202,20 @@ export const zMealCorrect = z.object({
   fiber_g: z.preprocess(blankAsAbsent, z.number().min(0).max(200).nullish()).transform(v => v ?? null)
 })
 
+// The owner's label figures for a drink (drink_labels): all four figures are required — a label
+// prints them all, and a caffeine-free drink is a typed 0, not a blank.
+export const zDrinkLabelSave = z.object({
+  name: zText(80).min(1),
+  serving_oz: z.number().min(1).max(128),
+  kcal: z.number().min(0).max(2_000),
+  caffeine_mg: z.number().min(0).max(1_000),
+  sodium_mg: z.number().min(0).max(5_000),
+  sugar_g: z.number().min(0).max(500),
+  barcode: z.string().trim().regex(/^(\d{8}|\d{12,14})$/).nullish().transform(v => v || null)
+})
+
+export const zDrinkLabelDelete = z.object({ name: zText(80).min(1) })
+
 // --- water (quick-add widget) --- same shape as the soda pair; `oz` is the one required field.
 
 export const zWaterAdd = z.object({

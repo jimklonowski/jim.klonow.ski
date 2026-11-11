@@ -174,24 +174,52 @@
           class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
           :title="hydrates(s.drink) ? 'Not counted as a soda; its ounces count toward the water goal' : 'Not counted as a soda'"
         >{{ DRINK_KIND_LABELS[drinkInfo(s.drink).kind] }}</span>
-        <!-- A tap the outbox is still sending has no server index to remove by; it is marked
-             instead, and the ✕ comes back once it lands. -->
-        <span
-          v-if="isPendingId(s.id)"
-          class="ml-auto shrink-0 text-meta text-muted"
-          title="Kept while offline — sent when you're back online"
-        >⏳ pending</span>
-        <button
-          v-else-if="!readonly"
-          type="button"
-          class="ml-auto shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50"
-          :disabled="removingIndex !== null"
-          @click="remove(i)"
-        >
-          {{ removingIndex === i ? '⋯' : '✕' }}
-        </button>
+        <span class="ml-auto shrink-0 flex items-baseline gap-3">
+          <!-- The drink's calories and where they come from: "140 kcal ✎" is the owner's own
+               label, "≈ 150 kcal" the built-in table (written from memory). The chip opens the
+               label form, where the can's figures are typed or scanned. -->
+          <template v-if="figuresChip(s)">
+            <button
+              v-if="!readonly"
+              type="button"
+              class="text-meta text-muted hover:text-accent cursor-pointer"
+              :title="figuresTitle(s)"
+              data-drink-label
+              @click="openLabel(s)"
+            >{{ figuresChip(s) }}</button>
+            <span
+              v-else
+              class="text-meta text-muted"
+              :title="figuresTitle(s)"
+              data-drink-label
+            >{{ figuresChip(s) }}</span>
+          </template>
+          <!-- A tap the outbox is still sending has no server index to remove by; it is marked
+               instead, and the ✕ comes back once it lands. -->
+          <span
+            v-if="isPendingId(s.id)"
+            class="text-meta text-muted"
+            title="Kept while offline — sent when you're back online"
+          >⏳ pending</span>
+          <button
+            v-else-if="!readonly"
+            type="button"
+            class="text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50"
+            :disabled="removingIndex !== null"
+            @click="remove(i)"
+          >
+            {{ removingIndex === i ? '⋯' : '✕' }}
+          </button>
+        </span>
       </div>
     </div>
+
+    <JournalDrinkLabelForm
+      v-if="!readonly && labelFor"
+      v-model:open="labelOpen"
+      :drink="labelFor.drink"
+      :size="labelFor.size"
+    />
   </div>
 </template>
 
@@ -201,7 +229,7 @@
 // inline. Writes go through /api/journal/soda and are reflected into the shared journal store.
 import { SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
-import { DRINK_GROUPS, DRINK_KIND_LABELS, LATE_CAFFEINE_HOUR, drinkInfo, drinkTotals, hydrates, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
+import { DRINK_GROUPS, DRINK_KIND_LABELS, LATE_CAFFEINE_HOUR, drinkFigures, drinkInfo, drinkSource, drinkTotals, hydrates, indexDrinkLabels, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { lastSoda as lastSodaOf, quickAddLabel as quickAddLabelOf } from '#shared/utils/soda'
 import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
@@ -240,10 +268,38 @@ const todaySodas = computed<SodaEntry[]>(() =>
 const sodaCount = computed(() => sodasOnly(todaySodas.value).length)
 // Every catalogued drink, sodas first — the custom form logs a Gatorade or a coffee here too.
 const DRINK_NAMES = DRINK_GROUPS.flatMap(g => g.names)
+// The owner's own label figures (drink_labels): read in place of the built-in table.
+const { data: labelRows } = useDrinkLabels()
+const labels = computed(() => indexDrinkLabels(labelRows.value))
 const caffeine = computed(() => {
-  const t = drinkTotals(todaySodas.value)
-  return t.caffeine_mg > 0 && t.lastCaffeine ? { mg: t.caffeine_mg, last: t.lastCaffeine, late: lateCaffeineMg(todaySodas.value) } : null
+  const t = drinkTotals(todaySodas.value, labels.value)
+  return t.caffeine_mg > 0 && t.lastCaffeine ? { mg: t.caffeine_mg, last: t.lastCaffeine, late: lateCaffeineMg(todaySodas.value, labels.value) } : null
 })
+
+/** A row's figures chip: null for an unnamed drink, which has no name to keep a label under. */
+function figuresChip(s: SodaEntry): string | null {
+  if (!s.drink?.trim()) return null
+  const mine = drinkSource(s.drink, labels.value) === 'label'
+  const f = drinkFigures(s.drink, s.size, labels.value)
+  if (!f) return mine ? 'label ✎' : 'label →'
+  return mine ? `${f.kcal} kcal ✎` : `≈ ${f.kcal} kcal`
+}
+function figuresTitle(s: SodaEntry): string {
+  const f = drinkFigures(s.drink, s.size, labels.value)
+  const detail = f ? `${f.kcal} kcal · ${f.sugar_g} g sugar · ${f.sodium_mg} mg sodium · ${f.caffeine_mg} mg caffeine — ` : ''
+  return drinkSource(s.drink, labels.value) === 'label'
+    ? `${detail}from your label`
+    : `${detail}from the built-in table, not checked against a label`
+}
+
+// The label form, for the row that was tapped.
+const labelFor = ref<{ drink: string, size: string | null } | null>(null)
+const labelOpen = ref(false)
+function openLabel(s: SodaEntry) {
+  if (!s.drink?.trim()) return
+  labelFor.value = { drink: s.drink.trim(), size: s.size ?? null }
+  labelOpen.value = true
+}
 
 // The last drink and the quick-add's label come from shared/utils/soda.ts — the home page's
 // + SODA button reads the same two, so they can't disagree.

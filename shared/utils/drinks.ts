@@ -87,15 +87,68 @@ const KIND_WORDS: Array<[RegExp, DrinkKind]> = [
   [/lemonade|juice/, 'other']
 ]
 
-/** What a logged drink is and holds per 12 fl oz. A blank or unknown name is a regular soda. */
-export function drinkInfo(name: string | null | undefined): DrinkInfo {
-  const key = (name ?? '').trim().toLowerCase()
+/** The name a drink is keyed by: trimmed, lowercased, inner whitespace collapsed. */
+export function drinkKey(name: string | null | undefined): string {
+  return (name ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+// --- the owner's own label figures (drink_labels, migration 0024) ---
+// The table above was written from memory. A drink whose can or bottle the owner has read (typed,
+// or scanned and checked) carries a row instead: the figures printed for one container, and that
+// container's size. Every figure below then reads the row; what KIND of drink it is still comes
+// from its name, so the soda count and the water goal do not move when a label is entered.
+
+/** A drink's figures as read off its label, for the container they describe. */
+export interface DrinkLabel {
+  key: string
+  /** The name as the owner logs it. */
+  name: string
+  /** The container the figures are printed for, fl oz. */
+  serving_oz: number
+  kcal: number
+  caffeine_mg: number
+  sodium_mg: number
+  sugar_g: number
+  barcode?: string | null
+  updated_at?: string
+}
+
+export type DrinkLabels = ReadonlyMap<string, DrinkLabel>
+
+export function indexDrinkLabels(rows: readonly DrinkLabel[] | null | undefined): DrinkLabels {
+  return new Map((rows ?? []).map(r => [r.key, r]))
+}
+
+/** Where a drink's figures come from: the owner's label, the built-in table, or its kind's typical figures. */
+export type DrinkSource = 'label' | 'table' | 'typical'
+
+export function drinkSource(name: string | null | undefined, labels?: DrinkLabels | null): DrinkSource {
+  const key = drinkKey(name)
+  if (labels?.get(key)) return 'label'
+  return DRINKS[key] ? 'table' : 'typical'
+}
+
+function builtInInfo(key: string): DrinkInfo {
   const known = DRINKS[key]
   if (known) return known
   const kind = KIND_WORDS.find(([re]) => re.test(key))?.[1] ?? 'soda'
   const base = KIND_DEFAULTS[kind]
   // "diet", "zero", "sugar-free": the sugar and its calories go, the rest of the kind stays.
   return /\b(diet|zero|sugar.?free|unsweet(ened)?)\b/.test(key) ? { ...base, kcal: 0, sugar_g: 0 } : base
+}
+
+/**
+ * What a logged drink is and holds per 12 fl oz. A blank or unknown name is a regular soda. With
+ * the owner's labels, a labelled drink's figures are the label's (scaled from its container to
+ * 12 fl oz, unrounded); its kind is still read from the name.
+ */
+export function drinkInfo(name: string | null | undefined, labels?: DrinkLabels | null): DrinkInfo {
+  const key = drinkKey(name)
+  const base = builtInInfo(key)
+  const label = labels?.get(key)
+  if (!label || !(label.serving_oz > 0)) return base
+  const per12 = 12 / label.serving_oz
+  return { kind: base.kind, kcal: label.kcal * per12, caffeine_mg: label.caffeine_mg * per12, sodium_mg: label.sodium_mg * per12, sugar_g: label.sugar_g * per12 }
 }
 
 /** The picker's list, grouped by kind in display spelling (app/data/journal.ts builds its items from it). */
@@ -141,10 +194,10 @@ export interface DrinkFigures {
 }
 
 /** One logged drink's figures at its size, or null when the size carries no volume. */
-export function drinkFigures(drink: string | null | undefined, size: string | null | undefined): DrinkFigures | null {
+export function drinkFigures(drink: string | null | undefined, size: string | null | undefined, labels?: DrinkLabels | null): DrinkFigures | null {
   const oz = sodaOunces(size)
   if (oz == null) return null
-  const info = drinkInfo(drink)
+  const info = drinkInfo(drink, labels)
   const scale = oz / 12
   return {
     oz,
@@ -168,11 +221,11 @@ export interface DrinkTotals {
   lastCaffeine: string | null
 }
 
-/** A day's drink list summed. */
-export function drinkTotals(list: readonly DrinkLike[] | null | undefined): DrinkTotals {
+/** A day's drink list summed; `labels` are the owner's own label figures, when there are any. */
+export function drinkTotals(list: readonly DrinkLike[] | null | undefined, labels?: DrinkLabels | null): DrinkTotals {
   const t: DrinkTotals = { kcal: 0, caffeine_mg: 0, sodium_mg: 0, sugar_g: 0, unsized: 0, hydratingOz: 0, lastCaffeine: null }
   for (const e of list ?? []) {
-    const f = drinkFigures(e.drink, e.size)
+    const f = drinkFigures(e.drink, e.size, labels)
     if (!f) {
       t.unsized++
       continue
@@ -199,10 +252,10 @@ export function hydrationOz(day: { water?: Array<{ oz?: number | null }> | null,
 export const LATE_CAFFEINE_HOUR = 14
 
 /** Milligrams of caffeine drunk at or after LATE_CAFFEINE_HOUR. */
-export function lateCaffeineMg(list: readonly DrinkLike[] | null | undefined): number {
+export function lateCaffeineMg(list: readonly DrinkLike[] | null | undefined, labels?: DrinkLabels | null): number {
   let mg = 0
   for (const e of list ?? []) {
-    const f = drinkFigures(e.drink, e.size)
+    const f = drinkFigures(e.drink, e.size, labels)
     if (f && e.time && Number(e.time.slice(0, 2)) >= LATE_CAFFEINE_HOUR) mg += f.caffeine_mg
   }
   return mg
