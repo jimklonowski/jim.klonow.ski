@@ -1,4 +1,6 @@
+import { FIVE_ARI, clinicalCalcs } from '#shared/utils/clinicalCalcs'
 import { readingOn, readingProvenanceText, readingValueText, usualLab, type Readings } from '#shared/utils/labReadings'
+import { ruleActiveOn } from '#shared/utils/protocolRules'
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { readingNoteFor } from '../../data/markerCaveats'
@@ -114,6 +116,17 @@ export default defineEventHandler(async (event) => {
   // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
   // renders it as of the draw date.
   const protocol = await protocolFor(event)
+  // The clinical calculators as of this draw (item 77): the model reports the figures the page
+  // shows — PSA doubled on a 5-ARI, FIB-4, the cystatin C eGFR — instead of deriving its own.
+  const birthRow = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('birth_date').first<{ value: string }>().catch(() => null)
+  const spans = [...protocol.rules, ...protocol.standing]
+  const calcs = clinicalCalcs(draws, target, {
+    birthDate: birthRow?.value ?? null,
+    fiveAriFrom: d => spans.find(s => FIVE_ARI.test(s.compound) && ruleActiveOn(s, d))?.from ?? null
+  })
+  const calcsBlock = calcs.length
+    ? `Clinical calculators as of this draw (deterministic — report these figures as given, do not recompute them):\n${calcs.map(c => c.value != null ? `- ${c.label}: ${c.value}${c.unit ? ` ${c.unit}` : ''} — ${c.reading} (${c.inputs})` : `- ${c.label}: not computable — ${c.missing}`).join('\n')}`
+    : ''
   // The dated marker goals with their verdicts as of this draw (item 60) — the frame the
   // summary reads the gating markers in, computed here so the model reports it, not re-judges it.
   const goalsBlock = await markerGoalsContext(db, date, protocol)
@@ -122,7 +135,7 @@ export default defineEventHandler(async (event) => {
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({
-    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, accutaneBlock, markerLines, readingNotes, qualitativeBlock
+    date, fasting: target.fasting, protocol, draws, protocolBlock, supplementBlock, cycleBlock, vaccineBlock, eventBlock, plannedBlock, phlebotomyBlock, goalsBlock, accutaneBlock, calcsBlock, markerLines, readingNotes, qualitativeBlock
   })
 
   const startedAt = Date.now()

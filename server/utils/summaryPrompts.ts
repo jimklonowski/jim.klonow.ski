@@ -30,6 +30,8 @@ export interface LabsSummaryInputs {
   goalsBlock: string
   /** The isotretinoin course as of this draw (accutaneContext), or ''. */
   accutaneBlock: string
+  /** The clinical calculators as of this draw (shared/utils/clinicalCalcs.ts), or ''. */
+  calcsBlock: string
   /** One "Label [unit, ref]: date: value -> NEW date: value" line per marker; a daggered value (†) has a reading note. */
   markerLines: string[]
   /** One "† Label on date: note" line per daggered reading (READING_NOTES), or []. */
@@ -52,7 +54,7 @@ ${i.protocolBlock}
 Marker history (oldest -> newest, "NEW" marks the new draw; a dagger † after a value means that reading has a note below):
 ${i.markerLines.join('\n')}
 ${i.readingNotes.length ? `\nReading notes — caveats that belong to one reading (a different assay, a different lab, a value censored at the instrument limit). They override whatever the bare numbers suggest: when a note says a value is not comparable with its neighbours, do not compute a change against it, and say in a clause why not:\n${i.readingNotes.join('\n')}\n` : ''}
-Estradiol and Estradiol (sensitive) are two assays of one hormone — the panel's immunoassay and the ultrasensitive LC/MS/MS add-on — and the immunoassay over-reads in men: trend each series against itself only, never one against the other, and when both exist for a draw the sensitive one is the number to act on. Likewise a creatinine eGFR understates kidney function in a lifter taking creatine; cystatin C, when present, is the check. A value the lab reported as "<X" or ">X" is stored as X. A reading sitting exactly on an assay floor or ceiling (LH 0.2 and FSH 0.7 under suppressive therapy, a total testosterone of exactly 1500 on an immunoassay panel) is therefore censored, not measured: read it as "below the floor" or "at least the ceiling", never trend it, and never compute a change from it.
+Estradiol and Estradiol (sensitive) are two assays of one hormone — the panel's immunoassay and the ultrasensitive LC/MS/MS add-on — and the immunoassay over-reads in men: trend each series against itself only, never one against the other, and when both exist for a draw the sensitive one is the number to act on. Likewise a creatinine eGFR understates kidney function in a lifter taking creatine; cystatin C, when present, is the check. ${i.calcsBlock ? `${i.calcsBlock}\n\n` : ''}A value the lab reported as "<X" or ">X" is stored as X. A reading sitting exactly on an assay floor or ceiling (LH 0.2 and FSH 0.7 under suppressive therapy, a total testosterone of exactly 1500 on an immunoassay panel) is therefore censored, not measured: read it as "below the floor" or "at least the ceiling", never trend it, and never compute a change from it.
 ${i.qualitativeBlock}
 Cover these, in order of importance:
 1. The most significant changes versus the previous draw, with specific numbers and % change.

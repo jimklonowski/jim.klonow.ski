@@ -115,6 +115,18 @@
       @refresh="refreshPlanned"
     />
 
+    <!-- Desk arithmetic for the viewed draw (item 77): PSA adjusted and its velocity, FIB-4,
+         cystatin C eGFR — from the profile's birth date and the schedule, never stored. -->
+    <LabsClinicalCalcs
+      v-if="latest"
+      class="mx-4 sm:mx-6 mt-4"
+      :draws="draws"
+      :draw="latest"
+      :birth-date="profileData?.birth_date"
+      :spans="calcSpans"
+      :is-owner="isOwner"
+    />
+
     <div class="px-4 sm:px-6 py-4 space-y-2.5">
       <!-- Category tabs: equal-width segmented row with per-category counts -->
       <TuiTabs
@@ -300,6 +312,11 @@ const { data: plannedData, refresh: refreshPlanned } = await usePlannedDraws()
 // shots before the viewed draw. Empty for the doctor role, so no chips there.
 const { data: journalData } = await useJournalEntries()
 const { isOwner } = await useAuth()
+// The calculators' inputs (item 77): the birth date is a profile fact every signed-in role gets
+// (the endpoint curates per role); the 5-ARI question reads the schedule's spans.
+const { data: profileData } = await useProfile()
+const { rules: calcRules, standing: calcStanding } = useProtocol()
+const calcSpans = computed(() => [...calcRules.value, ...calcStanding.value])
 const route = useRoute()
 const router = useRouter()
 

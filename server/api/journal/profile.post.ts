@@ -15,6 +15,9 @@ export default defineEventHandler(async (event) => {
   if (value && field.kind === 'select' && !field.options?.includes(value)) {
     throw createError({ statusCode: 400, message: `Invalid value for ${field.label}` })
   }
+  if (value && field.pattern && !field.pattern.test(value.trim())) {
+    throw createError({ statusCode: 400, message: `${field.label} must look like ${field.placeholder ?? 'the expected shape'}` })
+  }
   // A number field stores the number's canonical string ('100', not '100.0' or ' 100'), within
   // its bounds — the water tracker reads these straight back as its goal and cup size.
   let stored = value

@@ -20,6 +20,8 @@ export interface ProfileField {
   /** Bounds for a 'number' field — the server refuses values outside them. */
   min?: number
   max?: number
+  /** A 'text' field's required shape (a date) — the server refuses what doesn't match. */
+  pattern?: RegExp
   /** Shown after a 'number' value ("100 oz"). */
   unit?: string
   /**
@@ -35,6 +37,9 @@ export const BLOOD_TYPES = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 
 export const PROFILE_FIELDS: ProfileField[] = [
   { key: 'blood_type', label: 'Blood type', kind: 'select', options: BLOOD_TYPES, hint: 'ABO + Rh' },
+  // The age the clinical calculators need (audit #43 item 77: FIB-4, eGFR from cystatin C) and
+  // the clinical summary's header. A clinical fact, so the doctor's view has it.
+  { key: 'birth_date', label: 'Date of birth', kind: 'text', placeholder: 'YYYY-MM-DD', hint: 'for the age-dependent calculators (FIB-4, cystatin C eGFR)', pattern: /^\d{4}-\d{2}-\d{2}$/ },
   // The water tracker's two settings (shared/utils/water.ts reads them, with defaults when unset),
   // edited from JournalWaterTracker's ▾ panel.
   { key: 'water_goal_oz', label: 'Water goal', kind: 'number', min: 8, max: 400, unit: 'oz', hint: 'per day', tracker: true },

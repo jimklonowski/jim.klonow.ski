@@ -160,6 +160,16 @@
         </p>
       </section>
 
+      <!-- 2b. Desk arithmetic for the latest draw (item 77) -->
+      <LabsClinicalCalcs
+        v-if="latestDraw"
+        class="mb-4"
+        :draws="draws"
+        :draw="latestDraw"
+        :birth-date="profileData?.birth_date"
+        :spans="[...rules, ...protocolStanding]"
+      />
+
       <!-- 3. Hematocrit and iron -->
       <section class="mb-4">
         <TuiHeader label="HEMATOCRIT · HEMOGLOBIN · FERRITIN" />
@@ -304,6 +314,7 @@
 <script setup lang="ts">
 import { donationDeferral } from '#shared/utils/accutane'
 import { bpAverageLabel } from '#shared/utils/bloodPressure'
+import { ageOn } from '#shared/utils/clinicalCalcs'
 import { cycleProgress, cycleStatusOn } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { protocolOn } from '#shared/utils/drawLedger'
@@ -363,6 +374,8 @@ const rules = computed(() => effectiveRules(cycles.value, protocolRules.value))
 
 const facts = computed(() => {
   const out: string[] = []
+  const age = ageOn(profileData.value?.birth_date, asOf.value)
+  if (age != null) out.push(`age ${Math.floor(age)}`)
   const blood = profileData.value?.blood_type
   if (blood) out.push(`blood type ${blood}`)
   out.push(`${draws.value.length} draw${draws.value.length === 1 ? '' : 's'} on file`)
