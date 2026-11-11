@@ -3,7 +3,7 @@ import { SCHEDULED_TASKS } from './server/schedule'
 
 export default defineNuxtConfig({
   modules: [
-    '@comark/nuxt',
+    '@comark/vue',
     '@nuxt/eslint',
     '@nuxt/ui',
     '@nuxtjs/seo',
