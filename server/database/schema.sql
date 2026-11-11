@@ -58,7 +58,10 @@ CREATE TABLE IF NOT EXISTS labs_entries (
   -- NULL on summaries written before provenance was recorded.
   ai_summary_model TEXT,
   ai_summary_prompt_hash TEXT,
-  ai_summary_at TEXT
+  ai_summary_at TEXT,
+  -- Per-reading provenance (migration 0021): { marker: { qualifier, unit, ref_low, ref_high, lab,
+  -- assay, source } } as the report printed it. NULL on draws saved before it.
+  readings TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dexa_entries (

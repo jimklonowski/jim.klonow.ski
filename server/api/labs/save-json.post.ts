@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3'
+import { sanitizeReadings, type Readings } from '#shared/utils/labReadings'
 import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
 import { zLabsSave } from '#shared/utils/schemas'
 import { shiftDays } from '#shared/utils/dates'
@@ -69,18 +70,27 @@ export default defineEventHandler(async (event) => {
   // Merge with any existing row for this date rather than replacing it outright —
   // lets multiple one-off single-result uploads for the same date add up instead of clobbering each other.
   const before = await auditBefore(event, 'labs_entries', date)
-  const existing = await db.prepare('SELECT fasting, sources, markers, qualitative FROM labs_entries WHERE date = ?1')
-    .bind(date).first<{ fasting: number, sources: string, markers: string, qualitative: string }>()
+  const existing = await db.prepare('SELECT fasting, sources, markers, qualitative, readings FROM labs_entries WHERE date = ?1')
+    .bind(date).first<{ fasting: number, sources: string, markers: string, qualitative: string, readings: string | null }>()
 
   const existingSources = existing ? JSON.parse(existing.sources || '[]') as string[] : []
   const existingMarkers = existing ? JSON.parse(existing.markers || '{}') as Record<string, number> : {}
   const existingQualitative = existing ? JSON.parse(existing.qualitative || '[]') as { name: string, result: string }[] : []
+  const existingReadings = existing ? JSON.parse(existing.readings || '{}') as Readings : {}
 
   const mergedSources = [...new Set([...existingSources, ...sources])]
   // Same K/uL → cells/uL guard as process-pdf, so a hand-edited JSON save can't reintroduce the mix.
   const { markers: cleanMarkers, dropped } = sanitizeMarkers(body.markers)
   const newMarkers = normalizeAbsDifferential(cleanMarkers) as Record<string, number>
   const mergedMarkers = { ...existingMarkers, ...newMarkers }
+  // Provenance follows the values (item 72): a marker this save writes carries this save's
+  // provenance — or none, so a value re-saved without it never keeps the old report's lab and
+  // range — and markers this save leaves alone keep theirs. The source defaults to this upload's PDF.
+  const newReadings = sanitizeReadings(body.readings, new Set(Object.keys(newMarkers)), mergedSources, sources[0])
+  const mergedReadings: Readings = {
+    ...Object.fromEntries(Object.entries(existingReadings).filter(([key]) => !(key in newMarkers))),
+    ...newReadings
+  }
   // Tag each qualitative result with its report type so the dashboard can split echo
   // findings from genetic/other qualitative results without guessing from the name.
   const newQualitative = sanitizeQualitative(body.qualitative)
@@ -94,20 +104,22 @@ export default defineEventHandler(async (event) => {
   const fasting = mergedFasting(!!existing?.fasting, body) ? 1 : 0
 
   await db.prepare(`
-    INSERT INTO labs_entries (date, fasting, sources, markers, qualitative)
-    VALUES (?1, ?2, ?3, ?4, ?5)
+    INSERT INTO labs_entries (date, fasting, sources, markers, qualitative, readings)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6)
     ON CONFLICT(date) DO UPDATE SET
       fasting = excluded.fasting,
       sources = excluded.sources,
       markers = excluded.markers,
       qualitative = excluded.qualitative,
+      readings = excluded.readings,
       ai_summary = NULL, ai_summary_model = NULL, ai_summary_prompt_hash = NULL, ai_summary_at = NULL
   `).bind(
     date,
     fasting,
     JSON.stringify(mergedSources),
     JSON.stringify(mergedMarkers),
-    JSON.stringify(mergedQualitative)
+    JSON.stringify(mergedQualitative),
+    Object.keys(mergedReadings).length ? JSON.stringify(mergedReadings) : null
   ).run()
   await recordAudit(event, { table: 'labs_entries', key: date, before, summary: `${reportType ?? 'bloodwork'} ${date}` })
 

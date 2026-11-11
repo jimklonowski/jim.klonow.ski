@@ -1,4 +1,5 @@
 import type { ReadingNote } from '#shared/utils/labNotes'
+import type { Readings } from '#shared/utils/labReadings'
 
 /** A non-numeric finding (genotype, echo impression) stored alongside a draw's markers. */
 export interface QualitativeResult {
@@ -20,6 +21,12 @@ export interface LabsEntry {
    * demo sandbox. shared/utils/labNotes.ts reads it (readingNoteOn, isCensored).
    */
   notes?: Record<string, ReadingNote>
+  /**
+   * What the report printed beside each value (audit #43 item 72): bound qualifier, unit,
+   * reference range, lab, assay, source PDF — keyed by marker; {} on draws saved before
+   * migration 0021. shared/utils/labReadings.ts reads it.
+   */
+  readings?: Readings
   ai_summary?: string | null
   /** Provenance of ai_summary: the model, a hash of its exact prompt, and when (null before 0004). */
   ai_summary_model?: string | null

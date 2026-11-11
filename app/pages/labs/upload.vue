@@ -202,14 +202,25 @@
             >
               {{ entry.label }}
             </p>
-            <p class="num-display text-figure leading-none mt-1.5">
-              {{ entry.value }}
+            <p
+              class="num-display text-figure leading-none mt-1.5"
+              :title="entry.qualifier ? 'Printed as a bound, not a measurement' : undefined"
+            >
+              {{ entry.qualifier ?? '' }}{{ entry.value }}
             </p>
             <p
               class="mt-1.5 text-label"
               :class="entry.known ? 'text-muted' : 'text-warn'"
             >
               {{ entry.unit }}
+            </p>
+            <!-- What the report printed beside the value (item 72): lab, assay, its own range. -->
+            <p
+              v-if="entry.provenance"
+              class="mt-1 text-micro text-faint leading-tight truncate"
+              :title="entry.provenance"
+            >
+              {{ entry.provenance }}
             </p>
           </div>
         </div>
@@ -354,6 +365,7 @@
 
 <script setup lang="ts">
 import type { QualitativeResult } from '#shared/types/labs'
+import { readingProvenanceText, type Readings } from '#shared/utils/labReadings'
 import { BIOMARKERS } from '~/data/biomarkers'
 import { dexaFieldMeta } from '~/data/dexa'
 
@@ -365,6 +377,8 @@ interface LabResult {
   date: string
   fasting?: boolean
   markers?: Record<string, number>
+  /** What the report printed beside each value (item 72); rides the save as it came. */
+  readings?: Readings
   qualitative?: QualitativeResult[]
   weight_lbs?: number
   total?: Record<string, number>
@@ -483,6 +497,10 @@ interface PreviewEntry {
   unit: string
   /** False for a marker key the site can't store — shown in warning colour so it isn't silently dropped on save. */
   known: boolean
+  /** The report printed the value as a bound ("<", ">"), item 72. */
+  qualifier?: string
+  /** "Quest · immunoassay · printed range 264–916 ng/dL", for the cell's foot line. */
+  provenance?: string
 }
 
 // The top-level DEXA groups in report order, flattened to dotted paths ('total.body_fat_pct').
@@ -516,7 +534,8 @@ const previewEntries = computed<PreviewEntry[]>(() => {
     })
     .map(([key, value]) => {
       const meta = BIOMARKERS[key]
-      return { key, value, label: meta?.label ?? key, unit: meta?.unit ?? 'unrecognized key', known: !!meta }
+      const prov = res.readings?.[key]
+      return { key, value, label: meta?.label ?? key, unit: meta?.unit ?? 'unrecognized key', known: !!meta, qualifier: prov?.qualifier, provenance: readingProvenanceText(prov) || undefined }
     })
 })
 

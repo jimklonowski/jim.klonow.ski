@@ -4,6 +4,7 @@ import { localToday } from '#shared/utils/time'
 import { waterTotals } from '#shared/utils/water'
 import type { OverviewSummary } from '#shared/types/overview'
 import { MEASURED_MARKERS_SQL, currentReadings } from '#shared/utils/labsTimeline'
+import { isBoundReading, type Readings } from '#shared/utils/labReadings'
 import { computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 import { isCensoredOn } from '../data/markerCaveats'
 
@@ -43,7 +44,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
     `),
     // The recent rows, not one: the newest can be an echo (a scan, not the latest draw), and the
     // current readings reach back CURRENT_WINDOW_DAYS before the latest draw.
-    db.prepare('SELECT date, fasting, markers, qualitative FROM labs_entries ORDER BY date DESC LIMIT 20'),
+    db.prepare('SELECT date, fasting, markers, qualitative, readings FROM labs_entries ORDER BY date DESC LIMIT 20'),
     db.prepare('SELECT sources FROM labs_entries'),
     db.prepare('SELECT MAX(date) AS date FROM health_metrics'),
     db.prepare('SELECT date, total FROM dexa_entries ORDER BY date DESC LIMIT 1'),
@@ -60,7 +61,9 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
       date: r.date as string,
       fasting: !!r.fasting,
       markers: JSON.parse((r.markers as string) || '{}') as Record<string, number | null>,
-      qualitative: JSON.parse((r.qualitative as string) || '[]') as Array<{ name: string, category?: string }>
+      qualitative: JSON.parse((r.qualitative as string) || '[]') as Array<{ name: string, category?: string }>,
+      // Per-reading provenance (item 72): a printed < or > bound censors like a hand note does.
+      readings: JSON.parse((r.readings as string | null) || '{}') as Readings
     }))
     .filter(d => !isEchoOnly(d))
   const drawRow = draws[0]
@@ -73,7 +76,7 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   const demo = auth.role === 'demo'
   const current = Object.fromEntries(currentReadings(draws.map(d => ({
     date: d.date,
-    markers: computeMarkers(d.markers, d.fasting, k => !demo && isCensoredOn(k, d.date))
+    markers: computeMarkers(d.markers, d.fasting, k => (!demo && isCensoredOn(k, d.date)) || isBoundReading(d, k))
   }))))
 
   const pdfKeys = new Set<string>()

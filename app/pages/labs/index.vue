@@ -281,7 +281,7 @@ import { diffDays } from '#shared/utils/dates'
 import { BIOMARKERS, isEchoFinding, isEchoOnly } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { TIMING_CAVEAT, drawTimingChips } from '#shared/utils/drawTimingView'
-import { readingNoteOn } from '#shared/utils/labNotes'
+import { isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
 import { nextPlannedDraw } from '#shared/utils/plannedDraws'
 
@@ -467,7 +467,7 @@ const CHART_MARKERS = ['testosterone_total', 'igf1', 'apob', 'hs_crp', 'vitamin_
 function chartData(markerKey: string) {
   return entries.value
     .filter(e => e.markers[markerKey] != null)
-    .map(e => ({ date: e.date, value: e.markers[markerKey] as number, marker: readingNoteOn(e, markerKey) ? 'triangle' : '' }))
+    .map(e => ({ date: e.date, value: e.markers[markerKey] as number, marker: readingNoteOn(e, markerKey) || isCensored(e, markerKey) ? 'triangle' : '' }))
 }
 
 // Only the markers with a line to draw — two readings at least, as the DEXA page's trend cards

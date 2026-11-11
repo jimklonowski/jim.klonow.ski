@@ -10,6 +10,7 @@
 // The helpers below are the pure half, over those shapes.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
+import { isBoundReading, type ProvenancedDraw } from './labReadings.ts'
 import type { EventBand } from './protocolEvents.ts'
 import type { ProtocolRule } from './protocolRules.ts'
 import { ruleActiveOn } from './protocolRules.ts'
@@ -63,8 +64,8 @@ export function caveatCompoundOn(caveats: Record<string, MarkerCaveat>, key: str
   return spans.find(r => caveat.compounds.includes(r.compound) && ruleActiveOn(r, date))?.compound ?? null
 }
 
-/** A draw as the list serves it: its per-marker notes, when it has any. */
-export interface NotedDraw {
+/** A draw as the list serves it: its per-marker notes and provenance, when it has any. */
+export interface NotedDraw extends ProvenancedDraw {
   notes?: Record<string, ReadingNote> | null
 }
 
@@ -74,10 +75,11 @@ export function readingNoteOn(draw: NotedDraw | null | undefined, key: string): 
 }
 
 /**
- * A bound at the instrument's limit, not a measurement (a `censored` note): never the "previous"
- * reading a change is measured from, never an input to a derived marker, never a point a
- * two-marker comparison draws through (audit #43 item 15).
+ * A bound at the instrument's limit, not a measurement — a `censored` hand note, or a reading
+ * the report printed with a < or > qualifier (item 72, data from the extractor): never the
+ * "previous" reading a change is measured from, never an input to a derived marker, never a
+ * point a two-marker comparison draws through (audit #43 item 15).
  */
 export function isCensored(draw: NotedDraw | null | undefined, key: string): boolean {
-  return readingNoteOn(draw, key)?.censored === true
+  return readingNoteOn(draw, key)?.censored === true || isBoundReading(draw, key)
 }

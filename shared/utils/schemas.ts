@@ -488,6 +488,8 @@ export const zLabsSave = z.object({
   markers: z.unknown().optional(),
   qualitative: z.unknown().optional(),
   sources: z.unknown().optional(),
+  /** Per-reading provenance keyed by marker (item 72); sanitizeReadings whitelists it on the server. */
+  readings: z.unknown().optional(),
   weight_lbs: z.number().nullish().catch(null),
   ag_ratio: z.number().nullish().catch(null),
   total: zJsonBlock,

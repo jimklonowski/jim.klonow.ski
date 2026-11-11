@@ -1,5 +1,6 @@
 import { ISOTRETINOIN, courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn } from '#shared/utils/labNotes'
+import type { Readings } from '#shared/utils/labReadings'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 import type { GoalDraw, MarkerGoal } from '#shared/utils/markerGoals'
 import { VERDICT_WORD, cycleGoalSummary, goalLine, goalVerdict, goalsForCycle } from '#shared/utils/markerGoals'
@@ -29,11 +30,12 @@ export async function loadMarkerGoals(db: D1Database): Promise<MarkerGoal[]> {
 /** The blood draws on or before `asOf` as the verdicts read them, each with its reading notes
  * (echo-only rows dropped). Shared with accutaneContext. */
 export async function loadBloodDraws(db: D1Database, asOf: string): Promise<GoalDraw[]> {
-  const { results } = await db.prepare('SELECT date, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
-  return ((results ?? []) as Array<{ date: string, markers: string | null, qualitative: string | null }>)
-    .map(r => ({ date: r.date, markers: JSON.parse(r.markers || '{}') as Record<string, number | null>, qualitative: JSON.parse(r.qualitative || '[]') }))
+  const { results } = await db.prepare('SELECT date, markers, qualitative, readings FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
+  return ((results ?? []) as Array<{ date: string, markers: string | null, qualitative: string | null, readings: string | null }>)
+    .map(r => ({ date: r.date, markers: JSON.parse(r.markers || '{}') as Record<string, number | null>, qualitative: JSON.parse(r.qualitative || '[]'), readings: JSON.parse(r.readings || '{}') as Readings }))
     .filter(r => !isEchoOnly(r))
-    .map(r => ({ date: r.date, markers: r.markers, notes: readingNotesOn(r.date) ?? null }))
+    // Notes and the printed qualifiers both censor (isCensored reads either).
+    .map(r => ({ date: r.date, markers: r.markers, notes: readingNotesOn(r.date) ?? null, readings: r.readings }))
 }
 
 export async function markerGoalsContext(db: D1Database, asOf: string, protocol: ProtocolData, preloadedCycles?: Cycle[]): Promise<string> {

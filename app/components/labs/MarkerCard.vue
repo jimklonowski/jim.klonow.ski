@@ -154,13 +154,21 @@
               <span class="flex items-center gap-1.5 min-w-0">
                 <span class="text-muted">{{ row.dateLabel }}</span>
                 <span
+                  v-if="row.oddLab"
+                  class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
+                  :title="`Run by ${row.oddLab}, not the usual lab — its range and assay may differ`"
+                >{{ row.oddLab }}</span>
+                <span
                   v-for="t in row.tags"
                   :key="t.kind"
                   class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
                   :title="t.text"
                 >{{ t.short }}</span>
               </span>
-              <span class="flex items-baseline gap-2">
+              <span
+                class="flex items-baseline gap-2"
+                :title="row.provenance || undefined"
+              >
                 <span class="text-hi">{{ row.value }}<span
                   v-if="row.flagged"
                   class="text-warn"
@@ -201,13 +209,15 @@ import { BIOMARKERS, getStatus, statusLabel } from '~/data/biomarkers'
 import { courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import type { ReadingNote } from '#shared/utils/labNotes'
+import { readingOn, readingProvenanceText, readingValueText, usualLab, type Readings } from '#shared/utils/labReadings'
 import { PHLEBOTOMY_EFFECT_DAYS, PHLEBOTOMY_MARKERS, RBC_MASS_MARKERS, RBC_TURNOVER_DAYS, readingTags, transitionalWindows } from '#shared/utils/hematocrit'
 import { effectiveRules } from '~/utils/adherence'
 
 const props = defineProps<{
   biomarkerKey: string
-  /** Draws, each with the owner's assay notes the list attached to it (LabsEntry.notes). */
-  entries: Array<{ date: string, markers: Record<string, number | null>, notes?: Record<string, ReadingNote> }>
+  /** Draws, each with the owner's assay notes the list attached to it (LabsEntry.notes) and its
+   * per-reading provenance (LabsEntry.readings, item 72). */
+  entries: Array<{ date: string, markers: Record<string, number | null>, notes?: Record<string, ReadingNote>, readings?: Readings }>
   /** Open the detail modal on mount — set when a ?marker= deep link targets this card. */
   autoOpen?: boolean
   /**
@@ -349,24 +359,33 @@ const chartPoints = computed(() =>
     // ISO day: AreaChart formats the axis (’yy once the draws span years).
     date: e.date,
     value: e.markers[props.biomarkerKey] as number,
-    // A reading with its own note (a censored or different-assay value) gets an upward triangle
-    // instead of the usual dot, so the segment into it cannot be misread as a measured move.
-    marker: readingNoteOn(e, props.biomarkerKey) ? 'triangle' : ''
+    // A reading with its own note (a censored or different-assay value), or one the report
+    // printed as a bound, gets an upward triangle instead of the usual dot, so the segment into
+    // it cannot be misread as a measured move.
+    marker: readingNoteOn(e, props.biomarkerKey) || isCensored(e, props.biomarkerKey) ? 'triangle' : ''
   }))
 )
+
+// The lab most of this marker's readings came from (item 72): a reading from another lab wears
+// its name, since its range and assay may differ.
+const usual = computed(() => usualLab(withValue.value, props.biomarkerKey))
 
 const history = computed(() =>
   [...withValue.value].reverse().map((e) => {
     const value = e.markers[props.biomarkerKey] as number
     const s = getStatus(value, meta.value)
+    const prov = readingOn(e, props.biomarkerKey)
     return {
       date: e.date,
       dateLabel: formatDate(e.date),
-      value: num(value),
+      // "<10" / ">1500" when the report printed a bound.
+      value: readingValueText(num(value), prov),
       color: STATUS_COLORS[s],
       label: statusLabel(value, meta.value),
       flagged: caveatCompoundOn(caveats.value, props.biomarkerKey, e.date, caveatSpans.value) != null,
-      noted: readingNoteOn(e, props.biomarkerKey) != null,
+      noted: readingNoteOn(e, props.biomarkerKey) != null || isCensored(e, props.biomarkerKey),
+      oddLab: prov?.lab && prov.lab !== usual.value ? prov.lab : null,
+      provenance: readingProvenanceText(prov),
       tags: tagsOn(e.date)
     }
   })

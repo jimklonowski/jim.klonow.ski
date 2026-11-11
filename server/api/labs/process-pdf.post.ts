@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { sanitizeReadings } from '#shared/utils/labReadings'
 import { normalizeAbsDifferential } from '#shared/utils/labsUnits'
 import { isIsoDate } from '#shared/utils/time'
 
@@ -36,7 +37,12 @@ Rules:
 - Lab names vary between labs ("Neutrophils Absolute", "Neut Abs" and "ANC" are all ABSOLUTE NEUTROPHILS) — match by meaning, not exact wording, but never invent a marker the report doesn't contain
 - Estradiol has two keys by assay: a result labelled ultrasensitive, sensitive, LC/MS/MS or LC-MS/MS (Quest "Estradiol, Ultrasensitive LC/MS/MS", order code 30289) is ESTRADIOL, ULTRASENSITIVE; a plain "Estradiol" by immunoassay is ESTRADIOL. Never put one under the other's key
 - Only include markers actually present in the report
-- markers: one { key, value } entry per numeric result, key being one of the exact key names below
+- markers: one entry per numeric result, key being one of the exact key names below, and beside the value what the report printed (provenance):
+  - qualifier: "<" when the report printed the value as "<X" (a floor), ">" for ">X" (a ceiling), otherwise "". The value itself is the bare number either way
+  - unit: the unit exactly as printed next to the value ("ng/dL", "x10E3/uL"), "" if none
+  - ref_low / ref_high: the reference range the report prints for that result, each null when that end is not printed ("<39" is ref_high 39 and ref_low null)
+  - assay: the method when the test name or a footnote names one — "LC/MS/MS", "immunoassay", "ECLIA", "ultrasensitive" — otherwise ""
+- lab: the laboratory that issued the report, one word as it brands itself ("Quest", "CHW", "Labcorp"), "" if it cannot be told
 - qualitative is for any test result that is NOT a plain number — genetic/mutation analyses, antibody positive/negative, presence/absence findings, or any other categorical result. Use the report's own test name for "name" and its exact reported result (e.g. "Negative", "Heterozygous", "Detected") for "result". Leave the list empty if there are no such results.
 
 Use EXACTLY these key names (lab name → key):
@@ -167,10 +173,18 @@ const BLOODWORK_KEYS = [...EXTRACTION_PROMPT.matchAll(/→ (\w+)$/gm)].map(m => 
 const ECHO_KEYS = ['la_volume_index', 'lv_mass_index', 'e_e_prime_ratio', 'ivs_thickness', 'ejection_fraction']
 
 const markerList = (keys: string[]): JsonSchema => ({ type: 'array', items: obj({ key: { type: 'string', enum: keys }, value: num }) })
+// Bloodwork carries each value's provenance (item 72). Strings are '' and the range ends null
+// when the report has none: every property is required, and the two nullable ends are the only
+// union-typed parameters in the schema (the API caps those at 16).
+const numOrNull: JsonSchema = { type: ['number', 'null'] }
+const provenancedMarkerList = (keys: string[]): JsonSchema => ({
+  type: 'array',
+  items: obj({ key: { type: 'string', enum: keys }, value: num, qualifier: { type: 'string', enum: ['', '<', '>'] }, unit: str, ref_low: numOrNull, ref_high: numOrNull, assay: str })
+})
 const qualitativeList: JsonSchema = { type: 'array', items: obj({ name: str, result: str }) }
 const date: JsonSchema = { type: 'string', format: 'date' }
 
-const BLOODWORK_SCHEMA = obj({ date, fasting: { type: 'boolean' }, markers: markerList(BLOODWORK_KEYS), qualitative: qualitativeList })
+const BLOODWORK_SCHEMA = obj({ date, fasting: { type: 'boolean' }, lab: str, markers: provenancedMarkerList(BLOODWORK_KEYS), qualitative: qualitativeList })
 const ECHO_SCHEMA = obj({ date, markers: markerList(ECHO_KEYS), qualitative: qualitativeList })
 // Every DEXA figure as a dotted path into the stored shape: DEXA_FIELDS in server/utils/labs.ts,
 // which sanitizeDexa also enforces on the save.
@@ -196,6 +210,15 @@ function dexaObject(extracted: Record<string, unknown>): Record<string, unknown>
 function markerObject(list: unknown): Record<string, unknown> {
   if (!Array.isArray(list)) return {}
   return Object.fromEntries(list.filter(m => m && typeof m === 'object').map(m => [(m as { key: string }).key, (m as { value: unknown }).value]))
+}
+
+/** [{ key, qualifier, unit, ref_low, ref_high, assay }] + the report's lab → { key: provenance }, raw (sanitizeReadings bounds it). */
+function readingsObject(list: unknown, lab: unknown): Record<string, unknown> {
+  if (!Array.isArray(list)) return {}
+  return Object.fromEntries(list.filter(m => m && typeof m === 'object').map((m) => {
+    const r = m as Record<string, unknown>
+    return [r.key as string, { qualifier: r.qualifier, unit: r.unit, ref_low: r.ref_low, ref_high: r.ref_high, assay: r.assay, lab }]
+  }))
 }
 
 export default defineEventHandler(async (event) => {
@@ -260,6 +283,8 @@ export default defineEventHandler(async (event) => {
   catch {
     throw createError({ statusCode: 502, message: 'The extraction came back empty — try re-running it.' })
   }
+  const rawReadings = reportType === 'bloodwork' ? readingsObject(extracted.markers, extracted.lab) : {}
+  delete extracted.lab
   if (reportType === 'dexa') extracted = dexaObject(extracted)
   else extracted.markers = markerObject(extracted.markers)
 
@@ -294,6 +319,9 @@ export default defineEventHandler(async (event) => {
 
   // `sources` is built here and only here. It used to start from whatever the model returned,
   // which meant a crafted PDF could name any object in the labs bucket and have the saved row
-  // link to it through the authenticated PDF proxy.
-  return { ...extracted, sources: [pdfFilename], ...(dropped.length ? { ignoredMarkers: dropped } : {}) }
+  // link to it through the authenticated PDF proxy. Each reading's provenance names this PDF.
+  const readings = reportType === 'bloodwork'
+    ? sanitizeReadings(rawReadings, new Set(Object.keys(extracted.markers as Record<string, unknown>)), [pdfFilename], pdfFilename)
+    : undefined
+  return { ...extracted, sources: [pdfFilename], ...(readings ? { readings } : {}), ...(dropped.length ? { ignoredMarkers: dropped } : {}) }
 })

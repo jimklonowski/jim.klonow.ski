@@ -1,3 +1,4 @@
+import { readingOn, readingProvenanceText, readingValueText, usualLab, type Readings } from '#shared/utils/labReadings'
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { readingNoteFor } from '../../data/markerCaveats'
@@ -36,8 +37,8 @@ export default defineEventHandler(async (event) => {
   // Fetch only the target draw + comparison window — LIMIT in SQL rather than materializing and
   // JSON-parsing every historical draw only to slice it in JS.
   const { results } = await db.prepare(
-    `SELECT date, fasting, markers, qualitative FROM labs_entries WHERE date <= ?1 ORDER BY date DESC LIMIT ${MAX_PRIOR_DRAWS + 1}`
-  ).bind(date).all<LabsRow>()
+    `SELECT date, fasting, markers, qualitative, readings FROM labs_entries WHERE date <= ?1 ORDER BY date DESC LIMIT ${MAX_PRIOR_DRAWS + 1}`
+  ).bind(date).all<LabsRow & { readings: string | null }>()
 
   const rows = (results ?? []).reverse()
   const targetRow = rows.at(-1)
@@ -48,7 +49,9 @@ export default defineEventHandler(async (event) => {
   const draws = rows.map(r => ({
     date: r.date,
     fasting: !!r.fasting,
-    markers: JSON.parse(r.markers || '{}') as Record<string, number | null>
+    markers: JSON.parse(r.markers || '{}') as Record<string, number | null>,
+    // Per-reading provenance (item 72): the printed bound and the lab ride the history lines.
+    readings: JSON.parse(r.readings || '{}') as Readings
   }))
 
   const target = draws.at(-1)!
@@ -65,14 +68,22 @@ export default defineEventHandler(async (event) => {
   const markerLines = keys.map((key) => {
     const meta = BIOMARKERS[key]
     const label = meta?.label ?? key
-    const bracket = [meta?.unit, refRange(key)].filter(Boolean).join(', ')
+    const bracket = [meta?.unit, refRange(key)].filter(Boolean).join(' ')
     const head = `${label}${bracket ? ` [${bracket}]` : ''}`
+    // The lab is named on a reading only when the series spans more than one (item 72): a CHW
+    // value among Quest ones carries its own range and assay.
+    const usual = usualLab(draws, key)
+    const labs = new Set(draws.map(d => readingOn(d, key)?.lab).filter(Boolean))
     const history = draws
       .filter(d => d.markers[key] != null)
       .map((d) => {
+        const prov = readingOn(d, key)
         const note = readingNoteFor(key, d.date)
         if (note) readingNotes.push(`† ${label} on ${d.date}${note.censored ? ' (censored at the instrument limit)' : ''}: ${note.note}`)
-        return `${d.date === date ? 'NEW ' : ''}${d.date}: ${d.markers[key]}${note ? ' †' : ''}`
+        // A printed bound with no hand note explains itself from the provenance.
+        else if (prov?.qualifier) readingNotes.push(`† ${label} on ${d.date} (censored at the instrument limit): the report printed it as ${readingValueText(d.markers[key]!, prov)} — ${readingProvenanceText(prov)}.`)
+        const lab = labs.size > 1 && prov?.lab && prov.lab !== usual ? ` (${prov.lab}${prov.assay ? `, ${prov.assay}` : ''})` : ''
+        return `${d.date === date ? 'NEW ' : ''}${d.date}: ${readingValueText(d.markers[key]!, prov)}${lab}${note || prov?.qualifier ? ' †' : ''}`
       })
       .join(' -> ')
     return `${head}: ${history}`

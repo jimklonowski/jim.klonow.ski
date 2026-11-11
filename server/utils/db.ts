@@ -156,6 +156,8 @@ export function parseLabsRow(row: Record<string, unknown>) {
     sources: (JSON.parse((row.sources as string) || '[]') as string[]).map(toPdfUrl),
     markers: JSON.parse((row.markers as string) || '{}'),
     qualitative: JSON.parse((row.qualitative as string) || '[]'),
+    // Per-reading provenance (migration 0021); {} on draws saved before it.
+    readings: JSON.parse((row.readings as string | null | undefined) || '{}'),
     ai_summary: (row.ai_summary as string | null) ?? null,
     // Provenance (migration 0004); null for summaries written before it.
     ai_summary_model: (row.ai_summary_model as string | null | undefined) ?? null,
