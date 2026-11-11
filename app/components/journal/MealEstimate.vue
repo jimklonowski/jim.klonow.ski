@@ -137,6 +137,61 @@
             This is a sum of parts. Figures saved here are kept for the whole combo and will shadow
             the parts' own — to fix one part, enter its figures on its own instead.
           </p>
+          <!-- Barcode → Open Food Facts (item 81): prefills the fields below; nothing is saved
+               until the figures have been checked against the package and Save is pressed. -->
+          <div
+            class="flex flex-wrap items-end gap-2"
+            data-barcode
+          >
+            <UFormField
+              label="Barcode"
+              class="flex-1 min-w-40"
+              :ui="FIELD_UI"
+            >
+              <UInput
+                v-model="barcode"
+                inputmode="numeric"
+                placeholder="the digits under the bars"
+                class="w-full"
+                @keydown.enter.prevent="lookUp()"
+              />
+            </UFormField>
+            <button
+              type="button"
+              class="tui-btn"
+              :disabled="lookingUp || !barcodeValid"
+              @click="lookUp()"
+            >
+              {{ lookingUp ? 'LOOKING UP…' : 'LOOK UP' }}
+            </button>
+            <!-- A photo of the barcode (the phone's camera opens), decoded on the device. -->
+            <template v-if="canScan">
+              <button
+                type="button"
+                class="tui-btn"
+                :disabled="lookingUp"
+                @click="scanInput?.click()"
+              >
+                SCAN
+              </button>
+              <input
+                ref="scanInput"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                class="hidden"
+                @change="onScanFile"
+              >
+            </template>
+          </div>
+          <p
+            v-if="barcodeNote"
+            class="text-small"
+            :class="barcodeNote.tone === 'warn' ? 'text-warn' : 'text-muted'"
+            data-barcode-note
+          >
+            {{ barcodeNote.text }}
+          </p>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <UFormField
               label="kcal"
@@ -251,6 +306,7 @@
 // the owner the two ways in: enter the figures by hand (the preferred path), or ask the model
 // for this one meal.
 import { fmtKcal, fmtMacros, isLabelFigure, knownMeals, mealParts, suggestMeal } from '#shared/utils/nutrition'
+import { normalizeBarcode, type OffFigures } from '#shared/utils/openFoodFacts'
 
 const props = defineProps<{
   text: string | null | undefined
@@ -327,7 +383,82 @@ const FIELD_UI = { label: 'whitespace-nowrap' }
 const saving = ref(false)
 const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: number | '', fat_g: number | '', sodium_mg: number | '', fiber_g: number | '' }>({ kcal: '', protein_g: '', carbs_g: '', fat_g: '', sodium_mg: '', fiber_g: '' })
 
+// --- barcode lookup (item 81) ---
+// The digits (typed, pasted, or read off a photo where the browser has BarcodeDetector) go to
+// /api/journal/meals/barcode, which asks Open Food Facts; the answer fills the fields and says
+// where it came from and what serving it describes. The owner still presses Save.
+const barcode = ref('')
+const lookingUp = ref(false)
+const barcodeNote = ref<{ text: string, tone: 'ok' | 'warn' } | null>(null)
+const barcodeValid = computed(() => normalizeBarcode(barcode.value) != null)
+const scanInput = useTemplateRef<HTMLInputElement>('scanInput')
+// Shown once mounted (the scanner needs a browser): a photo of the barcode is decoded on the
+// device — natively where the browser can, else by the lazily loaded zxing-wasm reader
+// (app/utils/barcodeScan.ts), which is what an iPhone uses.
+const canScan = ref(false)
+onMounted(() => {
+  canScan.value = true
+})
+
+async function lookUp() {
+  const code = normalizeBarcode(barcode.value)
+  if (!code || lookingUp.value) return
+  lookingUp.value = true
+  barcodeNote.value = null
+  try {
+    const res = await $fetch<{ found: boolean, figures: OffFigures | null }>('/api/journal/meals/barcode', { query: { code } })
+    const f = res.figures
+    if (!res.found) barcodeNote.value = { text: 'Open Food Facts has no product with that barcode — type the figures from the label.', tone: 'warn' }
+    else if (!f) barcodeNote.value = { text: 'The product is listed but carries no nutrition figures — type them from the label.', tone: 'warn' }
+    else {
+      draft.kcal = f.kcal
+      draft.protein_g = f.protein_g
+      draft.carbs_g = f.carbs_g
+      draft.fat_g = f.fat_g
+      draft.sodium_mg = f.sodium_mg ?? ''
+      draft.fiber_g = f.fiber_g ?? ''
+      barcodeNote.value = f.basis === 'serving'
+        ? { text: `Filled from Open Food Facts: ${f.name}, per ${f.per}. Check it against the package and adjust for what was eaten, then Save.`, tone: 'ok' }
+        : { text: `Filled from Open Food Facts: ${f.name} — per 100 g, since the product lists no serving. Scale it to what was eaten before saving.`, tone: 'warn' }
+    }
+  }
+  catch (err) {
+    barcodeNote.value = { text: extractErrorMessage(err, 'The lookup failed — type the figures from the label.'), tone: 'warn' }
+  }
+  finally {
+    lookingUp.value = false
+  }
+}
+
+/** A photo of the barcode → its digits, where the browser can decode one. */
+async function onScanFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  lookingUp.value = true
+  barcodeNote.value = { text: 'Reading the barcode…', tone: 'ok' }
+  try {
+    // Loaded on first use: the decoder is ~1 MB and most visits never scan.
+    const { scanBarcode } = await import('~/utils/barcodeScan')
+    const code = await scanBarcode(file)
+    lookingUp.value = false
+    if (!code) {
+      barcodeNote.value = { text: 'No barcode could be read from that photo — try again closer and square-on, or type the digits.', tone: 'warn' }
+      return
+    }
+    barcode.value = code
+    await lookUp()
+  }
+  catch {
+    lookingUp.value = false
+    barcodeNote.value = { text: 'That photo could not be read — type the digits instead.', tone: 'warn' }
+  }
+}
+
 function openForm(text: string | null = null) {
+  barcode.value = ''
+  barcodeNote.value = null
   formText.value = text ?? props.text ?? ''
   const e = text ? lookup(text) : estimate.value
   draft.kcal = e?.kcal ?? ''

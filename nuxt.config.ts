@@ -317,6 +317,11 @@ export default defineNuxtConfig({
         // also catches directives not spelled out here (media, frames, workers).
         'default-src': ['\'self\''],
         'connect-src': ['\'self\''],
+        // The module's own default, restated to add 'wasm-unsafe-eval': the barcode scanner
+        // (app/utils/barcodeScan.ts, audit #43 item 81) compiles a WebAssembly decoder served
+        // from this origin. That keyword permits WebAssembly compilation only — not eval() or
+        // new Function() — and the wasm file itself must still come from 'self' (connect-src).
+        'script-src': ['\'self\'', 'https:', '\'unsafe-inline\'', '\'strict-dynamic\'', '\'nonce-{{nonce}}\'', '\'wasm-unsafe-eval\''],
         'font-src': ['\'self\''],
         // The default here was `'self' https: 'unsafe-inline'`: any https origin could serve a
         // stylesheet to injected markup (CSS exfiltration tricks). 'unsafe-inline' stays for Vue's

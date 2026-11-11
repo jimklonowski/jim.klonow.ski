@@ -367,7 +367,7 @@ test('soda calories: label figures per 12 oz, zero for diet, a regular default f
   assert.equal(sodaKcal('Dr Pepper', '20oz bottle'), 250)
   assert.equal(sodaKcal('Mountain Dew', '7.5oz mini can'), 106)
   assert.equal(sodaKcal('Dr Pepper Cherry', '12oz can'), 160, 'the cherry variant is its own label figure, not Dr Pepper\'s')
-  assert.equal(sodaKcal('7 Up Shirley Temple', '12oz can'), 170)
+  assert.equal(sodaKcal('7 Up Shirley Temple', '12oz can'), 140) // the can's label, 2026-11-11
   assert.equal(sodaKcal('Canada Dry Fruit Splash', '12oz can'), 140)
   assert.equal(sodaKcal('Coke Zero', '20oz bottle'), 0)
   assert.equal(sodaKcal('Pepsi Zero Sugar', '12oz can'), 0, 'an unlisted diet drink reads as diet')

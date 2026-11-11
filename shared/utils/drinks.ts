@@ -37,7 +37,8 @@ const DRINKS: Record<string, DrinkInfo> = {
   'wild cherry pepsi': d('soda', 160, 38, 30, 42),
   'sprite': d('soda', 140, 0, 65, 38),
   '7 up': d('soda', 140, 0, 45, 38),
-  '7 up shirley temple': d('soda', 170, 0, 45, 45),
+  // From the can's label (Jim's photo, 2026-11-11): 140 kcal, 40 mg sodium, 38 g sugar, caffeine free.
+  '7 up shirley temple': d('soda', 140, 0, 40, 38),
   'mountain dew': d('soda', 170, 54, 60, 46),
   'root beer': d('soda', 160, 0, 70, 45),
   'mr pibb': d('soda', 140, 40, 40, 39),
