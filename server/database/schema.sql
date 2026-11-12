@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS meal_estimates (
   updated_at TEXT NOT NULL,
   -- Migration 0023 (audit #43 item 71): NULL = no figure, never zero.
   sodium_mg REAL,
-  fiber_g REAL
+  fiber_g REAL,
+  -- Migration 0025: the barcode a hand entry's figures were looked up by; NULL when typed.
+  barcode TEXT
 );
 
 CREATE TABLE IF NOT EXISTS labs_entries (

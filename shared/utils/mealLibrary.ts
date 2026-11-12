@@ -167,12 +167,13 @@ export const ITEMS = {
     portion: '¼ Kirkland Signature frozen pepperoni pizza (153 g)',
     source: 'Costco 4-pack listing — 410 kcal / 18 g protein per quarter; carbs and fat estimated'
   },
-  // Tombstone Original Thin Crust CHEESE: no label found; ESTIMATED from the pepperoni quarter
-  // less the pepperoni (~20 kcal and 3 g fat).
+  // Tombstone Original 5 Cheese: the label per ¼ pizza, as Open Food Facts holds it for the box
+  // Jim scanned on 2026-11-11 (barcode 0071921702823). It replaced an estimate derived from the
+  // pepperoni label (320 / 15 / 34 / 13). The key keeps its old name.
   tombstone_thin_crust_cheese_quarter: {
-    kcal: 320, protein_g: 15, carbs_g: 34, fat_g: 13,
-    portion: '¼ Tombstone Original Thin Crust Cheese pizza',
-    source: 'estimated from the pepperoni label — confirm against the box'
+    kcal: 350, protein_g: 16, carbs_g: 35, fat_g: 16, sodium_mg: 670, fiber_g: 2,
+    portion: '¼ Tombstone Original 5 Cheese pizza (137 g)',
+    source: 'Open Food Facts, barcode 0071921702823 — per ¼ pizza (137 g); confirm against the box'
   },
   // Chipotle's published per-ingredient figures (chipotle.com nutrition calculator): chicken
   // 180/32P/0C/7F, white rice 210/4/40/4, black beans 130/8/22/1.5, fresh tomato salsa 25/0/4/0,
@@ -614,13 +615,17 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
     text: 'tombstone pizza',
     aliases: ['tombstone', 'tombstone pepperoni pizza', 'tombstone thin crust pepperoni'],
     parts: [['tombstone_thin_crust_pepperoni_quarter', 2]],
-    note: 'half a Tombstone Original Thin Crust Pepperoni (assumed half — confirm)'
+    note: 'half a Tombstone pepperoni pizza, 4 of 8 slices',
+    portion: { count: 4, unit: 'slice', whole: 8 }
   },
+  // Cut into 8, a sitting is 4 (Jim, 2026-11-12): "1/2 tombstone cheese pizza" is half the PIZZA,
+  // which without a declared portion was read as half the half-pizza serving — a quarter.
   {
     text: 'tombstone cheese pizza',
-    aliases: ['tombstone thin crust cheese'],
+    aliases: ['tombstone thin crust cheese', 'tombstone 5 cheese pizza'],
     parts: [['tombstone_thin_crust_cheese_quarter', 2]],
-    note: 'half a Tombstone Original Thin Crust Cheese (figures estimated from the pepperoni label)'
+    note: 'half a Tombstone cheese pizza, 4 of 8 slices',
+    portion: { count: 4, unit: 'slice', whole: 8 }
   },
   // One serving of the soup — CONFIRM (the whole 18 oz tub is "2 x tomato soup").
   {
@@ -751,7 +756,8 @@ function toEstimate(meal: LibraryMeal): Omit<MealEstimate, 'key'> {
     sodium_mg: sodium != null ? Math.round(sodium) : null,
     fiber_g: fiber != null ? round1(fiber) : null,
     confidence: 'high',
-    assumptions: `${portions.join(' + ')}${meal.note ? ` — ${meal.note}` : ''}`,
+    // What the meal is first, then the label arithmetic behind the figures.
+    assumptions: meal.note ? `${meal.note} · figures: ${portions.join(' + ')}` : portions.join(' + '),
     source: 'library',
     model: null,
     created_at: 'library',

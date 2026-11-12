@@ -199,7 +199,11 @@ export const zMealCorrect = z.object({
   fat_g: z.number().min(0).max(1_000),
   // Optional (item 71): blank = no figure, stored NULL.
   sodium_mg: z.preprocess(blankAsAbsent, z.number().min(0).max(20_000).nullish()).transform(v => v ?? null),
-  fiber_g: z.preprocess(blankAsAbsent, z.number().min(0).max(200).nullish()).transform(v => v ?? null)
+  fiber_g: z.preprocess(blankAsAbsent, z.number().min(0).max(200).nullish()).transform(v => v ?? null),
+  // Set together when a barcode lookup filled the form (migration 0025): the digits, and the
+  // product with the servings counted ("Open Food Facts: … — 2 × 0.25 pizza (137 g)").
+  barcode: z.string().trim().regex(/^(\d{8}|\d{12,14})$/).nullish().transform(v => v || null),
+  from: zOptText(300)
 })
 
 // The owner's label figures for a drink (drink_labels): all four figures are required — a label

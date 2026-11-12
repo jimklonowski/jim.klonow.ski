@@ -15,12 +15,14 @@ export default defineEventHandler(async (event) => {
   // earlier correction, or nothing — goes in the log, so a slip of the keyboard is one undo away.
   const before = await auditBefore(event, 'meal_estimates', key)
   const now = new Date().toISOString()
-  await db.prepare(MEAL_ESTIMATE_MANUAL_UPSERT).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now, body.sodium_mg, body.fiber_g).run()
+  // A barcode travels with what it found; without one the row is a plain hand entry.
+  const from = body.barcode ? body.from : null
+  await db.prepare(MEAL_ESTIMATE_MANUAL_UPSERT).bind(key, body.text, body.kcal, body.protein_g, body.carbs_g, body.fat_g, now, body.sodium_mg, body.fiber_g, from, body.barcode).run()
   await recordAudit(event, {
     table: 'meal_estimates',
     key,
     before,
-    summary: `figures for "${body.text.trim()}": ${body.kcal} kcal · ${body.protein_g}P / ${body.carbs_g}C / ${body.fat_g}F${body.sodium_mg != null ? ` · ${body.sodium_mg} mg sodium` : ''}${body.fiber_g != null ? ` · ${body.fiber_g} g fibre` : ''}`
+    summary: `figures for "${body.text.trim()}": ${body.kcal} kcal · ${body.protein_g}P / ${body.carbs_g}C / ${body.fat_g}F${body.sodium_mg != null ? ` · ${body.sodium_mg} mg sodium` : ''}${body.fiber_g != null ? ` · ${body.fiber_g} g fibre` : ''}${body.barcode ? ` · barcode ${body.barcode}` : ''}`
   })
 
   const [estimate] = await estimatesForKeys(db, [key])

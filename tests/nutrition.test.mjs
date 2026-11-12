@@ -536,3 +536,16 @@ test('a singular unit word ending a counted meal means one of them', () => {
   assert.equal(lookupEstimate(new Map(), 'chomps').kcal, two.kcal, 'an alias that is not the unit word is the serving')
   assert.match(lookupEstimate(new Map(), 'beef stick').assumptions, /^1 stick \(a serving is 2\) of beef sticks/)
 })
+
+test('"1/2 tombstone cheese pizza" is half the pizza — the half-pizza serving itself, said plainly', () => {
+  const serving = lookupEstimate(new Map(), 'tombstone cheese pizza')
+  assert.equal(serving.kcal, 700, 'two label quarters of 350')
+  assert.equal(serving.sodium_mg, 1340)
+  assert.match(serving.assumptions, /^half a Tombstone cheese pizza, 4 of 8 slices · figures: 2 × ¼ Tombstone/)
+  const half = lookupEstimate(new Map(), '1/2 tombstone cheese pizza')
+  assert.equal(half.kcal, 700, 'not a quarter: the fraction is of the whole pizza')
+  assert.equal(half.assumptions, '4 of 8 slices of tombstone cheese pizza', 'no arithmetic on arithmetic')
+  assert.equal(lookupEstimate(new Map(), 'whole tombstone cheese pizza').kcal, 1400)
+  assert.equal(lookupEstimate(new Map(), '2 slices tombstone cheese pizza').kcal, 350)
+  assert.equal(lookupEstimate(new Map(), '1/2 tombstone pizza').kcal, lookupEstimate(new Map(), 'tombstone pizza').kcal, 'the pepperoni one too')
+})

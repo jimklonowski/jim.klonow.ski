@@ -6,7 +6,7 @@
 // may be NULL. Plain TS so tests/mealEstimateSql.test.mjs can run the statements against the real
 // schema in node:sqlite.
 
-export const MEAL_ESTIMATE_COLUMNS = 'key, text, kcal, protein_g, carbs_g, fat_g, confidence, assumptions, source, model, prompt_hash, created_at, updated_at, sodium_mg, fiber_g'
+export const MEAL_ESTIMATE_COLUMNS = 'key, text, kcal, protein_g, carbs_g, fat_g, confidence, assumptions, source, model, prompt_hash, created_at, updated_at, sodium_mg, fiber_g, barcode'
 
 /**
  * A model estimate: ?1 key, ?2 text, ?3 kcal, ?4 protein_g, ?5 carbs_g, ?6 fat_g, ?7 confidence,
@@ -15,7 +15,7 @@ export const MEAL_ESTIMATE_COLUMNS = 'key, text, kcal, protein_g, carbs_g, fat_g
  */
 export const MEAL_ESTIMATE_AI_UPSERT = `
   INSERT INTO meal_estimates (${MEAL_ESTIMATE_COLUMNS})
-  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ai', ?9, ?10, ?11, ?11, ?12, ?13)
+  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ai', ?9, ?10, ?11, ?11, ?12, ?13, NULL)
   ON CONFLICT(key) DO UPDATE SET
     text = excluded.text, kcal = excluded.kcal, protein_g = excluded.protein_g, carbs_g = excluded.carbs_g,
     fat_g = excluded.fat_g, confidence = excluded.confidence, assumptions = excluded.assumptions,
@@ -24,16 +24,20 @@ export const MEAL_ESTIMATE_AI_UPSERT = `
   WHERE meal_estimates.source != 'manual'
 `
 
+/** What a hand entry's `assumptions` reads when the figures were typed, not looked up. */
+export const MANUAL_ASSUMPTIONS = 'corrected by hand'
+
 /**
- * A hand correction: ?1 key, ?2 text, ?3 kcal, ?4 protein_g, ?5 carbs_g, ?6 fat_g, ?7 now,
- * ?8 sodium_mg, ?9 fiber_g. Overwrites whatever is there and marks the row 'manual' (high
- * confidence, no model).
+ * A hand entry: ?1 key, ?2 text, ?3 kcal, ?4 protein_g, ?5 carbs_g, ?6 fat_g, ?7 now,
+ * ?8 sodium_mg, ?9 fiber_g, ?10 where the figures came from (NULL = typed by hand), ?11 the
+ * barcode they were looked up by (NULL = none; migration 0025). Overwrites whatever is there
+ * and marks the row 'manual' (high confidence, no model).
  */
 export const MEAL_ESTIMATE_MANUAL_UPSERT = `
   INSERT INTO meal_estimates (${MEAL_ESTIMATE_COLUMNS})
-  VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'high', 'corrected by hand', 'manual', NULL, NULL, ?7, ?7, ?8, ?9)
+  VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'high', COALESCE(?10, '${MANUAL_ASSUMPTIONS}'), 'manual', NULL, NULL, ?7, ?7, ?8, ?9, ?11)
   ON CONFLICT(key) DO UPDATE SET
     kcal = excluded.kcal, protein_g = excluded.protein_g, carbs_g = excluded.carbs_g, fat_g = excluded.fat_g,
-    confidence = 'high', assumptions = 'corrected by hand', source = 'manual', model = NULL, prompt_hash = NULL,
-    updated_at = excluded.updated_at, sodium_mg = excluded.sodium_mg, fiber_g = excluded.fiber_g
+    confidence = 'high', assumptions = excluded.assumptions, source = 'manual', model = NULL, prompt_hash = NULL,
+    updated_at = excluded.updated_at, sodium_mg = excluded.sodium_mg, fiber_g = excluded.fiber_g, barcode = excluded.barcode
 `

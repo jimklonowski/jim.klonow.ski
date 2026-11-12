@@ -122,11 +122,12 @@
       <template #body>
         <div class="space-y-3">
           <p
-            v-if="estimate?.assumptions && formText === text"
+            v-if="savedFrom"
             class="text-small text-muted"
+            data-figures-from
           >
-            {{ estimate.parts ? 'Summed from' : estimate.source === 'ai' ? 'Model assumed' : 'Portion' }}: {{ estimate.assumptions }}<span
-              v-if="estimate.source === 'ai' && !estimate.parts"
+            {{ savedFrom }}<span
+              v-if="estimate?.source === 'ai' && !estimate.parts"
               class="text-faint"
             > · {{ estimate.confidence }} confidence</span>
           </p>
@@ -192,6 +193,23 @@
           >
             {{ barcodeNote.text }}
           </p>
+          <!-- A label is per serving (¼ pizza); the meal is often more than one. The fields below
+               are the label's figures times this, and the saved row records the count. -->
+          <UFormField
+            v-if="scanned?.basis === 'serving'"
+            :label="`Servings eaten (one is ${scanned.per})`"
+            :ui="FIELD_UI"
+            data-servings
+          >
+            <UInput
+              v-model.number="servings"
+              type="number"
+              inputmode="decimal"
+              min="0.25"
+              step="0.25"
+              class="w-32"
+            />
+          </UFormField>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <UFormField
               label="kcal"
@@ -306,7 +324,8 @@
 // the owner the two ways in: enter the figures by hand (the preferred path), or ask the model
 // for this one meal.
 import { fmtKcal, fmtMacros, isLabelFigure, knownMeals, mealParts, suggestMeal } from '#shared/utils/nutrition'
-import type { OffFigures } from '#shared/utils/openFoodFacts'
+import { normalizeBarcode, type OffFigures } from '#shared/utils/openFoodFacts'
+import { MANUAL_ASSUMPTIONS } from '#shared/utils/mealEstimateSql'
 
 const props = defineProps<{
   text: string | null | undefined
@@ -355,7 +374,8 @@ const chipTitle = computed(() => {
   if (!e) return undefined
   if (e.parts) return `summed from ${e.assumptions}`
   if (e.source === 'library') return `meal library${e.assumptions ? ` — ${e.assumptions}` : ''}`
-  if (e.source === 'manual') return `entered by hand${e.assumptions && e.assumptions !== 'corrected by hand' ? ` — ${e.assumptions}` : ''}`
+  if (e.source === 'manual' && e.barcode) return `from the package barcode ${e.barcode}${e.assumptions ? ` — ${e.assumptions}` : ''}`
+  if (e.source === 'manual') return `entered by hand${e.assumptions && e.assumptions !== MANUAL_ASSUMPTIONS ? ` — ${e.assumptions}` : ''}`
   return [e.assumptions ? `model assumed: ${e.assumptions}` : null, `${e.confidence} confidence`].filter(Boolean).join(' · ')
 })
 
@@ -389,20 +409,52 @@ const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: num
 // where it came from and what serving it describes. The owner still presses Save.
 // The lookup and the photo scan are useBarcodeLookup's (a drink's label form shares them).
 const scanInput = useTemplateRef<HTMLInputElement>('scanInput')
+/** What the last lookup found, per ONE serving — the fields are this times `servings`. */
+const scanned = ref<OffFigures | null>(null)
+/** How many of the label's servings were eaten: a label is per ¼ pizza, a sitting is two of them. */
+const servings = ref<number | ''>(1)
+const servingsValid = computed(() => typeof servings.value === 'number' && Number.isFinite(servings.value) && servings.value > 0)
+const round1 = (n: number) => Math.round(n * 10) / 10
+
+function fillFromScan() {
+  const f = scanned.value
+  if (!f || !servingsValid.value) return
+  const n = servings.value as number
+  draft.kcal = Math.round(f.kcal * n)
+  draft.protein_g = round1(f.protein_g * n)
+  draft.carbs_g = round1(f.carbs_g * n)
+  draft.fat_g = round1(f.fat_g * n)
+  draft.sodium_mg = f.sodium_mg != null ? Math.round(f.sodium_mg * n) : ''
+  draft.fiber_g = f.fiber_g != null ? round1(f.fiber_g * n) : ''
+}
+watch(servings, fillFromScan)
+
 const { barcode, lookingUp, barcodeNote, barcodeValid, canScan, lookUp, onScanFile, resetBarcode } = useBarcodeLookup((f: OffFigures) => {
-  draft.kcal = f.kcal
-  draft.protein_g = f.protein_g
-  draft.carbs_g = f.carbs_g
-  draft.fat_g = f.fat_g
-  draft.sodium_mg = f.sodium_mg ?? ''
-  draft.fiber_g = f.fiber_g ?? ''
+  scanned.value = f
+  servings.value = 1
+  fillFromScan()
   return f.basis === 'serving'
-    ? { text: `Filled from Open Food Facts: ${f.name}, per ${f.per}. Check it against the package and adjust for what was eaten, then Save.`, tone: 'ok' }
+    ? { text: `Filled from Open Food Facts: ${f.name}, per ${f.per}. Set how many of those servings were eaten, check it against the package, then Save.`, tone: 'ok' }
     : { text: `Filled from Open Food Facts: ${f.name} — per 100 g, since the product lists no serving. Scale it to what was eaten before saving.`, tone: 'warn' }
+})
+
+/** Where a saved hand entry's figures came from, for the top of the form. */
+const savedFrom = computed(() => {
+  const e = estimate.value
+  if (!e || formText.value !== props.text) return null
+  if (e.parts) return `Summed from: ${e.assumptions}`
+  if (e.source === 'ai') return e.assumptions ? `Model assumed: ${e.assumptions}` : null
+  if (e.source === 'manual' && e.barcode) return `From the package barcode ${e.barcode} — ${e.assumptions ?? 'Open Food Facts'}`
+  if (e.source === 'manual' && (!e.assumptions || e.assumptions === MANUAL_ASSUMPTIONS)) return 'Entered by hand.'
+  return e.assumptions ? `Portion: ${e.assumptions}` : null
 })
 
 function openForm(text: string | null = null) {
   resetBarcode()
+  scanned.value = null
+  servings.value = 1
+  // A saved barcode comes back with its figures, so the form shows what they were looked up by.
+  barcode.value = (text ? lookup(text) : estimate.value)?.barcode ?? ''
   formText.value = text ?? props.text ?? ''
   const e = text ? lookup(text) : estimate.value
   draft.kcal = e?.kcal ?? ''
@@ -415,7 +467,8 @@ function openForm(text: string | null = null) {
 }
 
 const draftValid = computed(() =>
-  [draft.kcal, draft.protein_g, draft.carbs_g, draft.fat_g].every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0)
+  (!scanned.value || servingsValid.value)
+  && [draft.kcal, draft.protein_g, draft.carbs_g, draft.fat_g].every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0)
   // The two optional figures: blank, or a non-negative number.
   && [draft.sodium_mg, draft.fiber_g].every(v => v === '' || (typeof v === 'number' && Number.isFinite(v) && v >= 0))
 )
@@ -423,8 +476,21 @@ const draftValid = computed(() =>
 async function saveFigures() {
   if (!formText.value || !draftValid.value) return
   saving.value = true
+  // The barcode is kept with the figures it found: a fresh lookup names the product and the
+  // servings counted; a saved one that was left in the field is carried over as it was. Typed
+  // figures with no barcode are a plain hand entry.
+  const code = normalizeBarcode(barcode.value)
+  const before = lookup(formText.value)
+  const f = scanned.value
+  const from = !code
+    ? null
+    : f
+      ? `Open Food Facts: ${f.name} — ${f.basis === 'serving' ? `${servings.value} × ${f.per}` : 'per 100 g, scaled by hand'}`
+      : before?.barcode === code ? before.assumptions : null
   try {
     await correct({
+      barcode: from ? code : null,
+      from,
       text: formText.value,
       kcal: Math.round(draft.kcal as number),
       protein_g: draft.protein_g as number,

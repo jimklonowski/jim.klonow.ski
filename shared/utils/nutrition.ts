@@ -103,6 +103,8 @@ export interface MealEstimate {
   /** Sodium, mg, and fibre, g (migration 0023, item 71): null on figures saved before them or entered without. */
   sodium_mg?: number | null
   fiber_g?: number | null
+  /** The barcode a hand entry's figures were looked up by (migration 0025); `assumptions` then names the product and the servings. */
+  barcode?: string | null
   confidence: EstimateConfidence
   /** The portion the model assumed, one short clause; null when nothing was assumed. */
   assumptions: string | null
@@ -150,7 +152,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10
  * `e` times `n`, re-keyed to the text that asked for it ("2 x <meal>", "1 beef stick"). `label`
  * replaces the "N ×" wording when the scale came from a count in the serving's own unit.
  */
-export function scaleEstimate(e: MealEstimate, n: number, text: string, label?: string): MealEstimate {
+export function scaleEstimate(e: MealEstimate, n: number, text: string, label?: string, bare = false): MealEstimate {
   const { portion: _portion, ...rest } = e
   return {
     ...rest,
@@ -162,7 +164,10 @@ export function scaleEstimate(e: MealEstimate, n: number, text: string, label?: 
     fat_g: round1(e.fat_g * n),
     sodium_mg: e.sodium_mg != null ? Math.round(e.sodium_mg * n) : null,
     fiber_g: e.fiber_g != null ? round1(e.fiber_g * n) : null,
-    assumptions: `${label ?? `${n} ×`} ${e.text}${e.assumptions ? ` (${e.assumptions})` : ''}`
+    // `bare`: the count was read in the serving's own unit ("4 of 8 slices of …"), which says
+    // the portion outright — the serving's own description ("half a pizza, 2 × ¼ …") beside it
+    // read as arithmetic on arithmetic (Jim, 2026-11-12: "0.5 × … (2 × ¼ …)").
+    assumptions: `${label ?? `${n} ×`} ${e.text}${e.assumptions && !bare ? ` (${e.assumptions})` : ''}`
   }
 }
 
@@ -238,17 +243,17 @@ function countedEstimate(text: string, lookup: Lookup): MealEstimate | null {
   const unitName = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
   if (c.kind === 'whole') {
     if (!p?.whole) return scaleEstimate(base, 1, text, 'the whole')
-    return scaleEstimate(base, p.whole / p.count, text, `${unitName(p.whole, p.unit)} (whole) of`)
+    return scaleEstimate(base, p.whole / p.count, text, `${unitName(p.whole, p.unit)} (whole) of`, true)
   }
   if (c.kind === 'fraction') {
     if (!p?.whole) return scaleEstimate(base, c.n, text, `${Math.round(c.n * 100) / 100} ×`)
     const units = c.n * p.whole
-    return scaleEstimate(base, units / p.count, text, `${Math.round(units * 10) / 10} of ${p.whole} ${p.unit}s of`)
+    return scaleEstimate(base, units / p.count, text, `${Math.round(units * 10) / 10} of ${p.whole} ${p.unit}s of`, true)
   }
   // A typed unit must be the serving's own; "3 cups watermelon" against a stick-counted meal is unknown.
   if (c.unit && (!p || c.unit !== p.unit)) return null
   if (!p) return scaleEstimate(base, c.n, text)
-  return scaleEstimate(base, c.n / p.count, text, `${unitName(c.n, p.unit)} (a serving is ${p.count}) of`)
+  return scaleEstimate(base, c.n / p.count, text, `${unitName(c.n, p.unit)} (a serving is ${p.count}) of`, true)
 }
 
 /**

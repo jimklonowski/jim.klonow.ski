@@ -101,6 +101,7 @@ export function parseEstimateRow(r: Record<string, unknown>): MealEstimate {
     // NULL = no figure (rows from before migration 0023, or a hand entry that left it blank).
     sodium_mg: r.sodium_mg != null ? Number(r.sodium_mg) : null,
     fiber_g: r.fiber_g != null ? Number(r.fiber_g) : null,
+    barcode: (r.barcode as string | null | undefined) ?? null,
     confidence: (r.confidence as EstimateConfidence) ?? 'medium',
     assumptions: (r.assumptions as string | null) ?? null,
     source: r.source === 'manual' ? 'manual' : 'ai',
