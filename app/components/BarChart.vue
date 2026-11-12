@@ -14,6 +14,7 @@
     :height="chartHeight"
     :aria-label="ariaLabel ?? describedChart"
     :tooltip="{ content: { side: 'top', sideOffset: 10 } }"
+    :ui="{ root: 'chart-touch' }"
   >
     <template #tooltip="{ points }">
       <slot

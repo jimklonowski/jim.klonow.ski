@@ -16,7 +16,7 @@
     :height="chartHeight"
     :aria-label="ariaLabel ?? describedChart"
     :tooltip="tooltip"
-    :ui="{ root: bare ? 'overflow-visible' : undefined }"
+    :ui="{ root: bare ? 'chart-touch overflow-visible' : 'chart-touch' }"
   >
     <template #tooltip="{ points }">
       <div class="px-2.5 py-1.5 text-meta min-w-32 bg-raised border border-line-accent text-body shadow-(--panel-shadow)">

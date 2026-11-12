@@ -289,6 +289,16 @@
     -webkit-touch-callout: none;
     touch-action: manipulation;
   }
+  /* A chart is scrubbed with a finger: dragging along the line must move the tooltip, not start
+     a text selection or the copy/look-up callout (the tooltip lives inside the chart's root, so
+     it is covered too). pan-y leaves vertical page scrolling to the browser and hands horizontal
+     drags to the chart. */
+  .chart-touch {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: pan-y;
+  }
   .tui-btn:hover {
     border-color: var(--color-line-accent);
     color: var(--color-accent);

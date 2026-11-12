@@ -322,6 +322,9 @@ export default defineNuxtConfig({
         // from this origin. That keyword permits WebAssembly compilation only — not eval() or
         // new Function() — and the wasm file itself must still come from 'self' (connect-src).
         'script-src': ['\'self\'', 'https:', '\'unsafe-inline\'', '\'strict-dynamic\'', '\'nonce-{{nonce}}\'', '\'wasm-unsafe-eval\''],
+        // Spelled out for the in-app PDF viewer's pdf.js worker (app/utils/pdfRender.ts): without
+        // it a worker falls back to script-src, where 'strict-dynamic' switches 'self' off.
+        'worker-src': ['\'self\''],
         'font-src': ['\'self\''],
         // The default here was `'self' https: 'unsafe-inline'`: any https origin could serve a
         // stylesheet to injected markup (CSS exfiltration tricks). 'unsafe-inline' stays for Vue's
