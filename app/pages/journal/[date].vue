@@ -736,11 +736,15 @@
           <!-- Contact sheet: one square tile per photo in shooting order, captioned underneath.
                For the owner an empty slot of the set keeps its place as a dashed tile that points
                the uploader at it, so the sheet doubles as "what's still missing today". Photos
-               the day has outside the set follow, so nothing on file is ever hidden. -->
+               the day has outside the set follow, so nothing on file is ever hidden.
+               Tiles are thumbnails, about 7–9rem square at any width: this page is for entering
+               the day, and six columns across a wide screen made each photo ~270px and the
+               sheet taller than the form above it (Jim, 2026-11-12). The lightbox has the photo. -->
           <div class="min-w-0">
             <div
               v-if="isOwner || dayPhotos.length"
-              class="grid grid-cols-3 sm:grid-cols-6 gap-2.5"
+              class="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2.5"
+              data-photo-sheet
             >
               <template
                 v-for="c in sheetCategories"
@@ -779,6 +783,7 @@
                   <figcaption
                     class="mt-1 text-label uppercase tracking-[0.12em] truncate"
                     :class="isOwner && uploadCategory === c.value ? 'text-accent' : 'text-muted'"
+                    :title="c.label"
                   >
                     {{ c.label }}
                   </figcaption>
