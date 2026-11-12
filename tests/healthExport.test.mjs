@@ -98,3 +98,22 @@ test('the vitals still go to the journal row; a point with no date, an unknown m
   assert.deepEqual(healthByDate['2026-10-24'], {}, 'a null reading and a stageless night write nothing')
   assert.equal('undefined' in byDate, false)
 })
+
+test('blood pressure is the mean of the morning\'s session, not the last reading listed', () => {
+  const bp = (time, systolic, diastolic) => ({ date: `2026-11-08 ${time} -0600`, systolic, diastolic })
+  // A cuff's 3x mode: three readings a minute apart (the 98–112 spread Apple Health showed),
+  // listed out of order, plus an evening reading that is another session.
+  const { byDate } = parseHealthExport([{ name: 'blood_pressure', units: 'mmHg', data: [bp('07:03:10', 98, 64), bp('07:01:00', 112, 68), bp('07:02:05', 105, 66), bp('19:30:00', 131, 84)] }])
+  assert.deepEqual(byDate['2026-11-08'], { bp_systolic: 105, bp_diastolic: 66 })
+
+  // One reading is itself; the split metrics average the same way; two days stay apart.
+  assert.deepEqual(parseHealthExport([{ name: 'blood_pressure', data: [bp('07:00:00', 121.4, 77.6)] }]).byDate['2026-11-08'], { bp_systolic: 121, bp_diastolic: 78 })
+  const split = parseHealthExport([
+    { name: 'blood_pressure_systolic', data: [{ date: '2026-11-08 07:00:00 -0600', qty: 120 }, { date: '2026-11-08 07:01:00 -0600', qty: 116 }, { date: '2026-11-09 07:00:00 -0600', qty: 110 }] },
+    { name: 'blood_pressure_diastolic', data: [{ date: '2026-11-08 07:00:00 -0600', qty: 76 }, { date: '2026-11-08 07:01:00 -0600', qty: 72 }] }
+  ]).byDate
+  assert.deepEqual(split['2026-11-08'], { bp_systolic: 118, bp_diastolic: 74 })
+  assert.deepEqual(split['2026-11-09'], { bp_systolic: 110 })
+  // A date with no clock time (a daily aggregate) still counts every point.
+  assert.deepEqual(parseHealthExport([{ name: 'blood_pressure', data: [{ date: '2026-11-08', systolic: 120, diastolic: 80 }, { date: '2026-11-08', systolic: 110, diastolic: 70 }] }]).byDate['2026-11-08'], { bp_systolic: 115, bp_diastolic: 75 })
+})

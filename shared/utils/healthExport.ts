@@ -5,7 +5,8 @@
 // A metric arrives as { name, units, data: [{ date, qty | value, … }] }. Health Auto Export
 // aggregates per its export interval — a daily export gives one point per day, an hourly one
 // several — so the counts and energies (steps, kcal, water) are SUMMED over a date's points,
-// while readings (weight, rates, saturation, waist) keep the day's last, and sleep keeps the
+// while readings (weight, rates, saturation, waist) keep the day's last, blood pressure is the
+// mean of the day's first session (bpSession below), and sleep keeps the
 // day's longest session (sleepSession below). Units follow the phone's settings, so each branch
 // converts what it might be sent.
 //
@@ -115,11 +116,46 @@ function sleepSession(point: Record<string, unknown>): SleepSession | null {
   }
 }
 
+interface BpPoint {
+  at: unknown
+  value: number
+}
+
+/** A day's first session is the readings within this long of its earliest one. */
+const BP_SESSION_MS = 15 * 60_000
+
+/**
+ * The day's blood-pressure figure from its points: the MEAN of the first session — the readings
+ * within fifteen minutes of the day's earliest. A Withings cuff's 3x mode writes three readings
+ * a minute apart, and the mean of the three is the measurement (Jim's morning routine,
+ * 2026-11-12); keeping the last one, as this used to, stored whichever reading the export
+ * happened to list last. A reading taken later in the day is a different session and is left
+ * out, so the figure stays the morning's. Points with no readable time all count.
+ */
+function bpSession(points: BpPoint[]): number | null {
+  if (!points.length) return null
+  const timed = points.map(p => ({ value: p.value, t: instantOf(p.at) }))
+  const known = timed.filter(p => p.t != null)
+  const first = known.length ? Math.min(...known.map(p => p.t!)) : null
+  const session = first == null ? timed : timed.filter(p => p.t == null || p.t - first <= BP_SESSION_MS)
+  return Math.round(session.reduce((s, p) => s + p.value, 0) / session.length)
+}
+
+/** Epoch ms of a point's date ("2026-10-21 07:00:00 -0500" or ISO), or null. */
+function instantOf(at: unknown): number | null {
+  if (typeof at !== 'string') return null
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?) ([+-]\d{2}):?(\d{2})$/.exec(at)
+  const ms = Date.parse(m ? `${m[1]}T${m[2]}${m[3]}:${m[4]}` : at)
+  return Number.isNaN(ms) ? null : ms
+}
+
 export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthExport {
   const byDate: Record<string, Vitals> = {}
   const healthByDate: Record<string, HealthMetricsIn> = {}
   /** Minutes asleep in the session chosen for each date so far (the longest wins). */
   const sleepChosen: Record<string, number> = {}
+  /** Each date's blood-pressure points, averaged once every metric has been read. */
+  const bpPoints: Record<string, { sys: BpPoint[], dia: BpPoint[] }> = {}
 
   for (const metric of metrics) {
     const { name, units, data } = metric
@@ -147,15 +183,17 @@ export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthEx
         case 'heart_rate_variability':
           if (qty != null) v.hrv = Math.round(qty)
           break
+        // Blood pressure is collected, not written here: a cuff's triple measurement is three
+        // points a minute apart, and the day's figure is their mean (bpSession below).
         case 'blood_pressure':
-          if (typeof point.systolic === 'number') v.bp_systolic = Math.round(point.systolic)
-          if (typeof point.diastolic === 'number') v.bp_diastolic = Math.round(point.diastolic)
+          if (typeof point.systolic === 'number') (bpPoints[dateStr] ??= { sys: [], dia: [] }).sys.push({ at: point.date, value: point.systolic })
+          if (typeof point.diastolic === 'number') (bpPoints[dateStr] ??= { sys: [], dia: [] }).dia.push({ at: point.date, value: point.diastolic })
           break
         case 'blood_pressure_systolic':
-          if (qty != null) v.bp_systolic = Math.round(qty)
+          if (qty != null) (bpPoints[dateStr] ??= { sys: [], dia: [] }).sys.push({ at: point.date, value: qty })
           break
         case 'blood_pressure_diastolic':
-          if (qty != null) v.bp_diastolic = Math.round(qty)
+          if (qty != null) (bpPoints[dateStr] ??= { sys: [], dia: [] }).dia.push({ at: point.date, value: qty })
           break
 
         // --- health metrics ---
@@ -236,6 +274,14 @@ export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthEx
     if (h.active_kcal != null) h.active_kcal = round1(h.active_kcal)
     if (h.basal_kcal != null) h.basal_kcal = round1(h.basal_kcal)
     if (h.dietary_water_oz != null) h.dietary_water_oz = round1(h.dietary_water_oz)
+  }
+  // Each date's blood pressure: the mean of its first session.
+  for (const [date, points] of Object.entries(bpPoints)) {
+    const v = (byDate[date] ??= {})
+    const sys = bpSession(points.sys)
+    const dia = bpSession(points.dia)
+    if (sys != null) v.bp_systolic = sys
+    if (dia != null) v.bp_diastolic = dia
   }
   return { byDate, healthByDate }
 }
