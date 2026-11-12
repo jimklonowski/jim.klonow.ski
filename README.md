@@ -216,6 +216,7 @@ Every secret the Worker reads is listed, with notes, in `.env.example`. Copy it 
 | `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | Whoop OAuth app credentials, for connecting and the nightly sync. The secret also verifies webhook signatures |
 | `HEALTH_TOKEN` | Optional. `/api/health?token=…` gives the uptime monitor the full report, personal feed checks included — anonymous callers get task checks only |
 | `CALENDAR_TOKEN` | Optional. The credential for the calendar feed, `/calendar.ics?token=…` (`shared/utils/calendarFeed.ts`): planned draws with an evening-before alarm and their prep days, cycle checkpoint windows, the isotretinoin course's dated rungs, booster due dates, the CBC six weeks after a phlebotomy — all-day events with generic titles. The subscribe link is on `/tools/sharing`; the route 404s while the token is unset |
+| `QUICK_TOKEN` | Optional. The credential for the quick-log endpoint, `POST /api/quick/{water\|soda\|meal}` with `Authorization: Bearer …` — for an iOS Shortcut, an NFC tag or the Action Button (`shared/utils/quickLog.ts`). No body is needed: water pours the profile's cup, soda repeats the last soda; a meal (`{"text": "protein shake"}`) must already have label figures. The answer's `message` is one line for the Shortcut to show. The route 404s while the token is unset |
 
 Bindings (the D1 databases, R2 buckets, KV namespace and rate limiters) are declared in `wrangler.jsonc`; `pnpm types` regenerates their TypeScript types in `worker-configuration.d.ts`.
 

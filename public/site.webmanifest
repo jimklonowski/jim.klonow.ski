@@ -6,6 +6,11 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "shortcuts": [
+    { "name": "Journal", "short_name": "Journal", "description": "Today's log: water, drinks, meals", "url": "/journal" },
+    { "name": "Labs", "short_name": "Labs", "description": "Bloodwork and markers", "url": "/labs" },
+    { "name": "Ask", "short_name": "Ask", "description": "Ask the data", "url": "/ask" }
+  ],
   "icons": [
     { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
     { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },

@@ -229,6 +229,24 @@ export const zWaterAdd = z.object({
   id: zTapId
 })
 
+// --- the quick-log endpoint (audit #43 item 69, shared/utils/quickLog.ts) ---
+// Every field is optional: a bare tap of an NFC tag sends no body at all. Water with no `oz`
+// pours the profile's cup; soda with no `drink` repeats the last soda (zSodaAdd as it is).
+
+export const zQuickWater = z.object({
+  date: zIsoDate.optional(),
+  time: zClockTime.optional(),
+  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY).optional(),
+  id: zTapId
+})
+
+export const zQuickMeal = z.object({
+  date: zIsoDate.optional(),
+  time: zClockTime.optional(),
+  text: zText(200).min(1),
+  slot: zMealSlot.optional()
+})
+
 export const zWaterRemove = z.object({
   date: zIsoDate,
   index: z.coerce.number().int().min(0),
