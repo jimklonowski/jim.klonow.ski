@@ -32,6 +32,8 @@
               :connect-nulls="connect"
               :show-legend="series.length > 1"
               :format-value="format"
+              :y-bands="yBands"
+              :y-rules="yRules"
               fit-y
             />
             <p
@@ -124,7 +126,14 @@ const props = withDefaults(defineProps<{
   showNotes?: boolean
   /** How a reading prints in the stats strip; defaults to integer-or-one-decimal. */
   format?: (v: number) => string
+  /** Value bands and guides on the big chart (AreaChart's), with the line that explains them. */
+  yBands?: Array<{ from: number, to: number, color: string, opacity?: number }>
+  yRules?: Array<{ at: number, color: string }>
+  bandNote?: string
 }>(), {
+  yBands: () => [],
+  yRules: () => [],
+  bandNote: undefined,
   unit: '',
   accent: false,
   rawRows: undefined,
@@ -144,6 +153,7 @@ const { smooth } = useTrendRange()
 /** What the marks on the big chart mean, only the ones it carries. */
 const legend = computed(() => [
   smooth.value ? 'Line: trailing 7-reading average · figures below it: the raw readings.' : null,
+  props.bandNote ?? null,
   props.markLines.length ? 'Dashed verticals: lab draws.' : null,
   props.annotations.length ? 'Ember lines: dose changes · bands: events and cycles.' : null,
   'Hover the line for the day\'s values.'

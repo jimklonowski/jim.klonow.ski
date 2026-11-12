@@ -59,9 +59,28 @@
             :annotations="annotations"
             :connect="tile.connect"
             :show-notes="annotationsAvailable"
+            :y-bands="tile.yBands"
+            :y-rules="tile.yRules"
+            :band-note="tile.bandNote"
             expandable
           />
         </div>
+        <!-- Blood pressure as a clinician reads it (audit #43 item 83): the week's average, its
+             AHA category, and whether it sits under the goal. One cuff reading is noise. -->
+        <p
+          v-if="bpWeek"
+          class="mt-2 text-small text-muted"
+          data-bp-week
+        >
+          <span class="text-dim">BP, 7-day average:</span> <span class="text-hi">{{ bpWeek.systolic }}/{{ bpWeek.diastolic }}</span>
+          over {{ bpWeek.n }} reading{{ bpWeek.n === 1 ? '' : 's' }} ·
+          <span :class="BP_TONE[bpWeek.category.tone]">{{ bpWeek.category.label }}</span> (AHA) ·
+          goal under {{ bpWeek.goal.systolic }}/{{ bpWeek.goal.diastolic }}:
+          <span :class="bpWeek.met ? 'text-accent' : 'text-warn'">{{ bpWeek.met ? 'met' : 'not met' }}</span><span
+            v-if="bpWeek.n < BP_MIN_READINGS"
+            class="text-faint"
+          > · {{ BP_MIN_READINGS }} readings make a steadier week</span>
+        </p>
       </section>
 
       <!-- Food: estimates from the meal log (shared/utils/nutrition.ts), sodas included. -->
@@ -259,6 +278,7 @@
 
 <script setup lang="ts">
 import { cycleAnnotations, eventAnnotations, placeAnnotations, ruleAnnotations } from '#shared/utils/chartAnnotations'
+import { BP_DIASTOLIC_STAGE1, BP_SYSTOLIC_BANDS, bpGoal, bpWeekAverage } from '#shared/utils/bloodPressure'
 import { cycleEnd, isTentative } from '#shared/utils/cycles'
 import { LATE_CAFFEINE_HOUR, lateCaffeineMg } from '#shared/utils/drinks'
 import { MIN_GROUP, caffeinePoints, median, sleepByNight, sodiumPoints, splitAt, wholeDaySodium } from '#shared/utils/drivers'
@@ -383,6 +403,19 @@ function fmt(v: number | null, decimals = 0) {
   return decimals ? v.toFixed(decimals) : Math.round(v).toString()
 }
 
+// --- blood pressure: the week's average, the AHA bands, the goal (audit #43 item 83) ---
+const { data: profileData } = await useProfile()
+const bpWeek = computed(() => bpWeekAverage(entries.value, today.value, bpGoal(profileData.value?.bp_goal)))
+/** Fewer readings than this in the week and the average is flagged as thin. */
+const BP_MIN_READINGS = 3
+const BP_TONE = { ok: 'text-accent', warn: 'text-warn', danger: 'text-danger' } as const
+const BP_BAND_COLORS: Record<string, string> = { elevated: CHART_WARN, stage1: CHART_EMBER, stage2: CHART_DANGER }
+const BP_Y_BANDS = BP_SYSTOLIC_BANDS.map(b => ({ from: b.from, to: b.to, color: BP_BAND_COLORS[b.key] ?? CHART_WARN, opacity: 0.1 }))
+const BP_Y_RULES = [{ at: BP_DIASTOLIC_STAGE1, color: CHART_INDIGO }]
+const BP_BAND_NOTE = 'Tinted bands, on systolic: elevated 120–129, stage 1 130–139, stage 2 from 140 (AHA). Dashed line: diastolic 80, where stage 1 starts.'
+type YBand = { from: number, to: number, color: string, opacity?: number }
+const NO_BANDS: { yBands: YBand[], yRules: Array<{ at: number, color: string }>, bandNote: string | undefined } = { yBands: [], yRules: [], bandNote: undefined }
+
 const vitalTiles = computed(() => {
   const rows = vitalRows.value
   const sys = latest(rows, 'bp_systolic')
@@ -399,11 +432,14 @@ const vitalTiles = computed(() => {
         { key: 'weight_trend', name: 'Trend', color: CHART_INDIGO }
       ],
       // Only the weight chart carries the lab-draw verticals, per the mock.
-      markLines: drawMarkLines.value
+      markLines: drawMarkLines.value,
+      ...NO_BANDS
     },
     {
       label: 'BP',
-      unit: 'mmHg',
+      // The latest reading is the figure; the week's average rides beside it, since that is
+      // the number the categories are defined on.
+      unit: bpWeek.value ? `mmHg · 7d ${bpWeek.value.systolic}/${bpWeek.value.diastolic}` : 'mmHg',
       value: sys != null && dia != null ? `${Math.round(sys)}/${Math.round(dia)}` : '—',
       series: [
         { key: 'bp_systolic', name: 'sys', color: CHART_DANGER },
@@ -411,21 +447,27 @@ const vitalTiles = computed(() => {
       ],
       markLines: [],
       // Cuff readings are taken days apart; the days between are not gaps in a stream.
-      connect: true
+      connect: true,
+      // The expanded chart tints the AHA systolic bands and marks the diastolic stage 1 line.
+      yBands: BP_Y_BANDS,
+      yRules: BP_Y_RULES,
+      bandNote: BP_BAND_NOTE
     },
     {
       label: 'RHR',
       unit: 'bpm',
       value: fmt(latest(rows, 'rhr')),
       series: [{ key: 'rhr', name: 'RHR', color: CHART_WARN }],
-      markLines: []
+      markLines: [],
+      ...NO_BANDS
     },
     {
       label: 'HRV',
       unit: 'ms',
       value: fmt(latest(rows, 'hrv')),
       series: [{ key: 'hrv', name: 'HRV', color: CHART_INDIGO }],
-      markLines: []
+      markLines: [],
+      ...NO_BANDS
     }
   ]
 })

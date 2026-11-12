@@ -71,6 +71,9 @@
     :connect="connect"
     :show-notes="showNotes"
     :format="format"
+    :y-bands="yBands"
+    :y-rules="yRules"
+    :band-note="bandNote"
   />
 </template>
 
@@ -112,7 +115,15 @@ const props = withDefaults(defineProps<{
   showNotes?: boolean
   /** How a reading prints in the expanded view's stats (sleep prints as "6h55m"). */
   format?: (v: number) => string
+  /** Value bands and guides for the expanded view only — a 46px tile is read for its shape. */
+  yBands?: Array<{ from: number, to: number, color: string, opacity?: number }>
+  yRules?: Array<{ at: number, color: string }>
+  /** The legend line that explains them. */
+  bandNote?: string
 }>(), {
+  yBands: () => [],
+  yRules: () => [],
+  bandNote: undefined,
   height: 46,
   markLines: () => [],
   annotations: () => [],

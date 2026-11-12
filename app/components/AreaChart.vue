@@ -107,6 +107,11 @@ const props = withDefaults(defineProps<{
   fitY?: boolean
   /** How a y value prints on the axis ticks and in the tooltip (sleep minutes as "6h 39m"). */
   formatValue?: (v: number) => string
+  /** Faint horizontal bands between two y values (the AHA blood-pressure categories). Clipped to
+   * the readings' own span, so a band the line never reaches does not stretch the axis. */
+  yBands?: Array<{ from: number, to: number, color: string, opacity?: number }>
+  /** Dashed horizontal guides at y values, drawn only inside the readings' span. */
+  yRules?: Array<{ at: number, color: string }>
 }>(), {
   xAxisKey: 'date',
   height: 160,
@@ -123,7 +128,9 @@ const props = withDefaults(defineProps<{
   dualAxis: false,
   connectNulls: false,
   fitY: false,
-  formatValue: undefined
+  formatValue: undefined,
+  yBands: () => [],
+  yRules: () => []
 })
 
 /** "Line chart: Weight, Resting HR — 90 points, 2026-06-24 to 2026-09-22" */
@@ -227,6 +234,25 @@ const definition = computed(() => {
     const bands = onChart.filter(a => a.end != null && a.kind === kind)
     if (bands.length) {
       marks.push(decorative(rect(bands, { x1: 'at', x2: 'end', fill: ANNOTATION_STYLE[kind].color, fillOpacity: ANNOTATION_STYLE[kind].opacity })))
+    }
+  }
+  // Horizontal value bands and guides (blood-pressure categories), behind the lines. Each is cut
+  // to the span of the readings plus a little air: the y domain is inferred from the marks, and
+  // a whole 140–180 band under a line that tops out at 128 would flatten the line.
+  if ((props.yBands.length || props.yRules.length) && all.length > 1) {
+    const values = seriesRows.value.flatMap(s => s.rows.map(row => row.value))
+    if (values.length) {
+      const air = Math.max(2, (Math.max(...values) - Math.min(...values)) * 0.08)
+      const lo = Math.min(...values) - air
+      const hi = Math.max(...values) + air
+      for (const b of props.yBands) {
+        const y1 = Math.max(b.from, lo)
+        const y2 = Math.min(b.to, hi)
+        if (y2 > y1) marks.push(decorative(rect([{ x1: all[0], x2: all.at(-1), y1, y2 }], { x1: 'x1', x2: 'x2', y1: 'y1', y2: 'y2', fill: b.color, fillOpacity: b.opacity ?? 0.1 })))
+      }
+      for (const rule of props.yRules) {
+        if (rule.at > lo && rule.at < hi) marks.push(decorative(ruleY([rule.at], { stroke: rule.color, strokeOpacity: 0.6, strokeDasharray: '4 3' })))
+      }
     }
   }
   // Dashed verticals on lab draws; solid half-strength ember lines on dose changes.

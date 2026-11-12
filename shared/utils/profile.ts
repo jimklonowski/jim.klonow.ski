@@ -40,6 +40,9 @@ export const PROFILE_FIELDS: ProfileField[] = [
   // The age the clinical calculators need (audit #43 item 77: FIB-4, eGFR from cystatin C) and
   // the clinical summary's header. A clinical fact, so the doctor's view has it.
   { key: 'birth_date', label: 'Date of birth', kind: 'text', placeholder: 'YYYY-MM-DD', hint: 'for the age-dependent calculators (FIB-4, cystatin C eGFR)', pattern: /^\d{4}-\d{2}-\d{2}$/ },
+  // What the 7-day blood-pressure average is read against (audit #43 item 83,
+  // shared/utils/bloodPressure.ts bpGoal); unset = under 130/80, the AHA stage 1 line.
+  { key: 'bp_goal', label: 'Blood pressure goal', kind: 'text', placeholder: '130/80', hint: 'the 7-day average should sit under both figures', pattern: /^\d{2,3}\/\d{2,3}$/ },
   // The water tracker's two settings (shared/utils/water.ts reads them, with defaults when unset),
   // edited from JournalWaterTracker's ▾ panel.
   { key: 'water_goal_oz', label: 'Water goal', kind: 'number', min: 8, max: 400, unit: 'oz', hint: 'per day', tracker: true },
