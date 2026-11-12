@@ -236,7 +236,9 @@ export const zWaterAdd = z.object({
 export const zQuickWater = z.object({
   date: zIsoDate.optional(),
   time: zClockTime.optional(),
-  oz: z.number().positive().max(WATER_MAX_OZ_PER_ENTRY).optional(),
+  // A Shortcut's body field is Text unless its type is changed, so "8" is read as 8; a blank
+  // field is "no amount" (the cup).
+  oz: z.preprocess(v => (typeof v === 'string' ? (v.trim() === '' ? undefined : Number(v)) : v), z.number().positive().max(WATER_MAX_OZ_PER_ENTRY).optional()),
   id: zTapId
 })
 
