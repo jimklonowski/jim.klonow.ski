@@ -51,3 +51,11 @@ test('every body is optional except a meal\'s text', () => {
   assert.equal(zQuickMeal.safeParse({ text: 'protein shake', slot: 'brunch' }).success, false)
   assert.equal(zQuickMeal.safeParse({ text: 'x', date: '2026-13-40' }).success, false)
 })
+
+test('a Shortcut\'s Text field for ounces is read as a number', () => {
+  assert.equal(zQuickWater.parse({ oz: '8' }).oz, 8)
+  assert.equal(zQuickWater.parse({ oz: ' 16.5 ' }).oz, 16.5)
+  assert.equal(zQuickWater.parse({ oz: '' }).oz, undefined, 'a blank field is the cup')
+  assert.equal(zQuickWater.safeParse({ oz: 'a lot' }).success, false)
+  assert.equal(zQuickWater.safeParse({ oz: '-4' }).success, false)
+})
