@@ -83,6 +83,23 @@
       </div>
     </div>
 
+    <!-- The readiness cue (audit #43 item 74): the week's training load against the month's and
+         the morning's HRV against its baseline, as one line. Follows the shown day like the rows. -->
+    <p
+      v-if="ready"
+      data-scrub
+      data-readiness
+      class="mt-3 pt-2.5 border-t border-line-soft text-small text-muted leading-[1.6]"
+      :title="readyTitle"
+    >
+      <span class="text-meta text-faint uppercase tracking-widest">Readiness</span>
+      <span :class="READY_TONE[ready.verdict]"> ● {{ ready.headline }}</span>
+      <span
+        v-for="reason in ready.reasons"
+        :key="reason"
+      > · {{ reason }}</span>
+    </p>
+
     <p
       v-if="!rows.length"
       data-scrub
@@ -99,6 +116,7 @@ import type { HealthMetricsEntry } from '#shared/types/journal'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
 import { bpCategory, bpWeekAverage } from '#shared/utils/bloodPressure'
 import { shiftDays } from '#shared/utils/dates'
+import { readiness } from '#shared/utils/readiness'
 import { fmtRate, weightTrend } from '#shared/utils/weightTrend'
 
 /**
@@ -149,6 +167,19 @@ function pair<T extends { date: string }>(list: T[], pick: (row: T) => number | 
     title: current && current.date < asOf.value ? `last reading ${formatDate(current.date, 'monthDay')}` : undefined
   }
 }
+
+// --- readiness: an easy day or not, from load and HRV (shared/utils/readiness.ts) ---
+const ready = computed(() => readiness(props.entries, props.metrics, asOf.value))
+const READY_TONE = { easy: 'text-warn', steady: 'text-dim', go: 'text-accent' } as const
+const readyTitle = computed(() => {
+  const r = ready.value
+  if (!r) return undefined
+  return [
+    r.hrv ? `HRV baseline: ${r.hrv.n} readings over 28 days, mean ${r.hrv.mean.toFixed(1)} ms, SD ${r.hrv.sd.toFixed(1)}` : 'HRV: not enough readings for a baseline',
+    r.load ? `Strain: ${r.load.acuteDays} of the last 7 days against ${r.load.chronicDays} of the last 28, through yesterday` : 'Strain: not enough days for a ratio',
+    'An easy day is called by HRV 1 SD under baseline, or a week 1.5× the month'
+  ].join(' · ')
+})
 
 // Whoop's "optimal" sleep band; 70–84 is "sufficient", under 70 "poor".
 const SLEEP_PERF_OPTIMAL_MIN = 85
