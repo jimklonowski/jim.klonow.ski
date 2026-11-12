@@ -120,6 +120,14 @@
             {{ line }}
           </p>
         </div>
+        <!-- Intake on training days against rest days (audit #43 item 80), over the range. -->
+        <p
+          v-if="splitLine"
+          class="mt-1 text-small text-muted"
+          data-training-split
+        >
+          <span class="text-dim">Training days against rest days:</span> {{ splitLine }}
+        </p>
       </section>
 
       <!-- Drivers: a cause beside its effect — sodium and the next morning's systolic, caffeine
@@ -288,6 +296,7 @@ import {
 } from '#shared/utils/energyBalance'
 import { dayNutrition, fmtKcal, hasFullFigures, isDayDone, isWholeDay, nutritionIsEstimated, nutritionWindow } from '#shared/utils/nutrition'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
+import { SPLIT_MIN_DAYS, trainingSplit } from '#shared/utils/trainingSplit'
 import { fmtRate, weightTrend } from '#shared/utils/weightTrend'
 import { HEALTH_METRICS_META, formatDuration } from '~/data/health-metrics'
 import { ANNOTATION_STYLE, CHART_ACCENT, CHART_CYAN, CHART_DANGER, CHART_EMBER, CHART_INDIGO, CHART_WARN } from '~/utils/chartTheme'
@@ -620,6 +629,21 @@ const foodTiles = computed(() => {
       ]
     }
   ]
+})
+
+// --- training days against rest days (audit #43 item 80) ---
+// The list arrives merged across sources, so a ride Whoop and the watch both recorded counts once.
+const { data: workoutsData } = useWorkoutsEntries()
+const split = computed(() => trainingSplit(inRange(entries.value), workoutsData.value ?? [], estimateIndex.value, today.value))
+const splitLine = computed(() => {
+  const s = split.value
+  if (!s.training && !s.rest) return ''
+  const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
+  if (!s.enough) {
+    return `${days(s.training?.days ?? 0)} with a session and ${days(s.rest?.days ?? 0)} without are logged whole in this range — ${SPLIT_MIN_DAYS} of each are needed to compare.`
+  }
+  const group = (g: NonNullable<typeof s.training>) => `${fmtKcal(g.kcal)} kcal · ${g.protein_g} g protein · ${g.carbs_g} g carbs over ${days(g.days)}`
+  return `${group(s.training!)} on training days; ${group(s.rest!)} on rest days · ${signed(s.diffKcal!, 0)} kcal and ${signed(s.diffProtein!, 0)} g protein on training days.`
 })
 
 // --- drivers group ---
