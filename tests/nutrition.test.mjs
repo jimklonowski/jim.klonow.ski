@@ -549,3 +549,11 @@ test('"1/2 tombstone cheese pizza" is half the pizza — the half-pizza serving 
   assert.equal(lookupEstimate(new Map(), '2 slices tombstone cheese pizza').kcal, 350)
   assert.equal(lookupEstimate(new Map(), '1/2 tombstone pizza').kcal, lookupEstimate(new Map(), 'tombstone pizza').kcal, 'the pepperoni one too')
 })
+
+test('the Fairlife shake by any of its names is the bottle\'s label, sodium and fibre included', () => {
+  for (const text of ['Fairlife protein shake', 'protein shake', 'Protein shake + creatine', 'fairlife', 'fairlife protein shake + creatine']) {
+    const e = lookupEstimate(new Map(), text)
+    assert.ok(e, `${text} is known`)
+    assert.deepEqual([e.source, e.kcal, e.protein_g, e.carbs_g, e.fat_g, e.sodium_mg, e.fiber_g], ['library', 150, 30, 4, 2.5, 230, 1], text)
+  }
+})

@@ -6,7 +6,7 @@ import { normalizeBarcode, offFigures, type OffFigures, type OffProduct } from '
 // request. Only the barcode leaves the site — no session, no meal text.
 
 const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product'
-const FIELDS = 'code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutriments'
+const FIELDS = 'code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutrition_data_per,nutriments'
 
 export default defineEventHandler(async (event): Promise<{ found: boolean, code: string, figures: OffFigures | null }> => {
   requireOwner(event)

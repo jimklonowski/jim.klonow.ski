@@ -21,7 +21,7 @@ test('per-serving figures when the product has them: sodium from grams, the name
     serving_size: '1 stick (32 g)',
     nutriments: { 'energy-kcal_serving': 100, 'proteins_serving': 10, 'carbohydrates_serving': 0, 'fat_serving': 6, 'sodium_serving': 0.38, 'fiber_serving': 0, 'energy-kcal_100g': 312 }
   })
-  assert.deepEqual(f, { name: 'Original Beef Stick — Chomps', per: '1 stick (32 g)', basis: 'serving', kcal: 100, protein_g: 10, carbs_g: 0, fat_g: 6, sodium_mg: 380, fiber_g: 0, sugar_g: null, caffeine_mg: null, serving_oz: null })
+  assert.deepEqual(f, { name: 'Original Beef Stick — Chomps', per: '1 stick (32 g)', basis: 'serving', kcal: 100, protein_g: 10, carbs_g: 0, fat_g: 6, sodium_mg: 380, fiber_g: 0, sugar_g: null, caffeine_mg: null, serving_oz: null, scaled: false })
 })
 
 test('a drink: sugar, caffeine from grams, and the serving as fluid ounces', () => {
@@ -53,4 +53,21 @@ test('per 100 g when there is no serving data; salt stands in for sodium; missin
   assert.equal(offFigures({ product_name: 'Name only', nutriments: {} }), null, 'no energy figure → nothing to prefill')
   assert.equal(offFigures(null), null)
   assert.equal(offFigures({ code: '123', nutriments: { 'energy-kcal_serving': 50 } }).name, 'barcode 123')
+})
+
+test('junk sodium is no figure, and a record scaled from per-100 g says so (the fairlife shake, 2026-11-12)', () => {
+  // The record as Open Food Facts served it: entered per 100 g, sodium a rounding ghost.
+  const f = offFigures({
+    product_name: 'High Quality Protein', brands: 'fairlife', serving_size: '1 bottle (350 g)', nutrition_data_per: '100g',
+    nutriments: { 'energy-kcal_serving': 154, 'proteins_serving': 30.9, 'carbohydrates_serving': 4.13, 'fat_serving': 2.59, 'fiber_serving': 1.01, 'sodium_serving': 6.96e-35, 'salt_serving': 1.74e-34 }
+  })
+  assert.equal(f.sodium_mg, null, 'not "0 mg": the label says 230')
+  assert.equal(f.scaled, true)
+  assert.equal(f.kcal, 154)
+  // An exact zero is a real figure; a real small figure survives; salt-only junk is junk too.
+  assert.equal(offFigures({ nutriments: { 'energy-kcal_serving': 0, 'sodium_serving': 0 } }).sodium_mg, 0)
+  assert.equal(offFigures({ nutriments: { 'energy-kcal_serving': 5, 'sodium_serving': 0.005 } }).sodium_mg, 5)
+  assert.equal(offFigures({ nutriments: { 'energy-kcal_serving': 5, 'salt_serving': 1e-30 } }).sodium_mg, null)
+  assert.equal(offFigures({ nutrition_data_per: 'serving', nutriments: { 'energy-kcal_serving': 5 } }).scaled, false)
+  assert.equal(offFigures({ nutrition_data_per: '100g', nutriments: { 'energy-kcal_100g': 5 } }).scaled, false, 'per-100 figures shown as per-100 are not scaled')
 })

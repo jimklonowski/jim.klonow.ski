@@ -131,14 +131,16 @@ export const ITEMS = {
     portion: '1 Chomps original beef stick (1.15 oz)',
     source: 'https://www.costco.com/p/-/chomps-original-beef-sticks-mild-12-individually-wrapped-sticks/100741625 — per stick'
   },
-  // The protein shake is a Fairlife bottle, read as the Nutrition Plan 30 g shake Costco sells
-  // (11.5 fl oz: 150 kcal / 30 g protein / 4 g carbs / 2.5 g fat) — CONFIRM which Fairlife (Core
-  // Power 26 g is 170 kcal; Core Power Elite 42 g is 230 kcal). Added creatine (5+ g) has no
-  // calories, so "protein + creatine" is the same bottle.
+  // The protein shake is a Fairlife bottle: the 30 g chocolate shake, 340 mL (11.5 fl oz).
+  // CONFIRMED against the bottle (Jim's label photo, 2026-11-12): 150 kcal / 30 g protein /
+  // 4 g carbs / 2.5 g fat / 230 mg sodium / 1 g fibre — not Core Power (170 kcal / 26 g) nor
+  // Core Power Elite (230 kcal / 42 g). Its Open Food Facts record (barcode 0811620022118) is
+  // entered per 100 g with a junk sodium, so a scan reads 154 kcal and no sodium; these are the
+  // label's. Added creatine (5+ g) has no calories, so "protein + creatine" is the same bottle.
   fairlife_shake: {
-    kcal: 150, protein_g: 30, carbs_g: 4, fat_g: 2.5,
-    portion: '1 Fairlife Nutrition Plan 30 g protein shake (11.5 fl oz)',
-    source: 'Fairlife Nutrition Plan label — confirm it isn\'t Core Power (170 kcal / 26 g) or Core Power Elite (230 kcal / 42 g)'
+    kcal: 150, protein_g: 30, carbs_g: 4, fat_g: 2.5, sodium_mg: 230, fiber_g: 1,
+    portion: '1 Fairlife 30 g protein shake, chocolate (340 mL)',
+    source: 'the bottle\'s label (photo, 2026-11-12), barcode 0811620022118'
   },
   // Panera's You Pick Two, as Jim orders it. Panera's menu pages give the half sandwich and the
   // cup; the side that comes with the combo (baguette / chips / apple) is NOT counted — confirm.
@@ -577,7 +579,7 @@ export const MEAL_LIBRARY: LibraryMeal[] = [
   // creatine adds nothing. Aliases cover the wordings the key doesn't already fold.
   {
     text: 'protein + creatine shake',
-    aliases: ['protein shake', 'protein + creatine', 'fairlife', 'fairlife shake', 'fairlife + creatine', 'protein fruit smoothie'],
+    aliases: ['protein shake', 'protein + creatine', 'fairlife', 'fairlife shake', 'fairlife protein shake', 'fairlife protein', 'fairlife + creatine', 'fairlife protein shake + creatine', 'protein fruit smoothie'],
     parts: [['fairlife_shake', 1]],
     note: 'a Fairlife shake, with 5+ g creatine stirred in on most days'
   },

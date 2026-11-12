@@ -197,8 +197,8 @@
                are the label's figures times this, and the saved row records the count. -->
           <UFormField
             v-if="scanned?.basis === 'serving'"
-            :label="`Servings eaten (one is ${scanned.per})`"
-            :ui="FIELD_UI"
+            label="Servings eaten"
+            :help="`one serving is ${scanned.per}`"
             data-servings
           >
             <UInput
@@ -433,8 +433,13 @@ const { barcode, lookingUp, barcodeNote, barcodeValid, canScan, lookUp, onScanFi
   scanned.value = f
   servings.value = 1
   fillFromScan()
+  // What the record could not be trusted on, said beside the figures it filled.
+  const caveats = [
+    f.scaled ? 'This record was entered per 100 g and scaled to the serving, so the figures can be a few percent off the label — type the label\'s own numbers over them.' : null,
+    f.sodium_mg == null ? 'It has no usable sodium figure — read that off the label.' : null
+  ].filter(Boolean).join(' ')
   return f.basis === 'serving'
-    ? { text: `Filled from Open Food Facts: ${f.name}, per ${f.per}. Set how many of those servings were eaten, check it against the package, then Save.`, tone: 'ok' }
+    ? { text: `Filled from Open Food Facts: ${f.name}, per ${f.per}. Set how many of those servings were eaten, check it against the package, then Save.${caveats ? ` ${caveats}` : ''}`, tone: caveats ? 'warn' : 'ok' }
     : { text: `Filled from Open Food Facts: ${f.name} — per 100 g, since the product lists no serving. Scale it to what was eaten before saving.`, tone: 'warn' }
 })
 

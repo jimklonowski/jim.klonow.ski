@@ -19,6 +19,8 @@ export interface OffProduct {
   /** The serving as a number, in serving_quantity_unit ('ml' for a drink, 'g' for food). */
   serving_quantity?: number | string
   serving_quantity_unit?: string
+  /** How the contributor entered the figures: '100g' or 'serving'. */
+  nutrition_data_per?: string
   nutriments?: Record<string, number | string | undefined>
 }
 
@@ -41,10 +43,28 @@ export interface OffFigures {
   sugar_g: number | null
   caffeine_mg: number | null
   serving_oz: number | null
+  /**
+   * The record was entered per 100 g and the per-serving figures are the site's multiplication
+   * (150 kcal on the label reads 154): close, but the label's own numbers are the ones to save.
+   */
+  scaled: boolean
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
 const ML_PER_FL_OZ = 29.5735
+
+/**
+ * Grams → whole milligrams, with one refusal: a value that is not zero but rounds to zero is
+ * junk, not a figure. A fairlife shake's record held sodium as 6.96e-35 g (Jim's scan,
+ * 2026-11-12; the label says 230 mg), and "0 mg" in the form would have been saved as a
+ * sodium-free drink. An exact 0 is a real figure and stays 0; junk reads as "no figure".
+ */
+function mgFromGrams(g: number | null): number | null {
+  if (g == null) return null
+  if (g === 0) return 0
+  const mg = Math.round(g * 1000)
+  return mg > 0 ? mg : null
+}
 
 /**
  * A serving's volume in fl oz, or null when it is not a volume: "12 fl oz (355 ml)" → 12,
@@ -95,10 +115,11 @@ export function offFigures(product: OffProduct | null | undefined): OffFigures |
     protein_g: round1(num(`proteins${s}`) ?? 0),
     carbs_g: round1(num(`carbohydrates${s}`) ?? 0),
     fat_g: round1(num(`fat${s}`) ?? 0),
-    sodium_mg: sodiumG != null ? Math.round(sodiumG * 1000) : null,
+    sodium_mg: mgFromGrams(sodiumG),
     fiber_g: fiber != null ? round1(fiber) : null,
     sugar_g: sugar != null ? round1(sugar) : null,
-    caffeine_mg: caffeineG != null ? Math.round(caffeineG * 1000) : null,
+    caffeine_mg: mgFromGrams(caffeineG),
+    scaled: basis === 'serving' && product?.nutrition_data_per?.toLowerCase() === '100g',
     serving_oz: basis === 'serving' ? servingFlOz(product) : null
   }
 }

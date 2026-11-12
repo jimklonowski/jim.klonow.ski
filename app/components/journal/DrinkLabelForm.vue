@@ -224,7 +224,11 @@ const { barcode, lookingUp, barcodeNote, barcodeValid, canScan, lookUp, onScanFi
   draft.sugar_g = f.sugar_g ?? f.carbs_g
   draft.sodium_mg = f.sodium_mg ?? ''
   if (f.caffeine_mg != null) draft.caffeine_mg = f.caffeine_mg
-  const caffeine = f.caffeine_mg == null ? ' Caffeine is not listed there — read it off the can (0 if caffeine free).' : ''
+  const caffeine = [
+    f.caffeine_mg == null ? ' Caffeine is not listed there — read it off the can (0 if caffeine free).' : '',
+    f.sodium_mg == null ? ' It has no usable sodium figure — read that off the can.' : '',
+    f.scaled ? ' This record was entered per 100 g and scaled, so the figures can be a few percent off — type the can\'s own numbers over them.' : ''
+  ].join('')
   if (f.basis !== 'serving') {
     // Open Food Facts' per-100 figures are per 100 ml for a drink.
     draft.serving_oz = 3.4
