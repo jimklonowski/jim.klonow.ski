@@ -98,3 +98,26 @@ test('a label replaces the table\'s figures at any size; the kind still comes fr
   assert.equal(withLabels.sodium_mg, 100 + 45)
   assert.equal(indexEstimates([]).drinks, undefined, 'no labels → a plain index')
 })
+
+test('tea is neither a soda nor water, unless its name says unsweetened (Jim, 2026-11-12)', () => {
+  for (const name of ['Peace Tea', 'peach tea', 'Iced Tea', 'Sweet Tea', 'Peace Tea Peach', 'Arizona green tea']) {
+    assert.equal(drinkInfo(name).kind, 'tea', name)
+    assert.equal(isSodaEntry({ drink: name }), false, `${name} is not a soda`)
+    assert.equal(hydrates(name), false, `${name} is not water`)
+  }
+  assert.equal(hydrates('Unsweetened Iced Tea'), true)
+  assert.equal(hydrates('unsweet tea'), true)
+  assert.equal(hydrates('Gatorade'), true, 'sports drinks still count')
+  assert.equal(hydrates('Coffee'), false)
+  // A 23 oz can of peach tea: on no meter, but its sugar and calories are in the day.
+  const day = { water: [{ oz: 24 }], sodas: [{ time: '13:00', drink: 'Peace Tea', size: '23oz can' }, { time: '14:00', drink: 'Unsweetened Iced Tea', size: '16oz cup' }] }
+  assert.equal(hydrationOz(day), 40, 'the pours plus the unsweetened tea only')
+  assert.equal(sodasOnly(day.sodas).length, 0)
+  assert.ok(drinkFigures('Peace Tea', '23oz can').kcal > 100)
+  assert.equal(drinkFigures('Unsweetened Iced Tea', '16oz cup').kcal, 0)
+})
+
+test('Peace Tea reads its 12 oz can label', () => {
+  assert.deepEqual(drinkFigures('Peace Tea', '12oz can'), { oz: 12, kcal: 110, caffeine_mg: 12, sodium_mg: 130, sugar_g: 29 })
+  assert.equal(drinkFigures('peach tea', '12oz can').sugar_g, 29)
+})

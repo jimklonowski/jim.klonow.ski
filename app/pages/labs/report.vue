@@ -313,7 +313,7 @@
 
 <script setup lang="ts">
 import { donationDeferral } from '#shared/utils/accutane'
-import { bpAverageLabel } from '#shared/utils/bloodPressure'
+import { bpGoal, bpWeekAverage } from '#shared/utils/bloodPressure'
 import { ageOn } from '#shared/utils/clinicalCalcs'
 import { cycleProgress, cycleStatusOn } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
@@ -464,8 +464,9 @@ const vitalsLine = computed(() => {
   const from = shiftDays(asOf.value, -(VITALS_WINDOW_DAYS - 1))
   const rows = journal.value.filter(e => e.date >= from)
   const parts: string[] = []
-  const bp = bpAverageLabel(rows)
-  if (bp) parts.push(`BP ${bp} mmHg (mean of ${rows.filter(r => r.bp_systolic && r.bp_diastolic).length} readings)`)
+  // The month's mean with its AHA category and the goal it is held to (audit #43 item 83).
+  const bp = bpWeekAverage(rows, asOf.value, bpGoal(profileData.value?.bp_goal), VITALS_WINDOW_DAYS)
+  if (bp) parts.push(`BP ${bp.systolic}/${bp.diastolic} mmHg (mean of ${bp.n} reading${bp.n === 1 ? '' : 's'}; ${bp.category.label} by AHA categories; goal under ${bp.goal.systolic}/${bp.goal.diastolic} ${bp.met ? 'met' : 'not met'})`)
   const rhr = rows.map(r => r.rhr).filter((v): v is number => typeof v === 'number' && v > 0)
   if (rhr.length) parts.push(`resting HR ${Math.round(rhr.reduce((s, v) => s + v, 0) / rhr.length)} bpm (${rhr.length} days)`)
   const wt = describeTrend(weightTrend(weighInsOf(journal.value), asOf.value))

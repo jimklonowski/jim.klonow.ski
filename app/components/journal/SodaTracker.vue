@@ -131,7 +131,7 @@
           :ui="{ item: 'text-small' }"
         />
       </UFormField>
-      <div class="col-span-2">
+      <div class="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
           class="tui-btn tui-btn-accent"
@@ -139,6 +139,18 @@
           @click="quickAdd(true)"
         >
           {{ adding ? 'LOGGING…' : '+ LOG THIS' }}
+        </button>
+        <!-- The label form for whatever drink is named here, logged today or not: the way in to
+             a drink's figures without having to log one first. -->
+        <button
+          v-if="customDrink.trim()"
+          type="button"
+          class="text-meta text-muted hover:text-accent cursor-pointer text-left"
+          :title="customLabelTitle"
+          data-drink-label-custom
+          @click="openLabel({ drink: customDrink, size: customSize || null })"
+        >
+          {{ customLabelText }}
         </button>
       </div>
     </div>
@@ -295,7 +307,7 @@ function figuresTitle(s: SodaEntry): string {
 // The label form, for the row that was tapped.
 const labelFor = ref<{ drink: string, size: string | null } | null>(null)
 const labelOpen = ref(false)
-function openLabel(s: SodaEntry) {
+function openLabel(s: { drink?: string | null, size?: string | null }) {
   if (!s.drink?.trim()) return
   labelFor.value = { drink: s.drink.trim(), size: s.size ?? null }
   labelOpen.value = true
@@ -318,6 +330,16 @@ function sodaLabel(s: SodaEntry) {
 const customOpen = ref(false)
 const customDrink = ref('')
 const customSize = ref('')
+// The custom form's way in to a drink's label figures: says whose figures are in use now.
+const customLabelText = computed(() => (drinkSource(customDrink.value, labels.value) === 'label' ? 'your label ✎' : 'label figures →'))
+const customLabelTitle = computed(() => {
+  const source = drinkSource(customDrink.value, labels.value)
+  return source === 'label'
+    ? 'Figures come from your label — open to change them'
+    : source === 'table'
+      ? 'Figures come from the built-in table, not checked against a label — enter the can\'s own'
+      : 'Not in the built-in table: typical figures for its kind are used — enter the can\'s own'
+})
 const adding = ref(false)
 
 // Reassigns `data.value` (rather than mutating an entry in place) so the update is guaranteed to

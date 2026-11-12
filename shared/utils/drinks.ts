@@ -65,6 +65,12 @@ const DRINKS: Record<string, DrinkInfo> = {
   'cold brew': d('coffee', 5, 150, 10, 0),
   'iced tea': d('tea', 5, 35, 10, 0),
   'sweet tea': d('tea', 110, 30, 10, 28),
+  // Peace Tea Just Peachy, the 12 oz can's label (the product image Jim sent, 2026-11-12):
+  // 110 kcal, 130 mg sodium, 29 g sugar. The label prints no caffeine; 12 mg per can is Jim's
+  // figure (2026-11-12). "Peach tea" is the same can in Jim's log.
+  'peace tea': d('tea', 110, 12, 130, 29),
+  'peace tea just peachy': d('tea', 110, 12, 130, 29),
+  'peach tea': d('tea', 110, 12, 130, 29),
   // other
   'lemonade': d('other', 150, 0, 10, 40)
 }
@@ -157,7 +163,7 @@ export const DRINK_GROUPS: Array<{ kind: DrinkKind, label: string, names: string
   { kind: 'sports', label: 'Sports drink', names: ['Gatorade', 'Gatorade Zero', 'Powerade', 'Powerade Zero', 'Body Armor', 'Body Armor Lyte', 'Propel', 'Pedialyte'] },
   { kind: 'energy', label: 'Energy drink', names: ['Red Bull', 'Monster', 'Celsius'] },
   { kind: 'coffee', label: 'Coffee', names: ['Coffee', 'Cold Brew'] },
-  { kind: 'tea', label: 'Tea', names: ['Iced Tea', 'Sweet Tea'] },
+  { kind: 'tea', label: 'Tea', names: ['Iced Tea', 'Sweet Tea', 'Peace Tea', 'Unsweetened Iced Tea'] },
   { kind: 'other', label: 'Other', names: ['Lemonade'] }
 ]
 
@@ -180,9 +186,17 @@ export function sodasOnly<T extends DrinkLike>(list: readonly T[] | null | undef
   return (list ?? []).filter(isSodaEntry)
 }
 
-/** Whether a drink's ounces count toward the water goal: sports and electrolyte drinks do. */
+/**
+ * Whether a drink's ounces count toward the water goal: sports and electrolyte drinks do, and a
+ * tea only when its NAME says it is unsweetened ("unsweetened iced tea", "unsweet tea"). Jim's
+ * call, 2026-11-12: the tea he drinks is a sugary canned peach tea, so a bare "iced tea" or
+ * "peach tea" is neither water nor a soda — it is logged as a tea and counts on no meter.
+ * Coffee, soda and energy drinks never count. Read from the name, like the kind.
+ */
 export function hydrates(name: string | null | undefined): boolean {
-  return drinkInfo(name).kind === 'sports'
+  const key = drinkKey(name)
+  const kind = builtInInfo(key).kind
+  return kind === 'sports' || (kind === 'tea' && /\bunsweet(ened)?\b/.test(key))
 }
 
 export interface DrinkFigures {

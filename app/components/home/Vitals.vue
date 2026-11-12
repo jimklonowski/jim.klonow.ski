@@ -97,6 +97,7 @@
 import type { JournalEntry } from '~/data/journal'
 import type { HealthMetricsEntry } from '#shared/types/journal'
 import { RECOVERY_GREEN_MIN } from '#shared/utils/recovery'
+import { bpCategory, bpWeekAverage } from '#shared/utils/bloodPressure'
 import { shiftDays } from '#shared/utils/dates'
 import { fmtRate, weightTrend } from '#shared/utils/weightTrend'
 
@@ -206,16 +207,25 @@ const rows = computed(() => {
   if (bpRow) {
     const sys = bpRow.bp_systolic!
     const dia = bpRow.bp_diastolic!
-    const high = sys >= 130 || dia >= 85
-    const elevated = sys >= 120 || dia >= 80
+    // The figure is the latest reading; the status is the WEEK's average against the AHA
+    // categories once the week has three readings (audit #43 item 83: one cuff reading is noise
+    // — a single 131 no longer paints the tile red), else the reading's own category.
+    const week = bpWeekAverage(entriesAsOf.value, asOf.value)
+    const steady = week != null && week.n >= 3
+    const category = steady ? week.category : bpCategory({ systolic: sys, diastolic: dia })
+    const chip = { normal: '● ok', elevated: '● watch', stage1: '● stage 1', stage2: '● high', crisis: '● high' }[category.key]
     out.push({
       label: 'BP',
       value: `${sys}/${dia}`,
       unit: 'mmHg',
-      title: bpRow.date < asOf.value ? `last reading ${formatDate(bpRow.date, 'monthDay')}` : undefined,
+      title: [
+        bpRow.date < asOf.value ? `last reading ${formatDate(bpRow.date, 'monthDay')}` : null,
+        week ? `7-day average ${week.systolic}/${week.diastolic} over ${week.n} reading${week.n === 1 ? '' : 's'}` : null,
+        `${category.label} (AHA), from ${steady ? 'the week\'s average' : 'this reading'}`
+      ].filter(Boolean).join(' · '),
       delta: {
-        text: high ? '● high' : elevated ? '● watch' : '● ok',
-        class: high ? 'text-danger' : elevated ? 'text-warn' : 'text-accent'
+        text: chip,
+        class: { ok: 'text-accent', warn: 'text-warn', danger: 'text-danger' }[category.tone]
       }
     })
   }

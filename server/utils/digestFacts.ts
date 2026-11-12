@@ -1,13 +1,13 @@
 import type { ProtocolRule } from '#shared/utils/protocolRules'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 import { fmtDay, scheduleContext } from '#shared/utils/protocolProse'
-import { roundTo, shiftDays } from '#shared/utils/dates'
+import { diffDays, roundTo, shiftDays } from '#shared/utils/dates'
 import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/utils/trends'
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { LATE_CAFFEINE_HOUR, drinkTotals, hydrationOz, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
-import { bpLabel } from '#shared/utils/bloodPressure'
+import { bpGoal, bpLabel, bpWeekAverage, type BpReading, type BpWeek } from '#shared/utils/bloodPressure'
 import { TREND_LOOKBACK_DAYS, describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, hasFullFigures, isWholeDay, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
 import type { HealthMetricsEntry, JournalRow, SodaEntry, WorkoutEntry } from '#shared/types/journal'
@@ -229,6 +229,17 @@ function tallyDoses(entries: JournalRow[]) {
     .sort((a, b) => b.days - a.days)
 }
 
+/** The owner's blood-pressure goal (profile `bp_goal`), or the default when unset or unreadable. */
+async function bpGoalOf(db: D1Database): Promise<BpReading> {
+  const row = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('bp_goal').first<{ value: string }>().catch(() => null)
+  return bpGoal(row?.value)
+}
+
+/** "7-day average 122/74 over 5 readings: elevated by the AHA categories; goal under 130/80 met" */
+function bpWeekText(w: BpWeek): string {
+  return `${w.days}-day average ${w.systolic}/${w.diastolic} over ${w.n} reading${w.n === 1 ? '' : 's'}: ${w.category.label} by the AHA categories; goal under ${w.goal.systolic}/${w.goal.diastolic} ${w.met ? 'met' : 'not met'}`
+}
+
 export interface DigestFacts {
   lines: string[]
   stats: Record<string, unknown>
@@ -263,7 +274,11 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     lines.push(`Weight: ${entry.weight_lbs} lbs (${[describeTrend(wt), delta].filter(Boolean).join('; ')})`)
   }
   const bp = bpLabel(entry)
-  if (bp) lines.push(`Blood pressure: ${bp}`)
+  if (bp) {
+    // One reading is noise; the week's average and its AHA category ride with it (item 83).
+    const week = bpWeekAverage([...baseJournal, ...journal], date, await bpGoalOf(db))
+    lines.push(`Blood pressure: ${bp}${week && week.n > 1 ? ` (${bpWeekText(week)})` : ''}`)
+  }
   if (entry?.rhr != null) lines.push(`Resting HR: ${entry.rhr} bpm`)
   if (entry?.hrv != null) lines.push(`HRV: ${entry.hrv} ms`)
   if (h?.recovery_score != null) lines.push(`Whoop recovery: ${h.recovery_score}%`)
@@ -407,6 +422,9 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   const bpDia = avg(diaVals)
   if (bpSys != null && bpDia != null) {
     lines.push(`Avg blood pressure: ${Math.round(bpSys)}/${Math.round(bpDia)} (systolic range ${Math.min(...sysVals)}–${Math.max(...sysVals)}, ${sysVals.length} readings)`)
+    // The same week as full readings, against the AHA categories and the goal (item 83).
+    const week = bpWeekAverage(journal, end, await bpGoalOf(db), diffDays(start, end) + 1)
+    if (week) lines.push(`Blood pressure, read as a clinician would: ${bpWeekText(week)}`)
   }
 
   const rec = avg(health.map(h => h.recovery_score!).filter(v => v != null))
