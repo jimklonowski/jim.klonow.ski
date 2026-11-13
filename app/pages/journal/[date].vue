@@ -901,6 +901,7 @@
 <script setup lang="ts">
 import { KNOWN_COMPOUNDS, DOSE_UNITS, INJECTION_SITES, SODA_SIZES, blankEntry, blankSoda, blankWater, canonicalCompound, compoundSpellings, copyDoses, doseDefaults, lastSoda, withoutBlankRows } from '~/data/journal'
 import type { PeptideEntry, ReconstitutionEntry, SodaEntry, WaterEntry } from '~/data/journal'
+import { newTapId } from '~/composables/useQuickLogOutbox'
 import { WATER_DEFAULT_CUP_OZ, WATER_MAX_OZ_PER_ENTRY, waterSetting } from '#shared/utils/water'
 import { DRINK_GROUPS, hydrationOz } from '#shared/utils/drinks'
 import {
@@ -1336,8 +1337,10 @@ function removeReconstitution(i: number) {
 
 // Opens with the last soda named (today's rows first, then the newest day with one): the
 // usual drink in the usual size, time now — a phone shouldn't need both pickers for a repeat.
+// A row added here carries its own id, as a quick-add tap does: it is what lets the save merge
+// tell "this row, sent a second time" from "another drink just like it" (journalMerge.ts).
 function addSoda() {
-  form.sodas.push({ ...blankSoda(localTimeNow()), ...(lastSoda(form.sodas, allEntries.value ?? []) ?? {}) })
+  form.sodas.push({ ...blankSoda(localTimeNow()), ...(lastSoda(form.sodas, allEntries.value ?? []) ?? {}), id: newTapId() })
 }
 
 function removeSoda(i: number) {
@@ -1345,7 +1348,7 @@ function removeSoda(i: number) {
 }
 
 function addWater() {
-  form.water.push(blankWater(localTimeNow(), cupOz.value))
+  form.water.push({ ...blankWater(localTimeNow(), cupOz.value), id: newTapId() })
 }
 
 function removeWater(i: number) {
@@ -1404,6 +1407,20 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     base: !moving && targetEntry.value ? undefined : loadedBase.value ?? undefined
   }
   const saved = await $fetch<{ ok: boolean, date: string, kept: string[] }>('/api/journal/save', { method: 'POST', body: payload })
+  // The row now holds what was just sent, so that is what the next save must merge against.
+  // The rebuild after the refresh below normally re-reads it from the row — but if that refresh
+  // fails, or the move below does, the form stays as it is, and a second save against the OLD
+  // base added every drink and pour of this one again (audit #44 item 2).
+  loadedBase.value = {
+    weight_lbs: payload.weight_lbs ?? null,
+    bp_systolic: payload.bp_systolic ?? null,
+    bp_diastolic: payload.bp_diastolic ?? null,
+    rhr: payload.rhr ?? null,
+    hrv: payload.hrv ?? null,
+    sodas: payload.sodas.map(s => ({ ...s })),
+    water: payload.water.map(w => ({ ...w })),
+    food: { ...food }
+  }
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
   if (paired.length) {
     toast.add({ title: 'Meals matched to ones with figures', description: `Saved as ${paired.join(', ')}. Edit the field if that was wrong.`, color: 'info', icon: 'i-lucide-link' })

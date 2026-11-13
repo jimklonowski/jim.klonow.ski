@@ -54,6 +54,53 @@ test('duplicate identical items are counted, not collapsed', () => {
   assert.deepEqual(fields.water, [pour('08:00'), pour('09:00')])
 })
 
+// --- a save sent twice (audit #44 item 2) ---
+// The form's base only moves when the form is rebuilt from the row. A save whose response was
+// lost, or one followed by a failed list refresh or a failed move, is sent again with the SAME
+// base — while the row already holds what the first one wrote.
+
+test('a replayed save does not add its rows a second time', () => {
+  const base = day({ water: [pour('08:00')], sodas: [soda('12:00')] })
+  const form = day({ water: [pour('08:00'), { ...pour('10:00'), id: 'tap-aaaaaaaa' }], sodas: [soda('12:00'), { ...soda('15:00', 'Sprite'), id: 'tap-bbbbbbbb' }] })
+  const current = form // the first send landed
+  const { fields, kept } = mergeDaySave(form, base, current)
+  assert.deepEqual(fields.water, form.water)
+  assert.deepEqual(fields.sodas, form.sodas)
+  assert.deepEqual(kept, [], 'its own earlier write is not "logged elsewhere"')
+})
+
+test('a replayed save still keeps what really was logged elsewhere, and says only that', () => {
+  const mine = { ...pour('10:00'), id: 'tap-aaaaaaaa' }
+  const phone = { ...pour('11:30'), id: 'tap-cccccccc' }
+  const base = day({ water: [pour('08:00')] })
+  const form = day({ water: [pour('08:00'), mine] })
+  const current = day({ water: [pour('08:00'), mine, phone] }) // first send landed, then the phone tapped
+  const { fields, kept } = mergeDaySave(form, base, current)
+  assert.deepEqual(fields.water, [pour('08:00'), mine, phone])
+  assert.deepEqual(kept, ['1 water pour'])
+})
+
+test('two taps alike in everything but their id are two taps', () => {
+  // The form adds a 12 oz pour at 10:00 and the phone taps one the same minute: different ids,
+  // so neither is taken for a replay of the other.
+  const mine = { ...pour('10:00'), id: 'tap-aaaaaaaa' }
+  const phone = { ...pour('10:00'), id: 'tap-cccccccc' }
+  const { fields, kept } = mergeDaySave(day({ water: [mine] }), day(), day({ water: [phone] }))
+  assert.deepEqual(fields.water, [phone, mine])
+  assert.deepEqual(kept, ['1 water pour'])
+})
+
+test('a replayed removal does not take a second identical row', () => {
+  // Two identical pours, the form removed one, the first send landed: one is left and stays.
+  const base = day({ water: [pour('08:00'), pour('08:00'), pour('09:00')], sodas: [soda('12:00')] })
+  const form = day({ water: [pour('08:00'), pour('09:00')], sodas: [] })
+  const current = form
+  const { fields, kept } = mergeDaySave(form, base, current)
+  assert.deepEqual(fields.water, [pour('08:00'), pour('09:00')])
+  assert.deepEqual(fields.sodas, [])
+  assert.deepEqual(kept, [])
+})
+
 test('food merges per slot: the form\'s edit wins, an untouched slot takes the quick-logged value', () => {
   const base = day({ food: { breakfast: 'protein shake' } })
   const form = day({ food: { breakfast: 'protein + creatine shake', dinner: 'gyros' } }) // edited breakfast, added dinner

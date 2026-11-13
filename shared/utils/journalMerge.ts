@@ -10,7 +10,8 @@
 // wins, including removals; what it left alone takes the database's CURRENT value, so an append
 // made elsewhere survives. Lists (sodas, water) merge as multisets: the form's removals are taken
 // off the current list one occurrence each, its additions appended, and anything in the current
-// list that wasn't in base is kept. Pure and framework-free so it is unit-tested in plain node.
+// list that wasn't in base is kept. A save replayed against the same base is a no-op for the
+// lists (see mergeList). Pure and framework-free so it is unit-tested in plain node.
 import { MEAL_SLOTS, type MealSlot } from './nutrition.ts'
 
 export const DAY_VITALS = ['weight_lbs', 'bp_systolic', 'bp_diastolic', 'rhr', 'hrv'] as const
@@ -70,8 +71,19 @@ function mergeList(base: Item[], form: Item[], current: Item[]): { list: Item[],
   if (sameList(current, base)) return { list: form, keptCount: 0 }
   const removed = minus(base, form)
   const added = minus(form, base)
-  const elsewhere = minus(current, base)
-  const list = [...minus(current, removed), ...added].sort(byTime)
+  const arrived = minus(current, base)
+  const gone = minus(base, current)
+  // The same save can arrive twice with the same base: its response was lost and the user
+  // pressed Save again, or the list refresh (or the move) after it failed, so the form never
+  // learned the row had changed. The row then already holds this form's own additions and lacks
+  // its removals, and applying them again doubled every added drink and pour and took a second
+  // identical row for each removal (audit #44 item 2). So an addition the row already holds is
+  // not appended again, and a removal the row has already seen is not taken again. Rows the form
+  // adds carry a tap id, so "already holds" means that very row, not one that looks like it.
+  const fresh = minus(added, arrived)
+  const pending = minus(removed, gone)
+  const elsewhere = minus(arrived, added)
+  const list = [...minus(current, pending), ...fresh].sort(byTime)
   return { list, keptCount: elsewhere.length }
 }
 
