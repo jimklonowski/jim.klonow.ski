@@ -254,56 +254,6 @@
             </p>
           </div>
 
-          <!-- Photos: the acne set, newest shot per region -->
-          <div v-if="showPhotos">
-            <TuiHeader
-              label="PHOTOS"
-              :dashes="15"
-            >
-              <span
-                class="text-label normal-case"
-                :class="strip.stale ? 'text-warn' : 'text-muted'"
-              >{{ photosMeta }}</span>
-            </TuiHeader>
-            <div class="mt-2.5 grid grid-cols-4 sm:grid-cols-8 gap-2">
-              <figure
-                v-for="r in strip.regions"
-                :key="r.category"
-                class="min-w-0"
-              >
-                <NuxtLink
-                  v-if="r.latest"
-                  :to="`/journal/${r.latest.date}`"
-                  class="block aspect-square overflow-hidden border border-line-soft hover:border-line-accent transition-colors"
-                  :aria-label="`${photoCategoryLabel(r.category)} photo from ${formatDate(r.latest.date)}`"
-                >
-                  <img
-                    :src="r.latest.thumbUrl ?? r.latest.url"
-                    alt=""
-                    loading="lazy"
-                    class="w-full h-full object-cover"
-                    :class="{ '-scale-x-100': r.latest.frameFlip }"
-                  >
-                </NuxtLink>
-                <div
-                  v-else
-                  class="aspect-square border border-dashed border-line-input flex items-center justify-center text-meta text-faint"
-                >
-                  none
-                </div>
-                <figcaption class="mt-1 text-label uppercase tracking-[0.08em] truncate text-muted">
-                  {{ photoCategoryLabel(r.category) }}
-                </figcaption>
-                <p
-                  class="text-meta tabular-nums"
-                  :class="r.stale ? 'text-warn' : 'text-faint'"
-                >
-                  {{ r.daysAgo == null ? 'not shot' : r.daysAgo === 0 ? 'today' : `${r.daysAgo} d ago` }}
-                </p>
-              </figure>
-            </div>
-          </div>
-
           <!-- Signals: the streams that collect themselves, each against the eight weeks before -->
           <div>
             <TuiHeader
@@ -363,6 +313,56 @@
             <p class="mt-2 text-meta text-faint leading-[1.6]">
               Context, not measurements: dryness shows up as thirst, aches as fewer sessions, a rough patch in sleep and recovery. The labs above are the measurements. Anything felt goes in the day's notes, which the digests read.
             </p>
+          </div>
+
+          <!-- Photos: the acne set, newest shot per region -->
+          <div v-if="showPhotos">
+            <TuiHeader
+              label="PHOTOS"
+              :dashes="15"
+            >
+              <span
+                class="text-label normal-case"
+                :class="strip.stale ? 'text-warn' : 'text-muted'"
+              >{{ photosMeta }}</span>
+            </TuiHeader>
+            <div class="mt-2.5 grid grid-cols-4 sm:grid-cols-8 gap-2">
+              <figure
+                v-for="r in strip.regions"
+                :key="r.category"
+                class="min-w-0"
+              >
+                <NuxtLink
+                  v-if="r.latest"
+                  :to="`/journal/${r.latest.date}`"
+                  class="block aspect-square overflow-hidden border border-line-soft hover:border-line-accent transition-colors"
+                  :aria-label="`${photoCategoryLabel(r.category)} photo from ${formatDate(r.latest.date)}`"
+                >
+                  <img
+                    :src="r.latest.thumbUrl ?? r.latest.url"
+                    alt=""
+                    loading="lazy"
+                    class="w-full h-full object-cover"
+                    :class="{ '-scale-x-100': r.latest.frameFlip }"
+                  >
+                </NuxtLink>
+                <div
+                  v-else
+                  class="aspect-square border border-dashed border-line-input flex items-center justify-center text-meta text-faint"
+                >
+                  none
+                </div>
+                <figcaption class="mt-1 text-label uppercase tracking-[0.08em] truncate text-muted">
+                  {{ photoCategoryLabel(r.category) }}
+                </figcaption>
+                <p
+                  class="text-meta tabular-nums"
+                  :class="r.stale ? 'text-warn' : 'text-faint'"
+                >
+                  {{ r.daysAgo == null ? 'not shot' : r.daysAgo === 0 ? 'today' : `${r.daysAgo} d ago` }}
+                </p>
+              </figure>
+            </div>
           </div>
         </section>
       </div>
