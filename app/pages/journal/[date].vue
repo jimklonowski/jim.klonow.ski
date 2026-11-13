@@ -54,9 +54,11 @@
     <JournalNav />
 
     <!-- A failed list fetch must never present a blank "new entry" whose save would overwrite
-         the real row (journal/save is a full-column upsert) — surface it and hold Save. -->
+         the real row (journal/save is a full-column upsert) — surface it and hold Save. The
+         list is client-only, so on a hard load it is still on its way: say so. -->
     <TuiDataState
       :error="entriesError"
+      :pending="!listLoaded"
       @retry="refresh"
     />
 
@@ -64,10 +66,14 @@
       <!-- Every editable control sits inside one fieldset: a disabled fieldset disables all of
            its descendant inputs, selects and buttons at once, so a read-only role (friend) can't
            change a value the hidden Save button would never have sent. min-w-0 undoes the UA's
-           min-inline-size: min-content, which would otherwise break the grids inside. -->
+           min-inline-size: min-content, which would otherwise break the grids inside.
+           Held shut until the list has loaded too: until then the form is the blank one built
+           from nothing, and anything typed into it would be saved over the day's real doses and
+           notes (audit #44 item 1). -->
       <fieldset
-        :disabled="!canEdit"
+        :disabled="!canEdit || !listLoaded"
         class="min-w-0 space-y-5"
+        data-day-form
       >
         <!-- Date & vitals -->
         <section>
@@ -860,7 +866,7 @@
         />
         <UTextarea
           v-model="form.notes"
-          :disabled="!canEdit"
+          :disabled="!canEdit || !listLoaded"
           placeholder="Any observations, how you felt, etc."
           :rows="3"
           class="w-full mt-2.5"
@@ -1099,13 +1105,17 @@ const existingEntry = computed(() =>
   allEntries.value?.find(e => e.date === dateParam.value) ?? null
 )
 
+// The journal list is client-only: on a hard load (a reload, the home-screen app's cold start)
+// the page renders before it arrives, and until it does nothing here knows what the day holds.
+const listLoaded = computed(() => allEntries.value != null)
+
 // "New" only once the list has actually loaded — a failed fetch is unknown, not empty.
-const isNew = computed(() => allEntries.value != null && !existingEntry.value)
+const isNew = computed(() => listLoaded.value && !existingEntry.value)
 
 // Saving needs the list: without it we can't tell a genuinely new day from a row we simply
 // failed to load, and journal/save would overwrite that row with the blank form. And a real
 // date — a cleared date input reads as '' and would be a 400 from the schema.
-const canSave = computed(() => !entriesError.value && allEntries.value != null && isIsoDate(form.date))
+const canSave = computed(() => !entriesError.value && listLoaded.value && isIsoDate(form.date))
 
 // The Date field moves the day. Saving under a changed date used to be a silent overwrite:
 // journal/save upserts on the body's date, so the target day's row was replaced and this one
@@ -1212,10 +1222,16 @@ const form = reactive<{
 // The mounted revalidation (and any refresh triggered elsewhere) replaces the list a few hundred
 // ms after the page renders, which gives `existingEntry` a new identity. Rebuilding
 // unconditionally wiped whatever had been typed in that window, so it rebuilds only while clean.
+//
+// The one exception is the list's FIRST arrival on a hard load. The form standing then was built
+// from nothing — blank doses, blank notes, a blank merge base — so it holds no edit worth
+// keeping (the fieldset is shut until this moment), and keeping it would let Save write that
+// blank over the day's real doses and notes, which the merge does not protect (audit #44 item 1).
 const formGuard = useDirtyGuard(() => form)
 
-watch(existingEntry, () => {
-  if (formGuard.isDirty.value) return
+watch([existingEntry, listLoaded], ([, loaded], [, wasLoaded]) => {
+  const firstLoad = loaded && !wasLoaded
+  if (formGuard.isDirty.value && !firstLoad) return
   Object.assign(form, buildForm())
   formGuard.markClean()
 })
