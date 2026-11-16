@@ -1,13 +1,14 @@
 /// <reference path="../../../worker-configuration.d.ts" />
 import { localDaysAgo } from '#shared/utils/time'
-import { materializeSeedRows } from '#shared/utils/demoSeed'
+import { DEMO_SCRATCH_TABLES, materializeSeedRows } from '#shared/utils/demoSeed'
 import type { SeedTable } from '#shared/utils/demoSeed'
 
 // Nightly wipe + reseed of the demo sandbox (DEMO_DB) from the seed stored in R2
 // (demo/seed.json in LABS_BUCKET, uploaded by `pnpm demo:seed:remote`). Two jobs in one:
 // discard whatever demo visitors wrote yesterday, and re-anchor every relative date so the
 // persona's data always ends "yesterday" — streaks, LOGGED TODAY, and digest recency stay
-// alive without the seed ever going stale.
+// alive without the seed ever going stale. "Whatever visitors wrote" includes the tables the
+// seed has no rows for (DEMO_SCRATCH_TABLES): those are emptied.
 //
 // The seed lives in R2 instead of the bundle so ~180 KB of fixture JSON doesn't ride along
 // in the Worker bundle. Bindings come straight off the env — never
@@ -23,7 +24,8 @@ interface SeedFile {
 
 const SEED_KEY = 'demo/seed.json'
 
-interface ResetResult { tables: number, rows: number }
+/** `cleared`: rows visitors had left in the tables the seed doesn't carry. */
+interface ResetResult { tables: number, rows: number, cleared: number }
 
 export default defineTask({
   meta: {
@@ -35,7 +37,8 @@ export default defineTask({
   run: event => runLoggedTask(event, 'demo:reset', resetDemo)
 })
 
-async function resetDemo(env: Env): Promise<ResetResult> {
+// Exported for tests/demoSeed.test.mjs, which runs it over a recording database.
+export async function resetDemo(env: Env): Promise<ResetResult> {
   const db = env.DEMO_DB
   const bucket = env.LABS_BUCKET
 
@@ -94,5 +97,17 @@ async function resetDemo(env: Env): Promise<ResetResult> {
     total += rows.length
   }
 
-  return { tables: Object.keys(seed.tables).length, rows: total }
+  // The tables a visitor can write that the seed has nothing for. After the reseed, so a failure
+  // here (which fails the run, and is logged) never costs the sandbox its data. A table this
+  // sandbox doesn't have yet holds nothing, and is skipped.
+  let cleared = 0
+  for (const name of DEMO_SCRATCH_TABLES) {
+    if (name in seed.tables) continue
+    const info = await db.prepare(`PRAGMA table_info(${name})`).all<{ name: string }>()
+    if (!info.results?.length) continue
+    const gone = await db.prepare(`DELETE FROM ${name}`).run()
+    cleared += gone.meta?.changes ?? 0
+  }
+
+  return { tables: Object.keys(seed.tables).length, rows: total, cleared }
 }

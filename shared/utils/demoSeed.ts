@@ -23,6 +23,19 @@ export interface SeedTable {
   rows: unknown[][]
 }
 
+/**
+ * Tables a demo visitor can write to that the seed does not carry. A reset replaces every seeded
+ * table and, until audit #44 item 31, touched nothing else — so a marker goal, a drug–gene note
+ * or a drink label typed by one visitor stayed in the sandbox for every visitor after, for good.
+ * Both materializers empty these; a table that later gains seed rows is replaced like any other
+ * and its entry here becomes a no-op.
+ *
+ * Kept honest by tests/demoSeed.test.mjs, which reads the write endpoints a demo session is let
+ * into (requireWriteAccess) and fails when one of them writes a table that is neither seeded nor
+ * listed here.
+ */
+export const DEMO_SCRATCH_TABLES = ['marker_goals', 'pgx_notes', 'drink_labels'] as const
+
 const partsFmt = new Map<string, Intl.DateTimeFormat>()
 function wallClockParts(tz: string) {
   let fmt = partsFmt.get(tz)

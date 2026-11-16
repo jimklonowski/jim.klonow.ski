@@ -1,9 +1,13 @@
 // The demo seed's date materialization (shared/utils/demoSeed.ts), audit #42 item 12: calendar
-// days, not milliseconds, and a per-day zone offset for the workouts' local times.
+// days, not milliseconds, and a per-day zone offset for the workouts' local times. And the
+// sandbox reset (server/tasks/demo/reset.ts), audit #44 item 31: what a visitor wrote is gone
+// the next morning, in the tables the seed carries and in the ones it does not.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { materializeSeedRows, materializeSeedValue, zoneOffsetAt } from '../shared/utils/demoSeed.ts'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { DEMO_SCRATCH_TABLES, materializeSeedRows, materializeSeedValue, zoneOffsetAt } from '../shared/utils/demoSeed.ts'
 import { shiftDays, weekdayOf } from '../shared/utils/dates.ts'
 import { protocolFromRows } from '../shared/utils/protocolStore.ts'
 import { tallySchedule } from '../shared/utils/protocolRules.ts'
@@ -108,4 +112,119 @@ test('the generated seed materializes with unique journal dates and seasonally c
       assert.equal(s.slice(-5), zoneOffsetAt(date, time), `offset matches the day for ${s}`)
     }
   }
+})
+
+// --- The reset (audit #44 item 31) ---
+
+/** Every .ts file under `dir`. */
+function tsFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    return entry.isDirectory() ? tsFiles(path) : entry.name.endsWith('.ts') ? [path] : []
+  })
+}
+
+test('every table a demo session can write is one the reset reseeds or empties', () => {
+  const seed = JSON.parse(readFileSync(new URL('../scripts/demo/demo-seed.json', import.meta.url), 'utf8'))
+  const schema = readFileSync(new URL('../server/database/schema.sql', import.meta.url), 'utf8')
+  const tables = new Set([...schema.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map(m => m[1]))
+  const covered = new Set([...Object.keys(seed.tables), ...DEMO_SCRATCH_TABLES])
+
+  // The endpoints that let the demo role write: requireWriteAccess, or a role list naming it.
+  const apiDir = fileURLToPath(new URL('../server/api/', import.meta.url))
+  const writers = tsFiles(apiDir)
+    .map(path => ({ name: relative(apiDir, path).replaceAll('\\', '/'), src: readFileSync(path, 'utf8') }))
+    .filter(f => /requireWriteAccess\(|requireRole\([^)]*'demo'/.test(f.src))
+  assert.ok(writers.length >= 20, `found ${writers.length} demo-writable endpoints`)
+
+  const uncovered = []
+  for (const { name, src } of writers) {
+    // A table is named in the SQL itself, or in the audit call that goes with a helper's SQL.
+    const named = new Set()
+    const re = /\b(?:INSERT (?:OR \w+ )?INTO|DELETE FROM)\s+(\w+)|\bUPDATE (\w+) SET|audit(?:edDelete|Before)\(event, '(\w+)'|\btable: '(\w+)'/g
+    for (const m of src.matchAll(re)) named.add(m[1] ?? m[2] ?? m[3] ?? m[4])
+    if (/appendTapSql\(/.test(src)) named.add('journal_entries')
+    const written = [...named].filter(t => tables.has(t))
+    // A read-only endpoint behind requireRole(…'demo') names no table to write, and that is fine;
+    // one behind requireWriteAccess always writes, so naming none means this scan went blind.
+    if (/requireWriteAccess\(/.test(src)) assert.ok(written.length, `${name}: could not tell which table it writes`)
+    for (const t of written) if (!covered.has(t)) uncovered.push(`${name} → ${t}`)
+  }
+  assert.deepEqual(uncovered, [], 'a demo visitor can write a table the reset neither reseeds nor empties — add it to DEMO_SCRATCH_TABLES (shared/utils/demoSeed.ts)')
+
+  for (const t of DEMO_SCRATCH_TABLES) assert.ok(tables.has(t), `${t} is a real table`)
+})
+
+// reset.ts reaches these as Nitro auto-imports.
+globalThis.defineTask = task => task
+globalThis.runLoggedTask = () => {}
+globalThis.TaskFailure = class TaskFailure extends Error {}
+const { resetDemo } = await import('../server/tasks/demo/reset.ts')
+
+/**
+ * A database that writes down every statement it is asked to run. `columns` is what
+ * PRAGMA table_info answers per table (absent = no such table); `held` is how many rows a
+ * bare DELETE reports removing.
+ */
+function recordingEnv(seedTables, columns, held = {}) {
+  const log = []
+  const statement = sql => ({
+    sql,
+    bind: () => statement(sql),
+    all: async () => ({ results: (columns[/PRAGMA table_info\((\w+)\)/.exec(sql)?.[1]] ?? []).map(name => ({ name })) }),
+    run: async () => {
+      log.push(sql)
+      return { meta: { changes: held[/^DELETE FROM (\w+)$/.exec(sql)?.[1]] ?? 0 } }
+    }
+  })
+  return {
+    log,
+    env: {
+      DEMO_DB: {
+        prepare: statement,
+        batch: async (statements) => {
+          for (const s of statements) log.push(s.sql)
+        }
+      },
+      LABS_BUCKET: { get: async () => ({ json: async () => ({ version: 1, tables: seedTables }) }) }
+    }
+  }
+}
+const DAYS = { cols: ['date', 'notes'], jsonCols: [], rows: [['@D0', 'seeded']] }
+
+test('the reset empties the tables a visitor can write that the seed has no rows for', async () => {
+  const { env, log } = recordingEnv(
+    { journal_entries: DAYS },
+    { journal_entries: ['date', 'notes'], marker_goals: ['id'], pgx_notes: ['id'], drink_labels: ['key'] },
+    { marker_goals: 2, pgx_notes: 1 }
+  )
+  const result = await resetDemo(env)
+  assert.deepEqual(result, { tables: 1, rows: 1, cleared: 3 }, 'three rows a visitor left are counted in the run log')
+  for (const t of DEMO_SCRATCH_TABLES) assert.equal(log.filter(sql => sql === `DELETE FROM ${t}`).length, 1, t)
+  // After the reseed: a failure in this step cannot cost the sandbox its data.
+  const insert = log.findIndex(sql => sql.startsWith('INSERT INTO journal_entries'))
+  assert.ok(insert > 0 && insert < log.indexOf('DELETE FROM marker_goals'))
+})
+
+test('a scratch table this sandbox lacks is skipped; one the seed carries is replaced once, by the reseed', async () => {
+  const goals = { cols: ['id', 'note'], jsonCols: [], rows: [[1, 'seeded goal']] }
+  const { env, log } = recordingEnv(
+    { journal_entries: DAYS, marker_goals: goals },
+    { journal_entries: ['date', 'notes'], marker_goals: ['id', 'note'], pgx_notes: ['id'] }, // no drink_labels yet
+    { pgx_notes: 4 }
+  )
+  const result = await resetDemo(env)
+  assert.equal(result.cleared, 4)
+  assert.equal(log.includes('DELETE FROM drink_labels'), false, 'no such table: nothing to empty, and no failed run')
+  assert.equal(log.filter(sql => sql === 'DELETE FROM marker_goals').length, 1)
+  assert.equal(log[log.indexOf('DELETE FROM marker_goals') + 1].startsWith('INSERT INTO marker_goals'), true, 'its wipe rides with its reseed')
+})
+
+test('a sandbox behind the seed is left exactly as it was: nothing is deleted, scratch tables included', async () => {
+  const { env, log } = recordingEnv(
+    { journal_entries: DAYS },
+    { journal_entries: ['date'], marker_goals: ['id'], pgx_notes: ['id'], drink_labels: ['key'] } // no `notes` column
+  )
+  await assert.rejects(() => resetDemo(env), /no column notes/)
+  assert.deepEqual(log, [])
 })

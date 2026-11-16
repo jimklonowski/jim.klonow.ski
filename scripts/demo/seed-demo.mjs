@@ -18,7 +18,7 @@ import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync } from 'n
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { materializeSeedRows } from '../../shared/utils/demoSeed.ts'
+import { DEMO_SCRATCH_TABLES, materializeSeedRows } from '../../shared/utils/demoSeed.ts'
 import { localDaysAgo } from '../../shared/utils/time.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -42,6 +42,8 @@ const seed = JSON.parse(readFileSync(SEED_PATH, 'utf8'))
 // landed on one date — a primary-key clash on journal_entries after the wipe.
 const anchor = localDaysAgo(1)
 const materializedRows = table => materializeSeedRows(table, anchor)
+// Tables a visitor can write that the seed has no rows for: emptied, as the nightly reset does.
+const scratchTables = DEMO_SCRATCH_TABLES.filter(name => !(name in seed.tables))
 
 // --- Local: programmatic bindings ------------------------------------------------------------
 
@@ -65,6 +67,10 @@ async function seedLocal() {
           .run()
       }
       console.log(`  ${name}: ${rows.length} rows`)
+    }
+    for (const name of scratchTables) {
+      await db.prepare(`DELETE FROM ${name}`).run()
+      console.log(`  ${name}: emptied`)
     }
 
     await proxy.env.LABS_BUCKET.put(SEED_R2_KEY, readFileSync(SEED_PATH), {
@@ -102,6 +108,10 @@ function seedRemote() {
       statements.push(`INSERT INTO ${name} (${table.cols.join(',')}) VALUES\n${values};`)
     }
     console.log(`  ${name}: ${rows.length} rows`)
+  }
+  for (const name of scratchTables) {
+    statements.push(`DELETE FROM ${name};`)
+    console.log(`  ${name}: emptied`)
   }
 
   const tmp = mkdtempSync(join(tmpdir(), 'demo-seed-'))
