@@ -71,7 +71,7 @@
            from nothing, and anything typed into it would be saved over the day's real doses and
            notes (audit #44 item 1). -->
       <fieldset
-        :disabled="!canEdit || !listLoaded"
+        :disabled="!canEdit || !listLoaded || leaving"
         class="min-w-0 space-y-5"
         data-day-form
       >
@@ -866,7 +866,7 @@
         />
         <UTextarea
           v-model="form.notes"
-          :disabled="!canEdit || !listLoaded"
+          :disabled="!canEdit || !listLoaded || leaving"
           placeholder="Any observations, how you felt, etc."
           :rows="3"
           class="w-full mt-2.5"
@@ -1406,12 +1406,13 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     // replace, under a "kept what was logged elsewhere" toast (audit #43 item 11).
     base: !moving && targetEntry.value ? undefined : loadedBase.value ?? undefined
   }
-  const saved = await $fetch<{ ok: boolean, date: string, kept: string[] }>('/api/journal/save', { method: 'POST', body: payload })
-  // The row now holds what was just sent, so that is what the next save must merge against.
-  // The rebuild after the refresh below normally re-reads it from the row — but if that refresh
-  // fails, or the move below does, the form stays as it is, and a second save against the OLD
-  // base added every drink and pour of this one again (audit #44 item 2).
-  loadedBase.value = {
+  // The form stays open while the request is out, and on a slow connection it gets typed into.
+  // So both things this save leaves behind are taken NOW, as copies of what is being sent: the
+  // form's clean baseline, and the merge base for the save after this one. Taken after the
+  // answer, they would hold the newer typing too — which then read as saved and was wiped by
+  // the rebuild below, or sat in the base as if the row already had it (audit #44 item 3).
+  const sent = formGuard.capture()
+  const sentBase: DayLogFields = {
     weight_lbs: payload.weight_lbs ?? null,
     bp_systolic: payload.bp_systolic ?? null,
     bp_diastolic: payload.bp_diastolic ?? null,
@@ -1421,6 +1422,12 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
     water: payload.water.map(w => ({ ...w })),
     food: { ...food }
   }
+  const saved = await $fetch<{ ok: boolean, date: string, kept: string[] }>('/api/journal/save', { method: 'POST', body: payload })
+  // The row now holds what was just sent, so that is what the next save must merge against.
+  // The rebuild after the refresh below normally re-reads it from the row — but if that refresh
+  // fails, or the move below does, the form stays as it is, and a second save against the OLD
+  // base added every drink and pour of this one again (audit #44 item 2).
+  loadedBase.value = sentBase
   if (moving) await $fetch('/api/journal/move', { method: 'POST', body: { from, to, replace: targetEntry.value != null } })
   if (paired.length) {
     toast.add({ title: 'Meals matched to ones with figures', description: `Saved as ${paired.join(', ')}. Edit the field if that was wrong.`, color: 'info', icon: 'i-lucide-link' })
@@ -1428,13 +1435,24 @@ const { run: runSave, pending: saving } = useSaveAction(async () => {
   if (saved.kept?.length) {
     toast.add({ title: 'Kept what was logged elsewhere', description: `${saved.kept.join(', ')} had been added while this page was open and ${saved.kept.length === 1 ? 'was' : 'were'} kept.`, color: 'info', icon: 'i-lucide-merge' })
   }
-  // What was just saved is now the baseline, so the refresh below may rebuild from the row.
-  formGuard.markClean()
+  // What was SENT is now the baseline. If the form still matches it, the refresh below rebuilds
+  // from the row; if it was typed into meanwhile it stays dirty, is left as it stands, and Save
+  // is live again for the rest.
+  formGuard.markClean(sent)
+  const unsaved = formGuard.isDirty.value
   // The shell's streak / logged / soda figures come from the scalar summary, not this list.
   await Promise.all([refresh(), refreshNuxtData('overview')])
+  // The page follows the entry. That builds a fresh form from the row, which is why the form
+  // is shut for the length of such a save (`leaving`) — nothing can be typed that this would drop.
   if (to !== from) await navigateTo(`/journal/${to}`)
-  return { moved: moving, to }
-}, { success: r => (r.moved ? `Entry moved to ${r.to}` : 'Entry saved') })
+  return { moved: moving, to, unsaved }
+}, { success: r => `${r.moved ? `Entry moved to ${r.to}` : 'Entry saved'}${r.unsaved ? ' — what you typed since is not saved yet' : ''}` })
+
+// A save under a changed date ends with the page following the entry to its new address, and
+// that builds a fresh form from the row. An ordinary save keeps the form open and leaves newer
+// typing unsaved-but-intact (see the save above); this one cannot, so the form is held shut
+// while it is out rather than accept typing it would then drop (audit #44 item 3).
+const leaving = computed(() => saving.value && dateMoved.value)
 
 const saveLabel = computed(() => {
   if (saving.value) return 'SAVING…'

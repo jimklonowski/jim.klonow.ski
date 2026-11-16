@@ -23,10 +23,23 @@ export function useDirtyGuard(source: () => unknown, { prompt = DISCARD_PROMPT }
   const snapshot = ref(JSON.stringify(source()))
   const isDirty = computed(() => JSON.stringify(source()) !== snapshot.value)
 
+  /** The form as the guard compares it. Take one before a save goes out; hand it to markClean() once it lands. */
+  function capture(): string {
+    return JSON.stringify(source())
+  }
+
   // Snapshots now and again after the next tick: loading a form can trip its own watchers
   // (the cycle form re-anchors start_date when the precision changes), and that normalization
   // must count as part of the load, not as an edit.
-  function markClean() {
+  //
+  // With `as` (a capture() taken before a save was sent) the baseline is what was SENT, not what
+  // the form holds by the time the answer arrives: anything typed while the request was out
+  // stays dirty instead of being declared saved (audit #44 item 3).
+  function markClean(as?: string) {
+    if (as !== undefined) {
+      snapshot.value = as
+      return
+    }
     snapshot.value = JSON.stringify(source())
     nextTick(() => {
       snapshot.value = JSON.stringify(source())
@@ -67,5 +80,5 @@ export function useDirtyGuard(source: () => unknown, { prompt = DISCARD_PROMPT }
     })
   }
 
-  return { isDirty, markClean, confirmDiscard, guardOpen }
+  return { isDirty, capture, markClean, confirmDiscard, guardOpen }
 }
