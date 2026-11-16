@@ -73,7 +73,7 @@
             >
               <UInput
                 v-model="form.gene"
-                placeholder="CYP2D6"
+                placeholder="TPMT"
                 class="w-full"
               />
             </UFormField>
@@ -83,7 +83,7 @@
             >
               <UInput
                 v-model="form.genotype"
-                placeholder="*1/*4 — intermediate metabolizer"
+                placeholder="*1/*3A — intermediate metabolizer"
                 class="w-full"
               />
             </UFormField>
@@ -94,7 +94,7 @@
           >
             <UInput
               v-model="form.compounds"
-              placeholder="Tamoxifen, Clomiphene"
+              placeholder="Azathioprine, Mercaptopurine"
               class="w-full"
             />
           </UFormField>

@@ -17,7 +17,7 @@ export interface PgxNote {
 
 const fold = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 
-/** "Tamoxifen" matches "Tamoxifen Citrate" and the reverse; short fragments never match by containment. */
+/** "Azathioprine" matches "Azathioprine Sodium" and the reverse; short fragments never match by containment. */
 export function compoundMatches(listed: string, compound: string): boolean {
   const a = fold(listed)
   const b = fold(compound)
@@ -36,12 +36,12 @@ export function pgxNotesForMarker(notes: readonly PgxNote[], marker: string): Pg
   return notes.filter(n => n.markers.includes(marker))
 }
 
-/** "CYP2D6 *1/*4 — intermediate metabolizer" */
+/** "TPMT *1/*3A — intermediate metabolizer" */
 export function pgxHeading(n: Pick<PgxNote, 'gene' | 'genotype'>): string {
   return n.genotype ? `${n.gene} ${n.genotype}` : n.gene
 }
 
-/** "tamoxifen, clomiphene" from a typed list; blanks and repeats dropped, order kept. */
+/** "azathioprine, mercaptopurine" from a typed list; blanks and repeats dropped, order kept. */
 export function parseList(text: string): string[] {
   const seen = new Set<string>()
   const out: string[] = []

@@ -4,8 +4,8 @@
 -- The compound and protocol pages show a note beside a matching compound; the prompts read them.
 CREATE TABLE IF NOT EXISTS pgx_notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  gene TEXT NOT NULL,                    -- "CYP2D6"
-  genotype TEXT,                         -- "*1/*4 — intermediate metabolizer"
+  gene TEXT NOT NULL,                    -- "TPMT"
+  genotype TEXT,                         -- "*1/*3A — intermediate metabolizer"
   compounds TEXT NOT NULL DEFAULT '[]',  -- JSON array of compound names the note applies to
   markers TEXT NOT NULL DEFAULT '[]',    -- JSON array of marker keys it applies to
   note TEXT NOT NULL,
