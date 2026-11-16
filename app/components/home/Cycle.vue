@@ -198,6 +198,8 @@ import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/uti
 import { courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn } from '#shared/utils/labNotes'
 import { VERDICT_WORD, cycleGoalSummary, goalLabel, goalVerdict, goalsForCycle } from '#shared/utils/markerGoals'
+import { transitionalWindows } from '#shared/utils/hematocrit'
+import { effectiveRules } from '~/utils/adherence'
 
 // The one-glance cycle strip for the home dashboard's protocol column. Three states:
 // pre-flight for an upcoming cycle (baseline draw + gating markers), progress + due-status
@@ -245,18 +247,31 @@ const nameParts = computed(() => {
 const { data: goalsData } = useMarkerGoals()
 const { rules: protocolRules, standing: protocolStanding } = useProtocol()
 const { data: labNotes } = useLabNotes()
+// What the hematocrit page reads a red-cell marker against, so a goal is judged by the same
+// rules: the turnover windows after each dose change (planned cycles folded in, as that page
+// builds them) and the phlebotomy log (audit #44 item 16).
+const { data: phlebData } = usePhlebotomies()
 const goalsLine = computed(() => {
   if (!cycle.value) return null
   const goals = goalsForCycle(goalsData.value ?? [], cycle.value.id)
   if (!goals.length) return null
   const caveats = labNotes.value?.caveats ?? {}
   const spans = [...protocolRules.value, ...protocolStanding.value, ...courseCaveatSpans(props.cycles, props.entries)]
-  const verdicts = goals.map(g => goalVerdict(g, props.draws, today.value, d => caveatCompoundOn(caveats, g.marker, d, spans)))
+  const windows = transitionalWindows(effectiveRules(props.cycles, protocolRules.value))
+  const phlebotomies = phlebData.value ?? []
+  const verdicts = goals.map(g => goalVerdict(g, props.draws, today.value, {
+    confoundedBy: d => caveatCompoundOn(caveats, g.marker, d, spans),
+    windows,
+    phlebotomies
+  }))
   const s = cycleGoalSummary(verdicts)
   const blocker = verdicts.find(v => v.status === 'not-met')
+  // The day the last waiting goal can be read cleanly, when one is waiting on a turnover window.
+  const cleanFrom = verdicts.filter(v => v.status !== 'met' && v.cleanFrom).map(v => v.cleanFrom!).sort().at(-1)
+  const wait = cleanFrom ? ` · clean read from ${formatDate(cleanFrom, 'monthDay')}` : ''
   const detail = blocker
     ? `${goalLabel(blocker.goal, BIOMARKERS[blocker.goal.marker])} not met`
-    : s.open ? `${s.open} undecided` : 'every goal met'
+    : s.open ? `${s.open} undecided${wait}` : 'every goal met'
   return {
     text: `goals ${VERDICT_WORD[s.verdict]} · ${s.met}/${s.total} met · ${detail}`,
     class: s.verdict === 'go' ? 'text-accent' : s.verdict === 'no-go' ? 'text-danger' : 'text-muted'

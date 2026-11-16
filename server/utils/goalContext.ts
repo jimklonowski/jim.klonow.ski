@@ -4,16 +4,20 @@ import type { Readings } from '#shared/utils/labReadings'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 import type { GoalDraw, MarkerGoal } from '#shared/utils/markerGoals'
 import { VERDICT_WORD, cycleGoalSummary, goalLine, goalVerdict, goalsForCycle } from '#shared/utils/markerGoals'
-import { cycleStatusOn, isTentative, type Cycle } from '#shared/utils/cycles'
+import { cycleStatusOn, isTentative, mergeRules, type Cycle } from '#shared/utils/cycles'
+import { transitionalWindows } from '#shared/utils/hematocrit'
 import { BIOMARKERS, isEchoOnly } from '../../app/data/biomarkers'
 import { MARKER_CAVEATS, readingNotesOn } from '../data/markerCaveats'
 import { loadCycles } from './cycleContext'
+import { loadPhlebotomies } from './phlebotomyContext'
 
 // The dated marker goals as AI-prompt context (audit #43 item 60): each goal's deterministic
 // verdict as of `asOf`, and the GO / NO-GO / UNDECIDED roll-up for every planned cycle they
 // gate — so the model reports the verdict the page shows instead of inferring one. A reading
 // drawn on a medication that moves the marker (MARKER_CAVEATS × the protocol's spans) is
 // CONFOUNDED and decides nothing: the course's lipids never settle the Primobolan question.
+// A red-cell reading inside the turnover window after a dose change, or a CBC in the weeks after
+// a phlebotomy, is TOO EARLY (audit #44 item 16) — the pages' own windows and visit log.
 // Pronoun-free, like the rest of the prose. '' when no goal is on file.
 
 /** Every goal on file, oldest stated first; empty before migration 0020. */
@@ -41,9 +45,10 @@ export async function loadBloodDraws(db: D1Database, asOf: string): Promise<Goal
 export async function markerGoalsContext(db: D1Database, asOf: string, protocol: ProtocolData, preloadedCycles?: Cycle[]): Promise<string> {
   const goals = await loadMarkerGoals(db)
   if (!goals.length) return ''
-  const [draws, cycles, doseRes] = await Promise.all([
+  const [draws, cycles, visits, doseRes] = await Promise.all([
     loadBloodDraws(db, asOf),
     preloadedCycles ?? loadCycles(db),
+    loadPhlebotomies(db),
     // The isotretinoin dose log: the course stars its draws from the log and the cycle row too
     // (item 97), not only from the protocol row's dates.
     db.prepare(`SELECT date, peptides FROM journal_entries WHERE peptides LIKE '%${ISOTRETINOIN}%' ORDER BY date ASC`).all()
@@ -51,7 +56,15 @@ export async function markerGoalsContext(db: D1Database, asOf: string, protocol:
   const courseLog = ((doseRes.results ?? []) as Array<{ date: string, peptides: string | null }>)
     .map(r => ({ date: r.date, peptides: JSON.parse(r.peptides || '[]') as Array<{ compound: string, dose: number | null, unit?: string | null }> }))
   const spans = [...protocol.rules, ...protocol.standing, ...courseCaveatSpans(cycles, courseLog)]
-  const verdictOf = (g: MarkerGoal) => goalVerdict(g, draws, asOf, date => caveatCompoundOn(MARKER_CAVEATS, g.marker, date, spans))
+  // The windows as the pages build them (the schedule with every planned cycle folded in); only
+  // the visits on or before `asOf`, so a summary regenerated for an old draw is honest.
+  const windows = transitionalWindows(cycles.length ? mergeRules(protocol.rules, cycles) : protocol.rules)
+  const phlebotomies = visits.filter(p => p.date <= asOf)
+  const verdictOf = (g: MarkerGoal) => goalVerdict(g, draws, asOf, {
+    confoundedBy: date => caveatCompoundOn(MARKER_CAVEATS, g.marker, date, spans),
+    windows,
+    phlebotomies
+  })
   const line = (g: MarkerGoal) => goalLine(verdictOf(g), BIOMARKERS[g.marker])
 
   const sections: string[] = []
@@ -68,5 +81,5 @@ export async function markerGoalsContext(db: D1Database, asOf: string, protocol:
   const standing = goals.filter(g => g.cycle_id == null)
   if (standing.length) sections.push(`Standing marker goals, verdict as of ${asOf}:\n${standing.map(line).join('\n')}`)
   if (!sections.length) return ''
-  return `${sections.join('\n\n')}\nThese verdicts are computed from the draws on file: report them as given (MET / NOT MET / INSUFFICIENT / CONFOUNDED) rather than re-judging, and name what a draw would need to show to change one. A CONFOUNDED reading was taken on a medication known to move that marker and settles nothing about the goal.`
+  return `${sections.join('\n\n')}\nThese verdicts are computed from the draws on file: report them as given (MET / NOT MET / INSUFFICIENT / CONFOUNDED / TOO EARLY) rather than re-judging, and name what a draw would need to show to change one. A CONFOUNDED reading was taken on a medication known to move that marker and settles nothing about the goal. A TOO EARLY reading was taken before a dose change could show in red-cell mass, or in the weeks after a phlebotomy: it settles nothing either, and where a line names the first clean read, a draw before that date will not decide the goal.`
 }

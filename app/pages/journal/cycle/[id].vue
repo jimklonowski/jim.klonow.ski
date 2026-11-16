@@ -530,7 +530,8 @@ import type { GoalComparator, GoalStatus, MarkerGoal } from '#shared/utils/marke
 import {
   GOAL_COMPARATORS, STATUS_WORD, VERDICT_WORD, cycleGoalSummary, goalLabel, goalVerdict, goalsForCycle, isTrendGoal
 } from '#shared/utils/markerGoals'
-import { adherencePctClass } from '~/utils/adherence'
+import { transitionalWindows } from '#shared/utils/hematocrit'
+import { adherencePctClass, effectiveRules } from '~/utils/adherence'
 
 const route = useRoute()
 const { isOwner } = await useAuth()
@@ -546,6 +547,8 @@ const { data: plannedData } = await usePlannedDraws()
 const { data: goalsData, refresh: refreshGoals } = await useMarkerGoals()
 const { rules: protocolRules, standing: protocolStanding } = await useProtocol()
 const { data: labNotes } = await useLabNotes()
+// …and the phlebotomy log: a CBC read in the weeks after a visit shows the blood taken out.
+const { data: phlebData } = await usePhlebotomies()
 
 const cycleForm = useTemplateRef('cycleForm')
 
@@ -773,14 +776,22 @@ function gatingChips(drawDate: string, baselineDate: string | null): GatingChip[
 
 // --- marker goals ---
 const caveatSpans = computed(() => [...protocolRules.value, ...protocolStanding.value, ...courseCaveatSpans(data.value ?? [], entries.value)])
+// The turnover windows after each dose change, planned cycles folded in — the same list the
+// hematocrit page tags its readings from, so a goal and the reading beside it agree (audit #44
+// item 16).
+const turnoverWindows = computed(() => transitionalWindows(effectiveRules(data.value ?? [], protocolRules.value)))
 const goalVerdicts = computed(() => {
   if (!cycle.value) return []
   const caveats = labNotes.value?.caveats ?? {}
   return goalsForCycle(goalsData.value ?? [], cycle.value.id)
-    .map(g => goalVerdict(g, draws.value, today.value, date => caveatCompoundOn(caveats, g.marker, date, caveatSpans.value)))
+    .map(g => goalVerdict(g, draws.value, today.value, {
+      confoundedBy: date => caveatCompoundOn(caveats, g.marker, date, caveatSpans.value),
+      windows: turnoverWindows.value,
+      phlebotomies: phlebData.value ?? []
+    }))
 })
 const goalSummary = computed(() => cycleGoalSummary(goalVerdicts.value))
-const STATUS_CLASS: Record<GoalStatus, string> = { 'met': 'text-accent', 'not-met': 'text-danger', 'insufficient': 'text-muted', 'confounded': 'text-warn' }
+const STATUS_CLASS: Record<GoalStatus, string> = { 'met': 'text-accent', 'not-met': 'text-danger', 'insufficient': 'text-muted', 'confounded': 'text-warn', 'too-early': 'text-warn' }
 const VERDICT_CLASS: Record<string, string> = { 'go': 'text-accent', 'no-go': 'text-danger', 'undecided': 'text-muted' }
 
 const MARKER_ITEMS = Object.entries(BIOMARKERS).map(([value, m]) => ({ label: m.label, value })).sort((a, b) => a.label.localeCompare(b.label))

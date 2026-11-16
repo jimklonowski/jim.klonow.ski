@@ -8,7 +8,15 @@
 // Goals linked to a cycle roll up to GO / NO-GO / UNDECIDED for that cycle. Pure; the pages and
 // the prompts both read these.
 //
+// A reading the hematocrit page itself would not trust decides nothing either (audit #44 item
+// 16): a red-cell marker read inside the turnover window after a dose change cannot show that
+// change yet, and a CBC or ferritin read within weeks of a phlebotomy shows the blood taken out.
+// The verdict used to know neither — the page tagged the reading "transitional" while the goal
+// beside it said NOT MET and the cycle rolled up to NO-GO. Such a reading is TOO EARLY, and the
+// verdict names the first day a draw would be a clean one.
+//
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
+import { firstCleanDay, readingTags, type Phlebotomy, type TransitionalWindow } from './hematocrit.ts'
 import { isCensored, type NotedDraw } from './labNotes.ts'
 
 export type GoalComparator = 'below' | 'at_most' | 'above' | 'at_least' | 'falling' | 'rising'
@@ -44,7 +52,7 @@ export function isTrendGoal(comparator: GoalComparator): boolean {
   return comparator === 'falling' || comparator === 'rising'
 }
 
-export type GoalStatus = 'met' | 'not-met' | 'insufficient' | 'confounded'
+export type GoalStatus = 'met' | 'not-met' | 'insufficient' | 'confounded' | 'too-early'
 
 export interface GoalReading {
   date: string
@@ -60,8 +68,25 @@ export interface GoalVerdict {
   previous: GoalReading | null
   /** The compound that confounds `latest`, when the status is confounded. */
   confoundedBy: string | null
+  /**
+   * The first day a new draw of this marker would be a clean read, when that is still ahead of
+   * `asOf` (a turnover window is open, or a phlebotomy is recent); null when a draw today would
+   * be one, and for markers neither rule touches.
+   */
+  cleanFrom: string | null
   /** One line of why, for the chip title and the prompt. */
   reason: string
+}
+
+/** What a verdict reads besides the draws. Every part is optional: absent, it rules nothing out. */
+export interface GoalEvidence {
+  /** The protocol compound that skews this marker on a date, or null (caveatCompoundOn over the
+   * marker caveats and the protocol spans). */
+  confoundedBy?: (date: string) => string | null
+  /** The turnover windows after each dose change of an erythropoietic compound (transitionalWindows). */
+  windows?: readonly TransitionalWindow[]
+  /** The phlebotomy log. */
+  phlebotomies?: readonly Phlebotomy[]
 }
 
 /** A draw as the verdict reads it: its date, its markers and its per-reading notes. */
@@ -91,34 +116,57 @@ function holds(comparator: GoalComparator, value: number, target: number): boole
 }
 
 /**
- * The goal's verdict as of `asOf`. `confoundedBy(date)` names the protocol compound that skews
- * this marker on that date, or null (caveatCompoundOn over the marker caveats and the protocol
- * spans); omitted, nothing confounds.
+ * The goal's verdict as of `asOf`, read against `evidence` (see GoalEvidence; with none, only a
+ * censored reading is set aside).
+ *
+ * The order of the checks is the order of what a reading can be: absent; drawn on a medication
+ * that moves the marker (CONFOUNDED); for a trend, older than the goal (nothing new to judge);
+ * tagged transitional or post-phlebotomy by the hematocrit rules (TOO EARLY); and only then
+ * compared. A verdict that is not MET also says when the next clean read is possible, if that
+ * is not yet — so a NOT MET resting on a reading from before a dose cut reads as "not yet".
  */
-export function goalVerdict(goal: MarkerGoal, draws: readonly GoalDraw[], asOf: string, confoundedBy: (date: string) => string | null = () => null): GoalVerdict {
+export function goalVerdict(goal: MarkerGoal, draws: readonly GoalDraw[], asOf: string, evidence: GoalEvidence = {}): GoalVerdict {
+  const windows = evidence.windows ?? []
+  const phlebotomies = evidence.phlebotomies ?? []
+  const tagsOn = (date: string) => readingTags(goal.marker, date, windows, phlebotomies)
+  const clean = firstCleanDay(goal.marker, asOf, windows, phlebotomies)
+  const cleanFrom = clean > asOf ? clean : null
+  const waitNote = cleanFrom ? ` — next clean read from ${cleanFrom}` : ''
+
   const readings = goalReadings(goal, draws, asOf)
   const latest = readings.at(-1) ?? null
-  const base = { goal, latest, previous: null as GoalReading | null, confoundedBy: null as string | null }
+  const base = { goal, latest, previous: null as GoalReading | null, confoundedBy: null as string | null, cleanFrom }
   const pastDue = goal.by_date != null && asOf > goal.by_date
   const dueNote = pastDue ? ` — past the ${goal.by_date} date` : ''
 
-  if (!latest) return { ...base, status: 'insufficient', reason: `no usable reading on file${dueNote}` }
-  const compound = confoundedBy(latest.date)
+  if (!latest) return { ...base, status: 'insufficient', reason: `no usable reading on file${dueNote}${waitNote}` }
+  const compound = evidence.confoundedBy?.(latest.date) ?? null
   if (compound) return { ...base, status: 'confounded', confoundedBy: compound, reason: `${fmt(latest.value)} on ${latest.date} was drawn on ${compound}, which moves this marker — it decides nothing` }
 
-  if (isTrendGoal(goal.comparator)) {
-    if (latest.date < goal.stated) return { ...base, status: 'insufficient', reason: `no draw since the goal was set on ${goal.stated}${dueNote}` }
-    const previous = readings.at(-2) ?? null
-    if (!previous) return { ...base, status: 'insufficient', reason: `only one reading (${fmt(latest.value)} on ${latest.date}); a trend needs two${dueNote}` }
+  const trend = isTrendGoal(goal.comparator)
+  if (trend && latest.date < goal.stated) return { ...base, status: 'insufficient', reason: `no draw since the goal was set on ${goal.stated}${dueNote}${waitNote}` }
+
+  const tags = tagsOn(latest.date)
+  if (tags.length) {
+    const next = cleanFrom ? `first clean read from ${cleanFrom}` : 'a draw from today on is a clean read'
+    return { ...base, status: 'too-early', reason: `${fmt(latest.value)} on ${latest.date}: ${tags.map(t => t.text).join('; ')} — it decides nothing; ${next}` }
+  }
+
+  if (trend) {
+    // The reading to compare with is the last one that shows where the protocol had the marker:
+    // one taken in the weeks after a phlebotomy sits in the hole the visit made, and a "rise"
+    // from it is only the blood coming back. A transitional reading is a true level, and stays.
+    const previous = readings.slice(0, -1).findLast(r => !tagsOn(r.date).some(t => t.kind === 'post-phlebotomy')) ?? null
+    if (!previous) return { ...base, status: 'insufficient', reason: `only one reading (${fmt(latest.value)} on ${latest.date}); a trend needs two${dueNote}${waitNote}` }
     const delta = latest.value - previous.value
     const met = goal.comparator === 'falling' ? delta < 0 : delta > 0
     const move = delta === 0 ? 'flat' : `${delta > 0 ? '+' : ''}${fmt(delta)}`
-    return { ...base, previous, status: met ? 'met' : 'not-met', reason: `${fmt(previous.value)} on ${previous.date} → ${fmt(latest.value)} on ${latest.date} (${move})${met ? '' : dueNote}` }
+    return { ...base, previous, status: met ? 'met' : 'not-met', reason: `${fmt(previous.value)} on ${previous.date} → ${fmt(latest.value)} on ${latest.date} (${move})${met ? '' : `${dueNote}${waitNote}`}` }
   }
 
   if (goal.target == null) return { ...base, status: 'insufficient', reason: 'the goal has no target to compare with' }
   const met = holds(goal.comparator, latest.value, goal.target)
-  return { ...base, status: met ? 'met' : 'not-met', reason: `${fmt(latest.value)} on ${latest.date} against ${comparatorLabel(goal.comparator)} ${fmt(goal.target)}${met ? '' : dueNote}` }
+  return { ...base, status: met ? 'met' : 'not-met', reason: `${fmt(latest.value)} on ${latest.date} against ${comparatorLabel(goal.comparator)} ${fmt(goal.target)}${met ? '' : `${dueNote}${waitNote}`}` }
 }
 
 export function comparatorLabel(comparator: GoalComparator): string {
@@ -143,15 +191,15 @@ export interface CycleGoalSummary {
   verdict: CycleGoalVerdict
   met: number
   notMet: number
-  /** Insufficient or confounded. */
+  /** Insufficient, confounded or too early. */
   open: number
   total: number
 }
 
 /**
  * The roll-up: GO when every goal is met (and there is at least one), NO-GO when any is not met,
- * UNDECIDED otherwise — a goal with no usable reading yet, or a confounded one, decides nothing
- * either way.
+ * UNDECIDED otherwise — a goal with no usable reading yet, a confounded one, or one whose latest
+ * reading came too early to show anything, decides nothing either way.
  */
 export function cycleGoalSummary(verdicts: readonly GoalVerdict[]): CycleGoalSummary {
   const met = verdicts.filter(v => v.status === 'met').length
@@ -161,7 +209,7 @@ export function cycleGoalSummary(verdicts: readonly GoalVerdict[]): CycleGoalSum
   return { verdict, met, notMet, open, total: verdicts.length }
 }
 
-export const STATUS_WORD: Record<GoalStatus, string> = { 'met': 'MET', 'not-met': 'NOT MET', 'insufficient': 'INSUFFICIENT', 'confounded': 'CONFOUNDED' }
+export const STATUS_WORD: Record<GoalStatus, string> = { 'met': 'MET', 'not-met': 'NOT MET', 'insufficient': 'INSUFFICIENT', 'confounded': 'CONFOUNDED', 'too-early': 'TOO EARLY' }
 export const VERDICT_WORD: Record<CycleGoalVerdict, string> = { 'go': 'GO', 'no-go': 'NO-GO', 'undecided': 'UNDECIDED' }
 
 /** "- Hematocrit seen falling: NOT MET — 51.7 on … → 51.7 on … (flat)", for the prompts. */

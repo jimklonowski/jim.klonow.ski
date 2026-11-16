@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  HCT_LADDER, PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, hctDraws, hctHeadline, ironLedger, ironMgOf, ironSpansFrom, ladderRung, nextRung,
+  HCT_LADDER, PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, firstCleanDay, hctDraws, hctHeadline, ironLedger, ironMgOf, ironSpansFrom, ladderRung, nextRung,
   phlebotomyEffects, readingTags, rungAction, transitionalFor, transitionalWindows
 } from '../shared/utils/hematocrit.ts'
 import { diffDays } from '../shared/utils/dates.ts'
@@ -54,6 +54,32 @@ test('a dose change of an erythropoietic compound opens a 120-day transitional w
   assert.equal(transitionalFor('2026-11-04', windows).change, 'hCG 300→250 IU Tue+Fri', 'the latest change wins an overlap')
   assert.equal(transitionalFor('2026-07-01', windows), null)
   assert.deepEqual(transitionalWindows([]), [])
+})
+
+test('the first clean day: past every window and visit that covers it, and the day itself when none does', () => {
+  const windows = [
+    { from: '2026-08-24', to: '2026-12-21', change: 'T 100→75 mg' },
+    { from: '2026-10-24', to: '2027-02-20', change: 'hCG 300→250 IU Tue+Fri' }
+  ]
+  const visit = (date, id) => ({ id, date, kind: 'donation', ml: 500, pre_hgb: null, notes: null, created_at: 'x' })
+  assert.equal(firstCleanDay('hematocrit', '2026-07-01', windows, []), '2026-07-01', 'before any change')
+  assert.equal(firstCleanDay('hematocrit', '2026-09-09', windows, []), '2027-02-21', 'the first window runs into the second')
+  assert.equal(firstCleanDay('hematocrit', '2027-02-20', windows, []), '2027-02-21', 'the last day of a window is inside it')
+  assert.equal(firstCleanDay('hematocrit', '2027-02-21', windows, []), '2027-02-21')
+  // A visit near the end of the window pushes the day out by its own eight weeks…
+  assert.equal(firstCleanDay('hematocrit', '2026-11-16', windows, [visit('2027-02-10', 1)]), '2027-04-08')
+  // …but one that is still ahead of the day asked about is not known to it yet.
+  assert.equal(firstCleanDay('hematocrit', '2027-03-01', [], [visit('2027-03-01', 1)]), '2027-03-01', 'the visit\'s own day is before it')
+  assert.equal(firstCleanDay('hematocrit', '2027-03-02', [], [visit('2027-03-01', 1)]), '2027-04-27')
+  // Ferritin has no turnover window, only the visit's; estradiol has neither.
+  assert.equal(firstCleanDay('ferritin', '2026-11-16', windows, []), '2026-11-16')
+  assert.equal(firstCleanDay('ferritin', '2027-03-02', windows, [visit('2027-03-01', 1)]), '2027-04-27')
+  assert.equal(firstCleanDay('estradiol', '2026-11-16', windows, [visit('2026-11-01', 1)]), '2026-11-16')
+  // Every day it returns is one readingTags leaves untagged.
+  for (const from of ['2026-09-09', '2026-11-16', '2027-02-25']) {
+    const day = firstCleanDay('hematocrit', from, windows, [visit('2027-02-10', 1), visit('2027-01-05', 2)])
+    assert.deepEqual(readingTags('hematocrit', day, windows, [visit('2027-02-10', 1), visit('2027-01-05', 2)]), [], `${from} → ${day}`)
+  }
 })
 
 test('the headline: the last reading, its rung, the window today sits in, and whether the reading itself was transitional', () => {

@@ -230,6 +230,35 @@ export function readingTags(marker: string, date: string, windows: readonly Tran
   return tags
 }
 
+/**
+ * The first day on or after `from` on which a reading of `marker` would wear none of readingTags'
+ * tags: past every turnover window that covers it and more than PHLEBOTOMY_EFFECT_DAYS after every
+ * visit on file. `from` itself when nothing stands in the way — and always for a marker neither
+ * rule applies to. What a marker goal calls its first clean read (audit #44 item 16).
+ */
+export function firstCleanDay(marker: string, from: string, windows: readonly TransitionalWindow[], phlebotomies: readonly Phlebotomy[]): string {
+  let day = from
+  // Each pass steps past whatever covers `day`; overlapping windows and visits take a few passes.
+  for (let pass = 0; pass <= windows.length + phlebotomies.length; pass++) {
+    let next = day
+    if (RBC_MASS_MARKERS.has(marker)) {
+      const w = transitionalFor(day, windows)
+      if (w) next = shiftDays(w.to, 1)
+    }
+    if (PHLEBOTOMY_MARKERS.has(marker)) {
+      for (const p of phlebotomies) {
+        if (p.date < day && diffDays(p.date, day) <= PHLEBOTOMY_EFFECT_DAYS) {
+          const clear = shiftDays(p.date, PHLEBOTOMY_EFFECT_DAYS + 1)
+          if (clear > next) next = clear
+        }
+      }
+    }
+    if (next === day) return day
+    day = next
+  }
+  return day
+}
+
 export interface HctHeadline {
   current: { date: string, value: number } | null
   rung: LadderRung | null
