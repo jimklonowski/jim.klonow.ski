@@ -15,6 +15,8 @@ import { canAccessPage, type Role } from '#shared/utils/access'
 const AUTH_COOKIE = 'labs-auth'
 const UPLOAD_COOKIE = 'labs-upload-auth'
 const SESSION_DAYS = 30
+/** An owner token older than this is swapped for a fresh one on the next read (renewOwnerSession). */
+const RENEW_AFTER_DAYS = 7
 const UPLOAD_SESSION_HOURS = 12
 
 const ROLES: readonly Role[] = ['owner', 'friend', 'doctor', 'demo'] as const
@@ -22,16 +24,23 @@ const ROLES: readonly Role[] = ['owner', 'friend', 'doctor', 'demo'] as const
 export interface AuthContext {
   role: Role
   inviteId: string | null
-  /** When the token was minted (unix seconds); 0 for tokens from before `iat` existed. */
+  /** When THIS token was minted (unix seconds); 0 for tokens from before `iat` existed. */
   issuedAt: number
+  /**
+   * When the sign-in behind this token happened (unix seconds). A renewed token keeps it, so
+   * this — not `issuedAt` — is what the "sign out everywhere" cutoff is compared with.
+   */
+  startedAt: number
 }
 
 interface TokenPayload {
   r: string
   i?: string
   exp: number // unix seconds
-  /** Issued-at, unix seconds. Checked against the owner session cutoff (sign out everywhere). */
+  /** Issued-at, unix seconds: when this token was minted. Decides when it is due for renewal. */
   iat?: number
+  /** Session start, unix seconds: the sign-in this token descends from. Absent = `iat`. */
+  s?: number
 }
 
 function signingKey(): string {
@@ -71,19 +80,45 @@ function verifyToken(token: string | undefined): TokenPayload | null {
 export function readAuthCookie(event: H3Event): AuthContext | null {
   const payload = verifyToken(getCookie(event, AUTH_COOKIE))
   if (!payload || !ROLES.includes(payload.r as Role)) return null
-  return { role: payload.r as Role, inviteId: payload.i ?? null, issuedAt: payload.iat ?? 0 }
+  const issuedAt = payload.iat ?? 0
+  return { role: payload.r as Role, inviteId: payload.i ?? null, issuedAt, startedAt: payload.s ?? issuedAt }
 }
 
-export function setAuthCookie(event: H3Event, role: Role, inviteId?: string, maxAge = SESSION_DAYS * 86400) {
+/**
+ * Mints the session cookie. `startedAt` is passed only by a renewal, which carries the original
+ * sign-in time into the new token; a sign-in leaves it out and starts a session now.
+ */
+export function setAuthCookie(event: H3Event, role: Role, inviteId?: string, maxAge = SESSION_DAYS * 86400, startedAt?: number) {
   const iat = Math.floor(Date.now() / 1000)
   const exp = iat + maxAge
-  setCookie(event, AUTH_COOKIE, mintToken({ r: role, ...(inviteId ? { i: inviteId } : {}), exp, iat }), {
+  setCookie(event, AUTH_COOKIE, mintToken({ r: role, ...(inviteId ? { i: inviteId } : {}), exp, iat, s: startedAt ?? iat }), {
     httpOnly: true,
     secure: true,
     maxAge,
     path: '/',
     sameSite: 'lax'
   })
+}
+
+/**
+ * Keeps a session that is in use from running out (audit #44 item 5). The owner's token was a
+ * fixed 30 days from the sign-in, used or not, so the installed app signed itself out once a
+ * month — mid-day, with whatever the outbox still held. Now a token more than a week old is
+ * swapped for a fresh 30-day one whenever it is used: a device that is opened at least once a
+ * month stays signed in, and one left in a drawer for a month still expires.
+ *
+ * The new token keeps the old one's `startedAt`. Without that, a renewal would launder a token
+ * past "sign out everywhere": the cutoff takes up to a minute to reach every location, and a
+ * request from the lost device in that minute would have minted a token dated after it.
+ *
+ * Owner only. A guest session lives as long as its invite says and no longer; the demo's is a
+ * day by design. Returns whether a new cookie was set.
+ */
+export function renewOwnerSession(event: H3Event, auth: AuthContext): boolean {
+  if (auth.role !== 'owner') return false
+  if (Math.floor(Date.now() / 1000) - auth.issuedAt < RENEW_AFTER_DAYS * 86400) return false
+  setAuthCookie(event, 'owner', undefined, undefined, auth.startedAt)
+  return true
 }
 
 export function clearAuthCookies(event: H3Event) {
@@ -206,8 +241,9 @@ export async function requireUploadPin(event: H3Event) {
 
 // Owner sessions are self-contained signed tokens, so there was no way to end one before its
 // 30 days ran out — a lost laptop stayed signed in. "Sign out everywhere" stores a cutoff time,
-// and any owner or upload token minted before it is refused (the middleware checks owner
-// sessions; requireUploadPin checks its own). Guests don't need this: revoking their invite
+// and any owner session STARTED before it (a renewed token keeps its sign-in time), or upload
+// token minted before it, is refused (the middleware checks owner sessions; requireUploadPin
+// checks its own). Guests don't need this: revoking their invite
 // already ends every session it minted. Tokens from before `iat` existed read as issued at 0,
 // so the first cutoff signs them all out too.
 //

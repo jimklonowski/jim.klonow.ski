@@ -22,7 +22,16 @@ globalThis.createError = ({ statusCode, message }) => Object.assign(new Error(me
 globalThis.logError = () => {}
 
 const auth = await import('../server/utils/auth.ts')
-const { hasUploadPin, isCrossSite, ownerSessionCutoff, readAuthCookie, requireLabsAuth, requireOwner, requireSameOrigin, safeEqual, setAuthCookie, setUploadCookie, signOutEverywhereElse } = auth
+const { hasUploadPin, isCrossSite, ownerSessionCutoff, readAuthCookie, renewOwnerSession, requireLabsAuth, requireOwner, requireSameOrigin, safeEqual, setAuthCookie, setUploadCookie, signOutEverywhereElse } = auth
+
+// The middleware (server/middleware/auth.ts) reaches the helpers above as Nitro auto-imports.
+Object.assign(globalThis, { readAuthCookie, ownerSessionCutoff, renewOwnerSession })
+globalThis.defineEventHandler = fn => fn
+globalThis.sendRedirect = (_event, to, code) => ({ redirect: to, code })
+// Invite liveness: every invite is live unless the test says otherwise.
+let inviteRow = { revoked: 0 }
+globalThis.getRealDb = () => ({ prepare: () => ({ bind: () => ({ first: async () => inviteRow }) }) })
+const { default: authMiddleware } = await import('../server/middleware/auth.ts')
 
 /** A KV stub: `get` answers `value` (or throws when `fail` is set), `put` records into `puts`. */
 const kvOf = ({ value = null, fail = false, puts = [] } = {}) => ({
@@ -71,8 +80,9 @@ test('a session cookie round-trips its role, invite and issue time; the token is
   assert.equal(ctx.role, 'friend')
   assert.equal(ctx.inviteId, 'inv-123')
   assert.ok(Math.abs(ctx.issuedAt - Date.now() / 1000) < 5)
+  assert.equal(ctx.startedAt, ctx.issuedAt, 'a sign-in starts its session when it is minted')
   setAuthCookie(e, 'owner')
-  assert.deepEqual({ ...readAuthCookie(e), issuedAt: 0 }, { role: 'owner', inviteId: null, issuedAt: 0 })
+  assert.deepEqual({ ...readAuthCookie(e), issuedAt: 0, startedAt: 0 }, { role: 'owner', inviteId: null, issuedAt: 0, startedAt: 0 })
 })
 
 test('a tampered, re-signed, expired, unversioned or missing token is no session', () => {
@@ -183,4 +193,107 @@ test('the cutoff is memoised and an unreadable KV keeps the last known value rat
   // …and a KV that throws answers the same last-known cutoff.
   const broken = event({}, kvOf({ fail: true }))
   assert.equal(await ownerSessionCutoff(broken), cutoff)
+})
+
+// --- Renewal (audit #44 item 5) ---
+// Clock: the tests below run on a pinned clock that starts a day from now and only moves
+// forward, so the 15-second cutoff memo left by the tests above is always stale by then.
+const DAY = 86_400_000
+const T0 = Date.now() + DAY
+const sec = ms => Math.floor(ms / 1000)
+
+test('an owner token a week old is swapped for a fresh 30 days that keeps its sign-in time', async () => {
+  const e = event()
+  await at(T0, () => setAuthCookie(e, 'owner'))
+  const first = e.cookies['labs-auth']
+
+  await at(T0 + 6 * DAY, () => assert.equal(renewOwnerSession(e, readAuthCookie(e)), false, 'six days in: not yet'))
+  assert.equal(e.cookies['labs-auth'], first)
+
+  await at(T0 + 8 * DAY, () => assert.equal(renewOwnerSession(e, readAuthCookie(e)), true))
+  assert.notEqual(e.cookies['labs-auth'], first)
+  assert.deepEqual(e.setCookies['labs-auth'], { httpOnly: true, secure: true, maxAge: 30 * 86400, path: '/', sameSite: 'lax' })
+  const renewed = await at(T0 + 8 * DAY, () => readAuthCookie(e))
+  assert.equal(renewed.issuedAt, sec(T0 + 8 * DAY), 'minted now')
+  assert.equal(renewed.startedAt, sec(T0), 'the session still began at the sign-in')
+
+  // Day 37: the sign-in's own token would have died a week ago; the renewed one is 29 days old.
+  assert.equal(await at(T0 + 37 * DAY, () => readAuthCookie({ cookies: { 'labs-auth': first } })), null)
+  assert.equal((await at(T0 + 37 * DAY, () => readAuthCookie(e)))?.role, 'owner')
+  // Left unused for a month after its last renewal, it still runs out.
+  assert.equal(await at(T0 + 39 * DAY, () => readAuthCookie(e)), null)
+})
+
+test('only the owner is renewed: a guest lives as long as its invite gave it, the demo a day', async () => {
+  for (const [role, invite] of [['friend', 'inv-1'], ['doctor', 'inv-2'], ['demo', undefined]]) {
+    const e = event()
+    await at(T0, () => setAuthCookie(e, role, invite))
+    const token = e.cookies['labs-auth']
+    await at(T0 + 20 * DAY, () => assert.equal(renewOwnerSession(e, readAuthCookie(e)), false, role))
+    assert.equal(e.cookies['labs-auth'], token)
+  }
+})
+
+test('the middleware renews on a read, never on a write, and not before the week is up', async () => {
+  const e = event({ url: 'https://jim.klonow.ski/api/journal/list', method: 'GET' })
+  await at(T0, () => setAuthCookie(e, 'owner'))
+  const first = e.cookies['labs-auth']
+
+  await at(T0 + 2 * DAY, () => authMiddleware(e))
+  assert.equal(e.context.auth?.role, 'owner')
+  assert.equal(e.cookies['labs-auth'], first, 'two days in: left alone')
+
+  // A write (the sign-out POST among them) is never handed a cookie it did not ask for.
+  e.method = 'POST'
+  await at(T0 + 8 * DAY, () => authMiddleware(e))
+  assert.equal(e.context.auth?.role, 'owner')
+  assert.equal(e.cookies['labs-auth'], first)
+
+  e.method = 'GET'
+  await at(T0 + 8 * DAY + 60_000, () => authMiddleware(e))
+  assert.equal(e.context.auth?.role, 'owner')
+  assert.notEqual(e.cookies['labs-auth'], first, 'the read after it is')
+  assert.equal((await at(T0 + 8 * DAY + 60_000, () => readAuthCookie(e))).startedAt, sec(T0))
+
+  // A friend three weeks in, on a read: live (its invite is), and not renewed.
+  const guest = event({ url: 'https://jim.klonow.ski/api/journal/list', method: 'GET' })
+  await at(T0, () => setAuthCookie(guest, 'friend', 'inv-1'))
+  const guestToken = guest.cookies['labs-auth']
+  await at(T0 + 20 * DAY, () => authMiddleware(guest))
+  assert.equal(guest.context.auth?.role, 'friend')
+  assert.equal(guest.cookies['labs-auth'], guestToken)
+  inviteRow = { revoked: 1 }
+  await at(T0 + 20 * DAY, () => authMiddleware(guest))
+  assert.equal(guest.context.auth, null, 'and dead with its invite, as before')
+  inviteRow = { revoked: 0 }
+})
+
+test('a renewal cannot carry a session past "sign out everywhere"', async () => {
+  // Signed in on day 22, on a device that is later lost. The cutoff is pressed on day 30.5, and
+  // the lost device's token is renewed on day 31 — as it would be at a location the cutoff had
+  // not reached yet. The renewed token is dated AFTER the cutoff; its session began before it.
+  const lost = event({ url: 'https://jim.klonow.ski/api/journal/list', method: 'GET' })
+  await at(T0 + 22 * DAY, () => setAuthCookie(lost, 'owner'))
+  await at(T0 + 31 * DAY, () => assert.equal(renewOwnerSession(lost, readAuthCookie(lost)), true))
+  const renewed = lost.cookies['labs-auth']
+  const cutoff = sec(T0 + 30.5 * DAY)
+  assert.ok((await at(T0 + 32 * DAY, () => readAuthCookie(lost))).issuedAt > cutoff, 'the token itself is newer than the cutoff')
+
+  const kv = kvOf({ value: String(cutoff) })
+  const request = event({ url: 'https://jim.klonow.ski/api/journal/list', method: 'GET', cookies: { 'labs-auth': renewed } }, kv)
+  await at(T0 + 32 * DAY, () => authMiddleware(request))
+  assert.equal(request.context.auth, null, 'refused: the session started before the cutoff')
+  assert.equal(request.cookies['labs-auth'], renewed, 'and no fresh cookie is minted for it')
+
+  // A protected page on that dead session goes to the sign-in page.
+  const page = event({ url: 'https://jim.klonow.ski/journal', method: 'GET', cookies: { 'labs-auth': renewed } }, kv)
+  const answer = await at(T0 + 32 * DAY + 60_000, () => authMiddleware(page))
+  assert.equal(answer?.code, 302)
+  assert.match(answer.redirect, /^\/labs\/login\?/)
+
+  // A sign-in after the cutoff is a new session and passes.
+  const fresh = event({ url: 'https://jim.klonow.ski/api/journal/list', method: 'GET' }, kv)
+  await at(T0 + 32 * DAY + 120_000, () => setAuthCookie(fresh, 'owner'))
+  await at(T0 + 32 * DAY + 180_000, () => authMiddleware(fresh))
+  assert.equal(fresh.context.auth?.role, 'owner')
 })

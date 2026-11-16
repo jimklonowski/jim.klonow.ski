@@ -23,8 +23,13 @@ export default defineEventHandler(async (event) => {
   }
   // Owner sessions die with the "sign out everywhere" cutoff (server/utils/auth.ts). Only owner
   // tokens pay for the check; guests are covered by invite liveness above, demo by its 24h life.
-  if (auth?.role === 'owner' && auth.issuedAt < await ownerSessionCutoff(event)) auth = null
+  // The session's START is what is compared: a renewed token is as old as its sign-in.
+  if (auth?.role === 'owner' && auth.startedAt < await ownerSessionCutoff(event)) auth = null
   event.context.auth = auth
+  // A live owner session that is a week into its token gets a fresh one (renewOwnerSession). On
+  // reads only: every write in the app is followed by one, and the POSTs that set or clear this
+  // cookie themselves (sign in, sign out, sign out everywhere) are never second-guessed.
+  if (auth && (event.method === 'GET' || event.method === 'HEAD')) renewOwnerSession(event, auth)
 
   if (isApi) return // endpoints enforce their own requirements
   if (path === LOGIN_PATH) return

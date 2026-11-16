@@ -57,7 +57,8 @@ export default defineEventHandler(async (event) => {
 
   // The token is the owner's: the writes go to the real database and into the audit log, as
   // the owner's own taps on the site do (getDb and recordAudit read this).
-  event.context.auth = { role: 'owner', inviteId: null, issuedAt: Math.floor(Date.now() / 1000) }
+  const now = Math.floor(Date.now() / 1000)
+  event.context.auth = { role: 'owner', inviteId: null, issuedAt: now, startedAt: now }
   const db = getDb(event)
 
   if (kind === 'water') {
