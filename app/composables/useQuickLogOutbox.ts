@@ -1,4 +1,5 @@
 import type { SodaEntry, WaterEntry } from '#shared/types/journal'
+import { LOGIN_PATH } from '#shared/utils/access'
 
 // The quick-log outbox (audit #43 item 43). A soda or water tap made with no network used to
 // fail with "Failed to log …" and was gone — and tapping again later recorded the wrong time,
@@ -8,6 +9,11 @@ import type { SodaEntry, WaterEntry } from '#shared/types/journal'
 // comes back online or the tab is next looked at. The id makes the replay safe: the first try
 // may have landed without its answer arriving, and the endpoints skip a tap whose id the day
 // already holds (shared/utils/journalRemove.ts appendTapSql).
+//
+// Once a tap is in here, only two things take it out: it lands, or the server says the tap itself
+// is wrong (replayVerdict). An expired session, a rate limit or a server error on the replay used
+// to count as a refusal too, and the tap was deleted with a toast — the taps kept through a dead
+// zone were lost to a sign-out that happened to fall before the replay (audit #44 item 4).
 //
 // localStorage, not IndexedDB: the queue is a handful of small objects, read and written whole,
 // and every write is wrapped — storage can be absent or throw in a private window, and a tap
@@ -29,12 +35,38 @@ export function newTapId(): string {
 
 /**
  * True for a request that never got an answer: ofetch's FetchError with no `response` and no
- * status (the dead-network signature — `<no response> fetch failed`). A server's own refusal
- * (401, 400, 500) carries a status and must not be queued: it would fail the same way on replay.
+ * status (the dead-network signature — `<no response> fetch failed`). This is what decides
+ * whether a FRESH tap is queued: an answer with a status (401, 400, 500) fails in front of the
+ * person, who can act on it, so it is shown and not queued.
  */
 export function isNoResponse(err: unknown): boolean {
   const e = err as { response?: unknown, statusCode?: number, status?: number } | null
   return !!e && typeof e === 'object' && !e.response && e.statusCode == null && e.status == null
+}
+
+/**
+ * What a failed REPLAY says about a tap that is already queued — where throwing it away is
+ * silent loss, since the person tapped hours ago and has moved on:
+ *
+ *   offline     no answer: the network is still down. Keep everything, stop.
+ *   signed-out  401: the session ran out. Keep everything, stop, and say so — signing in is the fix.
+ *   blocked     403 / 429: this browser is being turned away (a Cloudflare challenge, a session of
+ *               another role, a rate limit), not this tap. Keep everything, stop.
+ *   retry       408 / 425 / 5xx / anything unrecognized: the server stumbled. Keep the tap and go
+ *               on to the next, so one tap the server chokes on cannot hold the others back.
+ *   refused     any other 4xx (400, 404, 409, 422 …): the tap itself is unacceptable and always
+ *               will be. Only this drops it, with a toast.
+ */
+export type ReplayVerdict = 'offline' | 'signed-out' | 'blocked' | 'retry' | 'refused'
+
+export function replayVerdict(err: unknown): ReplayVerdict {
+  if (isNoResponse(err)) return 'offline'
+  const e = err as { response?: { status?: number }, statusCode?: number, status?: number }
+  const status = e.statusCode ?? e.status ?? e.response?.status
+  if (status === 401) return 'signed-out'
+  if (status === 403 || status === 429) return 'blocked'
+  if (typeof status === 'number' && status >= 400 && status < 500 && status !== 408 && status !== 425) return 'refused'
+  return 'retry'
 }
 
 function readQueue(): PendingTap[] {
@@ -103,32 +135,70 @@ export function enqueueTap(tap: PendingTap): boolean {
   return kept
 }
 
+/** Takes one tap out of the queue (it landed, or it was refused for good). */
+function settle(id: string) {
+  const list = readQueue().filter(t => t.id !== id)
+  writeQueue(list)
+  pending.value = list
+}
+
+// Said once per page load: the replay runs every time the tab is looked at, and a sign-in is a
+// full page load, which starts this over.
+let toldSignedOut = false
+
+function tellSignedOut(toast: ReturnType<typeof useToast>, count: number) {
+  if (toldSignedOut) return
+  toldSignedOut = true
+  toast.add({
+    title: `Signed out — ${count} tap${count === 1 ? '' : 's'} kept`,
+    description: 'Sign in again and they are sent with the times they were made.',
+    color: 'warning',
+    icon: 'i-lucide-log-in',
+    duration: 0,
+    actions: [{
+      label: 'Sign in',
+      // A full page load, like every other change of session in the app.
+      onClick: () => {
+        const from = window.location.pathname + window.location.search
+        window.location.href = `${LOGIN_PATH}?${new URLSearchParams({ from })}`
+      }
+    }]
+  })
+}
+
 /**
- * Sends every queued tap, oldest first, stopping at the first that still gets no answer (the
- * network is still down — the rest would fail the same way). A tap the server refuses outright
- * (a status) is dropped with a toast: it will never succeed, and keeping it would retry forever.
- * One flush at a time; a second call joins the one in flight.
+ * Sends every queued tap, oldest first. What a failure does to the queue is replayVerdict's
+ * call: the network, the session or this browser being turned away stops the pass with every tap
+ * kept; a server error keeps the tap and moves on to the next; only a tap the server calls wrong
+ * in itself is dropped, with a toast. One flush at a time; a second call joins the one in flight.
  */
 export function flushOutbox(onLanded?: (tap: PendingTap, lists: { sodas?: SodaEntry[], water?: WaterEntry[] }) => void): Promise<void> {
   if (flushing) return flushing
   flushing = (async () => {
     const toast = useToast()
-    let list = readQueue()
-    while (list.length) {
-      const tap = list[0]!
+    // Taps a server error left in place this pass: tried once, then stepped over.
+    const stepped = new Set<string>()
+    for (;;) {
+      const tap = readQueue().find(t => !stepped.has(t.id))
+      if (!tap) break
       try {
         const lists = await send(tap)
-        list = readQueue().filter(t => t.id !== tap.id)
-        writeQueue(list)
-        pending.value = list
+        settle(tap.id)
         onLanded?.(tap, lists)
       }
       catch (err) {
-        if (isNoResponse(err)) break
-        list = readQueue().filter(t => t.id !== tap.id)
-        writeQueue(list)
-        pending.value = list
-        toast.add({ title: `A queued ${tap.kind} tap was refused`, description: `${tap.date} ${tap.time}: ${extractErrorMessage(err, 'the server said no')} — it was not logged.`, color: 'warning' })
+        const verdict = replayVerdict(err)
+        if (verdict === 'refused') {
+          settle(tap.id)
+          toast.add({ title: `A queued ${tap.kind} tap was refused`, description: `${tap.date} ${tap.time}: ${extractErrorMessage(err, 'the server said no')} — it was not logged.`, color: 'warning' })
+        }
+        else if (verdict === 'retry') {
+          stepped.add(tap.id)
+        }
+        else {
+          if (verdict === 'signed-out') tellSignedOut(toast, readQueue().length)
+          break
+        }
       }
     }
   })().finally(() => {
