@@ -163,12 +163,27 @@
           <span class="text-faint shrink-0">{{ w.time }}</span>
           <span class="text-hi">{{ fmtOz(w.oz) }} oz</span>
           <!-- A pour the outbox is still sending has no server index to remove by; it is marked
-               instead, and the ✕ comes back once it lands. -->
+               instead, and its ✕ takes it out of the outbox (the ordinary one comes back once
+               it lands). -->
           <span
             v-if="isPendingId(w.id)"
-            class="ml-auto shrink-0 text-meta text-muted"
-            title="Kept while offline — sent when you're back online"
-          >⏳ pending</span>
+            class="ml-auto shrink-0 flex items-baseline gap-2.5 text-meta"
+          >
+            <span
+              class="text-muted"
+              title="Kept while offline — sent when you're back online"
+            >⏳ pending</span>
+            <button
+              type="button"
+              class="text-faint hover:text-danger cursor-pointer"
+              title="Discard — it has not been sent"
+              :aria-label="`Discard the unsent ${w.time} pour`"
+              data-discard-tap
+              @click="discardTap(w.id)"
+            >
+              ✕
+            </button>
+          </span>
           <button
             v-else
             type="button"
@@ -200,7 +215,7 @@
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, WATER_MAX_OZ_PER_ENTRY, fmtOzValue, waterProgress, waterSetting, waterTotals } from '#shared/utils/water'
 import { hydrationOz } from '#shared/utils/drinks'
 import type { WaterEntry } from '~/data/journal'
-import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
+import { discardTap, flushPending, isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
 withDefaults(defineProps<{
   readonly?: boolean
@@ -263,6 +278,8 @@ async function quickAdd(oz: number | '', fromPanel = false) {
       body: { date, time, oz, id }
     })
     applyWaterLocally(date, water)
+    // The server is answering: send whatever the outbox is still holding.
+    flushPending()
     // The status line's "water N oz" reads the scalar shell summary, not this list.
     await refreshNuxtData('overview')
     if (fromPanel) panelOpen.value = false

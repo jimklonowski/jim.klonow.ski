@@ -3,7 +3,7 @@ import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, waterSetting, waterTotals 
 import { lastSoda as lastSodaOf, quickAddLabel } from '#shared/utils/soda'
 import { hydrationOz, sodasOnly } from '#shared/utils/drinks'
 import { patchJournalDay } from '~/utils/journalPatch'
-import { isNoResponse, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
+import { flushPending, isNoResponse, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
 // One-tap soda and water logging for places that aren't the journal hub (the home page's LOG
 // TODAY row). Same endpoints, same "last drink" and "cup size" defaults as the two tracker
@@ -68,6 +68,8 @@ export async function useQuickLog() {
         body: { date, time, drink, size, id }
       })
       patchToday({ sodas })
+      // The server is answering: send whatever the outbox is still holding.
+      flushPending()
       // The status line moves too, but a tap deserves a word of its own (audit #42 item 38).
       toast.add({ title: `Logged ${sodaLabel.value}`, description: `${sodasOnly(sodas).length} soda${sodasOnly(sodas).length === 1 ? '' : 's'} today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
@@ -96,6 +98,7 @@ export async function useQuickLog() {
         body: { date, time, oz, id }
       })
       patchToday({ water })
+      flushPending()
       toast.add({ title: `Logged ${oz} oz of water`, description: `${hydrationOz({ water, sodas: todayEntry.value?.sodas })} oz today`, color: 'success', icon: 'i-lucide-check' })
       await refreshNuxtData('overview')
     }

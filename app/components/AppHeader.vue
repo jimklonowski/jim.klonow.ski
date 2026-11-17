@@ -76,8 +76,8 @@
 </template>
 
 <script setup lang="ts">
-import type { JournalEntry } from '~/data/journal'
-import { useQuickLogOutbox } from '~/composables/useQuickLogOutbox'
+import type { JournalEntry, SodaEntry, WaterEntry } from '~/data/journal'
+import { useQuickLogOutbox, type PendingTap } from '~/composables/useQuickLogOutbox'
 import { patchJournalDay } from '~/utils/journalPatch'
 
 const route = useRoute()
@@ -86,15 +86,45 @@ const paletteOpen = useState('command-palette-open', () => false)
 
 // The quick-log outbox's replay is armed here, on every page, for anyone who can tap (owner and
 // demo — the roles the soda/water endpoints accept). A tap kept while offline is sent when the
-// browser comes back online or the tab is next looked at; when it lands, the server's list is
-// mirrored into the shared journal store (the pending mark clears) and the status line's counts
-// re-read (audit #43 item 43).
+// browser comes back online, the tab is next looked at, or another tap gets through; when it
+// lands, the server's list is mirrored into the shared journal store (the pending mark clears)
+// and the status line's counts re-read (audit #43 item 43). The role goes with it: a tap is
+// only replayed into the kind of session it was made in (audit #44 item 6).
 if (role.value === 'owner' || role.value === 'demo') {
   const journal = useNuxtData<JournalEntry[]>('/journal')
-  useQuickLogOutbox((tap, lists) => {
+  const dayOf = (tap: PendingTap) => journal.data.value?.find(e => e.date === tap.date)
+  const holds = (tap: PendingTap) => {
+    const day = dayOf(tap)
+    const list: Array<{ id?: string }> = (tap.kind === 'soda' ? day?.sodas : day?.water) ?? []
+    return list.some(e => e.id === tap.id)
+  }
+  const mirror = (tap: PendingTap, lists: { sodas?: SodaEntry[], water?: WaterEntry[] }) => {
     if (lists.sodas) patchJournalDay(journal.data, tap.date, { sodas: lists.sodas })
     if (lists.water) patchJournalDay(journal.data, tap.date, { water: lists.water })
-    refreshNuxtData('overview')
+  }
+  // On a cold start the replay runs before the journal list (fetched by the browser after mount)
+  // has arrived. A tap that lands in that gap has no list to be mirrored into, is out of the queue
+  // by the time the list comes, and the list — asked for a moment before the tap landed — may not
+  // hold it either: the day read one short until the next refresh. Such taps wait here.
+  const early: Array<{ tap: PendingTap, lists: { sodas?: SodaEntry[], water?: WaterEntry[] } }> = []
+  useQuickLogOutbox(role.value, {
+    onLanded(tap, lists) {
+      if (journal.data.value == null) early.push({ tap, lists })
+      else mirror(tap, lists)
+      refreshNuxtData('overview')
+    },
+    // Refused for good or discarded by hand: its row comes off the day.
+    onDropped(tap) {
+      const day = dayOf(tap)
+      if (!day || !holds(tap)) return
+      if (tap.kind === 'soda') patchJournalDay(journal.data, tap.date, { sodas: (day.sodas ?? []).filter(e => e.id !== tap.id) })
+      else patchJournalDay(journal.data, tap.date, { water: (day.water ?? []).filter(e => e.id !== tap.id) })
+    }
+  })
+  watch(() => journal.data.value, (list) => {
+    if (!list || !early.length) return
+    // A list that already holds the tap is at least as new as the answer that carried it.
+    for (const { tap, lists } of early.splice(0)) if (!holds(tap)) mirror(tap, lists)
   })
 }
 

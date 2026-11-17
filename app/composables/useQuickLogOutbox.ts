@@ -1,5 +1,6 @@
 import type { SodaEntry, WaterEntry } from '#shared/types/journal'
 import { LOGIN_PATH } from '#shared/utils/access'
+import { setPendingTapSource } from '~/utils/journalPatch'
 
 // The quick-log outbox (audit #43 item 43). A soda or water tap made with no network used to
 // fail with "Failed to log …" and was gone — and tapping again later recorded the wrong time,
@@ -15,14 +16,37 @@ import { LOGIN_PATH } from '#shared/utils/access'
 // to count as a refusal too, and the tap was deleted with a toast — the taps kept through a dead
 // zone were lost to a sign-out that happened to fall before the replay (audit #44 item 4).
 //
+// Three more things a queued tap needed (audit #44 item 6):
+//   - to stay on screen. The journal list overlays the queue on every server answer
+//     (app/utils/journalPatch.ts), so a pending pour no longer drops off the day — and gets
+//     tapped again — when the next tap gets through.
+//   - to be sent as soon as the server is known to be answering: a tap that lands flushes the
+//     queue (flushPending), not only the `online` event and the next look at the tab.
+//   - a way out and a home. A pending row can be discarded (discardTap), and a tap carries the
+//     kind of session it was made in: an owner's tap is never replayed into the demo sandbox, nor
+//     a demo tap into the real journal — each waits for its own session.
+//
 // localStorage, not IndexedDB: the queue is a handful of small objects, read and written whole,
 // and every write is wrapped — storage can be absent or throw in a private window, and a tap
 // must still go to the server then. No service worker is involved: this is about keeping the
 // tap, not about serving the app offline.
 
+/** The kind of session a tap was made in — the only kind it is ever sent back into. */
+export type TapRole = 'owner' | 'demo'
+
 export type PendingTap
-  = { id: string, kind: 'soda', date: string, time: string, drink?: string, size?: string }
-    | { id: string, kind: 'water', date: string, time: string, oz: number }
+  = { id: string, kind: 'soda', date: string, time: string, drink?: string, size?: string, role?: TapRole }
+    | { id: string, kind: 'water', date: string, time: string, oz: number, role?: TapRole }
+
+type TapLists = { sodas?: SodaEntry[], water?: WaterEntry[] }
+
+/** What the page does about a tap leaving the queue: both mirror the journal list. */
+export interface OutboxHandlers {
+  /** It landed: `lists` is the day as the server now holds it. */
+  onLanded?: (tap: PendingTap, lists: TapLists) => void
+  /** It is gone without landing — refused for good, or discarded by hand: take its row down. */
+  onDropped?: (tap: PendingTap) => void
+}
 
 const KEY = 'quicklog:outbox'
 
@@ -90,20 +114,36 @@ function writeQueue(list: PendingTap[]) {
   }
 }
 
-/** The queued taps, kept reactive for the widgets' pending marks. Client-only state. */
+/**
+ * This session's queued taps, kept reactive for the widgets' pending marks and overlaid on the
+ * journal list. Client-only state.
+ */
 const pending = ref<PendingTap[]>([])
 let armed = false
 let flushing: Promise<void> | null = null
+let sessionRole: TapRole | null = null
+let handlers: OutboxHandlers = {}
 
-/** The soda taps queued for `date`, as entries the widget can list beside the saved ones. */
-export function pendingSodas(date: string): SodaEntry[] {
-  return pending.value.filter((t): t is Extract<PendingTap, { kind: 'soda' }> => t.kind === 'soda' && t.date === date)
-    .map(t => ({ time: t.time, drink: t.drink, size: t.size, id: t.id }))
+/**
+ * Whether a queued tap belongs to this session. One with no role was queued before taps carried
+ * one, and goes wherever it would have gone then; with no session set, nothing is held back.
+ */
+const mine = (tap: PendingTap) => !tap.role || !sessionRole || tap.role === sessionRole
+
+/** Re-reads the queue into `pending`: this session's taps only. */
+function sync() {
+  pending.value = readQueue().filter(mine)
 }
 
-export function pendingWater(date: string): WaterEntry[] {
-  return pending.value.filter((t): t is Extract<PendingTap, { kind: 'water' }> => t.kind === 'water' && t.date === date)
-    .map(t => ({ time: t.time, oz: t.oz, id: t.id }))
+/**
+ * Says which kind of session this is and what the page does when a tap leaves the queue. Called
+ * once, by the arming below (and by the tests, which have no component to arm from).
+ */
+export function setOutboxSession(role: TapRole | null, next: OutboxHandlers = {}) {
+  sessionRole = role
+  handlers = next
+  setPendingTapSource(() => pending.value)
+  sync()
 }
 
 /** Is this stored entry one the outbox is still trying to send? (The widgets mark it.) */
@@ -128,18 +168,30 @@ async function send(tap: PendingTap): Promise<{ sodas?: SodaEntry[], water?: Wat
  */
 export function enqueueTap(tap: PendingTap): boolean {
   const list = readQueue()
-  list.push(tap)
+  list.push(sessionRole ? { ...tap, role: sessionRole } : tap)
   writeQueue(list)
   const kept = readQueue().some(t => t.id === tap.id)
-  if (kept) pending.value = readQueue()
+  if (kept) sync()
   return kept
 }
 
-/** Takes one tap out of the queue (it landed, or it was refused for good). */
+/** Takes one tap out of the queue (it landed, was refused for good, or was discarded). */
 function settle(id: string) {
-  const list = readQueue().filter(t => t.id !== id)
-  writeQueue(list)
-  pending.value = list
+  writeQueue(readQueue().filter(t => t.id !== id))
+  sync()
+}
+
+/**
+ * Throws away a tap that has not landed — the ✕ on a pending row. Without it a tap the server
+ * kept failing on sat in the list as "pending" for good, with nothing to press. If the tap did
+ * reach the server and only its answer was lost, the next refresh shows it as an ordinary row,
+ * which has its own ✕.
+ */
+export function discardTap(id: string | undefined) {
+  const tap = readQueue().find(t => t.id === id)
+  if (!tap) return
+  settle(tap.id)
+  handlers.onDropped?.(tap)
 }
 
 // Said once per page load: the replay runs every time the tab is looked at, and a sign-in is a
@@ -167,36 +219,38 @@ function tellSignedOut(toast: ReturnType<typeof useToast>, count: number) {
 }
 
 /**
- * Sends every queued tap, oldest first. What a failure does to the queue is replayVerdict's
- * call: the network, the session or this browser being turned away stops the pass with every tap
- * kept; a server error keeps the tap and moves on to the next; only a tap the server calls wrong
- * in itself is dropped, with a toast. One flush at a time; a second call joins the one in flight.
+ * Sends every tap queued in this kind of session, oldest first. What a failure does to the queue
+ * is replayVerdict's call: the network, the session or this browser being turned away stops the
+ * pass with every tap kept; a server error keeps the tap and moves on to the next; only a tap the
+ * server calls wrong in itself is dropped, with a toast. One flush at a time; a second call joins
+ * the one in flight.
  */
-export function flushOutbox(onLanded?: (tap: PendingTap, lists: { sodas?: SodaEntry[], water?: WaterEntry[] }) => void): Promise<void> {
+export function flushOutbox(): Promise<void> {
   if (flushing) return flushing
   flushing = (async () => {
     const toast = useToast()
     // Taps a server error left in place this pass: tried once, then stepped over.
     const stepped = new Set<string>()
     for (;;) {
-      const tap = readQueue().find(t => !stepped.has(t.id))
+      const tap = readQueue().find(t => mine(t) && !stepped.has(t.id))
       if (!tap) break
       try {
         const lists = await send(tap)
         settle(tap.id)
-        onLanded?.(tap, lists)
+        handlers.onLanded?.(tap, lists)
       }
       catch (err) {
         const verdict = replayVerdict(err)
         if (verdict === 'refused') {
           settle(tap.id)
           toast.add({ title: `A queued ${tap.kind} tap was refused`, description: `${tap.date} ${tap.time}: ${extractErrorMessage(err, 'the server said no')} — it was not logged.`, color: 'warning' })
+          handlers.onDropped?.(tap)
         }
         else if (verdict === 'retry') {
           stepped.add(tap.id)
         }
         else {
-          if (verdict === 'signed-out') tellSignedOut(toast, readQueue().length)
+          if (verdict === 'signed-out') tellSignedOut(toast, pending.value.length)
           break
         }
       }
@@ -205,6 +259,16 @@ export function flushOutbox(onLanded?: (tap: PendingTap, lists: { sodas?: SodaEn
     flushing = null
   })
   return flushing
+}
+
+/**
+ * Sends the queue if it holds anything for this session. Called by every replay trigger, and by
+ * each write path after a tap of its own lands: an answer from the server is the best sign there
+ * is that the queued ones will get one too, and the `online` event does not fire for a connection
+ * that was only ever slow.
+ */
+export function flushPending() {
+  if (readQueue().some(mine)) void flushOutbox()
 }
 
 /**
@@ -222,22 +286,19 @@ export function keepTap(tap: PendingTap, toast: ReturnType<typeof useToast>): So
 }
 
 /**
- * The outbox as a composable: the reactive queue, and the one-time arming of the replay
- * triggers (online, tab visible, and a mount with something queued). Client-only; on the server
- * the queue is empty and nothing arms.
+ * The outbox as a composable: the one-time arming of the session, the page's handlers and the
+ * replay triggers (online, tab visible, and a mount with something queued). Client-only; on the
+ * server the queue is empty and nothing arms.
  */
-export function useQuickLogOutbox(onLanded?: (tap: PendingTap, lists: { sodas?: SodaEntry[], water?: WaterEntry[] }) => void) {
+export function useQuickLogOutbox(role: TapRole, pageHandlers: OutboxHandlers = {}) {
   if (import.meta.client && !armed) {
     armed = true
-    pending.value = readQueue()
-    const replay = () => {
-      if (readQueue().length) flushOutbox(onLanded)
-    }
-    useEventListener(window, 'online', replay)
+    setOutboxSession(role, pageHandlers)
+    useEventListener(window, 'online', flushPending)
     useEventListener(document, 'visibilitychange', () => {
-      if (document.visibilityState === 'visible') replay()
+      if (document.visibilityState === 'visible') flushPending()
     })
-    replay()
+    flushPending()
   }
-  return { pending, enqueueTap, flushOutbox: () => flushOutbox(onLanded), pendingSodas, pendingWater, isPendingId }
+  return { pending }
 }

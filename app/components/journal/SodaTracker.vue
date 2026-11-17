@@ -207,12 +207,24 @@
             >{{ figuresChip(s) }}</span>
           </template>
           <!-- A tap the outbox is still sending has no server index to remove by; it is marked
-               instead, and the ✕ comes back once it lands. -->
-          <span
-            v-if="isPendingId(s.id)"
-            class="text-meta text-muted"
-            title="Kept while offline — sent when you're back online"
-          >⏳ pending</span>
+               instead, and its ✕ takes it out of the outbox (the ordinary one comes back once
+               it lands). -->
+          <template v-if="isPendingId(s.id)">
+            <span
+              class="text-meta text-muted"
+              title="Kept while offline — sent when you're back online"
+            >⏳ pending</span>
+            <button
+              type="button"
+              class="text-meta text-faint hover:text-danger cursor-pointer"
+              title="Discard — it has not been sent"
+              :aria-label="`Discard the unsent ${s.time} ${s.drink || 'soda'}`"
+              data-discard-tap
+              @click="discardTap(s.id)"
+            >
+              ✕
+            </button>
+          </template>
           <button
             v-else-if="!readonly"
             type="button"
@@ -243,7 +255,7 @@ import { SODA_SIZES } from '~/data/journal'
 import type { SodaEntry } from '~/data/journal'
 import { DRINK_GROUPS, DRINK_KIND_LABELS, LATE_CAFFEINE_HOUR, drinkFigures, drinkInfo, drinkSource, drinkTotals, hydrates, indexDrinkLabels, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { lastSoda as lastSodaOf, quickAddLabel as quickAddLabelOf } from '#shared/utils/soda'
-import { isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
+import { discardTap, flushPending, isNoResponse, isPendingId, keepTap, newTapId } from '~/composables/useQuickLogOutbox'
 
 withDefaults(defineProps<{
   readonly?: boolean
@@ -362,6 +374,8 @@ async function quickAdd(useCustom = false) {
       body: { date, time, drink, size, id }
     })
     applySodasLocally(date, sodas)
+    // The server is answering: send whatever the outbox is still holding.
+    flushPending()
     // The status line's "soda N today" reads the scalar shell summary, not this list.
     await refreshNuxtData('overview')
     if (useCustom) {
