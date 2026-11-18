@@ -355,3 +355,27 @@ test('a stream folds into course-relative weeks with a baseline band, and the su
   // Sunday, the week's last day: complete, so it counts.
   assert.equal(weeklySeries(sessions, start, '2026-11-20', 'sum').at(-1).partial, false)
 })
+
+test('a week with no sessions is a zero, not a gap, once the stream has begun (audit #44 item 12)', () => {
+  const start = '2026-11-07'
+  // Three sessions a week through week 0, then nothing in week 1 (Nov 14–20); read on Nov 24.
+  const sessions = ['2026-10-12', '2026-10-27', '2026-10-29', '2026-10-30', '2026-11-01', '2026-11-03', '2026-11-05', '2026-11-08', '2026-11-10', '2026-11-12']
+    .map(date => ({ date, value: 1 }))
+  const wk = weeklySeries(sessions, start, '2026-11-24', 'sum')
+  // Oct 12 is week −4; week −3 (Oct 17–23) had none: zero. Weeks −8…−5 predate the stream: null.
+  assert.deepEqual(wk.map(w => [w.index, w.value]), [[-8, null], [-7, null], [-6, null], [-5, null], [-4, 1], [-3, 0], [-2, 3], [-1, 3], [0, 3], [1, 0], [2, 0]])
+  assert.equal(wk.at(-1).partial, true, 'the running week')
+  const s = signalSummary(wk)
+  assert.equal(s.current, 0, 'the last complete week had none — it used to read week 0\'s three')
+  assert.equal(s.baseline, 1.8, 'the empty week counts in the baseline: (1 + 0 + 3 + 3) / 4')
+  assert.equal(s.delta, -1.8)
+  assert.deepEqual(s.values.slice(-3), [3, 3, 0], 'and the sparkline drops')
+
+  // A stream that began before the window: every empty week in range is a zero.
+  const old = weeklySeries([{ date: '2026-01-05', value: 1 }], start, '2026-11-13', 'sum')
+  assert.ok(old.every(w => w.value === 0))
+  // No points at all (the list did not load): nothing is claimed.
+  assert.ok(weeklySeries([], start, '2026-11-24', 'sum').every(w => w.value === null))
+  // A level is never zero-filled.
+  assert.equal(weeklySeries([{ date: '2026-10-20', value: 170 }, { date: '2026-11-10', value: 169 }], start, '2026-11-24')[6].value, null)
+})

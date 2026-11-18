@@ -18,12 +18,16 @@
         >
           BLOODWORK →
         </NuxtLink>
+        <!-- Only the owner can add photos (the photos page's upload is owner-only); a friend or
+             the demo can look, and the link says that instead of offering an add. -->
         <NuxtLink
           v-if="showPhotos"
           to="/journal/photos"
-          class="tui-btn tui-btn-accent"
+          class="tui-btn"
+          :class="isOwner ? 'tui-btn-accent' : ''"
+          data-photos-link
         >
-          + PHOTOS
+          {{ isOwner ? '+ PHOTOS' : 'PHOTOS →' }}
         </NuxtLink>
       </template>
     </JournalHeader>
@@ -382,6 +386,7 @@ import {
 } from '#shared/utils/accutane'
 import { cycleEnd, cycleProgress, isTentative } from '#shared/utils/cycles'
 import { shiftDays } from '#shared/utils/dates'
+import { hydrationOz } from '#shared/utils/drinks'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { photoCategoryLabel } from '#shared/utils/photoCategories'
 import { photoSet } from '#shared/utils/photoSets'
@@ -396,7 +401,7 @@ useSeoMeta({ title: 'Journal · Accutane' })
 // the acne photo set the record, and the self-collecting streams the context. Nothing is stored
 // here; shared/utils/accutane.ts holds the arithmetic.
 
-const { role, canEdit } = await useAuth()
+const { role, canEdit, isOwner } = await useAuth()
 const today = useToday()
 const route = useRoute()
 // The photos list refuses the doctor role (the photos are that role's blind spot by design), so
@@ -568,13 +573,17 @@ const signals = computed(() => {
   function pick<T>(rows: T[], date: (r: T) => string, value: (r: T) => number | null | undefined) {
     return rows.map(r => ({ date: date(r), value: value(r) }))
   }
-  const sumOz = (e: typeof js[number]) => e.water?.length ? e.water.reduce((s, w) => s + (w.oz ?? 0), 0) : null
+  // The day's water as every other page counts it: the pours plus the sports drinks' ounces
+  // (shared/utils/drinks.ts). Pours alone read a Gatorade day as a dry one. A day with neither
+  // is not a zero: nothing was logged. Today is left out: a day still under way is a running
+  // total, and averaged in as a day it read the week's first morning as "12 oz/day".
+  const dayOz = (e: typeof js[number]) => (e.date < t ? hydrationOz(e) || null : null)
   const defs = [
     { label: 'Weight', unit: 'lb', weeks: weeklySeries(pick(js, e => e.date, e => e.weight_lbs), start, t) },
     { label: 'Systolic', unit: 'mmHg', weeks: weeklySeries(pick(js, e => e.date, e => e.bp_systolic), start, t) },
     { label: 'RHR', unit: 'bpm', weeks: weeklySeries(pick(js, e => e.date, e => e.rhr), start, t) },
     { label: 'HRV', unit: 'ms', weeks: weeklySeries(pick(js, e => e.date, e => e.hrv), start, t) },
-    { label: 'Water', unit: 'oz/day', weeks: weeklySeries(pick(js, e => e.date, sumOz), start, t) },
+    { label: 'Water', unit: 'oz/day', weeks: weeklySeries(pick(js, e => e.date, dayOz), start, t) },
     { label: 'Sleep perf', unit: '%', weeks: weeklySeries(pick(hm, h => h.date, h => h.sleep_performance_pct), start, t) },
     { label: 'Recovery', unit: '%', weeks: weeklySeries(pick(hm, h => h.date, h => h.recovery_score), start, t) },
     { label: 'Workouts', unit: '/wk', weeks: weeklySeries(pick(workoutsData.value ?? [], w => w.date, () => 1), start, t, 'sum') }

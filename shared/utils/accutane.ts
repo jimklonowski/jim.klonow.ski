@@ -475,7 +475,14 @@ export interface WeekPoint {
 /**
  * A stream folded into course-relative weeks — `weeksBefore` of them before the start (the
  * baseline band) and every week of the course up to today. `mean` for a level (weight, HRV),
- * `sum` for a count (workouts, water pours). A week with no points is null, never zero.
+ * `sum` for a count (workouts, water pours).
+ *
+ * A week with no points is null for a level — nothing was measured. For a count it is ZERO once
+ * the stream has begun (from the week of its first point ever, in range or not): a week with no
+ * sessions is the finding, and as null it was skipped — "current" stayed on the last week that
+ * had any, the baseline averaged only the weeks with sessions, and the sparkline drew straight
+ * across the gap (audit #44 item 12). Before the stream's first point, and for a stream with no
+ * points at all (a list that failed to load), a count's week is still null.
  */
 export function weeklySeries(points: ReadonlyArray<{ date: string, value: number | null | undefined }>, start: string, today: string, agg: 'mean' | 'sum' = 'mean', weeksBefore = 8): WeekPoint[] {
   const firstIndex = -weeksBefore
@@ -486,16 +493,22 @@ export function weeklySeries(points: ReadonlyArray<{ date: string, value: number
     weeks.push({ from, index: i, value: null, n: 0, partial: agg === 'sum' && shiftDays(from, 6) > today })
   }
   const sums = new Map<number, number>()
+  // The week the stream's first point falls in, whether or not that week is in range.
+  let began = Infinity
   for (const p of points) {
     if (p.value == null || !Number.isFinite(p.value)) continue
     const i = Math.floor(diffDays(start, p.date) / 7)
+    if (i < began) began = i
     if (i < firstIndex || i > lastIndex) continue
     sums.set(i, (sums.get(i) ?? 0) + p.value)
     const w = weeks[i - firstIndex]!
     w.n++
   }
   for (const w of weeks) {
-    if (!w.n) continue
+    if (!w.n) {
+      if (agg === 'sum' && w.index >= began) w.value = 0
+      continue
+    }
     const s = sums.get(w.index) ?? 0
     w.value = roundTo(agg === 'sum' ? s : s / w.n, 1)
   }
