@@ -177,6 +177,12 @@ export function scaleEstimate(e: MealEstimate, n: number, text: string, label?: 
 // two-stick serving, "whole costco pizza" is 8 of the 4-slice serving's slices. A meal with no
 // declared portion is simply multiplied ("2 kiwi"). Distinct from "N x", which always multiplies
 // the whole serving. The text keeps its count, so the figures stay derivable from text + library.
+//
+// A BARE count (no unit word) is read in the serving's unit only when the meal is counted by that
+// unit's own name — "3 beef sticks", "6 mozzarella sticks", "2 chomps" (an alias of beef sticks).
+// Where the unit is something else, the count is of the meal: "2 gyros" is two gyros, not two of
+// a gyro's four slices; "2 watermelon" two containers, not two of its ~3 cups (audit #44 item 8).
+// The unit has to be typed to count in it: "2 slices costco pizza", "2 oz jerky".
 
 const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
 const FRACTION_GLYPHS: Record<string, number> = { '½': 0.5, '⅓': 1 / 3, '¼': 0.25, '¾': 0.75 }
@@ -217,6 +223,17 @@ export function splitCount(text: string): MealCount | null {
 /** A lookup at some trust level; `plain` skips the singular-word rule (a typed count already says how many). */
 type Lookup = (text: string, plain?: boolean) => MealEstimate | null
 
+const lastWord = (text: string) => text.trim().toLowerCase().split(/\s+/).at(-1)
+
+/**
+ * True when the meal is counted by its serving unit's own name: "beef sticks" in sticks, "chicken
+ * strips" in strips — by the library's spelling, so an alias ("chomps", "chicken tenders") counts
+ * the same way, or by the spelling typed. A gyro (in slices) or a pizza (in slices) is not.
+ */
+function countedByName(p: MealPortion, ...texts: string[]): boolean {
+  return texts.some(t => lastWord(t)?.replace(/s$/, '') === p.unit)
+}
+
 /**
  * "beef stick", "mozzarella stick", "chicken strip": a singular unit word ending a meal whose
  * serving is more than one of that unit means ONE of them. Plural folding keys "beef stick" and
@@ -226,8 +243,7 @@ type Lookup = (text: string, plain?: boolean) => MealEstimate | null
 function singularServing(e: MealEstimate, text: string): MealEstimate {
   const p = e.portion
   if (!p || p.count === 1) return e
-  const last = text.trim().toLowerCase().split(/\s+/).at(-1)
-  if (last !== p.unit) return e
+  if (lastWord(text) !== p.unit) return e
   return scaleEstimate(e, 1 / p.count, text, `1 ${p.unit} (a serving is ${p.count}) of`)
 }
 
@@ -253,6 +269,8 @@ function countedEstimate(text: string, lookup: Lookup): MealEstimate | null {
   // A typed unit must be the serving's own; "3 cups watermelon" against a stick-counted meal is unknown.
   if (c.unit && (!p || c.unit !== p.unit)) return null
   if (!p) return scaleEstimate(base, c.n, text)
+  // No unit typed, and the serving's unit is not what the meal is called: N of the meal.
+  if (!c.unit && !countedByName(p, base.text, c.rest)) return scaleEstimate(base, c.n, text)
   return scaleEstimate(base, c.n / p.count, text, `${unitName(c.n, p.unit)} (a serving is ${p.count}) of`, true)
 }
 
@@ -299,11 +317,16 @@ function resolve(index: EstimateIndex, trimmed: string, labelOnly: boolean, plai
   // snack slot). Both after the whole-text paths, so a combo priced as one meal ("grilled cheese
   // + guac") keeps those figures. With a leading "N x" the WHOLE is resolved and then multiplied
   // — reading the text as typed would hand the "2 x" to the first part alone.
+  //
+  // The parts before the count: a bare count belongs to the part it stands in front of. Read
+  // count-first, "2 gyros + apple" was two of (gyros + apple) — two apples — and "3 beef sticks
+  // + apple" six sticks and three apples (found with audit #44 item 8). The count-first reading
+  // remains for a joined text whose parts are not each known but whose whole is one priced meal.
   if (base) {
-    const compositeBase = countedEstimate(base.text, lookup) ?? composeEstimate(base.text, lookup)
+    const compositeBase = composeEstimate(base.text, lookup) ?? countedEstimate(base.text, lookup)
     return compositeBase ? scaleEstimate(compositeBase, qty!.n, trimmed) : null
   }
-  return countedEstimate(trimmed, lookup) ?? composeEstimate(trimmed, lookup)
+  return composeEstimate(trimmed, lookup) ?? countedEstimate(trimmed, lookup)
 }
 
 /**
@@ -596,8 +619,6 @@ function servingUnit(index: EstimateIndex, text: string): string | undefined {
   const p = lookupEstimate(index, text, true)?.portion
   return p && p.count !== 1 ? p.unit : undefined
 }
-
-const lastWord = (text: string) => text.trim().toLowerCase().split(/\s+/).at(-1)
 
 /**
  * True when pairing `typed` with `meal` would change how many are eaten: a text ending in the

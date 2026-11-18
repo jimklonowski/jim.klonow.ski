@@ -406,6 +406,9 @@ export interface LibraryMeal {
    * splitCount): "1 beef stick" against { count: 2, unit: 'stick' } is half a serving; "whole
    * costco pizza" against { count: 4, unit: 'slice', whole: 8 } is two. Only meals whose serving
    * is more than one of something need it — a bare count on a meal without one just multiplies.
+   * A bare count is read in this unit only when the meal's name ends in it ("beef sticks" in
+   * sticks); otherwise it counts servings ("2 gyros" is two gyros, not two of the four slices),
+   * and the unit has to be typed to count in it ("2 slices costco pizza").
    */
   portion?: MealPortion
 }

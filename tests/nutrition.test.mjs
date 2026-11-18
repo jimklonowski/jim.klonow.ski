@@ -468,6 +468,48 @@ test('a count before a meal is read in the serving\'s own unit when the library 
   assert.equal(lookupEstimate(new Map(), '2 eggs'), null)
 })
 
+test('a bare count is in the serving\'s unit only when the meal is named for that unit (audit #44 item 8)', () => {
+  const at = text => lookupEstimate(new Map(), text)
+  // Gyros count four slices of meat a serving: "2 gyros" is two gyros, not half of one.
+  const gyro = libraryLookup('gyros')
+  assert.equal(at('2 gyros').kcal, gyro.kcal * 2)
+  assert.equal(at('2 gyro').kcal, gyro.kcal * 2)
+  assert.match(at('2 gyros').assumptions, /^2 × gyros/)
+  assert.equal(at('2 slices gyros').kcal, Math.round(gyro.kcal / 2), 'the unit, typed, still counts in slices')
+  // A container of watermelon is ~3 cups; jerky is 2 oz; a sourdough snack 1.5 slices; a pizza 4 of 8.
+  assert.equal(at('2 watermelon').kcal, libraryLookup('watermelon').kcal * 2)
+  assert.equal(at('3 cups watermelon').kcal, Math.round(libraryLookup('watermelon').kcal * 3 / 3.1))
+  assert.equal(at('2 jerky').kcal, libraryLookup('jerky').kcal * 2)
+  assert.equal(at('2 oz jerky').kcal, libraryLookup('jerky').kcal)
+  assert.equal(at('2 sourdough').kcal, libraryLookup('sourdough snack').kcal * 2)
+  assert.equal(at('2 costco pizza').kcal, libraryLookup('costco cheese pizza').kcal * 2, 'two servings; slices are typed')
+  assert.equal(at('2 roasted veggies').kcal, libraryLookup('roasted veggies').kcal * 2)
+  // Meals named for their unit count in it, under every spelling of them.
+  const sticks = libraryLookup('beef sticks')
+  assert.equal(at('3 beef sticks').kcal, sticks.kcal * 1.5)
+  assert.equal(at('1 chomps').kcal, sticks.kcal / 2, 'an alias counts the way the meal does')
+  const strips = libraryLookup('chicken strips')
+  assert.equal(at('2 chicken strips').kcal, Math.round(strips.kcal * 2 / 3))
+  assert.equal(at('2 chicken tenders').kcal, Math.round(strips.kcal * 2 / 3))
+})
+
+test('a count at the front of a joined text belongs to its own part, not to every part', () => {
+  const at = text => lookupEstimate(new Map(), text)
+  const apple = libraryLookup('apple').kcal
+  const sticks = libraryLookup('beef sticks').kcal
+  assert.equal(at('2 gyros + apple').kcal, libraryLookup('gyros').kcal * 2 + apple)
+  assert.equal(at('3 beef sticks + apple').kcal, sticks * 1.5 + apple, 'three sticks and one apple')
+  assert.equal(at('2 kiwi, apple').kcal, libraryLookup('kiwi').kcal * 2 + apple)
+  assert.equal(at('half costco pizza + apple').kcal, libraryLookup('costco cheese pizza').kcal + apple)
+  // "N x" is still the whole order, doubled.
+  assert.equal(at('2 x beef sticks + apple').kcal, (sticks + apple) * 2)
+  assert.equal(at('2 x 1 beef stick + apple').kcal, (sticks / 2 + apple) * 2)
+  // A combo the library prices as one meal keeps that reading under a count.
+  const combo = libraryLookup('grilled cheese + guac')
+  assert.equal(at('grilled cheese + guac').kcal, combo.kcal)
+  assert.equal(at('2 x grilled cheese + guac').kcal, combo.kcal * 2)
+})
+
 test('splitCount reads the forms Jim types', () => {
   assert.deepEqual(splitCount('1 beef stick'), { n: 1, kind: 'count', unit: undefined, rest: 'beef stick' })
   assert.deepEqual(splitCount('4 slices costco pizza'), { n: 4, kind: 'count', unit: 'slice', rest: 'costco pizza' })
