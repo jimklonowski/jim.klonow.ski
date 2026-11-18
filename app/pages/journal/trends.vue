@@ -158,6 +158,7 @@
             :series="tile.series"
             :rows="driverRows"
             :raw-rows="driverRaw"
+            :span-keys="tile.pair"
             :annotations="annotations"
             :show-notes="annotationsAvailable"
             :connect="tile.connect"
@@ -652,6 +653,10 @@ const splitLine = computed(() => {
 // share an x axis. Sodium is charted only for a whole-figure day (wholeDaySodium); a floor is
 // not a figure.
 const DRIVER_FIELDS = ['sodium_mg', 'sys_next', 'late_caffeine_mg', 'sleep_night']
+// The two fields of each pair: both of a pair's tiles are trimmed to the days EITHER has a
+// reading (MetricTile `spanKeys`), so they draw the same span and line up day for day.
+const SODIUM_PAIR = ['sodium_mg', 'sys_next']
+const CAFFEINE_PAIR = ['late_caffeine_mg', 'sleep_night']
 const nightSleep = computed(() => sleepByNight(healthEntries.value))
 const systolicByDay = computed(() => new Map(entries.value.flatMap(e => (e.bp_systolic != null ? [[e.date, e.bp_systolic] as const] : []))))
 
@@ -671,19 +676,19 @@ const driverRows = computed(() => smoothRows(driverRaw.value, DRIVER_FIELDS))
 const driverTiles = computed(() => {
   const rows = driverRows.value
   const has = (field: string) => rows.filter(r => (r as Record<string, unknown>)[field] != null).length >= 2
-  const tiles: Array<{ key: string, label: string, unit: string, value: string, series: Array<{ key: string, name: string, color: string }>, connect?: boolean, format?: (v: number) => string }> = []
+  const tiles: Array<{ key: string, pair: string[], label: string, unit: string, value: string, series: Array<{ key: string, name: string, color: string }>, connect?: boolean, format?: (v: number) => string }> = []
   // A pair is shown whole or not at all: the cause without its effect is just another tile.
   if (has('sodium_mg') && has('sys_next')) {
     tiles.push(
-      { key: 'sodium_mg', label: 'Sodium', unit: 'mg/day · whole days', value: fmtKcal(latest(rows, 'sodium_mg') ?? 0), series: [{ key: 'sodium_mg', name: 'sodium', color: CHART_WARN }], connect: true },
-      { key: 'sys_next', label: 'Systolic', unit: 'mmHg · next morning', value: fmt(latest(rows, 'sys_next')), series: [{ key: 'sys_next', name: 'sys, next day', color: CHART_DANGER }], connect: true }
+      { key: 'sodium_mg', pair: SODIUM_PAIR, label: 'Sodium', unit: 'mg/day · whole days', value: fmtKcal(latest(rows, 'sodium_mg') ?? 0), series: [{ key: 'sodium_mg', name: 'sodium', color: CHART_WARN }], connect: true },
+      { key: 'sys_next', pair: SODIUM_PAIR, label: 'Systolic', unit: 'mmHg · next morning', value: fmt(latest(rows, 'sys_next')), series: [{ key: 'sys_next', name: 'sys, next day', color: CHART_DANGER }], connect: true }
     )
   }
   if (has('late_caffeine_mg') && has('sleep_night') && rows.some(r => (r.late_caffeine_mg ?? 0) > 0)) {
     const sleep = latest(rows, 'sleep_night')
     tiles.push(
-      { key: 'late_caffeine_mg', label: 'Late caffeine', unit: `mg after ${LATE_CAFFEINE_HOUR}:00`, value: fmt(latest(rows, 'late_caffeine_mg')), series: [{ key: 'late_caffeine_mg', name: 'late caffeine', color: CHART_EMBER }] },
-      { key: 'sleep_night', label: 'Sleep', unit: 'that night', value: sleep == null ? '—' : formatDuration(sleep), series: [{ key: 'sleep_night', name: 'sleep', color: CHART_INDIGO }], format: formatDuration }
+      { key: 'late_caffeine_mg', pair: CAFFEINE_PAIR, label: 'Late caffeine', unit: `mg after ${LATE_CAFFEINE_HOUR}:00`, value: fmt(latest(rows, 'late_caffeine_mg')), series: [{ key: 'late_caffeine_mg', name: 'late caffeine', color: CHART_EMBER }] },
+      { key: 'sleep_night', pair: CAFFEINE_PAIR, label: 'Sleep', unit: 'that night', value: sleep == null ? '—' : formatDuration(sleep), series: [{ key: 'sleep_night', name: 'sleep', color: CHART_INDIGO }], format: formatDuration }
     )
   }
   return tiles

@@ -270,8 +270,11 @@ const protein = computed(() => {
   const unit = `${target ? `/ ${target} g` : 'g'}${floor ? ' +' : ''}`
   const title = [floor ? 'A meal has no figures yet — this is a floor' : null, target && props.targetNote ? `Target ${props.targetNote}` : null].filter(Boolean).join(' · ') || undefined
   if (grams == null) return { value: '—', unit, pct: null, met: false, valueClass: 'text-muted', title }
-  const pct = target ? Math.round((grams / target) * 100) : null
-  const met = pct != null && pct >= 100
+  // Met on the grams, never the rounded percent: 199 g of 200 rounded to "100 %" and lit the
+  // meter one gram short (audit #44 item 13). Short of the target the percent stops at 99.
+  const met = !!target && grams >= target
+  const rounded = target ? Math.round((grams / target) * 100) : null
+  const pct = rounded == null || met ? rounded : Math.min(99, rounded)
   return { value: String(grams), unit, pct, met, valueClass: met ? 'text-accent' : 'text-hi', title }
 })
 

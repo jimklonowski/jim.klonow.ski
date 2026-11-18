@@ -120,7 +120,16 @@ const props = withDefaults(defineProps<{
   yRules?: Array<{ at: number, color: string }>
   /** The legend line that explains them. */
   bandNote?: string
+  /**
+   * Row fields whose readings set the tile's x span, in place of its own series: the tiles of a
+   * pair (a cause beside its effect on /journal/trends) pass both fields, so both are trimmed to
+   * the same days and a point in one sits over the same day in the other. Trimmed each to its
+   * own readings, a cause logged since June beside an effect measured since October drew two
+   * axes of different lengths that only looked aligned (audit #44 item 13).
+   */
+  spanKeys?: string[]
 }>(), {
+  spanKeys: undefined,
   yBands: () => [],
   yRules: () => [],
   bandNote: undefined,
@@ -146,12 +155,14 @@ const categories = computed(() =>
 // trend drawn through it (audit #42 item 3; dropping every blank row squeezed the gap days out
 // of the axis and the line bridged them).
 const hasReading = (r: Record<string, string | number | null>) => props.series.some(s => r[s.key] != null)
+// What the span is trimmed to: the tile's own readings, or a pair's shared fields (spanKeys).
+const inSpan = (r: Record<string, string | number | null>) => (props.spanKeys ? props.spanKeys.some(k => r[k] != null) : hasReading(r))
 const chartData = computed(() => {
   const rows = props.rows
-  const start = rows.findIndex(hasReading)
+  const start = rows.findIndex(inSpan)
   if (start < 0) return []
   let end = rows.length - 1
-  while (end > start && !hasReading(rows[end]!)) end--
+  while (end > start && !inSpan(rows[end]!)) end--
   return rows.slice(start, end + 1)
 })
 

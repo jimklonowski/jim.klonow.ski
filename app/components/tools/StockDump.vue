@@ -258,29 +258,45 @@ const { run: parse, pending: parsing } = useSaveAction(async () => {
   }
 }, { error: 'Parse failed' })
 
+// One request per row, and each row leaves the list as it lands. The list used to be cleared
+// only after the last one: a failure part-way left every row on screen, the saved ones
+// included, and pressing save again added those to the inventory a second time (audit #44
+// item 15). Now a retry sends only what is still here, the failed row first.
 const { run: saveAll, pending: saving } = useSaveAction(async () => {
-  const count = rows.value.length
-  for (const row of rows.value) {
-    const pill = isPillForm(row.form)
-    await $fetch('/api/journal/vials/save', {
-      method: 'POST',
-      body: {
-        compound: row.compound.trim(),
-        form: row.form,
-        vial_amount: pill ? pillTotal(row.amount, row.unit_count) : row.amount,
-        unit_count: pill ? row.unit_count : null,
-        vial_unit: row.vial_unit,
-        quantity: row.quantity,
-        status: 'sealed',
-        // An uncorrected guess stays visible on the DB row, not just in this modal.
-        notes: [row.notes, row.assumption && `assumed: ${row.assumption}`].filter(Boolean).join(' · ') || null
-      }
-    })
+  let saved = 0
+  try {
+    while (rows.value.length) {
+      const row = rows.value[0]!
+      const pill = isPillForm(row.form)
+      await $fetch('/api/journal/vials/save', {
+        method: 'POST',
+        body: {
+          compound: row.compound.trim(),
+          form: row.form,
+          vial_amount: pill ? pillTotal(row.amount, row.unit_count) : row.amount,
+          unit_count: pill ? row.unit_count : null,
+          vial_unit: row.vial_unit,
+          quantity: row.quantity,
+          status: 'sealed',
+          // An uncorrected guess stays visible on the DB row, not just in this modal.
+          notes: [row.notes, row.assumption && `assumed: ${row.assumption}`].filter(Boolean).join(' · ') || null
+        }
+      })
+      rows.value = rows.value.slice(1)
+      saved++
+    }
   }
-  rows.value = []
+  catch (err) {
+    if (!saved) throw err
+    // What landed is in the inventory now: the page behind re-reads it, and the toast says
+    // how far the save got.
+    emit('saved')
+    const left = rows.value.length
+    throw new Error(`${saved} product${saved === 1 ? '' : 's'} saved; ${left} still here — ${extractErrorMessage(err, 'the save failed')}. Fix the first row or save again for the rest.`, { cause: err })
+  }
   text.value = ''
   open.value = false
   emit('saved')
-  return count
+  return saved
 }, { success: count => ({ title: 'Stockpile logged', description: `${count} products added` }) })
 </script>

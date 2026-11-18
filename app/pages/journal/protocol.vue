@@ -703,10 +703,12 @@ interface VersionForm {
   note: string
   /** For 'stop': the item's stop note, saved on the item alongside the end date. */
   stopNoteBefore: string
+  /** For 'stop': the running version's OWN note (why that dose began), sent back as it is. */
+  versionNote: string
 }
 
 function emptyVersionForm(): VersionForm {
-  return { id: undefined, item_id: 0, itemName: '', kind: 'standing', mode: 'change', from_date: localToday(), to_date: '', dose_label: '', weekdays: [...DAILY], note: '', stopNoteBefore: '' }
+  return { id: undefined, item_id: 0, itemName: '', kind: 'standing', mode: 'change', from_date: localToday(), to_date: '', dose_label: '', weekdays: [...DAILY], note: '', stopNoteBefore: '', versionNote: '' }
 }
 
 const versionForm = reactive<VersionForm>(emptyVersionForm())
@@ -743,7 +745,7 @@ function openChange(row: Row) {
 /** Close the running version on a day; the stop note lands on the item for the prompts. */
 function openStop(row: Row) {
   if (!row.current) return
-  openVersion(row, 'stop', { id: row.current.id, from_date: row.current.from_date ?? '', to_date: localToday(), dose_label: row.current.dose_label ?? '', weekdays: parseWeekdays(row.current.weekdays) ?? [], note: row.item.stop_note ?? '' })
+  openVersion(row, 'stop', { id: row.current.id, from_date: row.current.from_date ?? '', to_date: localToday(), dose_label: row.current.dose_label ?? '', weekdays: parseWeekdays(row.current.weekdays) ?? [], note: row.item.stop_note ?? '', versionNote: row.current.note ?? '' })
 }
 
 function openResume(row: Row) {
@@ -758,10 +760,12 @@ function openEditVersion(row: Row, v: ProtocolVersionRow) {
 const { run: saveVersion, pending: savingVersion } = useSaveAction(async () => {
   const f = versionForm
   if (f.mode === 'stop') {
-    // The end date goes on the running version; the note is the item's stop note.
+    // The end date goes on the running version; the note typed here is the item's stop note.
+    // The version's own note goes back as it was: this request used to send null for it, so
+    // stopping a compound wiped why its last dose had been set (audit #44 item 15).
     await $fetch('/api/journal/protocol/version', {
       method: 'POST',
-      body: { id: f.id, item_id: f.item_id, from_date: f.from_date || null, to_date: f.to_date, dose_label: f.dose_label || null, weekdays: f.weekdays.length ? f.weekdays : null, note: null }
+      body: { id: f.id, item_id: f.item_id, from_date: f.from_date || null, to_date: f.to_date, dose_label: f.dose_label || null, weekdays: f.weekdays.length ? f.weekdays : null, note: f.versionNote || null }
     })
     if (f.note !== f.stopNoteBefore) {
       const item = rows.value.find(r => r.item.id === f.item_id)?.item

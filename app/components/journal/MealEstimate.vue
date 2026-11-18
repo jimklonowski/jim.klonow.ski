@@ -411,6 +411,8 @@ const draft = reactive<{ kcal: number | '', protein_g: number | '', carbs_g: num
 const scanInput = useTemplateRef<HTMLInputElement>('scanInput')
 /** What the last lookup found, per ONE serving — the fields are this times `servings`. */
 const scanned = ref<OffFigures | null>(null)
+/** The barcode `scanned` was found under: the figures' provenance is saved only with that same code. */
+const scannedCode = ref<string | null>(null)
 /** How many of the label's servings were eaten: a label is per ¼ pizza, a sitting is two of them. */
 const servings = ref<number | ''>(1)
 const servingsValid = computed(() => typeof servings.value === 'number' && Number.isFinite(servings.value) && servings.value > 0)
@@ -429,8 +431,9 @@ function fillFromScan() {
 }
 watch(servings, fillFromScan)
 
-const { barcode, lookingUp, barcodeNote, barcodeValid, canScan, lookUp, onScanFile, resetBarcode } = useBarcodeLookup((f: OffFigures) => {
+const { barcode, lookingUp, barcodeNote, barcodeValid, canScan, lookUp, onScanFile, resetBarcode } = useBarcodeLookup((f: OffFigures, code: string) => {
   scanned.value = f
+  scannedCode.value = code
   servings.value = 1
   fillFromScan()
   // What the record could not be trusted on, said beside the figures it filled.
@@ -441,6 +444,13 @@ const { barcode, lookingUp, barcodeNote, barcodeValid, canScan, lookUp, onScanFi
   return f.basis === 'serving'
     ? { text: `Filled from Open Food Facts: ${f.name}, per ${f.per}. Set how many of those servings were eaten, check it against the package, then Save.${caveats ? ` ${caveats}` : ''}`, tone: caveats ? 'warn' : 'ok' }
     : { text: `Filled from Open Food Facts: ${f.name} — per 100 g, since the product lists no serving. Scale it to what was eaten before saving.`, tone: 'warn' }
+}, () => {
+  // A new lookup has begun: the last product is let go now, not when (if) the new one answers.
+  // Kept through a second lookup that found nothing, it went on being the form's product — the
+  // figures typed by hand were saved as "Open Food Facts: <the first product>", and touching
+  // Servings eaten wrote the first product's figures back over them (audit #44 item 14).
+  scanned.value = null
+  scannedCode.value = null
 })
 
 /** Where a saved hand entry's figures came from, for the top of the form. */
@@ -457,6 +467,7 @@ const savedFrom = computed(() => {
 function openForm(text: string | null = null) {
   resetBarcode()
   scanned.value = null
+  scannedCode.value = null
   servings.value = 1
   // A saved barcode comes back with its figures, so the form shows what they were looked up by.
   barcode.value = (text ? lookup(text) : estimate.value)?.barcode ?? ''
@@ -486,7 +497,9 @@ async function saveFigures() {
   // figures with no barcode are a plain hand entry.
   const code = normalizeBarcode(barcode.value)
   const before = lookup(formText.value)
-  const f = scanned.value
+  // The looked-up product only while the field still holds the barcode it was found under: the
+  // digits changed by hand since are another product's, and say nothing of these figures.
+  const f = scannedCode.value === code ? scanned.value : null
   const from = !code
     ? null
     : f

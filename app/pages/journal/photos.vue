@@ -158,7 +158,8 @@
             v-if="pendingCount"
             type="button"
             class="tui-btn tui-btn-accent disabled:opacity-50"
-            :disabled="uploadingAll"
+            :disabled="uploadingAll || filing > 0"
+            data-upload-all
             @click="uploadAllPending"
           >
             {{ uploadLabel }}
@@ -697,6 +698,10 @@ const files = ref<File[]>([])
 const fileMeta = reactive(new Map<File, PhotoMeta>())
 const previewUrls = new Map<File, string>()
 const uploadingAll = ref(false)
+// Drops whose capture times are still being read. A new row is provisional until then — no
+// date, the set's first slot — and UPLOAD was already live: pressed in that moment it sent
+// the photos with an empty date under the wrong slot (audit #44 item 15). It waits now.
+const filing = ref(0)
 
 watch(files, (newFiles, oldFiles) => {
   for (const f of oldFiles ?? []) {
@@ -721,21 +726,35 @@ watch(files, (newFiles, oldFiles) => {
  * file for the day, or queued from an earlier drop, are skipped.
  */
 async function fileSlots(added: File[]) {
-  const shots = await Promise.all(added.map(async (f) => {
-    const at = await photoTakenAt(f)
-    return { date: localDateStr(at), takenAt: at.getTime() }
-  }))
-  const spokenFor = [
-    ...(photosData.value ?? []).map(p => ({ date: p.date, category: p.category })),
-    ...[...fileMeta.entries()].filter(([f, m]) => !added.includes(f) && m.date).map(([, m]) => ({ date: m.date, category: m.category }))
-  ]
-  const categories = assignPhotoSlots(set.value, shots, spokenFor)
-  added.forEach((f, i) => {
-    const meta = fileMeta.get(f)
-    if (!meta) return // removed from the list while its EXIF was still being read
-    meta.date = shots[i]!.date
-    meta.category = categories[i]!
-  })
+  filing.value++
+  try {
+    const shots = await Promise.all(added.map(async (f) => {
+      const at = await photoTakenAt(f)
+      return { date: localDateStr(at), takenAt: at.getTime() }
+    }))
+    const spokenFor = [
+      ...(photosData.value ?? []).map(p => ({ date: p.date, category: p.category })),
+      ...[...fileMeta.entries()].filter(([f, m]) => !added.includes(f) && m.date).map(([, m]) => ({ date: m.date, category: m.category }))
+    ]
+    const categories = assignPhotoSlots(set.value, shots, spokenFor)
+    added.forEach((f, i) => {
+      const meta = fileMeta.get(f)
+      if (!meta) return // removed from the list while its EXIF was still being read
+      meta.date = shots[i]!.date
+      meta.category = categories[i]!
+    })
+  }
+  catch {
+    // A file whose time could not be read at all: dated today, so its row can still be
+    // corrected and sent rather than sit without a date for good.
+    for (const f of added) {
+      const meta = fileMeta.get(f)
+      if (meta && !meta.date) meta.date = today.value
+    }
+  }
+  finally {
+    filing.value--
+  }
 }
 
 function metaFor(file: File): PhotoMeta {
@@ -763,15 +782,18 @@ const hasFinished = computed(() => [...fileMeta.values()].some(m => m.status ===
 
 const uploadLabel = computed(() => {
   if (uploadingAll.value) return 'UPLOADING…'
+  if (filing.value) return 'READING DATES…'
   const n = pendingCount.value
   return `↑ UPLOAD ${n} PHOTO${n === 1 ? '' : 'S'}`
 })
 
 async function uploadAllPending() {
+  if (uploadingAll.value || filing.value) return
   uploadingAll.value = true
+  // Only a row that has its date: one without is still provisional, whatever the button says.
   const toUpload = files.value.filter((f) => {
     const m = fileMeta.get(f)
-    return m && (m.status === 'pending' || m.status === 'error')
+    return m && !!m.date && (m.status === 'pending' || m.status === 'error')
   })
   for (const f of toUpload) {
     const meta = fileMeta.get(f)!

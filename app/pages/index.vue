@@ -513,8 +513,13 @@ const water = computed(() => {
   if (!isFullAccess.value) return null
   const { oz: ozRaw, count: pours } = waterOn(asOf.value)
   const goal = quickLog?.goalOz.value ?? waterSetting(profile?.data.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ)
-  const pct = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
-  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met: pct >= 100, pours }
+  // Met is the ounces against the goal, never the rounded percent: 99.5 oz of 100 rounded to
+  // "100 %" and lit the meter as met half an ounce short (audit #44 item 13). Short of the goal
+  // the percent stops at 99, so the figure and the colour say the same thing.
+  const met = goal > 0 && ozRaw >= goal
+  const rounded = goal > 0 ? Math.round((ozRaw / goal) * 100) : 0
+  const pct = met ? rounded : Math.min(99, rounded)
+  return { oz: fmtOzValue(ozRaw), ozRaw, goal, pct, met, pours }
 })
 /** The SODA meter's week: sodas per day for the 7 days ending on the shown day, oldest first. */
 const sodaDays = computed(() => {

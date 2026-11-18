@@ -59,6 +59,22 @@
             Loading…
           </p>
 
+          <!-- A list that failed to load is not an empty one: say so, with a way back. -->
+          <div
+            v-else-if="status === 'error' && !digests.length"
+            class="py-8 text-center text-small text-warn"
+            data-digests-error
+          >
+            <p>The digests didn't load.</p>
+            <button
+              type="button"
+              class="tui-btn mt-2.5"
+              @click="refresh()"
+            >
+              ⟳ RETRY
+            </button>
+          </div>
+
           <p
             v-else-if="!filtered.length"
             class="py-8 text-center text-small text-muted"
@@ -136,9 +152,12 @@ const visible = computed(() =>
 const open = useState('digest-panel-open', () => false)
 const { data, status, execute, refresh } = useDigests()
 
+// Loaded on the first opening — and on any later one while the last load stands failed: a
+// first load that failed used to count as loaded, so the panel read "No digests yet" until the
+// page was reloaded (audit #44 item 15).
 let loadedOnce = false
 watch(open, (v) => {
-  if (v && !loadedOnce) {
+  if (v && (!loadedOnce || status.value === 'error')) {
     loadedOnce = true
     execute()
   }
