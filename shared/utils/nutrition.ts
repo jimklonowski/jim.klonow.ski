@@ -139,11 +139,25 @@ export function indexEstimates(rows: MealEstimate[] | null | undefined, drinks?:
   return index
 }
 
-/** The LABEL figures for exactly this key — a hand entry (the most recent intent), else the code library — or null. */
+/**
+ * The LABEL figures for exactly this key — a hand entry (the most recent intent), else the code
+ * library — or null.
+ *
+ * A hand entry (typed or from a barcode) replaces the library's FIGURES for a meal, not how the
+ * meal is counted: it keeps the library's `portion`. Without it, figures entered for "tombstone
+ * cheese pizza" made "1/2 tombstone cheese pizza" half of the half-pizza serving again, and
+ * "1 beef stick" the whole two-stick serving (audit #44 item 9). The entry is for the serving the
+ * library names — unless it was saved under the singular spelling ("beef stick", which the chip
+ * shows as ONE stick): then its figures are one unit's, and it counts as a serving of one.
+ */
 function labelLookup(index: EstimateIndex, text: string, key: string): MealEstimate | null {
   const row = index.get(key) ?? null
-  if (row?.source === 'manual') return row
-  return libraryLookup(text)
+  const library = libraryLookup(text)
+  if (row?.source !== 'manual') return library
+  const p = library?.portion
+  if (!p) return row
+  const perUnit = p.count !== 1 && lastWord(row.text) === p.unit
+  return { ...row, portion: perUnit ? { ...p, count: 1 } : p }
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10

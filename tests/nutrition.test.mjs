@@ -592,6 +592,46 @@ test('"1/2 tombstone cheese pizza" is half the pizza — the half-pizza serving 
   assert.equal(lookupEstimate(new Map(), '1/2 tombstone pizza').kcal, lookupEstimate(new Map(), 'tombstone pizza').kcal, 'the pepperoni one too')
 })
 
+test('a hand-entered or barcode figure for a library meal keeps how the meal is counted (audit #44 item 9)', () => {
+  // The box, scanned: 720 kcal for the half-pizza sitting, in place of the library's 700.
+  const scanned = indexEstimates([est('tombstone cheese pizza', 720, 32, 70, 34, { source: 'manual', barcode: '071921004576', sodium_mg: 1400 })])
+  const at = text => lookupEstimate(scanned, text)
+  assert.deepEqual([at('tombstone cheese pizza').kcal, at('tombstone cheese pizza').source], [720, 'manual'])
+  assert.equal(at('1/2 tombstone cheese pizza').kcal, 720, 'half the PIZZA, which is the serving — not a quarter')
+  assert.equal(at('1/2 tombstone cheese pizza').source, 'manual')
+  assert.equal(at('whole tombstone cheese pizza').kcal, 1440)
+  assert.equal(at('2 slices tombstone cheese pizza').kcal, 360)
+  assert.equal(at('2 slices tombstone cheese pizza').sodium_mg, 700)
+  assert.equal(at('2 x tombstone cheese pizza').kcal, 1440)
+  assert.equal(at('tombstone 5 cheese pizza').kcal, 700, 'an alias with no hand entry of its own is still the library')
+
+  // Figures typed for the two-stick serving: one stick is half of them, by a count or by the singular.
+  const serving = indexEstimates([est('beef sticks', 200, 20, 0, 14, { source: 'manual' })])
+  assert.equal(lookupEstimate(serving, 'beef sticks').kcal, 200)
+  assert.equal(lookupEstimate(serving, '1 beef stick').kcal, 100)
+  assert.equal(lookupEstimate(serving, 'beef stick').kcal, 100)
+  assert.equal(lookupEstimate(serving, '3 beef sticks').kcal, 300)
+  assert.equal(lookupEstimate(serving, 'apple + beef stick').kcal, libraryLookup('apple').kcal + 100)
+  // The pairing guard reads the unit off a hand entry too.
+  assert.equal(knownMeals([], serving).find(m => m.key === mealKey('beef sticks')).unit, 'stick')
+
+  // Figures typed on the chip of "beef stick" (which shows ONE stick) are one stick's: a count
+  // multiplies them, and the singular is not halved a second time.
+  const single = indexEstimates([est('beef stick', 100, 10, 0, 7, { source: 'manual' })])
+  assert.equal(lookupEstimate(single, 'beef stick').kcal, 100)
+  assert.equal(lookupEstimate(single, '1 beef stick').kcal, 100)
+  assert.equal(lookupEstimate(single, '3 beef sticks').kcal, 300)
+
+  // A hand entry for a meal the library does not know, or one without a portion, is as it was.
+  const plain = indexEstimates([est('veggie lasagna', 600, 30, 60, 25, { source: 'manual' }), est('kiwi', 50, 1, 12, 0, { source: 'manual' })])
+  assert.equal(lookupEstimate(plain, 'veggie lasagna').portion, undefined)
+  assert.equal(lookupEstimate(plain, '2 veggie lasagna').kcal, 1200)
+  assert.equal(lookupEstimate(plain, '2 kiwi').kcal, 100)
+  // A model row never takes the library's place, with or without a portion.
+  const ai = indexEstimates([est('tombstone cheese pizza', 999, 1, 1, 1)])
+  assert.equal(lookupEstimate(ai, '1/2 tombstone cheese pizza').kcal, 700)
+})
+
 test('the Fairlife shake by any of its names is the bottle\'s label, sodium and fibre included', () => {
   for (const text of ['Fairlife protein shake', 'protein shake', 'Protein shake + creatine', 'fairlife', 'fairlife protein shake + creatine']) {
     const e = lookupEstimate(new Map(), text)
