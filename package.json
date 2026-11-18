@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.11.16b",
+  "version": "2026.11.17",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -33,7 +33,7 @@
     "theme:css": "node scripts/theme/build-themes-css.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0",
+    "@anthropic-ai/sdk": "^1.9.0",
     "@tanstack/charts": "^1.5.0",
     "@unhead/vue": "^3.4.3",
     "@vueuse/core": "^14.4.0",
@@ -51,7 +51,7 @@
     "@iconify-json/lucide": "^1.2.155",
     "@iconify-json/simple-icons": "^1.2.102",
     "@nuxt/eslint": "^1.17.0",
-    "@nuxt/ui": "^4.12.0",
+    "@nuxt/ui": "^4.12.2",
     "@nuxtjs/seo": "6.0.1",
     "@types/node": "^24.19.2",
     "@types/three": "^0.187.0",
@@ -64,7 +64,7 @@
     "typescript": "^6.0.3",
     "vue": "catalog:",
     "vue-tsc": "^3.3.14",
-    "wrangler": "^4.162.0"
+    "wrangler": "^4.163.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
