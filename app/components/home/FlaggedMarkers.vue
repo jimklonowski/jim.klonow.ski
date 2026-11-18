@@ -19,7 +19,7 @@
         class="grid grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[190px_120px_1fr_110px] gap-x-3 gap-y-1.5 items-center px-3 py-2.5 bg-raised border-l-2 hover:bg-row-hover transition-colors"
         :style="{ borderLeftColor: color(f) }"
       >
-        <span class="text-row text-hi truncate">{{ slotLabel(f.key, f.meta.label) }}<span
+        <span class="text-row text-hi truncate">{{ markerSlotLabel(f.key, f.meta.label) }}<span
           v-if="f.date !== drawDate"
           class="ml-1.5 text-micro text-muted"
           :title="`Not on the ${drawDate ? formatDate(drawDate, 'monthDay') : 'latest'} draw — the newest reading, from ${formatDate(f.date, 'monthDay')}`"
@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { STATUS_COLORS } from '~/utils/chartTheme'
-import { slotLabel } from '#shared/utils/estradiol'
+import { markerSlotLabel } from '#shared/utils/estradiol'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import type { FlaggedMarker } from '~/composables/useOverview'
 

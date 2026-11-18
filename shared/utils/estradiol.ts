@@ -67,7 +67,7 @@ export function slotKeyOn(key: string, draw: { markers: Markers } | null | undef
 }
 
 /** The label a marker is shown under: the pair's one name, else the catalogue's. */
-export function slotLabel(key: string, label: string): string {
+export function markerSlotLabel(key: string, label: string): string {
   return isEstradiolKey(key) ? ESTRADIOL_LABEL : label
 }
 

@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { isFullAccessRole } from '#shared/utils/access'
-import { E2_IMMUNOASSAY, E2_SENSITIVE, isEstradiolKey, slotLabel } from '#shared/utils/estradiol'
+import { E2_IMMUNOASSAY, E2_SENSITIVE, isEstradiolKey, markerSlotLabel } from '#shared/utils/estradiol'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { CompoundInfo } from '~/data/compoundInfo'
@@ -173,7 +173,7 @@ const markerItems = computed(() => {
     const status = getStatus(value ?? null, meta)
     const flag = status === 'high' ? ' · HIGH' : status === 'low' ? ' · LOW' : ''
     return {
-      label: slotLabel(key, meta.label).toLowerCase(),
+      label: markerSlotLabel(key, meta.label).toLowerCase(),
       suffix: value != null ? `${fmtMarkerValue(value)}${meta.unit ? ` ${meta.unit}` : ''}${flag}` : 'not on a recent draw',
       onSelect: () => go(`/labs?marker=${key}`)
     }

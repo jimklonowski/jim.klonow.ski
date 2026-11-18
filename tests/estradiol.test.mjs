@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  E2_IMMUNOASSAY, E2_SENSITIVE, actionableEstradiol, estradiolKeyOn, foldAssays, foldCurrent, isEstradiolKey, slotKeyOn, slotLabel
+  E2_IMMUNOASSAY, E2_SENSITIVE, actionableEstradiol, estradiolKeyOn, foldAssays, foldCurrent, isEstradiolKey, slotKeyOn, markerSlotLabel
 } from '../shared/utils/estradiol.ts'
 import { currentReadings, drawFlags } from '../shared/utils/labsTimeline.ts'
 import { RETEST_RULES, markersDue } from '../shared/utils/retest.ts'
@@ -27,9 +27,9 @@ test('either key names the one slot; every other marker is itself', () => {
   assert.equal(slotKeyOn('estradiol', draw('d', {})), 'estradiol', 'no estradiol on the draw: the key asked for, which reads blank')
   assert.equal(slotKeyOn('hematocrit', both), 'hematocrit')
   assert.ok(isEstradiolKey('estradiol') && isEstradiolKey('estradiol_sensitive') && !isEstradiolKey('estrone'))
-  assert.equal(slotLabel('estradiol_sensitive', 'Estradiol (sensitive)'), 'Estradiol')
-  assert.equal(slotLabel('estradiol', 'Estradiol'), 'Estradiol')
-  assert.equal(slotLabel('ferritin', 'Ferritin'), 'Ferritin')
+  assert.equal(markerSlotLabel('estradiol_sensitive', 'Estradiol (sensitive)'), 'Estradiol')
+  assert.equal(markerSlotLabel('estradiol', 'Estradiol'), 'Estradiol')
+  assert.equal(markerSlotLabel('ferritin', 'Ferritin'), 'Ferritin')
 })
 
 test('one sample run by both assays is one reading and one flag', () => {
