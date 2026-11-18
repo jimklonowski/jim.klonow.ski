@@ -319,6 +319,7 @@ import { cycleProgress, cycleStatusOn } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { protocolOn } from '#shared/utils/drawLedger'
 import { TIMING_CAVEAT, drawTimingChips } from '#shared/utils/drawTimingView'
+import { foldCurrent } from '#shared/utils/estradiol'
 import { hctDraws, ladderRung, phlebotomyEffects, rungAction } from '#shared/utils/hematocrit'
 import { isCensored } from '#shared/utils/labNotes'
 import { readingOn, readingRangeText, readingValueText } from '#shared/utils/labReadings'
@@ -411,7 +412,9 @@ const timing = computed(() => (latestDraw.value ? drawTimingChips(journal.value,
 
 // --- 2. out of range ---
 const flagged = computed(() => {
-  const current = currentReadings(draws.value)
+  // Estradiol as one row (foldCurrent): the LC/MS/MS reading when the draw has it. The row keeps
+  // the catalogue's name for the assay, since a clinician should see which one it is.
+  const current = foldCurrent(currentReadings(draws.value))
   const out: Array<{ key: string, label: string, value: string, unit: string, status: 'high' | 'low', ref: string, date: string, note: string }> = []
   for (const [key, cur] of current) {
     const meta = BIOMARKERS[key]

@@ -7,6 +7,7 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { diffDays, shiftDays } from './dates.ts'
+import { estradiolKeyOn, isEstradiolKey } from './estradiol.ts'
 import { OVERDUE_DAYS, isOpen, plannedDrawStates, type PlannedDraw } from './plannedDraws.ts'
 
 export interface RetestRule {
@@ -91,7 +92,12 @@ export function markersDue(draws: readonly RetestDraw[], plans: readonly Planned
   const sorted = [...draws].filter(d => d.date <= today).sort((a, b) => a.date.localeCompare(b.date))
   const open = plannedDrawStates([...plans], sorted.map(d => d.date), today).filter(isOpen).map(s => s.plan)
   const out: MarkerDue[] = []
+  // Estradiol's two assays run one clock (shared/utils/estradiol.ts): the newest draw that read
+  // either restarts it, and the entry is the assay that draw is read by. The immunoassay's own
+  // clock otherwise stayed overdue for good once a draw carried only the LC/MS/MS reading.
+  const estradiolNow = estradiolKeyOn([...sorted].reverse().find(d => estradiolKeyOn(d) != null))
   for (const [key, rule] of Object.entries(rules)) {
+    if (isEstradiolKey(key) && key !== estradiolNow) continue
     const last = [...sorted].reverse().find(d => d.markers[key] != null && Number.isFinite(d.markers[key]))
     if (!last) continue
     const value = last.markers[key] as number

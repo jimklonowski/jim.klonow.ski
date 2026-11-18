@@ -6,6 +6,7 @@
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { COMPOUND_SHORT, drawTimingChips, type TimingChip } from './drawTimingView.ts'
+import { E2_IMMUNOASSAY, E2_SENSITIVE, isEstradiolKey, slotKeyOn } from './estradiol.ts'
 import { readingTags, transitionalWindows, type Phlebotomy, type ReadingTag } from './hematocrit.ts'
 import { isCensored, readingNoteOn, type NotedDraw } from './labNotes.ts'
 import { PK_MODELS } from './pk.ts'
@@ -38,6 +39,12 @@ export interface ProtocolCell {
 }
 
 export interface MarkerCell {
+  /**
+   * The marker key the value was read from: the column's own, except estradiol, whose column
+   * reads the draw's LC/MS/MS reading when it has one and the immunoassay otherwise
+   * (shared/utils/estradiol.ts). The range and the delta are that key's.
+   */
+  key: string
   value: number | null
   /** A bound at the assay's limit: shown daggered, never diffed. */
   censored: boolean
@@ -90,26 +97,40 @@ export function protocolOn(rules: readonly ProtocolRule[], date: string): Protoc
 /** The ledger, newest draw first. Deltas are against the previous usable reading of the same marker. */
 export function ledgerRows(draws: readonly LedgerDraw[], journal: readonly LoggedDay[], rules: readonly ProtocolRule[], phlebotomies: readonly Phlebotomy[] = []): LedgerRow[] {
   const sorted = [...draws].sort((a, b) => a.date.localeCompare(b.date))
-  const last: Partial<Record<LedgerMarker, { value: number, date: string }>> = {}
+  // The previous usable reading per key READ, not per column: an immunoassay estradiol is only
+  // ever diffed against the last immunoassay one, an LC/MS/MS against the last LC/MS/MS.
+  const last: Record<string, { value: number, date: string }> = {}
   const windows = transitionalWindows(rules)
   const rows: LedgerRow[] = []
   for (const d of sorted) {
     const cells = {} as Record<LedgerMarker, MarkerCell>
-    for (const key of LEDGER_MARKERS) {
+    for (const column of LEDGER_MARKERS) {
+      const key = slotKeyOn(column, d)
       const raw = d.markers[key]
       const value = raw != null && Number.isFinite(raw) ? raw : null
       const censored = value != null && isCensored(d, key)
       const prev = last[key]
       const usable = value != null && !censored
-      cells[key] = {
+      cells[column] = {
+        key,
         value,
         censored,
-        noted: readingNoteOn(d, key) != null,
+        // A note that only says which estradiol assay this is has nothing left to add: the column
+        // reads one assay per draw and marks the immunoassay itself. A bound still shows.
+        noted: readingNoteOn(d, key) != null && !(isEstradiolKey(key) && !censored),
         delta: usable && prev ? Number((value - prev.value).toFixed(1)) : null,
         since: usable && prev ? prev.date : null,
         tags: value != null ? readingTags(key, d.date, windows, phlebotomies) : []
       }
       if (usable) last[key] = { value, date: d.date }
+      // The assay the estradiol column did not show on this draw is still that assay's latest
+      // reading: a later draw that only has it is diffed against this one, not an older one.
+      if (isEstradiolKey(column)) {
+        for (const other of [E2_SENSITIVE, E2_IMMUNOASSAY]) {
+          const v = d.markers[other]
+          if (other !== key && v != null && Number.isFinite(v) && !isCensored(d, other)) last[other] = { value: v, date: d.date }
+        }
+      }
     }
     rows.push({ date: d.date, fasting: d.fasting === true, protocol: protocolOn(rules, d.date), timing: drawTimingChips(journal, d.date), cells })
   }

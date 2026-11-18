@@ -522,6 +522,7 @@ import {
   cycleSpanDays, cycleStatusOn, doseLabelOf, durationLabel, plannedDoses, tentativeStartLabel
 } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
+import { slotKeyOn, slotLabel } from '#shared/utils/estradiol'
 import { checkpointPlan, planInWindow } from '#shared/utils/plannedDraws'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
@@ -760,10 +761,13 @@ function gatingChips(drawDate: string, baselineDate: string | null): GatingChip[
   if (!draw) return []
   const baseline = baselineDate ? draws.value.find(d => d.date === baselineDate) : null
   const chips: GatingChip[] = []
-  for (const key of GATING_MARKERS) {
+  for (const slot of GATING_MARKERS) {
+    // Estradiol reads the draw's own assay (LC/MS/MS when it has one), and the baseline's reading
+    // of that same assay or none: the two are never diffed (shared/utils/estradiol.ts).
+    const key = slotKeyOn(slot, draw)
     const value = draw.markers[key]
     if (value == null) continue
-    const label = BIOMARKERS[key]?.label ?? key
+    const label = slotLabel(key, BIOMARKERS[key]?.label ?? key)
     const prior = baseline?.markers[key]
     chips.push({
       key,

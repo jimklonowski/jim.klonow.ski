@@ -66,25 +66,27 @@ export const READING_NOTES: Record<string, ReadingNote[]> = {
   // immunoassay) is paired with the Jason Health ultrasensitive LC/MS/MS add-on. Since item 65
   // the add-on has its own key (estradiol_sensitive) and the extractor files it there; the two
   // draws before that were split by server/database/fix-estradiol-assays-2026-11-10.sql. These
-  // notes say the pair exists, so neither card's reader mistakes one series for the other.
+  // notes say the pair exists, for the labs summary prompt. The pages no longer print them: the
+  // one Estradiol card names each reading's assay itself (shared/utils/estradiol.ts), so a note
+  // here is shown only when it marks a bound (`censored`).
   estradiol: [
     {
       date: '2026-08-15',
-      note: 'Standard immunoassay estradiol from the Whoop Advanced Labs panel. The same sample was also run by ultrasensitive LC/MS/MS (106), which is on the Estradiol (sensitive) card — the two assays are never compared with each other.'
+      note: 'Standard immunoassay estradiol from the Whoop Advanced Labs panel. The same sample was also run by ultrasensitive LC/MS/MS (106), which is its own series — the two assays are never compared with each other.'
     },
     {
       date: '2026-10-17',
-      note: 'Standard immunoassay estradiol from the Whoop Advanced Labs panel. The same sample was also run by ultrasensitive LC/MS/MS (126), on the Estradiol (sensitive) card; that series is the one to act on, and the two are never compared with each other.'
+      note: 'Standard immunoassay estradiol from the Whoop Advanced Labs panel. The same sample was also run by ultrasensitive LC/MS/MS (126), its own series; that series is the one to act on, and the two are never compared with each other.'
     }
   ],
   estradiol_sensitive: [
     {
       date: '2026-08-15',
-      note: 'Ultrasensitive LC/MS/MS estradiol (Quest order code 30289), a same-day add-on. The panel\'s standard immunoassay on the same sample read 85 (on the Estradiol card); compare this value only with other ultrasensitive readings.'
+      note: 'Ultrasensitive LC/MS/MS estradiol (Quest order code 30289), a same-day add-on. The panel\'s standard immunoassay on the same sample read 85; compare this value only with other ultrasensitive readings.'
     },
     {
       date: '2026-10-17',
-      note: 'Ultrasensitive LC/MS/MS estradiol, a same-day add-on. Against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20 %. The panel\'s standard immunoassay on the same sample read 157 (on the Estradiol card) and must never be set against this series.'
+      note: 'Ultrasensitive LC/MS/MS estradiol, a same-day add-on. Against the ultrasensitive 106 of 2026-08-15 it is a rise of about 20 %. The panel\'s standard immunoassay on the same sample read 157 and must never be set against this series.'
     }
   ]
 }

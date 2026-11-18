@@ -4,6 +4,7 @@ import { localToday } from '#shared/utils/time'
 import type { OverviewSummary } from '#shared/types/overview'
 import { MEASURED_MARKERS_SQL, currentReadings } from '#shared/utils/labsTimeline'
 import { hydrationOz, sodasOnly, type DrinkLike } from '#shared/utils/drinks'
+import { foldCurrent } from '#shared/utils/estradiol'
 import { isBoundReading, type Readings } from '#shared/utils/labReadings'
 import { computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 import { isCensoredOn } from '../data/markerCaveats'
@@ -74,10 +75,12 @@ export default defineEventHandler(async (event): Promise<OverviewSummary> => {
   // owner's censored readings (server/data/markerCaveats.ts) are no input — a demo draw on the
   // same date is a different draw.
   const demo = auth.role === 'demo'
-  const current = Object.fromEntries(currentReadings(draws.map(d => ({
+  // Estradiol is one reading here (foldCurrent): the status line counted the same sample's two
+  // assays as two flags.
+  const current = Object.fromEntries(foldCurrent(currentReadings(draws.map(d => ({
     date: d.date,
     markers: computeMarkers(d.markers, d.fasting, k => (!demo && isCensoredOn(k, d.date)) || isBoundReading(d, k))
-  }))))
+  })))))
 
   const todayDrinks = JSON.parse((todayRow?.sodas as string) || '[]') as DrinkLike[]
   const pdfKeys = new Set<string>()

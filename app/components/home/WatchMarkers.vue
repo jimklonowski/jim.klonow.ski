@@ -87,6 +87,7 @@
 import type { LabsEntry } from '#shared/types/labs'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
+import { E2_IMMUNOASSAY, E2_SENSITIVE, ESTRADIOL_ASSAYS, estradiolKeyOn, isEstradiolKey } from '#shared/utils/estradiol'
 import { isCensored } from '#shared/utils/labNotes'
 import { CHART_ACCENT, STATUS_COLORS } from '~/utils/chartTheme'
 
@@ -129,7 +130,21 @@ function refLabel(min?: number, max?: number) {
 // none, so a shared date no longer drew the hollow dot on one). Only a note marked `censored` (a
 // value at the instrument limit) leaves the line — a provenance note (the estradiol assay pairs)
 // is a real reading and stays on it.
-const tiles = computed(() => WATCH_MARKERS.flatMap((key) => {
+//
+// Estradiol's tile is one assay's series, never a line through both (shared/utils/estradiol.ts):
+// the assay of the newest estradiol reading — the LC/MS/MS once a draw has it — unless that
+// series is a single point and the other has a line to draw. With both assays on file the foot
+// says which one the line is.
+function seriesKey(slot: string): string {
+  if (!isEstradiolKey(slot)) return slot
+  const count = (k: string) => props.draws.filter(d => d.markers[k] != null).length
+  const latest = estradiolKeyOn(props.draws.findLast(d => estradiolKeyOn(d) != null)) ?? slot
+  const other = latest === E2_SENSITIVE ? E2_IMMUNOASSAY : E2_SENSITIVE
+  return count(latest) < 2 && count(other) >= 2 ? other : latest
+}
+
+const tiles = computed(() => WATCH_MARKERS.flatMap((slot) => {
+  const key = seriesKey(slot)
   const meta = BIOMARKERS[key]
   if (!meta) return []
   const series = props.draws
@@ -169,10 +184,13 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((key) => {
   })
 
   const label = meta.label.replace(/\s*\(.*\)$/, '')
-  const foot = latest.censored ? `† ${fmt(latest.value)} is a ceiling` : refLabel(meta.refMin, meta.refMax)
+  const bothAssays = isEstradiolKey(key) && props.draws.some(d => d.markers[E2_SENSITIVE] != null) && props.draws.some(d => d.markers[E2_IMMUNOASSAY] != null)
+  const ref = [refLabel(meta.refMin, meta.refMax), bothAssays ? ESTRADIOL_ASSAYS[key]!.short : ''].filter(Boolean).join(' · ')
+  const foot = latest.censored ? `† ${fmt(latest.value)} is a ceiling` : ref
   const statusWord = { optimal: 'in range', low: 'low', high: 'high', unknown: 'no reference range' }[status] ?? status
   return [{
-    key,
+    // The slot, not the assay: the link opens the one estradiol card either way.
+    key: slot,
     // "Testosterone (Total)" → "Testosterone": the parenthetical doesn't fit a quarter-width tile.
     label,
     unit: meta.unit,

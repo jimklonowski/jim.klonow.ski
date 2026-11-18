@@ -142,7 +142,7 @@
           :key="key"
           :biomarker-key="key"
           :entries="cardEntries(key)"
-          :latest-value="timeTravelling ? newest?.markers[key] ?? null : null"
+          :latest-markers="timeTravelling ? newest?.markers ?? null : null"
           :auto-open="key === linkedMarker"
         />
       </div>
@@ -300,6 +300,7 @@ import { diffDays } from '#shared/utils/dates'
 import { BIOMARKERS, isEchoFinding, isEchoOnly } from '~/data/biomarkers'
 import type { Category } from '~/data/biomarkers'
 import { TIMING_CAVEAT, drawTimingChips } from '#shared/utils/drawTimingView'
+import { E2_IMMUNOASSAY, E2_SENSITIVE, estradiolKeyOn, isEstradiolKey } from '#shared/utils/estradiol'
 import { isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import { entriesAsOf, resolveAsOf } from '#shared/utils/labsTimeline'
 import { nextPlannedDraw } from '#shared/utils/plannedDraws'
@@ -375,11 +376,15 @@ const CATEGORY_SHORT: Record<Category, string> = {
   cardiac: 'Cardiac'
 }
 
+// Estradiol's two assays are one card (shared/utils/estradiol.ts), under the immunoassay's key —
+// the one every older link and goal names. It is there when either assay has a reading.
+const cardHasReading = (key: string) => visibleEntries.value.some(e => (key === E2_IMMUNOASSAY ? estradiolKeyOn(e) != null : e.markers[key] != null))
+
 function byCategory(cat: Category) {
   return Object.entries(BIOMARKERS)
-    .filter(([, m]) => m.category === cat)
+    .filter(([key, m]) => m.category === cat && key !== E2_SENSITIVE)
     // Only markers this draw history actually has readings for — an empty card is noise.
-    .filter(([key]) => visibleEntries.value.some(e => e.markers[key] != null))
+    .filter(([key]) => cardHasReading(key))
     .map(([key]) => key)
 }
 
@@ -397,7 +402,9 @@ const categories = computed(() =>
 // a query-only change doesn't remount the page.
 const linkedMarker = computed(() => {
   const key = route.query.marker
-  return typeof key === 'string' && BIOMARKERS[key] ? key : null
+  if (typeof key !== 'string' || !BIOMARKERS[key]) return null
+  // Either estradiol key opens the pair's one card.
+  return isEstradiolKey(key) ? E2_IMMUNOASSAY : key
 })
 
 const activeCategory = ref<Category>(linkedMarker.value ? BIOMARKERS[linkedMarker.value]!.category : 'hormones')

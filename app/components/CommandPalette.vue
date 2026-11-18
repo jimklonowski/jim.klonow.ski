@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { isFullAccessRole } from '#shared/utils/access'
+import { E2_IMMUNOASSAY, E2_SENSITIVE, isEstradiolKey, slotLabel } from '#shared/utils/estradiol'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import type { CompoundInfo } from '~/data/compoundInfo'
@@ -163,12 +164,16 @@ const markerItems = computed(() => {
   // marker it didn't test) — printed the way every card prints it; a marker last measured
   // before the window says so instead of a bare unit.
   const known = new Set([...measured.value, ...Object.keys(current.value)])
-  return Object.entries(BIOMARKERS).filter(([key]) => known.has(key)).map(([key, meta]) => {
+  // Estradiol is one entry for its two assays (shared/utils/estradiol.ts): the one `current`
+  // holds, which the server has already folded to a single reading; with neither current, the
+  // LC/MS/MS key stands for the pair. Either key opens the one card.
+  const estradiol = [E2_SENSITIVE, E2_IMMUNOASSAY].find(k => current.value[k]) ?? [E2_SENSITIVE, E2_IMMUNOASSAY].find(k => known.has(k))
+  return Object.entries(BIOMARKERS).filter(([key]) => known.has(key) && (!isEstradiolKey(key) || key === estradiol)).map(([key, meta]) => {
     const value = current.value[key]?.value
     const status = getStatus(value ?? null, meta)
     const flag = status === 'high' ? ' · HIGH' : status === 'low' ? ' · LOW' : ''
     return {
-      label: meta.label.toLowerCase(),
+      label: slotLabel(key, meta.label).toLowerCase(),
       suffix: value != null ? `${fmtMarkerValue(value)}${meta.unit ? ` ${meta.unit}` : ''}${flag}` : 'not on a recent draw',
       onSelect: () => go(`/labs?marker=${key}`)
     }

@@ -5,6 +5,7 @@ import type { HealthMetricsEntry, WorkoutEntry } from '#shared/types/journal'
 import type { Role } from '#shared/utils/access'
 import { BIOMARKERS, countFlags, getStatus, isEchoOnly } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
+import { foldCurrent } from '#shared/utils/estradiol'
 import { isCensored } from '#shared/utils/labNotes'
 import { currentReadings } from '#shared/utils/labsTimeline'
 
@@ -80,8 +81,12 @@ export function useOverview(role: Ref<Role | null>) {
     return [...(source?.peptides ?? [])].sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
   })
 
-  /** Each marker's current reading: its newest within the window before the latest draw (currentReadings). */
-  const current = computed(() => currentReadings(draws.value))
+  /**
+   * Each marker's current reading: its newest within the window before the latest draw
+   * (currentReadings), with estradiol as one reading — the LC/MS/MS when the two assays share a
+   * draw, the newer otherwise (foldCurrent). The flagged rows and the counts both read this.
+   */
+  const current = computed(() => foldCurrent(currentReadings(draws.value)))
 
   /** Every out-of-range current reading, high first then low, worst delta first. */
   const flagged = computed<FlaggedMarker[]>(() => {

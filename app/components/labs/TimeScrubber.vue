@@ -175,6 +175,7 @@
 import { STATUS_COLORS } from '~/utils/chartTheme'
 import type { LabsEntry } from '#shared/types/labs'
 import { BIOMARKERS } from '~/data/biomarkers'
+import { foldAssays } from '#shared/utils/estradiol'
 import { drawFlags } from '#shared/utils/labsTimeline'
 
 // The time-travel dock under /labs: one tick per draw, a playhead you can drag, click or
@@ -221,13 +222,16 @@ function onSlide(value: number | number[] | undefined) {
 function fastingText(index: number) {
   return sorted.value[index]!.fasting ? 'fasting' : 'non-fasting'
 }
+// A draw's flags and marker count, with its estradiol as one reading (foldAssays): the same
+// sample run by both assays is not two markers or two flags.
+const flagsAt = (index: number) => drawFlags(foldAssays(sorted.value[index]!.markers), BIOMARKERS)
 function flagText(index: number) {
-  const flags = drawFlags(sorted.value[index]!.markers, BIOMARKERS)
+  const flags = flagsAt(index)
   return flags.high + flags.low ? `${flags.high} high / ${flags.low} low` : 'no flags'
 }
 /** Tooltip line: fasting state, how big the panel was, and its flags. */
 function drawMeta(index: number) {
-  const { count } = drawFlags(sorted.value[index]!.markers, BIOMARKERS)
+  const { count } = flagsAt(index)
   return `${fastingText(index)} · ${count} markers · ${flagText(index)}`
 }
 
@@ -256,7 +260,7 @@ onBeforeUnmount(() => observer?.disconnect())
 const stride = computed(() => railWidth.value ? Math.max(1, Math.ceil((dates.value.length * 52) / railWidth.value)) : 1)
 
 const ticks = computed(() => dates.value.map((date, index) => {
-  const flags = drawFlags(sorted.value[index]!.markers, BIOMARKERS)
+  const flags = flagsAt(index)
   const active = index === viewedIndex.value
   // Within a stride of the playhead, the active label wins and the first/last label stands down.
   const nearActive = Math.abs(index - viewedIndex.value) < stride.value

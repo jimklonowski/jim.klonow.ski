@@ -112,12 +112,17 @@
           > *</span><span
             v-if="row.original.cells[key].tags.length"
             class="text-muted"
-          > {{ tagGlyphs(row.original.cells[key]) }}</span></span>
+          > {{ tagGlyphs(row.original.cells[key]) }}</span><span
+            v-if="isFallbackAssay(row.original.cells[key])"
+            class="text-muted"
+          > {{ IMMUNOASSAY_GLYPH }}</span></span>
         </template>
       </UTable>
 
       <p class="px-4 sm:px-6 py-3 text-meta text-faint leading-[1.6] print:break-inside-avoid">
-        Change in parentheses is against the previous usable reading of that marker. † a value at the assay's ceiling, a bound rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). {{ TAG_GLYPH.transitional }} a red-cell reading inside the ~{{ RBC_TURNOVER_DAYS }}-day turnover window after a dose change, which cannot yet show that change's full effect. {{ TAG_GLYPH['post-phlebotomy'] }} a reading within {{ PHLEBOTOMY_EFFECT_DAYS / 7 }} weeks of a blood donation or therapeutic phlebotomy, which reads the blood taken out. Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
+        Change in parentheses is against the previous usable reading of that marker. † a value at the assay's ceiling, a bound rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). {{ TAG_GLYPH.transitional }} a red-cell reading inside the ~{{ RBC_TURNOVER_DAYS }}-day turnover window after a dose change, which cannot yet show that change's full effect. {{ TAG_GLYPH['post-phlebotomy'] }} a reading within {{ PHLEBOTOMY_EFFECT_DAYS / 7 }} weeks of a blood donation or therapeutic phlebotomy, which reads the blood taken out. <template v-if="mixedEstradiol">
+          Estradiol is the ultrasensitive LC/MS/MS reading; {{ IMMUNOASSAY_GLYPH }} marks a draw that only has the standard immunoassay, which is diffed against other immunoassay readings only.
+        </template> Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
       </p>
       <p class="px-4 sm:px-6 pb-3 text-meta text-ghost">
         {{ GENERAL_DISCLAIMER }}
@@ -130,6 +135,7 @@
 import type { TableColumn } from '@nuxt/ui'
 import { LEDGER_MARKERS, cellText, ledgerRows, type LedgerMarker, type LedgerRow, type MarkerCell } from '#shared/utils/drawLedger'
 import { TIMING_CAVEAT } from '#shared/utils/drawTimingView'
+import { E2_IMMUNOASSAY, E2_SENSITIVE, ESTRADIOL_ASSAYS, ESTRADIOL_LABEL, isEstradiolKey } from '#shared/utils/estradiol'
 import { PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, type ReadingTag } from '#shared/utils/hematocrit'
 import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
@@ -163,17 +169,25 @@ const columns: TableColumn<LedgerRow>[] = [
   ...LEDGER_MARKERS.map(key => ({ id: key, header: `${BIOMARKERS[key]?.label.replace(/^Testosterone \((\w+)\)$/, '$1 T') ?? key} ${BIOMARKERS[key]?.unit ? `(${BIOMARKERS[key]!.unit})` : ''}`.trim() }))
 ]
 
-function cellClass(key: LedgerMarker, cell: MarkerCell): string {
+// The estradiol column holds one reading per draw (shared/utils/estradiol.ts). Once any draw has
+// the LC/MS/MS reading, a draw that only has the immunoassay is marked, since the two are
+// different numbers on the same blood; a history that is immunoassay throughout needs no mark.
+const IMMUNOASSAY_GLYPH = 'ⁱ'
+const mixedEstradiol = computed(() => rows.value.some(r => r.cells.estradiol.value != null && r.cells.estradiol.key === E2_SENSITIVE))
+const isFallbackAssay = (cell: MarkerCell) => mixedEstradiol.value && cell.value != null && cell.key === E2_IMMUNOASSAY
+
+// The range is the reading's own key's: an LC/MS/MS estradiol is judged against its own limit.
+function cellClass(_column: LedgerMarker, cell: MarkerCell): string {
   if (cell.value == null) return 'text-faint'
   if (cell.censored) return 'text-muted'
-  const meta = BIOMARKERS[key]
+  const meta = BIOMARKERS[cell.key]
   const s = meta ? getStatus(cell.value, meta) : 'normal'
   return s === 'high' ? 'text-danger' : s === 'low' ? 'text-warn' : s === 'optimal' ? 'text-accent' : 'text-hi'
 }
 
-function cellTitle(key: LedgerMarker, cell: MarkerCell): string | undefined {
+function cellTitle(_column: LedgerMarker, cell: MarkerCell): string | undefined {
   if (cell.value == null) return undefined
-  const parts = [BIOMARKERS[key]?.label ?? key]
+  const parts = [isEstradiolKey(cell.key) ? `${ESTRADIOL_LABEL}, ${ESTRADIOL_ASSAYS[cell.key]!.name}` : BIOMARKERS[cell.key]?.label ?? cell.key]
   if (cell.censored) parts.push('at the assay ceiling — a bound, not a measurement')
   else if (cell.since) parts.push(`change since the ${cell.since} draw`)
   for (const t of cell.tags) parts.push(`${t.short}: ${t.text}`)

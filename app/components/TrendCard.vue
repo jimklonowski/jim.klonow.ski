@@ -29,6 +29,8 @@
           :mark-lines="markLines"
           :step="step"
           :marker-key="markerKey"
+          :connect-nulls="connectNulls"
+          :y-rules="yRules"
         />
         <template #fallback>
           <div :style="{ height: `${height}px` }" />
@@ -46,7 +48,8 @@ import { CHART_ACCENT } from '~/utils/chartTheme'
 const props = withDefaults(defineProps<{
   label: string
   unit?: string
-  data: Array<Record<string, string | number>>
+  /** A null field is a draw that did not measure that series (see `connectNulls`). */
+  data: Array<Record<string, string | number | null>>
   /** Single-series color; ignored when `categories` is given. */
   color?: string
   /** Multi-series override; defaults to one `value` series named after the label. */
@@ -60,7 +63,12 @@ const props = withDefaults(defineProps<{
   /** Row field naming a per-row point symbol, for readings that must not read as ordinary
    * points (a censored assay value). See AreaChart's `markerKey`. */
   markerKey?: string
-}>(), { color: CHART_ACCENT, height: 128, showLegend: false, markLines: () => [], step: false, markerKey: undefined })
+  /** Run each line straight across the rows where it has no reading: two series measured on
+   * different draws (the two estradiol assays), where a gap is "not run that day". */
+  connectNulls?: boolean
+  /** Dashed horizontal guides at y values (a reference limit per series). */
+  yRules?: Array<{ at: number, color: string }>
+}>(), { color: CHART_ACCENT, height: 128, showLegend: false, markLines: () => [], step: false, markerKey: undefined, connectNulls: false, yRules: () => [] })
 
 const resolvedCategories = computed(() =>
   props.categories ?? { value: { name: props.label, color: props.color } }

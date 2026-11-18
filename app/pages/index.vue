@@ -369,6 +369,7 @@
 
 <script setup lang="ts">
 import { diffDays, shiftDays } from '#shared/utils/dates'
+import { E2_IMMUNOASSAY, E2_SENSITIVE } from '#shared/utils/estradiol'
 import { workoutStartMs } from '#shared/utils/time'
 import { isFullAccessRole } from '#shared/utils/access'
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, fmtOzValue, waterSetting, waterTotals } from '#shared/utils/water'
@@ -649,7 +650,8 @@ const contextNote = computed(() => {
   if (status.get('ferritin') === 'low') notes.push('ferritin re-test suggested — iron stores below optimal')
   if (status.get('ferritin') === 'high') notes.push('ferritin high — iron stores or inflammation; worth a re-test with CRP')
   if (status.get('fsh') === 'low' || status.get('lh') === 'low') notes.push('FSH/LH suppression expected on-protocol')
-  if (status.get('estradiol') === 'high') notes.push('estradiol tracks total testosterone; watch for water retention')
+  // Whichever assay the current estradiol is (the flagged list holds one of the two).
+  if (status.get(E2_SENSITIVE) === 'high' || status.get(E2_IMMUNOASSAY) === 'high') notes.push('estradiol tracks total testosterone; watch for water retention')
   return notes.join('; ') || null
 })
 

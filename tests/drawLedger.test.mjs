@@ -46,7 +46,8 @@ test('one row per draw, newest first: timing chips, and each marker with its cha
   assert.equal(oct.cells.testosterone_total.since, '2026-08-15')
   assert.equal(cellText(oct.cells.hematocrit), '51.7 (±0)')
   assert.equal(cellText(oct.cells.estradiol), '126 (+20)')
-  assert.equal(oct.cells.estradiol.noted, true, 'the assay note rides along')
+  assert.equal(oct.cells.estradiol.noted, false, 'a note that only names the assay is not starred: the column says which assay it reads')
+  assert.equal(oct.cells.estradiol.key, 'estradiol')
   assert.equal(cellText(oct.cells.ferritin), '48 (−13)')
   // Timing: Sep 9 is ~48 h after the Sep 7 shot; Oct 17 ~48 h after Oct 15.
   assert.match(sep.timing.find(c => c.short === 'T').text, /^48 h after T/)
@@ -55,6 +56,29 @@ test('one row per draw, newest first: timing chips, and each marker with its cha
   assert.equal(oct.fasting, true)
   assert.equal(sep.fasting, false)
   assert.deepEqual(ledgerRows([], journal, rules), [])
+})
+
+test('the estradiol column reads the LC/MS/MS reading when a draw has it, and never diffs one assay against the other (audit #44 item 20)', () => {
+  const e2 = (date, markers) => ({ date, fasting: true, markers })
+  const rows = ledgerRows([
+    e2('2026-05-01', { estradiol: 30 }),
+    e2('2026-07-01', { estradiol: 57 }),
+    e2('2026-08-15', { estradiol: 85, estradiol_sensitive: 106 }),
+    e2('2026-09-20', { estradiol_sensitive: 110 }), // the add-on alone: was a blank cell
+    e2('2026-10-17', { estradiol: 157, estradiol_sensitive: 126 }),
+    e2('2026-11-20', { estradiol: 140 }) // the panel alone
+  ], [], [])
+  const cell = date => rows.find(r => r.date === date).cells.estradiol
+  assert.deepEqual(rows.map(r => r.cells.estradiol.key).reverse(), ['estradiol', 'estradiol', 'estradiol_sensitive', 'estradiol_sensitive', 'estradiol_sensitive', 'estradiol'])
+  assert.equal(cellText(cell('2026-07-01')), '57 (+27)')
+  assert.equal(cellText(cell('2026-08-15')), '106', 'the first LC/MS/MS reading has nothing of its own kind before it')
+  assert.equal(cellText(cell('2026-09-20')), '110 (+4)')
+  assert.equal(cellText(cell('2026-10-17')), '126 (+16)')
+  // The immunoassay-only draw diffs against the last immunoassay reading (Oct 17's 157), which
+  // the column did not show but the record holds — not the LC/MS/MS 126 beside it, and not the
+  // older immunoassay reading the column last printed (Jul 1's 57).
+  assert.equal(cellText(cell('2026-11-20')), '140 (−17)')
+  assert.equal(cell('2026-11-20').since, '2026-10-17')
 })
 
 test('each Hct/ferritin cell carries its reading tags: the turnover window after the T cut, and a phlebotomy before the draw (item 101)', () => {
