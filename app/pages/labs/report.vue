@@ -319,7 +319,7 @@ import { cycleProgress, cycleStatusOn } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
 import { protocolOn } from '#shared/utils/drawLedger'
 import { TIMING_CAVEAT, drawTimingChips } from '#shared/utils/drawTimingView'
-import { hctDraws, ladderRung, phlebotomyEffects } from '#shared/utils/hematocrit'
+import { hctDraws, ladderRung, phlebotomyEffects, rungAction } from '#shared/utils/hematocrit'
 import { isCensored } from '#shared/utils/labNotes'
 import { readingOn, readingRangeText, readingValueText } from '#shared/utils/labReadings'
 import { CURRENT_WINDOW_DAYS, currentReadings, entriesAsOf } from '#shared/utils/labsTimeline'
@@ -447,15 +447,20 @@ const rungLine = computed(() => {
   const last = [...hct.value].reverse().find(d => d.hematocrit != null)
   if (!last) return ''
   const rung = ladderRung(last.hematocrit)
+  // The rung's advice as of the page's date, like /labs/hematocrit: during an isotretinoin course
+  // the page said "weigh a donation" one line above "Blood donation deferred until …" (audit #44
+  // item 18).
   return rung
-    ? `Latest hematocrit ${last.hematocrit} % (${formatDate(last.date, 'monthDay')}) sits on the "${rung.label}" rung of the action ladder: ${rung.action}.`
+    ? `Latest hematocrit ${last.hematocrit} % (${formatDate(last.date, 'monthDay')}) sits on the "${rung.label}" rung of the action ladder: ${rungAction(rung, donationDeferred.value)}.`
     : `Latest hematocrit ${last.hematocrit} % (${formatDate(last.date, 'monthDay')}), under the ladder's first rung (50).`
 })
 const phlebRows = computed(() => phlebotomyEffects((phlebData.value ?? []).filter(p => p.date <= asOf.value), hct.value).map(e => ({
   text: `${formatDate(e.phlebotomy.date, 'monthDay')}: ${e.phlebotomy.kind === 'donation' ? 'blood donation' : 'therapeutic phlebotomy'}${e.phlebotomy.ml ? `, ${e.phlebotomy.ml} mL` : ''}${e.hctDelta != null ? ` — Hct ${e.before!.value} → ${e.after!.value} (${e.hctDelta > 0 ? '+' : ''}${e.hctDelta})` : e.before ? ` — Hct ${e.before.value} before, no draw since` : ''}.`
 })))
+const donationHold = computed(() => donationDeferral(cycles.value, asOf.value))
+const donationDeferred = computed(() => donationHold.value?.active === true)
 const deferral = computed(() => {
-  const d = donationDeferral(cycles.value, asOf.value)
+  const d = donationHold.value
   return d?.active ? `Blood donation deferred until ${formatDate(d.until, 'monthDay')}: isotretinoin course since ${formatDate(d.start, 'monthDay')}.` : ''
 })
 
