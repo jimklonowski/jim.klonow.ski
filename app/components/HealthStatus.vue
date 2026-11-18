@@ -48,7 +48,7 @@
             <span class="min-w-0">
               <span class="text-faint">{{ kindOf(check.name) }}</span>
               <span class="text-hi">{{ nameOf(check.name) }}</span>
-              <span class="block text-muted break-words">{{ check.detail }}</span>
+              <span class="block text-muted wrap-break-word">{{ check.detail }}</span>
             </span>
           </li>
         </ul>

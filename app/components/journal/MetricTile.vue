@@ -6,7 +6,7 @@
     :aria-haspopup="expandable ? 'dialog' : undefined"
     :aria-label="expandable ? `Expand ${label} chart` : undefined"
     class="group block w-full text-left bg-raised border border-line-soft px-3 py-2.5"
-    :class="to || expandable ? 'hover:bg-row-hover hover:border-line transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-[-1px]' : ''"
+    :class="to || expandable ? 'hover:bg-row-hover hover:border-line transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-1' : ''"
     @click="expandable ? (open = true) : undefined"
   >
     <div class="flex items-baseline gap-2 text-micro text-muted">

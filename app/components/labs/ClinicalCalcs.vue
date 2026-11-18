@@ -32,19 +32,19 @@
         </div>
         <p
           v-if="r.value != null"
-          class="mt-1 text-meta text-dim leading-[1.5]"
+          class="mt-1 text-meta text-dim leading-normal"
         >
           {{ r.reading }}
         </p>
         <p
           v-if="r.value != null"
-          class="mt-0.5 text-micro text-faint leading-[1.5]"
+          class="mt-0.5 text-micro text-faint leading-normal"
         >
           {{ r.inputs }}
         </p>
         <p
           v-else
-          class="mt-1 text-meta text-muted leading-[1.5]"
+          class="mt-1 text-meta text-muted leading-normal"
         >
           {{ r.missing }}<template v-if="/date of birth/.test(r.missing ?? '') && isOwner">
             — <NuxtLink
@@ -55,7 +55,7 @@
         </p>
       </div>
     </div>
-    <p class="mt-1.5 text-micro text-faint leading-[1.5]">
+    <p class="mt-1.5 text-micro text-faint leading-normal">
       Desk arithmetic from the draw, the profile's date of birth and the schedule: PSA ×2 while on a 5-ARI, FIB-4 (age, AST, ALT, platelets), CKD-EPI 2012 cystatin C eGFR. Not stored; never written by a model.
     </p>
   </section>
