@@ -60,13 +60,22 @@ export function sodaKcal(drink: string | null | undefined, size: string | null |
   return drinkFigures(drink, size)?.kcal ?? null
 }
 
-/** The most recently logged SODA across the journal, with its day — what the soda quick-add repeats (audit #42 item 41: the hub widget and the home button each found it). A sports drink or a coffee logged since is not it: the + SODA button stays the usual soda. */
+/**
+ * The most recently logged SODA across the journal, with its day — what the soda quick-add repeats
+ * (audit #42 item 41: the hub widget and the home button each found it). A sports drink or a
+ * coffee logged since is not it: the + SODA button stays the usual soda.
+ *
+ * A soda logged with no name is not what to repeat either: the last NAMED one is, and a nameless
+ * one only when the history has no other. One nameless tap used to become "the last soda", and
+ * every tap after it was nameless too (audit #44 item 7); app/data/journal.ts's form prefill
+ * already skipped blank rows.
+ */
 export function lastSoda<T extends { time: string, drink?: string | null, size?: string | null }>(
   entries: Array<{ date: string, sodas?: T[] | null }>
 ): (T & { date: string }) | null {
   const all = entries.flatMap(e => sodasOnly(e.sodas).map(s => ({ ...s, date: e.date })))
   all.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  return all.at(-1) ?? null
+  return all.findLast(s => !!s.drink?.trim()) ?? all.at(-1) ?? null
 }
 
 /** "DR PEPPER 12oz can" — the quick-add's own label for the drink it will log; "SODA" with no history. */

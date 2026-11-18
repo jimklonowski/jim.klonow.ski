@@ -30,6 +30,8 @@ export async function useQuickLog() {
   /** The same split in two — "DR PEPPER" and "12oz can" — for a button that drops the size on a phone. */
   const sodaDrink = computed(() => quickAddLabel({ drink: lastSoda.value?.drink }))
   const sodaSize = computed(() => lastSoda.value?.size ?? '')
+  /** False until the journal list (client-only) has arrived: before that the last soda is not known, and + SODA logged one with no name or size (audit #44 item 7). */
+  const sodaReady = computed(() => data.value != null)
   // Sodas only: the drink list also holds sports drinks and coffee (shared/utils/drinks.ts).
   const sodasToday = computed(() => sodasOnly(todayEntry.value?.sodas).length)
   /** Sodas on any day — the home SODA meter's week ends on the day the column is scrubbed to. */
@@ -54,7 +56,7 @@ export async function useQuickLog() {
   const addingWater = ref(false)
 
   async function addSoda() {
-    if (addingSoda.value) return
+    if (addingSoda.value || !sodaReady.value) return
     addingSoda.value = true
     const date = today.value
     const time = localTimeNow()
@@ -112,5 +114,5 @@ export async function useQuickLog() {
     }
   }
 
-  return { sodaLabel, sodaDrink, sodaSize, sodasToday, sodasOn, cupOz, goalOz, waterOzToday, watersToday, waterOn, addingSoda, addingWater, addSoda, addWater }
+  return { sodaLabel, sodaDrink, sodaSize, sodaReady, sodasToday, sodasOn, cupOz, goalOz, waterOzToday, watersToday, waterOn, addingSoda, addingWater, addSoda, addWater }
 }

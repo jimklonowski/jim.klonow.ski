@@ -61,6 +61,15 @@ test('the soda quick-add repeats the last SODA, not the Gatorade logged after it
   assert.equal(lastSoda([entries[1]]), null)
 })
 
+test('a soda logged with no name does not become the one the quick-add repeats', () => {
+  const named = { date: '2026-11-10', sodas: [{ time: '12:00', drink: 'Dr Pepper', size: '12oz can' }] }
+  const nameless = { date: '2026-11-11', sodas: [{ time: '08:00' }, { time: '09:00', drink: '  ', size: '20oz bottle' }] }
+  assert.deepEqual(lastSoda([named, nameless]), { time: '12:00', drink: 'Dr Pepper', size: '12oz can', date: '2026-11-10' })
+  // With nothing named anywhere, the newest row is still handed back (its size is worth repeating).
+  assert.deepEqual(lastSoda([nameless]), { time: '09:00', drink: '  ', size: '20oz bottle', date: '2026-11-11' })
+  assert.equal(lastSoda([]), null)
+})
+
 // --- the owner's own label figures (drink_labels, migration 0024) ---
 
 test('a label replaces the table\'s figures at any size; the kind still comes from the name', async () => {

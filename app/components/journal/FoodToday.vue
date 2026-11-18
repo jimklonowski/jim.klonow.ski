@@ -291,6 +291,7 @@ const props = withDefaults(defineProps<{
 
 const toast = useToast()
 const route = useRoute()
+const router = useRouter()
 const { isOwner } = await useAuth()
 const { data } = await useJournalEntries()
 const { data: profileData, refresh: refreshProfile } = await useProfile()
@@ -361,12 +362,16 @@ onMounted(() => {
 const suggestedSlot = computed(() => slotForTime(clock.value))
 
 // `/journal?meal=dinner#food` (the home page's "+ add dinner →") lands with that slot's input
-// open. Only for write roles; a reload keeps the query, which just reopens the input.
+// open. Only for write roles. The query is used once and taken out of the URL: left there, a
+// reload (or the PWA restoring the page) reopened the slot after it had been logged (audit #44
+// item 7).
 onMounted(() => {
   const slot = route.query.meal
-  if (!props.readonly && typeof slot === 'string' && (MEAL_SLOTS as readonly string[]).includes(slot)) {
-    startEdit(slot as MealSlot)
-  }
+  if (typeof slot !== 'string') return
+  const query = { ...route.query }
+  delete query.meal
+  void router.replace({ query, hash: route.hash })
+  if (!props.readonly && (MEAL_SLOTS as readonly string[]).includes(slot)) startEdit(slot as MealSlot)
 })
 
 // Slot-ranked history: what was logged for lunch floats first on the lunch input, and every
@@ -411,15 +416,36 @@ const saving = ref(false)
 const liveDraft = refDebounced(draft, 350)
 const known = computed(() => knownMeals(entries.value, index.value))
 
+// The draft is seeded from the slot's saved text, and the list that holds that text can be behind
+// the server: a visit served from the cached list is revalidated in the background, and a first
+// load that failed leaves no list at all. An input opened then — the `?meal=` landing, or a tap —
+// was seeded from nothing over a slot that was in fact logged (from the phone, the Shortcut), and
+// Enter on an empty draft clears the slot (audit #44 item 7). Two guards: an open draft nobody
+// has typed in follows the saved text when it changes under it, and an empty draft over a slot
+// the card knows no text for saves nothing (saveSlot) — there is nothing there to clear.
+let seed: { text: string, draft: string, another: boolean } | null = null
+const seedDraft = (text: string, another: boolean) => (another && text.trim() ? `${text.trim()} + ` : text)
+
 /** Opens the slot's input; `another` seeds it with the saved text plus " + " for a second item. */
 function startEdit(slot: MealSlot, another = false) {
   // Not while a save is in flight: switching slots mid-save let the finishing save close the new
   // edit under the cursor (audit #42 item 38).
   if (saving.value) return
   const text = todayEntry.value?.food?.[slot] ?? ''
-  draft.value = another && text.trim() ? `${text.trim()} + ` : text
+  draft.value = seedDraft(text, another)
+  seed = { text, draft: draft.value, another }
   editing.value = slot
 }
+// The open slot's saved text changed (a refresh brought a meal logged from another device or the
+// Shortcut): an untouched draft is re-seeded from it; one that has been typed in is left alone.
+watch(() => (editing.value ? todayEntry.value?.food?.[editing.value] ?? '' : null), (saved) => {
+  if (saved == null || !seed || saved === seed.text) return
+  const untouched = draft.value === seed.draft
+  seed = { ...seed, text: saved }
+  if (!untouched) return
+  draft.value = seedDraft(saved, seed.another)
+  seed.draft = draft.value
+})
 
 // The shared local mirror (app/utils/journalPatch.ts), same as the soda and water widgets.
 function applyFoodLocally(date: string, food: Partial<Record<MealSlot, string>>) {
@@ -430,6 +456,10 @@ function applyFoodLocally(date: string, food: Partial<Record<MealSlot, string>>)
  * (same key, or a strong match), and said so — the log converges on one spelling instead of
  * growing variants. */
 async function saveSlot(slot: MealSlot) {
+  // Enter on an empty draft is the CLEAR button's write. With no saved text on the card the
+  // button is disabled, and so is the key: an empty save could only clear a meal the card has
+  // not been told about yet.
+  if (!draft.value.trim() && !todayEntry.value?.food?.[slot]?.trim()) return
   const resolved = resolveMealText(draft.value, known.value)
   await writeSlot(slot, resolved.text, resolved.changed)
 }

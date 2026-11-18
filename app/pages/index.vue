@@ -192,6 +192,7 @@
           :can-edit="canEdit"
           :cup-oz="cupOz"
           :soda-label="sodaLabel"
+          :soda-ready="sodaReady"
           :adding-water="addingWater"
           :adding-soda="addingSoda"
           @add-water="addWater"
@@ -406,6 +407,7 @@ useEventListener('scroll', trackChromeScrolled, { passive: true })
 // too — two rejected list fetches on every landing, server-rendered and again on mount.
 const quickLog = canEdit.value ? await useQuickLog() : null
 const sodaLabel = computed(() => quickLog?.sodaLabel.value ?? 'SODA')
+const sodaReady = computed(() => quickLog?.sodaReady.value ?? false)
 const cupOz = computed(() => quickLog?.cupOz.value ?? WATER_DEFAULT_CUP_OZ)
 const addingSoda = computed(() => quickLog?.addingSoda.value ?? false)
 const addingWater = computed(() => quickLog?.addingWater.value ?? false)

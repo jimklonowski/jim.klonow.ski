@@ -39,8 +39,9 @@
         v-if="!readonly"
         type="button"
         class="tui-btn tui-btn-accent min-w-0"
-        :disabled="adding"
+        :disabled="adding || !listLoaded"
         :title="`+ ${quickAddLabel}`"
+        data-soda-quick-add
         @click="quickAdd()"
       >
         <span class="truncate min-w-0">{{ adding ? 'LOGGING…' : `+ ${quickAddLabel}` }}</span>
@@ -68,7 +69,8 @@
           <button
             type="button"
             class="text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50"
-            :disabled="adding"
+            :disabled="adding || !listLoaded"
+            data-soda-quick-add
             @click="quickAdd()"
           >{{ adding ? 'logging…' : `+ ${quickAddLabel}` }}</button>
           <span class="text-faint">·</span>
@@ -135,7 +137,7 @@
         <button
           type="button"
           class="tui-btn tui-btn-accent"
-          :disabled="adding"
+          :disabled="adding || !listLoaded"
           @click="quickAdd(true)"
         >
           {{ adding ? 'LOGGING…' : '+ LOG THIS' }}
@@ -266,6 +268,11 @@ withDefaults(defineProps<{
 const toast = useToast()
 const { data } = await useJournalEntries()
 const entries = computed(() => data.value ?? [])
+// With no journal list (it is fetched by the browser after mount, and a first load can fail)
+// this widget knows neither the last soda nor today's list. A tap then logged a soda with no
+// name and no size — which then WAS the last soda, so every tap after it was nameless too — and
+// its answer had no list to be mirrored into (audit #44 item 7). The buttons wait for the list.
+const listLoaded = computed(() => data.value != null)
 
 // Home-timezone date/time (shared/utils/time.ts), not the runtime's clock zone: a late-night
 // tap logs against the Chicago calendar day whether the phone is travelling or the SSR pass is
@@ -361,6 +368,7 @@ function applySodasLocally(date: string, sodas: SodaEntry[]) {
 }
 
 async function quickAdd(useCustom = false) {
+  if (adding.value || !listLoaded.value) return
   adding.value = true
   const date = localDateStr()
   const time = localTimeStr()

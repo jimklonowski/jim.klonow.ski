@@ -138,8 +138,9 @@
           v-if="canEdit"
           type="button"
           class="tui-btn w-17 shrink-0 justify-center px-0 py-1.5"
-          :disabled="addingSoda"
+          :disabled="addingSoda || !sodaReady"
           :title="`Log a soda today: ${sodaLabel}`"
+          data-home-soda
           @click="emit('addSoda')"
         >
           {{ addingSoda ? '…' : '+ SODA' }}
@@ -208,6 +209,8 @@ const props = defineProps<{
   cupOz: number
   /** What + SODA logs ("DR PEPPER 12oz can"), for its title. */
   sodaLabel: string
+  /** False until the journal list has arrived and the last soda is known: + SODA waits for it. */
+  sodaReady: boolean
   addingWater: boolean
   addingSoda: boolean
 }>()
