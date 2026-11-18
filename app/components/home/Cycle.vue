@@ -194,7 +194,7 @@ import {
   cycleStatusOn, doseLabelOf, relevantCycle, tentativeStartLabel
 } from '#shared/utils/cycles'
 import { diffDays } from '#shared/utils/dates'
-import { slotKeyOn, slotLabel } from '#shared/utils/estradiol'
+import { slotKeyOn, markerSlotLabel } from '#shared/utils/estradiol'
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 import { courseCaveatSpans } from '#shared/utils/accutane'
 import { caveatCompoundOn } from '#shared/utils/labNotes'
@@ -427,7 +427,7 @@ const chips = computed(() => {
     const value = draw.markers[key]
     if (value == null) continue
     const meta = BIOMARKERS[key]
-    const label = slotLabel(key, meta?.label ?? key)
+    const label = markerSlotLabel(key, meta?.label ?? key)
     const s = meta ? getStatus(value, meta) : 'normal'
     const cls = s === 'high' ? 'text-danger' : s === 'low' ? 'text-warn' : s === 'optimal' ? 'text-accent' : 'text-dim'
     // One decimal at most, trailing zero dropped: 51.7 stays 51.7 (it rounded to "52" for values

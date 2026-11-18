@@ -522,7 +522,7 @@ import {
   cycleSpanDays, cycleStatusOn, doseLabelOf, durationLabel, plannedDoses, tentativeStartLabel
 } from '#shared/utils/cycles'
 import { diffDays, shiftDays } from '#shared/utils/dates'
-import { slotKeyOn, slotLabel } from '#shared/utils/estradiol'
+import { slotKeyOn, markerSlotLabel } from '#shared/utils/estradiol'
 import { checkpointPlan, planInWindow } from '#shared/utils/plannedDraws'
 import type { CycleSignal } from '#shared/utils/cycleSignals'
 import { computeCycleSignals } from '#shared/utils/cycleSignals'
@@ -767,7 +767,7 @@ function gatingChips(drawDate: string, baselineDate: string | null): GatingChip[
     const key = slotKeyOn(slot, draw)
     const value = draw.markers[key]
     if (value == null) continue
-    const label = slotLabel(key, BIOMARKERS[key]?.label ?? key)
+    const label = markerSlotLabel(key, BIOMARKERS[key]?.label ?? key)
     const prior = baseline?.markers[key]
     chips.push({
       key,
