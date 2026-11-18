@@ -364,6 +364,42 @@
   }
 }
 
+/* Paper (audit #44 item 19). The colors are themes.css's closing `@media print` block — PAPER on a
+   white sheet, whichever preset is on screen. This is the structural half: a printed page is the
+   page's own content, so the shell around <main> (header, status line, demo banner, footer, the
+   panels) is left off, and a table row is never cut in two by a page edge. A page that prints a
+   scroll box opens it itself (`print:overflow-visible`): paper cannot scroll. */
+@media print {
+  [data-app-shell] {
+    min-height: 0;
+  }
+
+  [data-app-shell] > :not(main) {
+    display: none !important;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  /* A page wider than an upright sheet (the draw ledger's eight columns) marks itself
+     `print-wide` and the sheet is turned. The name goes on <body>, not on the marked element: a
+     named page ends with its element, and whatever follows it in the document — nothing a reader
+     can see — then took a blank upright sheet of its own. Browsers that do not honour a page
+     size (Safari) print it upright, and the orientation is the reader's to pick in the dialog. */
+  body:has(.print-wide) {
+    page: wide;
+  }
+}
+
+@page wide {
+  size: landscape;
+}
+
 @keyframes tui-blink {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }

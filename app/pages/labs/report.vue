@@ -48,7 +48,7 @@
     <!-- One page for a clinician: everything deterministic, nothing written by a model. -->
     <article
       v-if="draws.length"
-      class="px-4 sm:px-6 pb-6 max-w-4xl text-small leading-[1.6]"
+      class="px-4 sm:px-6 pb-6 max-w-4xl text-small leading-[1.6] print:px-0 print:pb-0 print:max-w-none"
       data-report
     >
       <header class="border-b border-line pb-3 mb-4">
@@ -64,7 +64,7 @@
       </header>
 
       <!-- 1. Protocol in force -->
-      <section class="mb-4">
+      <section class="mb-4 print:break-inside-avoid">
         <TuiHeader label="PROTOCOL IN FORCE" />
         <div
           v-if="protocolRows.length"
@@ -100,7 +100,7 @@
       </section>
 
       <!-- 2. Flagged markers -->
-      <section class="mb-4">
+      <section class="mb-4 print:break-inside-avoid">
         <TuiHeader :label="`OUT OF RANGE · ${flagged.length}`" />
         <table
           v-if="flagged.length"
@@ -163,7 +163,7 @@
       <!-- 2b. Desk arithmetic for the latest draw (item 77) -->
       <LabsClinicalCalcs
         v-if="latestDraw"
-        class="mb-4"
+        class="mb-4 print:break-inside-avoid"
         :draws="draws"
         :draw="latestDraw"
         :birth-date="profileData?.birth_date"
@@ -171,7 +171,7 @@
       />
 
       <!-- 3. Hematocrit and iron -->
-      <section class="mb-4">
+      <section class="mb-4 print:break-inside-avoid">
         <TuiHeader label="HEMATOCRIT · HEMOGLOBIN · FERRITIN" />
         <table
           v-if="hctRows.length"
@@ -242,7 +242,7 @@
       </section>
 
       <!-- 4. Vitals, last 30 days -->
-      <section class="mb-4">
+      <section class="mb-4 print:break-inside-avoid">
         <TuiHeader label="VITALS · LAST 30 DAYS" />
         <p
           v-if="vitalsLine"
@@ -259,7 +259,7 @@
       </section>
 
       <!-- 5. Next draw -->
-      <section class="mb-4">
+      <section class="mb-4 print:break-inside-avoid">
         <TuiHeader label="NEXT DRAW" />
         <p
           v-if="nextDraw"
@@ -282,7 +282,7 @@
       </section>
 
       <!-- 6. Immunizations -->
-      <section class="mb-4">
+      <section class="mb-4 print:break-inside-avoid">
         <TuiHeader label="IMMUNIZATIONS" />
         <div
           v-if="vaccineRows.length"

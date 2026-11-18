@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import * as fsSync from 'node:fs'
 import { ANNOTATION_STYLE, BAND_COLORS, CHART_AXIS, STATUS_COLORS, THEME } from '../app/utils/chartTheme.ts'
 import {
-  DEFAULT_THEME, PRESETS, SCALE_STEPS, THEME_IDS, THEME_LIST, TOKEN_KEYS, accentScale, isThemeId
+  DEFAULT_THEME, PRESETS, PRINT_PRESET, SCALE_STEPS, THEME_IDS, THEME_LIST, TOKEN_KEYS, accentScale, isThemeId, printCss
 } from '../shared/utils/themePresets.ts'
 import { DEFAULT_FONT, FONTS, FONT_IDS, FONT_LIST, isFontId } from '../shared/utils/displayFonts.ts'
 import { DEFAULT_SCALE, SCALES, SCALE_IDS, SCALE_LIST, isScaleId } from '../shared/utils/displayScale.ts'
@@ -208,6 +208,27 @@ test('PAPER is the one light preset, held to the same floors, and the panel shad
   assert.match(css, /--panel-shadow:\s*0 0 12px rgba\(0, 0, 0, 0\.5\);/, 'main.css declares the default glow')
   assert.equal(phosphor.shadow, '0 0 12px rgba(0, 0, 0, 0.5)', 'the default preset carries the same value')
   assert.ok(displayCss().includes(`--panel-shadow: ${paper.shadow};`), 'themes.css redefines it for paper')
+})
+
+test('paper is printed in PAPER on white, after every preset block (audit #44 item 19)', () => {
+  const paper = PRESETS.paper
+  assert.equal(PRINT_PRESET.tokens.bg, '#ffffff', 'the sheet is white')
+  for (const key of TOKEN_KEYS) if (key !== 'bg') assert.equal(PRINT_PRESET.tokens[key], paper.tokens[key], `print ${key} is paper's`)
+  // Ink on white: the text ramp down to `faint` (section labels, footnotes) and the status colors
+  // a reading is printed in all clear the body-text floor.
+  for (const t of ['hi', 'body', 'dim', 'muted', 'faint', 'accent', 'warn', 'danger']) {
+    const got = contrast(PRINT_PRESET.tokens[t], '#ffffff')
+    assert.ok(got >= 4.5, `${t} on white is ${got.toFixed(2)}:1`)
+  }
+  const out = displayCss()
+  const block = printCss()
+  assert.ok(out.endsWith(block), 'the print block closes themes.css')
+  assert.ok(out.lastIndexOf('html[data-theme="') < out.lastIndexOf('@media print {'), 'no preset block follows it')
+  assert.match(block, /^@media print \{\n {2}html,\n {2}html\[data-theme\] \{\n/, 'same weight as a preset block, plus the bare root')
+  for (const key of TOKEN_KEYS) assert.ok(block.includes(`    --color-${key}: ${PRINT_PRESET.tokens[key]};`), `print block sets ${key}`)
+  assert.ok(block.includes('color-scheme: light;'))
+  // The structural half lives in main.css: the shell is not printed.
+  assert.match(css, /@media print \{[\s\S]*\[data-app-shell\] > :not\(main\)/, 'main.css hides the shell on paper')
 })
 
 test('every preset keeps the accent and the status trio apart', () => {

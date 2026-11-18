@@ -315,14 +315,33 @@ const PAPER = derive({
 export const THEME_LIST: readonly ThemePreset[] = [PHOSPHOR, AMBER, ICE, WHITE, EMKAY, EMKAY_INVERTED, PAPER]
 export const PRESETS = Object.fromEntries(THEME_LIST.map(p => [p.id, p])) as Record<ThemeId, ThemePreset>
 
+/** A preset as declarations: every color token, the accent scale, the panel shadow. */
+function themeVars(p: ThemePreset, indent = '  '): string[] {
+  return [
+    ...TOKEN_KEYS.map(k => `${indent}--color-${k}: ${p.tokens[k]};`),
+    ...SCALE_STEPS.map(s => `${indent}--color-phosphor-${s}: ${p.scale[s]};`),
+    `${indent}--panel-shadow: ${p.shadow};`
+  ]
+}
+
 /** The `html[data-theme]` block for one preset. */
 export function themeCss(p: ThemePreset): string {
-  const vars = [
-    ...TOKEN_KEYS.map(k => `  --color-${k}: ${p.tokens[k]};`),
-    ...SCALE_STEPS.map(s => `  --color-phosphor-${s}: ${p.scale[s]};`),
-    `  --panel-shadow: ${p.shadow};`
-  ]
-  return `html[data-theme="${p.id}"] {\n${vars.join('\n')}\n}\n`
+  return `html[data-theme="${p.id}"] {\n${themeVars(p).join('\n')}\n}\n`
+}
+
+/**
+ * What a page is printed in: PAPER on a white sheet, whichever preset is on screen. Browsers drop
+ * background colors on paper, so a dark preset printed its near-white text on white (audit #44
+ * item 19); PAPER's text ramp and status colors were tuned as ink on a light page.
+ */
+export const PRINT_PRESET: ThemePreset = { ...PAPER, tokens: { ...PAPER.tokens, bg: '#ffffff' } }
+
+/**
+ * The `@media print` block that closes themes.css. It names `html[data-theme]` with the same
+ * weight as the preset blocks and comes after them, so it wins on paper for every preset.
+ */
+export function printCss(): string {
+  return `@media print {\n  html,\n  html[data-theme] {\n${themeVars(PRINT_PRESET, '    ').join('\n')}\n    color-scheme: light;\n  }\n}\n`
 }
 
 /** app/assets/css/themes.css in full: every preset but the default, which main.css already is. */
@@ -332,7 +351,8 @@ export function themesCss(): string {
     '   Regenerate with `pnpm theme:css`; tests/theme.test.mjs fails while this file is stale.',
     '   Each html[data-theme] block overrides the @theme color tokens in main.css (phosphor, the',
     '   default) for one preset, and each html[data-font] block after them the face tokens for one',
-    '   font (shared/utils/displayFonts.ts); both outrank Tailwind\'s `:root`, so the utilities follow. */',
+    '   font (shared/utils/displayFonts.ts); both outrank Tailwind\'s `:root`, so the utilities follow.',
+    '   The `@media print` block at the foot is PAPER on a white sheet, for every preset. */',
     ''
   ].join('\n')
   return header + THEME_LIST.filter(p => p.id !== DEFAULT_THEME).map(themeCss).join('\n')

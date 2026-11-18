@@ -1,5 +1,7 @@
 <template>
-  <div>
+  <div class="print-wide">
+    <!-- print-wide: the table is wider than an upright sheet, so the page prints landscape
+         (main.css, `@media print`). -->
     <!-- Breadcrumb title row, the hematocrit page's shape -->
     <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2 px-4 sm:px-6 pt-4 pb-3.5">
       <h1 class="flex items-baseline gap-2.5 min-w-0">
@@ -17,7 +19,7 @@
       >
         {{ rows.length }} draws · {{ formatDate(rows[rows.length - 1]!.date, 'monthDay') }} → {{ formatDate(rows[0]!.date, 'monthDay') }}
       </p>
-      <div class="flex flex-wrap items-center gap-2 ml-auto">
+      <div class="flex flex-wrap items-center gap-2 ml-auto print:hidden">
         <NuxtLink
           to="/labs"
           class="tui-btn"
@@ -26,7 +28,7 @@
         </NuxtLink>
         <button
           type="button"
-          class="tui-btn print:hidden"
+          class="tui-btn"
           @click="print"
         >
           PRINT
@@ -50,8 +52,9 @@
       <UTable
         :data="rows"
         :columns="columns"
-        class="border-y border-line"
-        :ui="{ td: 'py-2 align-top text-small', th: 'text-label uppercase tracking-[0.12em] text-muted' }"
+        class="border-y border-line print:overflow-visible"
+        data-ledger-table
+        :ui="{ td: 'py-2 align-top text-small print:px-2', th: 'text-label uppercase tracking-[0.12em] text-muted print:px-2 print:tracking-[0.04em]' }"
       >
         <template #date-cell="{ row }">
           <span class="text-hi tabular-nums whitespace-nowrap">{{ formatDate(row.original.date, 'short') }}</span>
@@ -113,7 +116,7 @@
         </template>
       </UTable>
 
-      <p class="px-4 sm:px-6 py-3 text-meta text-faint leading-[1.6]">
+      <p class="px-4 sm:px-6 py-3 text-meta text-faint leading-[1.6] print:break-inside-avoid">
         Change in parentheses is against the previous usable reading of that marker. † a value at the assay's ceiling, a bound rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). {{ TAG_GLYPH.transitional }} a red-cell reading inside the ~{{ RBC_TURNOVER_DAYS }}-day turnover window after a dose change, which cannot yet show that change's full effect. {{ TAG_GLYPH['post-phlebotomy'] }} a reading within {{ PHLEBOTOMY_EFFECT_DAYS / 7 }} weeks of a blood donation or therapeutic phlebotomy, which reads the blood taken out. Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
       </p>
       <p class="px-4 sm:px-6 pb-3 text-meta text-ghost">

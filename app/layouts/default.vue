@@ -1,5 +1,9 @@
 <template>
-  <div class="min-h-screen flex flex-col bg-bg">
+  <div
+    class="min-h-screen flex flex-col bg-bg"
+    data-app-shell
+  >
+    <!-- data-app-shell: on paper only <main> is printed (main.css, `@media print`). -->
     <AppHeader />
     <DemoBanner />
     <StatusLine />

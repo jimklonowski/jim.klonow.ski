@@ -2,7 +2,8 @@
    Regenerate with `pnpm theme:css`; tests/theme.test.mjs fails while this file is stale.
    Each html[data-theme] block overrides the @theme color tokens in main.css (phosphor, the
    default) for one preset, and each html[data-font] block after them the face tokens for one
-   font (shared/utils/displayFonts.ts); both outrank Tailwind's `:root`, so the utilities follow. */
+   font (shared/utils/displayFonts.ts); both outrank Tailwind's `:root`, so the utilities follow.
+   The `@media print` block at the foot is PAPER on a white sheet, for every preset. */
 html[data-theme="amber"] {
   --color-bg: #0b0907;
   --color-raised: #14110c;
@@ -319,4 +320,54 @@ html[data-scale="l"] {
 
 html[data-scale="xl"] {
   --type-scale: 1.25;
+}
+
+@media print {
+  html,
+  html[data-theme] {
+    --color-bg: #ffffff;
+    --color-raised: #e7edea;
+    --color-inset: #eef3f0;
+    --color-status: #f1f5f3;
+    --color-nav-active: #d2ded7;
+    --color-row-hover: #dce5e0;
+    --color-line: #cbd5d0;
+    --color-line-soft: #d2dcd7;
+    --color-line-accent: #b3c2ba;
+    --color-line-input: #c2cdc7;
+    --color-line-field: #93a89e;
+    --color-line-row: #e2eae5;
+    --color-accent: #147f5b;
+    --color-accent-hover: #012619;
+    --color-accent-bg: #cbddd4;
+    --color-accent-bg-hover: #bacdc4;
+    --color-warn: #966c08;
+    --color-danger: #c0463d;
+    --color-ember: #b55515;
+    --color-mark: #65776e;
+    --color-band: #afc3b9;
+    --color-band-outer: #c3d3cb;
+    --color-hi: #0a0e0c;
+    --color-body: #202623;
+    --color-dim: #313c37;
+    --color-muted: #4d5d55;
+    --color-faint: #5e7168;
+    --color-ghost: #7e8e86;
+    --color-nav-idle: #5c6b64;
+    --color-pupil: #0a0e0c;
+    --color-glint: #f6f9f7;
+    --color-phosphor-50: #f0fdf6;
+    --color-phosphor-100: #c9e9d9;
+    --color-phosphor-200: #92c4ac;
+    --color-phosphor-300: #69a68a;
+    --color-phosphor-400: #147f5b;
+    --color-phosphor-500: #137453;
+    --color-phosphor-600: #166246;
+    --color-phosphor-700: #1b503b;
+    --color-phosphor-800: #1b4131;
+    --color-phosphor-900: #1b382b;
+    --color-phosphor-950: #15281f;
+    --panel-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    color-scheme: light;
+  }
 }
