@@ -10,6 +10,8 @@ import { drinkTotals, hydrationOz, lateCaffeineMg, sodasOnly, type DrinkLike } f
 import { dexaCalibration, energyBalance, type ScanMass } from './energyBalance.ts'
 import { dayNutrition, hasFullFigures, isWholeDay, type EstimateIndex, type MealSlot } from './nutrition.ts'
 import { sodaTotals } from './soda.ts'
+import { localClockOf, workoutStartMs } from './time.ts'
+import { isTrainingType } from './trainingSplit.ts'
 import { weighInsOf, weightTrend } from './weightTrend.ts'
 
 export interface ScoreJournalDay {
@@ -28,6 +30,8 @@ export interface ScoreHealthDay {
 }
 export interface ScoreWorkout {
   date: string
+  /** What it was ("Cycling", "Walking"): a commute or a walk is activity, not a session (trainingSplit.ts). */
+  workout_type?: string | null
   duration_min?: number | null
 }
 
@@ -58,11 +62,24 @@ export interface ScoreRow {
 
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
 const signed = (n: number, digits = 1) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toFixed(digits)}`
-const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`
+// Rounded to the minute BEFORE it is split: 419.6 minutes used to print "6h 60m".
+const hm = (min: number) => {
+  const whole = Math.round(min)
+  return `${Math.floor(whole / 60)}h ${String(whole % 60).padStart(2, '0')}m`
+}
 
-/** Minutes after noon a night began, from "2026-10-21 23:12:00 -0500" or an ISO stamp read as printed; null when unreadable. */
+/**
+ * Minutes after noon a night began, on the home-timezone clock; null when unreadable. Two forms
+ * reach `sleep_start`: Health Auto Export prints local time with its offset ("2026-10-21 23:12:00
+ * -0500") and Whoop writes the instant in UTC ("2026-10-22T04:12:00.000Z"). Both name an instant,
+ * and the clock is read off that instant — read as printed, a Whoop night began at "04:12", five
+ * or six hours from the same bedtime off the watch, and a week holding both sources showed a
+ * bedtime "wandering" by hours (audit #44 item 11; drivers.ts nightOf already read the instant).
+ * A stamp with no zone on it can only be read as printed.
+ */
 export function bedtimeMinutes(stamp: string | null | undefined): number | null {
-  const m = /[T ](\d{2}):(\d{2})/.exec(stamp ?? '')
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(stamp ?? '') ? workoutStartMs(stamp) : null
+  const m = /(\d{2}):(\d{2})/.exec(zoned != null ? localClockOf(zoned) : /[T ](\d{2}:\d{2})/.exec(stamp ?? '')?.[1] ?? '')
   if (!m) return null
   const mins = Number(m[1]) * 60 + Number(m[2])
   // Noon-anchored so 23:30 and 00:30 sit an hour apart, not 23 hours.
@@ -127,15 +144,22 @@ export function weeklyScorecard(i: ScorecardInputs): ScoreRow[] {
     })
   }
 
-  // --- training ---
-  const sessions = inWeek(i.workouts)
+  // --- training: sessions, not every logged activity. A commute, a walk or a stretch is on the
+  // workouts list too; counted here, a week of bike commutes read as a week of training (the
+  // same rule as the training-day split, trainingSplit.ts). What was left out is said.
+  const logged = inWeek(i.workouts)
+  const sessions = logged.filter(w => isTrainingType(w.workout_type))
+  const other = logged.length - sessions.length
   const minutes = Math.round(sessions.reduce((s, w) => s + (w.duration_min ?? 0), 0))
   const activeDays = new Set(sessions.map(w => w.date)).size
   rows.push({
     key: 'training',
     label: 'Training',
     value: `${sessions.length} session${sessions.length === 1 ? '' : 's'}`,
-    detail: sessions.length ? `${minutes} min across ${activeDays} day${activeDays === 1 ? '' : 's'}` : 'none logged',
+    detail: [
+      sessions.length ? `${minutes} min across ${activeDays} day${activeDays === 1 ? '' : 's'}` : 'none logged',
+      other ? `${other} walk${other === 1 ? '' : 's'}, commute${other === 1 ? '' : 's'} or the like not counted` : ''
+    ].filter(Boolean).join(' · '),
     tone: sessions.length ? 'ok' : 'warn'
   })
 

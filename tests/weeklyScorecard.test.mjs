@@ -33,8 +33,63 @@ const workouts = [{ date: '2026-11-02', duration_min: 45 }, { date: '2026-11-02'
 
 test('bedtime minutes are noon-anchored so midnight does not split a week', () => {
   assert.equal(bedtimeMinutes('2026-10-21 23:30:00 -0500'), 690)
-  assert.equal(bedtimeMinutes('2026-10-22T00:30:00.000Z'), 750, 'an hour later, not 23 hours earlier')
+  assert.equal(bedtimeMinutes('2026-10-22 00:30:00 -0500'), 750, 'an hour later, not 23 hours earlier')
   assert.equal(bedtimeMinutes(null), null)
+  assert.equal(bedtimeMinutes('no time here'), null)
+})
+
+test('a night\'s start is read off the instant: Whoop\'s UTC stamp and the watch\'s local one agree (audit #44 item 11)', () => {
+  // 23:30 in Chicago on Oct 21 (CDT) is 04:30 UTC on the 22nd.
+  assert.equal(bedtimeMinutes('2026-10-22T04:30:00.000Z'), 690)
+  assert.equal(bedtimeMinutes('2026-10-22T04:30:00.000Z'), bedtimeMinutes('2026-10-21 23:30:00 -0500'))
+  // After the clocks go back (CST) the same bedtime is 05:30 UTC.
+  assert.equal(bedtimeMinutes('2026-11-05T05:30:00.000Z'), 690)
+  // A stamp printed in another zone is still that instant at home: 21:30 Pacific is 23:30 Central.
+  assert.equal(bedtimeMinutes('2026-10-21 21:30:00 -0700'), 690)
+  // No zone on the stamp: only the printed clock is known.
+  assert.equal(bedtimeMinutes('2026-10-21T23:30:00'), 690)
+
+  // A week of 23:00 bedtimes, some nights from Whoop and some from the watch: no spread at all.
+  const mixed = Array.from({ length: 7 }, (_, n) => {
+    const date = shiftDays(START, n)
+    return { date, sleep_total_min: 450, sleep_start: n % 2 ? `${shiftDays(date, 1)}T05:00:00.000Z` : `${date} 23:00:00 -0600` }
+  })
+  const sleep = weeklyScorecard({ start: START, end: END, journal: [], health: mixed, workouts: [], estimates: new Map(), scans: [], proteinTarget: null, waterGoalOz: null }).find(r => r.key === 'sleep')
+  assert.equal(sleep.detail, '7 nights · bedtime ±0 min')
+  assert.equal(sleep.tone, 'ok')
+})
+
+test('sleep never prints sixty minutes', () => {
+  const night = min => ({ date: START, sleep_total_min: min })
+  const value = min => weeklyScorecard({ start: START, end: END, journal: [], health: [night(min)], workouts: [], estimates: new Map(), scans: [], proteinTarget: null, waterGoalOz: null }).find(r => r.key === 'sleep').value
+  assert.equal(value(419.6), '7h 00m/night')
+  assert.equal(value(419.4), '6h 59m/night')
+  assert.equal(value(59.7), '1h 00m/night')
+})
+
+test('training counts sessions; a commute, a walk or a round of disc golf is said but not counted', () => {
+  const week = workouts => weeklyScorecard({ start: START, end: END, journal: [], health: [], workouts, estimates: new Map(), scans: [], proteinTarget: null, waterGoalOz: null }).find(r => r.key === 'training')
+  const mixed = week([
+    { date: '2026-11-02', workout_type: 'Cycling', duration_min: 45 },
+    { date: '2026-11-02', workout_type: 'Commuting', duration_min: 18 },
+    { date: '2026-11-03', workout_type: 'Walking', duration_min: 30 },
+    { date: '2026-11-04', workout_type: 'Disc Golf', duration_min: 90 },
+    { date: '2026-11-05', workout_type: 'Functional Strength Training', duration_min: 30 },
+    { date: '2026-11-06', duration_min: 20 }
+  ])
+  assert.deepEqual([mixed.value, mixed.detail, mixed.tone], ['3 sessions', '95 min across 3 days · 3 walks, commutes or the like not counted', 'ok'])
+  const walksOnly = week([{ date: '2026-11-03', workout_type: 'Walking', duration_min: 30 }])
+  assert.deepEqual([walksOnly.value, walksOnly.detail, walksOnly.tone], ['0 sessions', 'none logged · 1 walk, commute or the like not counted', 'warn'])
+})
+
+test('the owner\'s drink labels are read for the caffeine row when the index carries them', async () => {
+  const { indexDrinkLabels, drinkKey } = await import('../shared/utils/drinks.ts')
+  const { indexEstimates } = await import('../shared/utils/nutrition.ts')
+  const day = [{ date: '2026-11-03', sodas: [{ time: '15:30', drink: 'Dr Pepper', size: '12oz can' }] }]
+  const caffeine = estimates => weeklyScorecard({ start: START, end: END, journal: day, health: [], workouts: [], estimates, scans: [], proteinTarget: null, waterGoalOz: null }).find(r => r.key === 'caffeine')
+  assert.equal(caffeine(indexEstimates([])).value, '41 mg/day', 'the built-in table')
+  const labels = indexDrinkLabels([{ key: drinkKey('Dr Pepper'), name: 'Dr Pepper', serving_oz: 12, kcal: 150, caffeine_mg: 0, sodium_mg: 55, sugar_g: 40 }])
+  assert.equal(caffeine(indexEstimates([], labels)), undefined, 'a caffeine-free label: no caffeine row at all')
 })
 
 test('the week\'s rows: weight, intake, protein, training, steps, sleep, soda, caffeine, water', () => {

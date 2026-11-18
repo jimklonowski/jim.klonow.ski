@@ -24,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { indexDrinkLabels } from '#shared/utils/drinks'
 import { indexEstimates, type MealEstimate } from '#shared/utils/nutrition'
 import { proteinTargetFor } from '#shared/utils/proteinTarget'
 import { WATER_DEFAULT_GOAL_OZ, waterSetting } from '#shared/utils/water'
@@ -42,6 +43,10 @@ const { data: dexaData } = useDexaEntries()
 const { data: profileData } = useProfile()
 // The same store useMealEstimates reads (one key), without its awaited wrapper.
 const { data: estimateData } = useListResource<MealEstimate[]>('/journal/meal-estimates', '/api/journal/meals/estimates', { label: 'meal estimates' })
+// The owner's own drink labels ride on the figures index, as in useMealEstimates: without them
+// the Caffeine and Intake rows read the built-in table for a drink whose can has been entered,
+// and disagreed with the day's own caffeine line (audit #44 item 11).
+const { data: labelRows } = useDrinkLabels()
 
 const rows = computed(() => {
   const journal = journalData.value
@@ -53,7 +58,7 @@ const rows = computed(() => {
     journal,
     health: healthData.value ?? [],
     workouts: workoutData.value ?? [],
-    estimates: indexEstimates(estimateData.value ?? []),
+    estimates: indexEstimates(estimateData.value ?? [], indexDrinkLabels(labelRows.value)),
     scans,
     proteinTarget: proteinTargetFor(profileData.value, dexaData.value ?? [], props.end)?.grams ?? null,
     waterGoalOz: waterSetting(profileData.value, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ)
