@@ -186,13 +186,19 @@ import { drawFlags } from '#shared/utils/labsTimeline'
 // timeline would pile the recent monthly draws — the ones you actually scrub between — into a
 // sliver at the right edge. The tooltip and readout carry the real dates.
 const props = defineProps<{
-  /** Every draw, any order. */
-  entries: LabsEntry[]
+  /**
+   * Every blood draw, any order — the same rows the page resolves `?asof=` against, and no
+   * echo-only row. Handed every labs row, a scan was a stop on the rail: the page took its date
+   * for no draw at all and snapped back to the latest, and with a scan as the newest row PREV
+   * stepped onto the real latest draw, which the page reads as "not time-travelling" — so the
+   * button did nothing (audit #44 item 17).
+   */
+  draws: LabsEntry[]
 }>()
 
 const viewedDate = defineModel<string | null>({ required: true })
 
-const sorted = computed(() => [...props.entries].sort((a, b) => a.date.localeCompare(b.date)))
+const sorted = computed(() => [...props.draws].sort((a, b) => a.date.localeCompare(b.date)))
 const dates = computed(() => sorted.value.map(e => e.date))
 const last = computed(() => dates.value.length - 1)
 const viewedIndex = computed(() => {

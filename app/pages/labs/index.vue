@@ -264,9 +264,9 @@
     <!-- Time travel: scrub the whole page back to an earlier draw. Sticky, so it stays in
          reach while the cards scroll, and settles above the footer at the end. -->
     <LabsTimeScrubber
-      v-if="entries.length >= 2"
+      v-if="draws.length >= 2"
       v-model="viewedDate"
-      :entries="entries"
+      :draws="draws"
     />
 
     <!-- Full echo findings -->
