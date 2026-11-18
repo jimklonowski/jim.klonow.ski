@@ -6,8 +6,10 @@
 //     does not, and its ounces count toward the water goal (Jim's call, 2026-11-11);
 //   - label figures per 12 fl oz: calories, caffeine, sodium, sugar — the day's nutrition total,
 //     the caffeine line (item 70) and the sodium total (item 71) all read these.
-// A name the table doesn't know is guessed by kind from its words, then given that kind's
-// typical figures; an unrecognized name is a regular soda, which is what the log held before.
+// A name the table doesn't hold as typed is read as a version of the table drink it names, when
+// there is one ("Sprite Zero", "7up" — see tableMatch); otherwise its kind is guessed from its
+// words and it gets that kind's typical figures. An unrecognized name is a regular soda, which is
+// what the log held before.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
 import { sodaOunces } from './soda.ts'
@@ -131,16 +133,78 @@ export type DrinkSource = 'label' | 'table' | 'typical'
 export function drinkSource(name: string | null | undefined, labels?: DrinkLabels | null): DrinkSource {
   const key = drinkKey(name)
   if (labels?.get(key)) return 'label'
-  return DRINKS[key] ? 'table' : 'typical'
+  return DRINKS[key] || tableMatch(key, wordKind(key)) ? 'table' : 'typical'
 }
 
+// --- a name the table does not hold as typed ---
+// Drinks are named freehand, and a name one word off the table used to fall straight to its
+// kind's typical figures: "Sprite Zero", "7up", "Fanta" and "Caffeine Free Diet Coke" each read
+// as a typical soda with 35 mg of caffeine per 12 oz, which then counted as late caffeine in the
+// sleep driver and on the weekly scorecard (audit #44 item 10). Now the table is asked first for
+// the drink the name is a version of: the row whose every word the name holds ("sprite" in
+// "sprite zero"; "diet coke" in "caffeine free diet coke" — the longest such row). What the other
+// words say is then applied: diet / zero / sugar-free takes the sugar and its calories out,
+// caffeine-free / decaf takes the caffeine out — also off a kind's typical figures, when no row
+// fits. The KIND is still read from the name's words alone, and only a row of that kind is used,
+// so no drink moves on or off the soda count or the water goal.
+
+/** What kind of drink a name's words say it is; an unrecognized name is a soda. */
+function wordKind(key: string): DrinkKind {
+  return KIND_WORDS.find(([re]) => re.test(key))?.[1] ?? 'soda'
+}
+
+/** Other common spellings of a table name, in the words the table uses. */
+const SPELLINGS: Array<[RegExp, string]> = [
+  [/\bcoca cola\b/g, 'coke'],
+  [/\bseven up\b/g, '7 up'],
+  [/\bmtn dew\b/g, 'mountain dew'],
+  [/\b(?:mr )?pibb(?: xtra)?\b/g, 'mr pibb']
+]
+
+/** A name's words for matching: "7up" is "7 up", punctuation is a space ("Dr. Pepper"), order is free. */
+function nameWords(key: string): string[] {
+  let s = key.replace(/(\d)([a-z])/g, '$1 $2').replace(/[^a-z0-9]+/g, ' ').trim()
+  for (const [re, to] of SPELLINGS) s = s.replace(re, to)
+  const words = s ? s.split(' ') : []
+  // The table's Fanta and Crush are the orange ones; any flavour of either reads as that row
+  // (all caffeine-free, within a few calories of each other).
+  if ((words.includes('fanta') || words.includes('crush')) && !words.includes('orange')) words.push('orange')
+  return words
+}
+
+const TABLE_WORDS: Array<{ words: string[], info: DrinkInfo }> = Object.entries(DRINKS).map(([name, info]) => ({ words: nameWords(name), info }))
+
+/** The table row a name is a version of — every word of the row is in the name, the longest row wins — or null. */
+function tableMatch(key: string, kind: DrinkKind): DrinkInfo | null {
+  const have = new Set(nameWords(key))
+  let best: { words: string[], info: DrinkInfo } | null = null
+  for (const row of TABLE_WORDS) {
+    if (row.info.kind !== kind || row.words.length <= (best?.words.length ?? 0)) continue
+    if (row.words.every(w => have.has(w))) best = row
+  }
+  return best?.info ?? null
+}
+
+const SUGAR_FREE = /\b(diet|zero|sugar.?free|unsweet(ened)?)\b/
+const CAFFEINE_FREE = /\bcaff(eine)?.?free\b|\bdecaf(feinated)?\b|\bno caffeine\b/
+
+// Names repeat (a history holds a handful, read on every chart), and the answer is a pure
+// function of the name.
+const BUILT_IN = new Map<string, DrinkInfo>()
+
 function builtInInfo(key: string): DrinkInfo {
-  const known = DRINKS[key]
+  const known = DRINKS[key] ?? BUILT_IN.get(key)
   if (known) return known
-  const kind = KIND_WORDS.find(([re]) => re.test(key))?.[1] ?? 'soda'
-  const base = KIND_DEFAULTS[kind]
-  // "diet", "zero", "sugar-free": the sugar and its calories go, the rest of the kind stays.
-  return /\b(diet|zero|sugar.?free|unsweet(ened)?)\b/.test(key) ? { ...base, kcal: 0, sugar_g: 0 } : base
+  const kind = wordKind(key)
+  const base = tableMatch(key, kind) ?? KIND_DEFAULTS[kind]
+  const info: DrinkInfo = {
+    ...base,
+    // "diet", "zero", "sugar-free": the sugar and its calories go, the rest stays.
+    ...(SUGAR_FREE.test(key) ? { kcal: 0, sugar_g: 0 } : {}),
+    ...(CAFFEINE_FREE.test(key) ? { caffeine_mg: 0 } : {})
+  }
+  if (BUILT_IN.size < 500) BUILT_IN.set(key, info)
+  return info
 }
 
 /**

@@ -19,6 +19,64 @@ test('what a drink is: the table first, then its words, then a regular soda', ()
   assert.equal(hydrates('Coffee'), false)
 })
 
+test('a version of a table drink reads that drink\'s figures, not a typical soda\'s caffeine (audit #44 item 10)', () => {
+  const at = name => drinkInfo(name)
+  // The four from the audit: each used to carry 35 mg of caffeine per 12 oz.
+  assert.deepEqual(at('Sprite Zero'), { kind: 'soda', kcal: 0, caffeine_mg: 0, sodium_mg: 65, sugar_g: 0 })
+  assert.deepEqual(at('Caffeine Free Diet Coke'), { kind: 'soda', kcal: 0, caffeine_mg: 0, sodium_mg: 40, sugar_g: 0 })
+  assert.deepEqual(at('7up'), at('7 Up'))
+  assert.deepEqual(at('Fanta'), at('Orange Fanta'))
+  assert.equal(at('Fanta').caffeine_mg, 0)
+  // Spelling, punctuation and word order.
+  assert.deepEqual(at('Dr. Pepper'), at('Dr Pepper'))
+  assert.deepEqual(at('Cherry Dr Pepper'), at('Dr Pepper Cherry'))
+  assert.deepEqual(at('Coca-Cola'), at('Coke'))
+  assert.deepEqual(at('Mtn Dew'), at('Mountain Dew'))
+  assert.deepEqual(at('Pibb Xtra'), at('Mr Pibb'))
+  assert.equal(at('Fanta Grape').caffeine_mg, 0)
+  // The base drink's caffeine stays under "diet" / "zero"; only the sugar goes.
+  assert.deepEqual(at('Diet Dr Pepper'), { kind: 'soda', kcal: 0, caffeine_mg: 41, sodium_mg: 55, sugar_g: 0 })
+  assert.equal(at('Diet Mountain Dew').caffeine_mg, 54)
+  assert.equal(at('Vanilla Coke').caffeine_mg, 34)
+  assert.equal(at('A&W Root Beer').caffeine_mg, 0)
+  // The longest row wins: "diet coke" (46 mg), not "coke" (34 mg).
+  assert.equal(at('Diet Coke Lime').caffeine_mg, 46)
+  assert.equal(at('Caffeine Free Coke').caffeine_mg, 0)
+  assert.equal(at('Caffeine-Free Coke').kcal, 140, 'only the caffeine goes')
+  // "Caffeine free" and "decaf" are honoured with no row to go on, and for other kinds.
+  assert.equal(at('Caffeine Free Something').caffeine_mg, 0)
+  assert.equal(at('Decaf Coffee').caffeine_mg, 0)
+  assert.equal(at('Decaf Coffee').kind, 'coffee')
+  // A name with no table drink in it is still a typical soda, caffeine and all.
+  assert.equal(at('Some Local Cola').caffeine_mg, 35)
+  assert.equal(at('Diet Something').caffeine_mg, 35)
+  // Other kinds read their own rows the same way, and never change kind by it.
+  assert.deepEqual(at('Gatorade Zero Glacier Freeze'), at('Gatorade Zero'))
+  assert.equal(at('Monster Zero').kcal, 0)
+  assert.equal(at('Monster Zero').caffeine_mg, 120)
+  assert.equal(at('Lemonade Gatorade').kind, 'sports')
+  assert.equal(at('Coke Energy').kind, 'energy', 'the words decide the kind; the cola row is not used for it')
+  assert.equal(at('Coke Energy').caffeine_mg, 115)
+  // What it does to a day: a 20 oz Sprite Zero at 16:00 is no late caffeine.
+  const day = [{ time: '16:00', drink: 'Sprite Zero', size: '20oz bottle' }, { time: '17:00', drink: '7up', size: '12oz can' }]
+  assert.equal(lateCaffeineMg(day), 0)
+  assert.equal(drinkTotals(day).lastCaffeine, null)
+  assert.equal(sodasOnly(day).length, 2, 'both still count as sodas')
+})
+
+test('every table drink is of the kind its own name says, so matching by kind loses none', async () => {
+  const { DRINK_GROUPS, drinkSource } = await import('../shared/utils/drinks.ts')
+  for (const group of DRINK_GROUPS) {
+    for (const name of group.names) {
+      assert.equal(drinkInfo(name).kind, group.kind, name)
+      assert.equal(drinkInfo(`${name} special edition`).kind, group.kind, `a version of ${name}`)
+    }
+  }
+  assert.equal(drinkSource('Sprite Zero'), 'table')
+  assert.equal(drinkSource('7up'), 'table')
+  assert.equal(drinkSource('Some Local Cola'), 'typical')
+})
+
 test('figures scale with the size; a size without a volume has none', () => {
   assert.deepEqual(drinkFigures('Dr Pepper', '12oz can'), { oz: 12, kcal: 150, caffeine_mg: 41, sodium_mg: 55, sugar_g: 40 })
   assert.deepEqual(drinkFigures('Gatorade', '20oz bottle'), { oz: 20, kcal: 133, caffeine_mg: 0, sodium_mg: 267, sugar_g: 35 })
