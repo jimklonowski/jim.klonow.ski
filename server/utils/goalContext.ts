@@ -1,12 +1,12 @@
 import { ISOTRETINOIN, courseCaveatSpans } from '#shared/utils/accutane'
-import { caveatCompoundOn } from '#shared/utils/labNotes'
+import { caveatCompoundOn, isCensored } from '#shared/utils/labNotes'
 import type { Readings } from '#shared/utils/labReadings'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 import type { GoalDraw, MarkerGoal } from '#shared/utils/markerGoals'
 import { VERDICT_WORD, cycleGoalSummary, goalLine, goalVerdict, goalsForCycle } from '#shared/utils/markerGoals'
 import { cycleStatusOn, isTentative, mergeRules, type Cycle } from '#shared/utils/cycles'
 import { transitionalWindows } from '#shared/utils/hematocrit'
-import { BIOMARKERS, isEchoOnly } from '../../app/data/biomarkers'
+import { BIOMARKERS, computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 import { MARKER_CAVEATS, readingNotesOn } from '../data/markerCaveats'
 import { loadCycles } from './cycleContext'
 import { loadPhlebotomies } from './phlebotomyContext'
@@ -31,15 +31,26 @@ export async function loadMarkerGoals(db: D1Database): Promise<MarkerGoal[]> {
   }
 }
 
-/** The blood draws on or before `asOf` as the verdicts read them, each with its reading notes
- * (echo-only rows dropped). Shared with accutaneContext. */
+/**
+ * The blood draws on or before `asOf` as the verdicts read them, each with its reading notes
+ * (echo-only rows dropped) and its derived markers folded in. Shared with accutaneContext.
+ *
+ * The derived markers (Trig/HDL, HOMA-IR, remnant cholesterol, free T %) are never stored: the
+ * pages compute them per draw as the list loads (useLabsEntries), and so must this. Read raw, a
+ * goal on one of them was MET on the page and "INSUFFICIENT — no reading on file" in every
+ * prompt (audit #44 item 22). Same rules as the pages: a fasting-only marker needs a fasting
+ * draw, and nothing is derived from a reading that is a bound.
+ */
 export async function loadBloodDraws(db: D1Database, asOf: string): Promise<GoalDraw[]> {
-  const { results } = await db.prepare('SELECT date, markers, qualitative, readings FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
-  return ((results ?? []) as Array<{ date: string, markers: string | null, qualitative: string | null, readings: string | null }>)
-    .map(r => ({ date: r.date, markers: JSON.parse(r.markers || '{}') as Record<string, number | null>, qualitative: JSON.parse(r.qualitative || '[]'), readings: JSON.parse(r.readings || '{}') as Readings }))
+  const { results } = await db.prepare('SELECT date, fasting, markers, qualitative, readings FROM labs_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all()
+  return ((results ?? []) as Array<{ date: string, fasting: number | null, markers: string | null, qualitative: string | null, readings: string | null }>)
+    .map(r => ({ date: r.date, fasting: !!r.fasting, markers: JSON.parse(r.markers || '{}') as Record<string, number | null>, qualitative: JSON.parse(r.qualitative || '[]'), readings: JSON.parse(r.readings || '{}') as Readings }))
     .filter(r => !isEchoOnly(r))
-    // Notes and the printed qualifiers both censor (isCensored reads either).
-    .map(r => ({ date: r.date, markers: r.markers, notes: readingNotesOn(r.date) ?? null, readings: r.readings }))
+    .map((r) => {
+      // Notes and the printed qualifiers both censor (isCensored reads either).
+      const draw: GoalDraw = { date: r.date, markers: r.markers, notes: readingNotesOn(r.date) ?? null, readings: r.readings }
+      return { ...draw, markers: computeMarkers(r.markers, r.fasting, key => isCensored(draw, key)) }
+    })
 }
 
 export async function markerGoalsContext(db: D1Database, asOf: string, protocol: ProtocolData, preloadedCycles?: Cycle[]): Promise<string> {

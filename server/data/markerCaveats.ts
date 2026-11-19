@@ -39,6 +39,11 @@ export const MARKER_CAVEATS: Record<string, MarkerCaveat> = {
   hdl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
   cholesterol: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
   non_hdl: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  // The two derived lipid figures are built from those same readings (Trig/HDL from triglycerides
+  // and HDL, remnant from total, HDL and LDL), so a goal on one is as confounded as its inputs
+  // (audit #44 item 22: a goal on a derived marker is now judged in the prompts too).
+  trig_hdl_ratio: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
+  remnant_cholesterol: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIPID_NOTE },
   alt: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIVER_NOTE },
   ast: { compounds: ISOTRETINOIN, note: ISOTRETINOIN_LIVER_NOTE }
 }

@@ -53,6 +53,39 @@ test('a reading drawn on the course is CONFOUNDED, and a done cycle\'s goals are
   assert.equal(old, '', 'goals of a finished cycle, and no standing ones: nothing to say')
 })
 
+test('a goal on a derived marker is judged from the draw\'s own inputs, by the pages\' rules (audit #44 item 22)', async () => {
+  const derived = [
+    { id: 11, marker: 'trig_hdl_ratio', comparator: 'below', target: 2, by_date: null, cycle_id: null, stated: '2026-10-01', note: null, created_at: 'x' },
+    { id: 12, marker: 'homa_ir', comparator: 'below', target: 1.5, by_date: null, cycle_id: null, stated: '2026-10-01', note: null, created_at: 'x' },
+    { id: 13, marker: 'remnant_cholesterol', comparator: 'at_most', target: 30, by_date: null, cycle_id: null, stated: '2026-10-01', note: null, created_at: 'x' },
+    { id: 14, marker: 'free_t_pct', comparator: 'at_most', target: 3, by_date: null, cycle_id: null, stated: '2026-08-01', note: null, created_at: 'x' }
+  ]
+  const panel = { triglycerides: 120, hdl: 48, ldl: 100, cholesterol: 170, glucose: 90, insulin: 6 }
+  // A fasting panel on Oct 17: every derived figure is there to judge. They were all
+  // "INSUFFICIENT — no reading on file" while the page beside the prompt called them.
+  const fasting = [{ date: '2026-10-17', fasting: 1, markers: JSON.stringify(panel), qualitative: null }]
+  const text = await markerGoalsContext(fakeDb({ goals: derived, labs: fasting }), '2026-10-20', protocol)
+  assert.match(text, /- Trig\/HDL Ratio under 2[^:\n]*: NOT MET — 2\.5 on 2026-10-17/)
+  assert.match(text, /- HOMA-IR under 1\.5[^:\n]*: MET — 1\.3 on 2026-10-17/)
+  assert.match(text, /- Remnant Cholesterol at or under 30[^:\n]*: MET — 22 on 2026-10-17/)
+  // The same panel not fasting: HOMA-IR is not derived (a fed insulin is not a fasting one); the rest are.
+  const fed = await markerGoalsContext(fakeDb({ goals: derived, labs: [{ ...fasting[0], fasting: 0 }] }), '2026-10-20', protocol)
+  assert.match(fed, /- HOMA-IR under 1\.5[^:\n]*: INSUFFICIENT/)
+  assert.match(fed, /- Trig\/HDL Ratio under 2[^:\n]*: NOT MET — 2\.5/)
+  // Sep 9's total T is the censored ceiling (READING_NOTES): no free T % is built on a bound.
+  const sep = [{ date: '2026-09-09', fasting: 1, markers: JSON.stringify({ testosterone_total: 1500, testosterone_free: 300 }), qualitative: null }]
+  const bound = await markerGoalsContext(fakeDb({ goals: derived, labs: sep }), '2026-09-10', protocol)
+  assert.match(bound, /- Free T %[^:\n]*: INSUFFICIENT/)
+  const clean = await markerGoalsContext(fakeDb({ goals: derived, labs: [{ ...sep[0], date: '2026-08-15' }] }), '2026-08-16', protocol)
+  assert.match(clean, /- Free T %[^:\n]*: MET — 2 on 2026-08-15/, 'the same figures on a draw whose total T is a measurement')
+  // On the course (from Nov 7) the derived lipid figures are as confounded as the readings they are built from.
+  const onCourse = [{ date: '2026-12-15', fasting: 1, markers: JSON.stringify(panel), qualitative: null }]
+  const course = await markerGoalsContext(fakeDb({ goals: derived, labs: onCourse }), '2026-12-16', protocol)
+  assert.match(course, /- Trig\/HDL Ratio under 2[^:\n]*: CONFOUNDED — 2\.5 on 2026-12-15 was drawn on Isotretinoin/)
+  assert.match(course, /- Remnant Cholesterol at or under 30[^:\n]*: CONFOUNDED/)
+  assert.match(course, /- HOMA-IR under 1\.5[^:\n]*: MET/, 'not a lipid: judged as usual')
+})
+
 test('a red-cell reading inside a turnover window or after a phlebotomy is TOO EARLY, by the pages\' own windows (audit #44 item 16)', async () => {
   // The schedule with its two cuts: T on Aug 24, hCG on Oct 24.
   const rule = (compound, from, to, doseLabel, weekdays = [1, 4]) => ({ compound, doseLabel, weekdays, from, to })
