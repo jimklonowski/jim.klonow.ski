@@ -10,7 +10,8 @@
 // Pure; tests/clinicalCalcs.test.mjs pins each formula.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
-import { diffDays, roundTo } from './dates.ts'
+import { diffDays, roundTo, shiftDays } from './dates.ts'
+import { BEFORE_RECORDS } from './protocolStore.ts'
 
 /** Age in years (one decimal) on `date`, or null without a parseable birth date. */
 export function ageOn(birthDate: string | null | undefined, date: string): number | null {
@@ -23,6 +24,53 @@ export const FIVE_ARI_PSA_FACTOR = 2
 export const FIVE_ARI = /finasteride|dutasteride/i
 /** Before this many days on the drug the halving is incomplete, so the ×2 overstates. */
 export const FIVE_ARI_SETTLE_DAYS = 180
+
+/** A stretch of the schedule, as the 5-ARI question reads it (a rule or a standing version). */
+export interface FiveAriSpan {
+  compound: string
+  from: string
+  to?: string | null
+}
+
+export interface FiveAriCourse {
+  /** The first day of the unbroken stretch on the drug, or null when the schedule has no start
+   * date for it — on the drug, for a length nobody wrote down. */
+  from: string | null
+}
+
+/**
+ * The 5-ARI course covering `date`, or null when none was on the schedule that day. Its start is
+ * the first day of the UNBROKEN stretch, not of the schedule row in force: a dose or cadence
+ * change is a new version starting the day after the old one ends, and reading that version's
+ * own start put a reading "12 days into a 5-ARI" a year into the drug — early again after every
+ * edit, the ×2 said to overstate, the velocity never settled (audit #44 item 21). A switch from
+ * finasteride to dutasteride is the same stretch; a real gap starts a new one. A stretch whose
+ * first version has no start date (stored as BEFORE_RECORDS) has no known length.
+ */
+export function fiveAriOn(spans: readonly FiveAriSpan[], date: string): FiveAriCourse | null {
+  const drug = spans.filter(s => FIVE_ARI.test(s.compound))
+  const active = drug.filter(s => date >= s.from && (s.to == null || date <= s.to))
+  if (!active.length) return null
+  let start = active.map(s => s.from).sort()[0]!
+  for (;;) {
+    const dayBefore = shiftDays(start, -1)
+    const earlier = drug.filter(s => s.from < start && (s.to == null || s.to >= dayBefore)).map(s => s.from).sort()[0]
+    if (!earlier) break
+    start = earlier
+  }
+  return { from: start === BEFORE_RECORDS ? null : start }
+}
+
+/**
+ * Every draw before ?1 that carries a PSA reading, oldest first (`date`, `psa`): the velocity's
+ * history for a caller that holds only a window of recent draws (the labs summary). PSA is drawn
+ * about yearly, so the reading to compare with is usually outside any such window.
+ * tests/clinicalCalcs.test.mjs runs it on the real schema.
+ */
+export const PSA_HISTORY_SQL = `
+  SELECT date, json_extract(markers, '$.psa') AS psa FROM labs_entries
+  WHERE date < ?1 AND json_extract(markers, '$.psa') IS NOT NULL ORDER BY date
+`
 
 /** PSA velocity is only read over at least this gap: two draws a month apart measure assay noise. */
 export const PSA_VELOCITY_MIN_DAYS = 90
@@ -99,14 +147,14 @@ export interface CalcDraw {
 export interface CalcContext {
   /** YYYY-MM-DD from the profile, or null. */
   birthDate: string | null | undefined
-  /** The day the 5-ARI span covering `date` began, or null when none was on the schedule that day. */
-  fiveAriFrom: (date: string) => string | null
+  /** The 5-ARI course covering `date` (fiveAriOn over the schedule's spans), or null when none. */
+  fiveAri: (date: string) => FiveAriCourse | null
   female?: boolean
 }
 
-/** Days on the 5-ARI as of `date`, or null when not on one. */
+/** Days on the 5-ARI as of `date`; null when not on one, or on one with no start date on file. */
 function daysOnFiveAri(ctx: CalcContext, date: string): number | null {
-  const from = ctx.fiveAriFrom(date)
+  const from = ctx.fiveAri(date)?.from
   return from ? diffDays(from, date) : null
 }
 
@@ -123,20 +171,29 @@ export function clinicalCalcs(draws: readonly CalcDraw[], draw: CalcDraw, ctx: C
 
   // PSA
   if (m.psa != null) {
+    const on = ctx.fiveAri(draw.date) != null
+    // Null on the drug too, when its start is not on the schedule — which the protocol page
+    // defines as long-standing, since before the records began. No count is printed then (it read
+    // "20,000 days into a 5-ARI", counted from the placeholder date) and the reading is not
+    // called early.
     const daysOn = daysOnFiveAri(ctx, draw.date)
-    const on = daysOn != null
-    const early = on && daysOn < FIVE_ARI_SETTLE_DAYS
+    const early = daysOn != null && daysOn < FIVE_ARI_SETTLE_DAYS
+    const undated = on && daysOn == null
     const adjusted = psaAdjusted({ date: draw.date, value: m.psa, onFiveAri: on })
     out.push({
       key: 'psa_adjusted',
       label: 'PSA, adjusted',
       value: fmt(adjusted),
       unit: 'ng/mL',
-      inputs: on ? `${fmt(m.psa)} measured ${daysOn} days into a 5-ARI × ${FIVE_ARI_PSA_FACTOR}` : `${fmt(m.psa)} measured, no 5-ARI on the schedule that day`,
+      inputs: !on
+        ? `${fmt(m.psa)} measured, no 5-ARI on the schedule that day`
+        : undated
+          ? `${fmt(m.psa)} measured on a long-standing 5-ARI (no start date on the schedule) × ${FIVE_ARI_PSA_FACTOR}`
+          : `${fmt(m.psa)} measured ${daysOn} days into a 5-ARI × ${FIVE_ARI_PSA_FACTOR}`,
       reading: `${adjusted > 4 ? 'over 4.0 — the conventional urology referral line' : adjusted > 2.5 ? 'above 2.5 — worth a velocity read and a repeat' : 'under 2.5'}${early ? `; under ${FIVE_ARI_SETTLE_DAYS} days on the drug the halving is incomplete, so the ×2 overstates` : ''}`,
       tone: adjusted > 4 ? 'danger' : adjusted > 2.5 ? 'warn' : 'ok'
     })
-    const series = draws.filter(d => d.markers.psa != null && d.date <= draw.date).map(d => ({ date: d.date, value: d.markers.psa!, onFiveAri: ctx.fiveAriFrom(d.date) != null }))
+    const series = draws.filter(d => d.markers.psa != null && d.date <= draw.date).map(d => ({ date: d.date, value: d.markers.psa!, onFiveAri: ctx.fiveAri(d.date) != null }))
     const v = psaVelocity(series)
     if (v) {
       // Across the drug's start, or with the later reading still early on it, the two are not

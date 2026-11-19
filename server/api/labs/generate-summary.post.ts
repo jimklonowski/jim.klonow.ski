@@ -1,6 +1,5 @@
-import { FIVE_ARI, clinicalCalcs } from '#shared/utils/clinicalCalcs'
+import { PSA_HISTORY_SQL, clinicalCalcs, fiveAriOn } from '#shared/utils/clinicalCalcs'
 import { readingOn, readingProvenanceText, readingValueText, usualLab, type Readings } from '#shared/utils/labReadings'
-import { ruleActiveOn } from '#shared/utils/protocolRules'
 import { zSummaryGenerate } from '#shared/utils/schemas'
 import { BIOMARKERS } from '../../../app/data/biomarkers'
 import { readingNoteFor } from '../../data/markerCaveats'
@@ -19,6 +18,12 @@ const MAX_PRIOR_DRAWS = 6
 
 // Protocol context (dose-days per compound, draw timing on the dosing curves, stops and dose
 // changes) is server/utils/protocolContext.ts, shared with the DEXA summary.
+
+/** Every earlier draw with a PSA reading, oldest first, as the calculators read a draw. */
+async function psaDrawsBefore(db: D1Database, date: string): Promise<Array<{ date: string, markers: Record<string, number | null> }>> {
+  const { results } = await db.prepare(PSA_HISTORY_SQL).bind(date).all<{ date: string, psa: number | null }>()
+  return (results ?? []).flatMap(r => (typeof r.psa === 'number' ? [{ date: r.date, markers: { psa: r.psa } }] : []))
+}
 
 function refRange(key: string): string {
   const meta = BIOMARKERS[key]
@@ -120,9 +125,14 @@ export default defineEventHandler(async (event) => {
   // shows — PSA doubled on a 5-ARI, FIB-4, the cystatin C eGFR — instead of deriving its own.
   const birthRow = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('birth_date').first<{ value: string }>().catch(() => null)
   const spans = [...protocol.rules, ...protocol.standing]
-  const calcs = clinicalCalcs(draws, target, {
+  // The PSA velocity reads every PSA on file, not the comparison window above: PSA is drawn about
+  // once a year, so its previous reading is usually older than the last seven draws, and the
+  // summary was told the velocity "needs two PSA readings" while the page beside it printed one
+  // (audit #44 item 21). Only the draws that carry a PSA, and only when this one does.
+  const psaHistory = target.markers.psa != null ? await psaDrawsBefore(db, date) : []
+  const calcs = clinicalCalcs([...psaHistory, target], target, {
     birthDate: birthRow?.value ?? null,
-    fiveAriFrom: d => spans.find(s => FIVE_ARI.test(s.compound) && ruleActiveOn(s, d))?.from ?? null
+    fiveAri: d => fiveAriOn(spans, d)
   })
   // The hand-entered drug-gene notes (item 78).
   const pgxBlock = await pgxContext(db)

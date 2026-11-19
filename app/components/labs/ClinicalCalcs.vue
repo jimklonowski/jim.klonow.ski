@@ -62,9 +62,8 @@
 </template>
 
 <script setup lang="ts">
-import { FIVE_ARI, clinicalCalcs, type CalcDraw } from '#shared/utils/clinicalCalcs'
+import { clinicalCalcs, fiveAriOn, type CalcDraw } from '#shared/utils/clinicalCalcs'
 import type { CaveatSpan } from '#shared/utils/labNotes'
-import { ruleActiveOn } from '#shared/utils/protocolRules'
 
 // The clinical calculators (audit #43 item 77) for the viewed draw: /labs under the planned
 // draws, and the clinical summary. The 5-ARI question is answered from the schedule's spans
@@ -80,8 +79,9 @@ const props = defineProps<{
   isOwner?: boolean
 }>()
 
-const fiveAriFrom = (date: string) => props.spans.find(s => FIVE_ARI.test(s.compound) && ruleActiveOn(s, date))?.from ?? null
-const rows = computed(() => clinicalCalcs(props.draws, props.draw, { birthDate: props.birthDate, fiveAriFrom }))
+// fiveAriOn reads the whole unbroken stretch on the drug: the span in force alone restarted the
+// clock at every dose or cadence change (audit #44 item 21).
+const rows = computed(() => clinicalCalcs(props.draws, props.draw, { birthDate: props.birthDate, fiveAri: date => fiveAriOn(props.spans, date) }))
 
 function toneClass(tone: string) {
   return tone === 'danger' ? 'text-danger' : tone === 'warn' ? 'text-warn' : tone === 'ok' ? 'text-accent' : 'text-muted'
