@@ -59,7 +59,7 @@
           {{ facts.join(' · ') }}
         </p>
         <p class="mt-1 text-meta text-faint">
-          Built from the record as stored: lab values with each laboratory's own reference ranges, the dosing schedule, the logged vitals. No AI-written text. Printed {{ formatDate(today, 'long') }}.
+          Built from the record as stored: lab values judged against one set of reference ranges, with a laboratory's own printed range noted where it differs, the dosing schedule, the logged vitals. No AI-written text. Printed {{ formatDate(today, 'long') }}.
         </p>
       </header>
 
@@ -156,7 +156,7 @@
           Every current reading is inside its reference range.
         </p>
         <p class="mt-1 text-meta text-faint">
-          Current = each marker's newest reading in the {{ CURRENT_WINDOW_DAYS }} days before the latest draw. A reading marked † was printed by the lab as a bound (&lt; or &gt;), not a measurement.
+          Current = each marker's newest reading in the {{ CURRENT_WINDOW_DAYS }} days before the latest draw. HIGH and LOW are against the reference shown, the same range for every draw whichever lab ran it. A reading marked † was printed by the lab as a bound (&lt; or &gt;), not a measurement.
         </p>
       </section>
 
@@ -254,7 +254,7 @@
           v-else
           class="mt-1.5 text-muted"
         >
-          {{ journalShared ? 'No vitals logged in the window.' : 'The daily log is not part of this view.' }}
+          No vitals logged in the window.
         </p>
       </section>
 
@@ -322,10 +322,10 @@ import { TIMING_CAVEAT, drawTimingChips } from '#shared/utils/drawTimingView'
 import { foldCurrent } from '#shared/utils/estradiol'
 import { hctDraws, ladderRung, phlebotomyEffects, rungAction } from '#shared/utils/hematocrit'
 import { isCensored } from '#shared/utils/labNotes'
-import { readingOn, readingRangeText, readingValueText } from '#shared/utils/labReadings'
+import { printedRangeNote, readingOn, readingRangeText, readingValueText } from '#shared/utils/labReadings'
 import { CURRENT_WINDOW_DAYS, currentReadings, entriesAsOf } from '#shared/utils/labsTimeline'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
-import { drawLabel, nextPlannedDraw, purposeLines } from '#shared/utils/plannedDraws'
+import { countdownLabel, drawLabel, nextPlannedDraw, purposeLines } from '#shared/utils/plannedDraws'
 import { cadenceOf, ruleActiveOn } from '#shared/utils/protocolRules'
 import { markersDue } from '#shared/utils/retest'
 import { vaccineCoverage } from '#shared/utils/vaccines'
@@ -347,7 +347,6 @@ const HCT_ROWS = 6
 
 const route = useRoute()
 const today = useToday()
-const { role } = await useAuth()
 const [{ data: labsData, error, refresh }, { rules: protocolRules, standing: protocolStanding }, { data: cyclesData }, { data: journalData }, { data: phlebData }, { data: plannedData }, { data: vaccData }, { data: profileData }] = await Promise.all([
   useLabsEntries(),
   useProtocol(),
@@ -366,10 +365,11 @@ const asOf = computed(() => {
 // Blood draws on or before the date; an echo-only row is a scan.
 const draws = computed(() => entriesAsOf((labsData.value ?? []).filter(e => !isEchoOnly(e)), asOf.value))
 const latestDraw = computed(() => draws.value.at(-1) ?? null)
+// Every role's list carries the vitals and the dose log: the doctor's is a projection that keeps
+// exactly those (shared/utils/journalProjection.ts). The vitals section used to tell a doctor
+// "the daily log is not part of this view" whenever the window was empty, which was never the
+// reason (audit #44 item 25).
 const journal = computed(() => (journalData.value ?? []).filter(e => e.date <= asOf.value))
-// The doctor's view carries no daily log (the list answers empty), so the vitals section says so
-// instead of reading as "none logged".
-const journalShared = computed(() => role.value !== 'doctor')
 const cycles = computed(() => cyclesData.value ?? [])
 const rules = computed(() => effectiveRules(cycles.value, protocolRules.value))
 
@@ -424,12 +424,16 @@ const flagged = computed(() => {
     const draw = draws.value.find(d => d.date === cur.date)
     const prov = readingOn(draw, key)
     const censored = isCensored(draw, key)
-    // The range the lab printed for that reading when known, else the catalogue's.
-    const printed = readingRangeText(prov)
-    const ref = printed || (meta.refMin == null && meta.refMax == null ? '' : `${meta.refMin ?? ''}–${meta.refMax ?? ''}`.replace(/^–/, '<').replace(/–$/, '>'))
+    // The range the status was judged on — the catalogue's, as on every other page. The column
+    // used to print the lab's own range beside a status it had not been judged against ("LOW ·
+    // 30–400"), in the lab's unit even where the value is stored in another, and a floor-only
+    // range came out backwards ("40>"); what the lab printed now rides in the note where it
+    // differs (audit #44 item 25).
+    const ref = readingRangeText({ ref_low: meta.refMin, ref_high: meta.refMax })
     const notes = [
       censored ? '† a bound at the assay limit' : '',
       prov?.lab ? prov.lab : '',
+      printedRangeNote(cur.value, prov, meta),
       readingNoteShort(draw?.notes?.[key]?.note)
     ].filter(Boolean)
     out.push({ key, label: meta.label, value: readingValueText(fmtMarkerValue(cur.value), prov), unit: meta.unit, status, ref, date: cur.date, note: notes.join(' · ') })
@@ -487,14 +491,15 @@ const drawDates = computed(() => draws.value.map(d => d.date))
 const nextDraw = computed(() => {
   const s = nextPlannedDraw(plannedData.value ?? [], drawDates.value, asOf.value)
   if (!s) return ''
-  const when = s.inDays >= 0 ? `in ${s.inDays} day${s.inDays === 1 ? '' : 's'}` : `${-s.inDays} days ago, results pending`
+  // "today" / "tomorrow" / "in 9 days": a draw on the page's own date read "in 0 days".
+  const when = `${countdownLabel(s.inDays)}${s.inDays < 0 ? ', results pending' : ''}`
   const q = purposeLines(s.plan)
   return `${formatDate(s.plan.date, 'long')} (${when}) — ${drawLabel(s.plan)}${q.length ? `. To answer: ${q.join('; ')}` : ''}.`
 })
 const dueLine = computed(() => {
   const due = markersDue(draws.value, plannedData.value ?? [], asOf.value)
   if (!due.length) return ''
-  return `Retests due: ${due.map(d => `${BIOMARKERS[d.key]?.label ?? d.key} (${d.inDays < 0 ? `${-d.inDays} d overdue` : `in ${d.inDays} d`}${d.planned ? ', booked' : ''})`).join(', ')}.`
+  return `Retests due: ${due.map(d => `${BIOMARKERS[d.key]?.label ?? d.key} (${d.inDays < 0 ? `${-d.inDays} d overdue` : d.inDays === 0 ? 'today' : `in ${d.inDays} d`}${d.planned ? ', booked' : ''})`).join(', ')}.`
 })
 
 // --- 6. immunizations ---

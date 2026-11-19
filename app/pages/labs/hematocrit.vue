@@ -477,6 +477,7 @@ import {
   hctDraws, hctHeadline, ironLedger, ironSpansFrom, phlebotomyEffects, rungAction, transitionalFor, transitionalWindows
 } from '#shared/utils/hematocrit'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
+import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 import { HEMATOCRIT_DOSSIER } from '~/data/hematocritInfo'
 import { effectiveRules } from '~/utils/adherence'
@@ -624,7 +625,9 @@ const statCells = computed(() => {
       label: 'Ferritin',
       value: ferritin ? fmt(ferritin.ferritin!) : '—',
       unit: 'ng/mL',
-      class: ferritin && ferritin.ferritin! < 30 ? 'text-warn' : 'text-hi',
+      // LOW where the ferritin card says LOW (the catalogue's floor): this tile had its own line
+      // at 30, so a reading in between was a warning on /labs and plain here (audit #44 item 26).
+      class: ferritin && getStatus(ferritin.ferritin, BIOMARKERS.ferritin!) === 'low' ? 'text-warn' : 'text-hi',
       note: ferritin ? formatDate(ferritin.date, 'monthDay') : 'no reading'
     },
     {

@@ -2,6 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cellText, ledgerRows, parseDoseLabel, protocolOn, protocolText } from '../shared/utils/drawLedger.ts'
+import { effectiveRules } from '../app/utils/adherence.ts'
 
 const rules = [
   { compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2026-01-01', injected: true, doses: [{ from: '2026-01-01', label: '100 mg' }, { from: '2026-08-24', label: '75 mg' }] },
@@ -27,6 +28,22 @@ test('the protocol in force on a date: injectables at that day\'s dose step, wee
   assert.deepEqual(parseDoseLabel('2.5 iu'), { amount: 2.5, unit: 'iu' })
   assert.equal(parseDoseLabel('pea-sized'), null)
   assert.equal(protocolOn([{ compound: 'HGH', doseLabel: 'pea-sized', weekdays: [1], from: '2026-01-01', injected: true }], '2026-10-17')[0].text, 'pea-sized ×1/wk')
+})
+
+// Audit #44 item 24: /labs/ledger passed the standing rules alone. The page now passes
+// effectiveRules(cycles, rules), like the hematocrit page, the report and the marker cards.
+test('with the cycles folded in, a draw mid-cycle lists the cycle compound and wears the turnover mark its start opened', () => {
+  const standing = [{ compound: 'Testosterone Cypionate', doseLabel: '75 mg', weekdays: [1, 4], from: '2025-01-01', injected: true }]
+  const cycle = { name: 'Primo', start_date: '2026-09-21', planned_weeks: 12, compounds: [{ compound: 'Methenolone Enanthate', dose: 200, unit: 'mg', weekdays: [1, 4], fromWeek: 1 }] }
+  const draw = [{ date: '2026-10-17', fasting: true, markers: { hematocrit: 50.2 } }]
+  const [bare] = ledgerRows(draw, [], standing)
+  assert.deepEqual(bare.protocol.map(c => c.compound), ['Testosterone Cypionate'], 'the standing rules alone: no cycle compound')
+  assert.deepEqual(bare.cells.hematocrit.tags, [], 'and no window: T has run unchanged for well over a turnover')
+  const [merged] = ledgerRows(draw, [], effectiveRules([cycle], standing))
+  assert.deepEqual(merged.protocol.map(c => [c.compound, c.text]), [['Testosterone Cypionate', '150 mg/wk'], ['Methenolone Enanthate', '400 mg/wk']])
+  assert.deepEqual(merged.cells.hematocrit.tags.map(t => t.kind), ['transitional'], '26 days after the cycle started')
+  const [before] = ledgerRows([{ date: '2026-09-01', fasting: true, markers: { hematocrit: 50.2 } }], [], effectiveRules([cycle], standing))
+  assert.deepEqual([before.protocol.map(c => c.compound), before.cells.hematocrit.tags], [['Testosterone Cypionate'], []], 'a draw before the cycle is untouched')
 })
 
 test('one row per draw, newest first: timing chips, and each marker with its change from the previous usable reading', () => {

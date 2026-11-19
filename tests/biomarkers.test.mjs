@@ -2,8 +2,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { BIOMARKERS, computeMarkers, isEchoOnly, statusLabel } from '../app/data/biomarkers.ts'
+import { PSA_FIRST_YEAR_RISE, PSA_REFERRAL, PSA_VELOCITY_WATCH } from '../shared/utils/clinicalCalcs.ts'
 
 const panel = { glucose: 90, insulin: 9, triglycerides: 80, hdl: 50, cholesterol: 180, ldl: 100 }
+
+// Audit #44 item 26: the PSA card's text named a 1.4 ng/mL rise while the calculator under the
+// cards flagged a velocity of 0.75. Both lines now come from clinicalCalcs' constants.
+test('the PSA card names the same follow-up lines the calculator uses', () => {
+  const text = BIOMARKERS.psa.description
+  assert.equal(BIOMARKERS.psa.refMax, PSA_REFERRAL)
+  assert.ok(text.includes(`above ${PSA_REFERRAL.toFixed(1)}`), text)
+  assert.ok(text.includes(`faster than ${PSA_VELOCITY_WATCH} ng/mL a year`), text)
+  assert.ok(text.includes(`more than ${PSA_FIRST_YEAR_RISE} ng/mL within the first year`), text)
+  assert.ok(PSA_FIRST_YEAR_RISE > PSA_VELOCITY_WATCH, 'the first-year line is the looser of the two')
+})
 
 test('a fasting draw gets every derived marker its inputs allow', () => {
   const m = computeMarkers(panel, true)

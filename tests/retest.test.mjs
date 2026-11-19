@@ -2,6 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { RETEST_RULES, cadenceText, isFlaggedReading, markersDue, suggestedDrawDate } from '../shared/utils/retest.ts'
+import { HCT_LADDER, ladderRung } from '../shared/utils/hematocrit.ts'
+import { BIOMARKERS, getStatus } from '../app/data/biomarkers.ts'
 
 const TODAY = '2026-11-10'
 const plan = (id, date, over = {}) => ({ id, date, lab: 'Quest', panel: null, fasting: true, purpose: null, cycle_id: null, checkpoint_key: null, labs_date: null, created_at: '2026-10-01T00:00:00Z', ...over })
@@ -12,13 +14,44 @@ const draws = [
 ]
 
 test('a flagged reading runs the short clock: hematocrit at 50 every 42 days, ferritin under 38 every 42, a clean one the long clock', () => {
-  assert.equal(isFlaggedReading(RETEST_RULES.hematocrit, 50), true, 'at the bound counts')
+  assert.equal(isFlaggedReading(RETEST_RULES.hematocrit, 50), true, 'the ladder rung starts on its own figure')
   assert.equal(isFlaggedReading(RETEST_RULES.hematocrit, 49.9), false)
-  assert.equal(isFlaggedReading(RETEST_RULES.ferritin, 38), true)
+  assert.equal(isFlaggedReading(RETEST_RULES.ferritin, 37.9), true)
+  assert.equal(isFlaggedReading(RETEST_RULES.ferritin, 38), false, 'at the reference floor the card reads in range, and so does the clock')
+  assert.equal(isFlaggedReading(RETEST_RULES.alt, 46), false, 'at the reference ceiling likewise')
+  assert.equal(isFlaggedReading(RETEST_RULES.alt, 47), true)
   assert.equal(isFlaggedReading(RETEST_RULES.testosterone_total, 5000), false, 'no flagged clock on that rule')
   assert.equal(cadenceText(RETEST_RULES.hematocrit, true), '42-day cadence while 50 or over')
-  assert.equal(cadenceText(RETEST_RULES.ferritin, true), '42-day cadence while 38 or under')
+  assert.equal(cadenceText(RETEST_RULES.ferritin, true), '42-day cadence while under 38')
+  assert.equal(cadenceText(RETEST_RULES.alt, true), '42-day cadence while over 46')
   assert.equal(cadenceText(RETEST_RULES.hematocrit, false), '90-day cadence')
+})
+
+// Audit #44 item 26: the short clock and the card are one judgement. Every flag line is the
+// catalogue's reference bound, and a reading is flagged exactly when its card reads HIGH or LOW —
+// at the bound, just inside it and just outside it. The two lines that are their own are named.
+test('the flag lines are the catalogue\'s bounds, read the way the cards read them', () => {
+  const OWN_LINE = new Set(['hematocrit', 'ldl'])
+  assert.equal(RETEST_RULES.hematocrit.flagFrom, HCT_LADDER[0].at, 'hematocrit runs on the ladder\'s first rung')
+  assert.ok(isFlaggedReading(RETEST_RULES.hematocrit, HCT_LADDER[0].at) && ladderRung(HCT_LADDER[0].at) != null)
+  assert.ok(RETEST_RULES.ldl.flagAbove > BIOMARKERS.ldl.refMax, 'LDL\'s short clock starts past the card\'s HIGH line, never inside the range')
+  let checked = 0
+  for (const [key, rule] of Object.entries(RETEST_RULES)) {
+    if (rule.flaggedDays == null || OWN_LINE.has(key)) continue
+    const meta = BIOMARKERS[key]
+    assert.ok(meta, `${key} is in the catalogue`)
+    assert.equal(rule.flagFrom, undefined, `${key} has no rung of its own`)
+    if (rule.flagAbove != null) assert.equal(rule.flagAbove, meta.refMax, `${key}: the flag line is the reference ceiling`)
+    if (rule.flagBelow != null) assert.equal(rule.flagBelow, meta.refMin, `${key}: the flag line is the reference floor`)
+    const bound = rule.flagAbove ?? rule.flagBelow
+    for (const value of [bound - 0.1, bound, bound + 0.1]) {
+      const status = getStatus(value, meta)
+      const outThatSide = rule.flagAbove != null ? status === 'high' : status === 'low'
+      assert.equal(isFlaggedReading(rule, value), outThatSide, `${key} at ${value}: flagged = the card's ${status}`)
+    }
+    checked++
+  }
+  assert.ok(checked >= 7, `${checked} ruled markers checked`)
 })
 
 test('markers due: the clock starts at the last reading, soonest first; outside the horizon left out; a nearby open plan covers', () => {

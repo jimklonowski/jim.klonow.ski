@@ -103,6 +103,55 @@ export function readingRangeText(prov: ReadingProvenance | null | undefined): st
   return ''
 }
 
+/** Spellings of one unit that the labs print differently; the figures are on the same scale. */
+const UNIT_ALIASES: Record<string, string> = {
+  'thousand/ul': 'k/ul',
+  'x10e3/ul': 'k/ul',
+  '10^3/ul': 'k/ul',
+  'million/ul': 'm/ul',
+  'x10e6/ul': 'm/ul',
+  '10^6/ul': 'm/ul',
+  'uiu/ml': 'miu/l',
+  'ug/dl': 'mcg/dl',
+  'ug/l': 'ng/ml'
+}
+
+/** A unit reduced to what it measures in: case, spacing, µ and the labs' own spellings folded. */
+export function unitKey(unit: string | null | undefined): string {
+  const u = (unit ?? '').toLowerCase().replace(/\s+/g, '').replace(/[µμ]/g, 'u').replace(/²/g, '2')
+  return UNIT_ALIASES[u] ?? u
+}
+
+/** The range a reading was judged on: the site's catalogue entry for the marker. */
+export interface JudgedRange {
+  unit: string
+  refMin?: number
+  refMax?: number
+}
+
+/**
+ * A note for a reading whose laboratory printed a different reference range from the one the
+ * site judged it on, or '' when the two agree or the report printed none. The clinical summary
+ * showed the lab's range in its Reference column beside a status judged on the catalogue's, so a
+ * ferritin of 35 read "LOW · 30–400" and a CHW differential stored in cells/uL sat beside a range
+ * in K/uL (audit #44 item 25). The column now holds the range the status came from; this says what
+ * the lab printed. "Inside it" is claimed only for a measured value whose printed unit is known to
+ * be the site's — a range in another unit or with no unit on file, or a bound, is quoted and left
+ * unjudged.
+ */
+export function printedRangeNote(value: number, prov: ReadingProvenance | null | undefined, judged: JudgedRange): string {
+  const printed = readingRangeText(prov)
+  if (!prov || !printed) return ''
+  const unitKnown = prov.unit != null || judged.unit === ''
+  const sameUnit = unitKnown && unitKey(prov.unit) === unitKey(judged.unit)
+  const sameRange = (prov.ref_low ?? null) === (judged.refMin ?? null) && (prov.ref_high ?? null) === (judged.refMax ?? null)
+  if (sameRange && (sameUnit || prov.unit == null)) return ''
+  const text = `${printed}${prov.unit ? ` ${prov.unit}` : ''}`
+  if (!sameUnit || prov.qualifier) return `lab's own range ${text}`
+  const inside = (prov.ref_low == null || value >= prov.ref_low) && (prov.ref_high == null || value <= prov.ref_high)
+  return inside ? `inside the lab's own range, ${text}` : `lab's own range ${text}`
+}
+
 /** "Quest · LC/MS/MS · printed range 264–916 ng/dL · at the instrument ceiling" — for a title or a prompt line. */
 export function readingProvenanceText(prov: ReadingProvenance | null | undefined): string {
   if (!prov) return ''

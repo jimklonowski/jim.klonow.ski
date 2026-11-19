@@ -1,3 +1,4 @@
+import { PSA_FIRST_YEAR_RISE, PSA_REFERRAL, PSA_VELOCITY_WATCH } from '#shared/utils/clinicalCalcs'
 import { roundTo } from '#shared/utils/dates'
 
 export const CATEGORY_LABELS = {
@@ -51,7 +52,9 @@ export const BIOMARKERS: Record<string, BiomarkerMeta> = {
   lh: { label: 'LH', unit: 'mIU/mL', category: 'hormones', refMin: 1.5, refMax: 9.3, description: 'Luteinizing Hormone — signals the testes to produce testosterone. Works with FSH to regulate reproductive and hormonal function.' },
   // Quest male reference range; a one-off add-on, not on the standing panels.
   prolactin: { label: 'Prolactin', unit: 'ng/mL', category: 'hormones', refMin: 2.0, refMax: 18.0, description: 'Pituitary hormone that in men acts as a brake on the HPG axis. Elevated prolactin suppresses LH and testosterone, flattens libido, and drives the progestogenic gyno seen with 19-nors (nandrolone, trenbolone) that tamoxifen alone won\'t fix. Stress, poor sleep, a hard workout and a draw soon after waking all nudge it up, so a single mildly high reading is normally repeated before acting on it.' },
-  psa: { label: 'PSA', unit: 'ng/mL', category: 'hormones', refMax: 4.0, description: 'Prostate-Specific Antigen — the prostate screening marker, run on the annual CHW panel. Testosterone therapy can nudge it up; a rise of more than ~1.4 ng/mL within a year, or a level above 4.0, is the conventional trigger for urology follow-up.' },
+  // The three follow-up lines are clinicalCalcs' constants, so this text and the PSA calculator
+  // under the cards cannot name different figures again (audit #44 item 26).
+  psa: { label: 'PSA', unit: 'ng/mL', category: 'hormones', refMax: PSA_REFERRAL, description: `Prostate-Specific Antigen — the prostate screening marker, run on the annual CHW panel. Testosterone therapy can nudge it up. The conventional triggers for urology follow-up are a level above ${PSA_REFERRAL.toFixed(1)} or a rise faster than ${PSA_VELOCITY_WATCH} ng/mL a year; the testosterone-therapy guidelines add a rise of more than ${PSA_FIRST_YEAR_RISE} ng/mL within the first year of treatment.` },
 
   // Metabolic
   glucose: { label: 'Glucose', unit: 'mg/dL', category: 'metabolic', refMin: 65, refMax: 99, optimalMin: 70, optimalMax: 85, description: 'Fasting blood sugar level. Elevated readings indicate insulin resistance or pre-diabetes. Optimal fasting glucose is typically 70–85 mg/dL.' },

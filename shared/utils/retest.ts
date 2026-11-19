@@ -13,12 +13,14 @@ import { OVERDUE_DAYS, isOpen, plannedDrawStates, type PlannedDraw } from './pla
 export interface RetestRule {
   /** Days between readings while the last one was unremarkable. */
   days: number
-  /** Days between readings while the last one was flagged (needs flagAbove or flagBelow). */
+  /** Days between readings while the last one was flagged (needs one of the three flag lines). */
   flaggedDays?: number
-  /** A reading at or above this is flagged. */
+  /** A reading OVER this is flagged: the marker's reference ceiling, where its card turns HIGH. */
   flagAbove?: number
-  /** A reading at or below this is flagged. */
+  /** A reading UNDER this is flagged: the marker's reference floor, where its card turns LOW. */
   flagBelow?: number
+  /** A reading AT or over this is flagged: a rung that starts on its own figure (the hematocrit ladder's 50). */
+  flagFrom?: number
 }
 
 /**
@@ -26,9 +28,17 @@ export interface RetestRule {
  * run half-yearly unless out of range; PSA and vitamin D yearly. The hematocrit's 42 days at
  * 50 is the control panel's watch rung ("retest in 6 weeks"). Keyed by marker; the label and
  * unit come from BIOMARKERS where the number is shown.
+ *
+ * A flagAbove / flagBelow figure is the catalogue's reference bound and is read the way the card
+ * reads it — over, under, never "at". Both used to count the bound itself, so a ferritin of
+ * exactly 38 or an ALT of exactly 46 ran the short clock as "flagged" while its card read in
+ * range (audit #44 item 26). The hematocrit rung is the one line that includes its figure, as
+ * ladderRung does. LDL is the one figure that is not its card's: 130, the borderline-high line,
+ * where the card turns HIGH over 100 — left as it was, so a reading between the two keeps the
+ * half-yearly clock. tests/retest.test.mjs holds every other figure to the catalogue.
  */
 export const RETEST_RULES: Record<string, RetestRule> = {
-  hematocrit: { days: 90, flaggedDays: 42, flagAbove: 50 },
+  hematocrit: { days: 90, flaggedDays: 42, flagFrom: 50 },
   ferritin: { days: 90, flaggedDays: 42, flagBelow: 38 },
   testosterone_total: { days: 90 },
   estradiol: { days: 90 },
@@ -71,15 +81,16 @@ export interface MarkerDue {
 /** Whether a reading of `key` runs the flagged clock. */
 export function isFlaggedReading(rule: RetestRule, value: number): boolean {
   if (rule.flaggedDays == null) return false
-  if (rule.flagAbove != null && value >= rule.flagAbove) return true
-  if (rule.flagBelow != null && value <= rule.flagBelow) return true
+  if (rule.flagFrom != null && value >= rule.flagFrom) return true
+  if (rule.flagAbove != null && value > rule.flagAbove) return true
+  if (rule.flagBelow != null && value < rule.flagBelow) return true
   return false
 }
 
-/** "42-day cadence while 50 or over" / "90-day cadence". */
+/** "42-day cadence while 50 or over" / "42-day cadence while under 38" / "90-day cadence". */
 export function cadenceText(rule: RetestRule, flagged: boolean): string {
   if (!flagged || rule.flaggedDays == null) return `${rule.days}-day cadence`
-  const bound = rule.flagAbove != null ? `${rule.flagAbove} or over` : `${rule.flagBelow} or under`
+  const bound = rule.flagFrom != null ? `${rule.flagFrom} or over` : rule.flagAbove != null ? `over ${rule.flagAbove}` : `under ${rule.flagBelow}`
   return `${rule.flaggedDays}-day cadence while ${bound}`
 }
 

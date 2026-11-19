@@ -69,8 +69,8 @@
             class="text-dim"
           >
             <span
-              v-for="c in row.original.protocol"
-              :key="c.compound"
+              v-for="(c, i) in row.original.protocol"
+              :key="`${c.compound}-${i}`"
               class="block whitespace-nowrap"
               :title="`${c.compound} ${c.label} on ${c.perWeek} day${c.perWeek === 1 ? '' : 's'} a week`"
             >{{ c.short }} {{ c.text }}</span>
@@ -140,20 +140,28 @@ import { PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, type ReadingTag } from '#sha
 import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'
 import { boundPhrase } from '#shared/utils/labNotes'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
+import { effectiveRules } from '~/utils/adherence'
 
 useSeoMeta({ title: 'Labs · Draw ledger' })
 
 // The draw ledger (audit #43 item 64): per draw, the protocol in force, the injection-relative
 // timing and the gating markers with deltas — a doctor-readable table, printable, no AI.
-// shared/utils/drawLedger.ts holds the arithmetic. The dose log is a client-only list and the
-// doctor role has none, so that column reads "—" for it.
-const [{ data: labsData, error, refresh }, { data: journalData }, { rules }, { data: phlebData }] = await Promise.all([
+// shared/utils/drawLedger.ts holds the arithmetic. The doctor's journal list keeps the dose log
+// (shared/utils/journalProjection.ts), so the timing column fills in for that view too.
+const [{ data: labsData, error, refresh }, { data: journalData }, { rules: protocolRules }, { data: phlebData }, { data: cyclesData }] = await Promise.all([
   useLabsEntries(),
   useJournalEntries(),
   useProtocol(),
   // Each Hct/ferritin cell says when it sits in a turnover window or just after a phlebotomy (item 101).
-  usePhlebotomies()
+  usePhlebotomies(),
+  useCycles()
 ])
+
+// The standing schedule with every planned cycle folded in, as /labs/hematocrit, the report and
+// the marker cards read it. On the standing rules alone a draw taken mid-cycle listed no cycle
+// compound under "protocol in force", and its hematocrit wore no turnover mark for the window
+// the cycle's start opened, while the card for the same reading did (audit #44 item 24).
+const rules = computed(() => effectiveRules(cyclesData.value ?? [], protocolRules.value))
 
 // Blood draws only: an echo-only row is a scan, not a draw.
 const draws = computed(() => (labsData.value ?? []).filter(e => !isEchoOnly(e)))

@@ -74,8 +74,20 @@ export const PSA_HISTORY_SQL = `
 
 /** PSA velocity is only read over at least this gap: two draws a month apart measure assay noise. */
 export const PSA_VELOCITY_MIN_DAYS = 90
-/** The conventional velocity that triggers urology follow-up, ng/mL per year. */
+/**
+ * The PSA lines, in one place. Two of them are about a rise and are not the same test: the
+ * velocity line is a rate between any two comparable readings (the calculator below), the
+ * first-year line is a total rise over the first twelve months of testosterone therapy. The PSA
+ * card's text named only the second ("more than ~1.4 ng/mL within a year") beside a calculator
+ * flagging the first at 0.75, so a velocity of 1.0 read as a follow-up on one and as nothing on
+ * the other (audit #44 item 26). The card's description is built from these (app/data/biomarkers.ts).
+ */
+/** The level that is the conventional urology referral line, ng/mL. */
+export const PSA_REFERRAL = 4
+/** The velocity that warrants follow-up, ng/mL per year. */
 export const PSA_VELOCITY_WATCH = 0.75
+/** The rise within the first year of testosterone therapy that warrants follow-up, ng/mL. */
+export const PSA_FIRST_YEAR_RISE = 1.4
 
 export interface PsaReading {
   date: string
@@ -190,8 +202,8 @@ export function clinicalCalcs(draws: readonly CalcDraw[], draw: CalcDraw, ctx: C
         : undated
           ? `${fmt(m.psa)} measured on a long-standing 5-ARI (no start date on the schedule) × ${FIVE_ARI_PSA_FACTOR}`
           : `${fmt(m.psa)} measured ${daysOn} days into a 5-ARI × ${FIVE_ARI_PSA_FACTOR}`,
-      reading: `${adjusted > 4 ? 'over 4.0 — the conventional urology referral line' : adjusted > 2.5 ? 'above 2.5 — worth a velocity read and a repeat' : 'under 2.5'}${early ? `; under ${FIVE_ARI_SETTLE_DAYS} days on the drug the halving is incomplete, so the ×2 overstates` : ''}`,
-      tone: adjusted > 4 ? 'danger' : adjusted > 2.5 ? 'warn' : 'ok'
+      reading: `${adjusted > PSA_REFERRAL ? `over ${PSA_REFERRAL.toFixed(1)} — the conventional urology referral line` : adjusted > 2.5 ? 'above 2.5 — worth a velocity read and a repeat' : 'under 2.5'}${early ? `; under ${FIVE_ARI_SETTLE_DAYS} days on the drug the halving is incomplete, so the ×2 overstates` : ''}`,
+      tone: adjusted > PSA_REFERRAL ? 'danger' : adjusted > 2.5 ? 'warn' : 'ok'
     })
     const series = draws.filter(d => d.markers.psa != null && d.date <= draw.date).map(d => ({ date: d.date, value: d.markers.psa!, onFiveAri: ctx.fiveAri(d.date) != null }))
     const v = psaVelocity(series)
