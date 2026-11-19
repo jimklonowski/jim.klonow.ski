@@ -25,95 +25,49 @@
     <!-- The next open plan: the countdown and what and where, always; what it answers and the
          prep behind a toggle, closed until asked for — open, the two lists ran the panel past a
          screen's height above the marker cards (Jim, 2026-11-19). The toggle still says how much
-         is folded away, and when a prep step applies today. -->
+         is folded away, and when a prep step applies today. Open, the two lists sit UNDER the
+         main text, side by side: beside it, as a narrow right-hand column, they left the rest of
+         the panel blank down their whole length. -->
     <div
       v-if="next"
       class="mt-2.5 border border-line-soft bg-raised px-3.5 py-3"
       data-next-draw
     >
-      <div
-        class="grid grid-cols-1 gap-x-6 gap-y-3"
-        :class="detailsOpen && hasDetails ? 'sm:grid-cols-[minmax(150px,auto)_minmax(0,1fr)]' : ''"
-      >
-        <div class="min-w-0">
-          <div class="flex items-baseline gap-2">
-            <span
-              class="num-display text-display leading-none"
-              :class="bigClass"
-            >{{ big.value }}</span>
-            <span
-              v-if="big.unit"
-              class="text-label text-muted"
-            >{{ big.unit }}</span>
-          </div>
-          <p class="text-row text-hi mt-1.5">
-            {{ formatDate(next.plan.date, 'long') }}
-          </p>
-          <p class="text-meta text-muted">
-            {{ drawLabel(next.plan) }}
-          </p>
-          <p
-            v-if="footLine"
-            class="text-meta text-faint mt-1.5"
-          >
-            {{ footLine }}
-          </p>
-          <!-- Never folded: the one line here that asks for something to be done. -->
-          <p
-            v-if="next.status === 'overdue'"
-            class="text-small text-warn mt-1.5"
-          >
-            No results on file for this draw yet.
-            <NuxtLink
-              v-if="isOwner"
-              to="/labs/upload"
-              class="text-accent hover:text-accent-hover"
-            >upload results →</NuxtLink>
-          </p>
+      <div class="min-w-0">
+        <div class="flex items-baseline gap-2">
+          <span
+            class="num-display text-display leading-none"
+            :class="bigClass"
+          >{{ big.value }}</span>
+          <span
+            v-if="big.unit"
+            class="text-label text-muted"
+          >{{ big.unit }}</span>
         </div>
-
-        <div
-          v-if="detailsOpen && hasDetails"
-          id="planned-details"
-          class="min-w-0 text-small space-y-2.5"
-          data-next-draw-details
+        <p class="text-row text-hi mt-1.5">
+          {{ formatDate(next.plan.date, 'long') }}
+        </p>
+        <p class="text-meta text-muted">
+          {{ drawLabel(next.plan) }}
+        </p>
+        <p
+          v-if="footLine"
+          class="text-meta text-faint mt-1.5"
         >
-          <div v-if="questions.length">
-            <p class="tui-label text-micro">
-              answers
-            </p>
-            <div class="flex flex-col gap-0.5 mt-1">
-              <div
-                v-for="(q, i) in questions"
-                :key="q"
-                class="flex gap-2.5 min-w-0"
-              >
-                <span class="text-ghost shrink-0">{{ i === questions.length - 1 ? '└' : '├' }}</span>
-                <span class="text-body">{{ q }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="shownPrep.length">
-            <p class="tui-label text-micro">
-              prep
-            </p>
-            <div class="flex flex-col gap-0.5 mt-1">
-              <div
-                v-for="(r, i) in shownPrep"
-                :key="r.key"
-                class="flex gap-2.5 min-w-0"
-              >
-                <span class="text-ghost shrink-0">{{ i === shownPrep.length - 1 ? '└' : '├' }}</span>
-                <span
-                  class="shrink-0 w-14 text-meta"
-                  :class="r.state === 'ahead' ? 'text-faint' : 'text-accent'"
-                >{{ prepWhen(r) }}</span>
-                <span :class="r.state === 'ahead' ? 'text-muted' : 'text-body'">{{ r.text }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          {{ footLine }}
+        </p>
+        <!-- Never folded: the one line here that asks for something to be done. -->
+        <p
+          v-if="next.status === 'overdue'"
+          class="text-small text-warn mt-1.5"
+        >
+          No results on file for this draw yet.
+          <NuxtLink
+            v-if="isOwner"
+            to="/labs/upload"
+            class="text-accent hover:text-accent-hover"
+          >upload results →</NuxtLink>
+        </p>
       </div>
 
       <div
@@ -153,6 +107,57 @@
             ✕ delete
           </button>
         </span>
+      </div>
+
+      <!-- Two columns from tablet width when there are both lists; one list takes the row. -->
+      <div
+        v-if="detailsOpen && hasDetails"
+        id="planned-details"
+        class="mt-3 pt-3 border-t border-line-soft grid grid-cols-1 gap-x-8 gap-y-3 text-small"
+        :class="questions.length && shownPrep.length ? 'md:grid-cols-2' : ''"
+        data-next-draw-details
+      >
+        <div
+          v-if="questions.length"
+          class="min-w-0"
+        >
+          <p class="tui-label text-micro">
+            answers
+          </p>
+          <div class="flex flex-col gap-0.5 mt-1">
+            <div
+              v-for="(q, i) in questions"
+              :key="q"
+              class="flex gap-2.5 min-w-0"
+            >
+              <span class="text-ghost shrink-0">{{ i === questions.length - 1 ? '└' : '├' }}</span>
+              <span class="text-body">{{ q }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="shownPrep.length"
+          class="min-w-0"
+        >
+          <p class="tui-label text-micro">
+            prep
+          </p>
+          <div class="flex flex-col gap-0.5 mt-1">
+            <div
+              v-for="(r, i) in shownPrep"
+              :key="r.key"
+              class="flex gap-2.5 min-w-0"
+            >
+              <span class="text-ghost shrink-0">{{ i === shownPrep.length - 1 ? '└' : '├' }}</span>
+              <span
+                class="shrink-0 w-14 text-meta"
+                :class="r.state === 'ahead' ? 'text-faint' : 'text-accent'"
+              >{{ prepWhen(r) }}</span>
+              <span :class="r.state === 'ahead' ? 'text-muted' : 'text-body'">{{ r.text }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <p
