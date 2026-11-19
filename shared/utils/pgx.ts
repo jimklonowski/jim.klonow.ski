@@ -31,9 +31,13 @@ export function pgxNotesForCompound(notes: readonly PgxNote[], compound: string)
   return notes.filter(n => n.compounds.some(c => compoundMatches(c, compound)))
 }
 
-/** The notes that bear on a marker key. */
-export function pgxNotesForMarker(notes: readonly PgxNote[], marker: string): PgxNote[] {
-  return notes.filter(n => n.markers.includes(marker))
+/**
+ * The notes that bear on a marker key, in the order entered — or on any of several keys, for a
+ * card that stands for more than one (estradiol's two assays): a note naming both is listed once.
+ */
+export function pgxNotesForMarker(notes: readonly PgxNote[], marker: string | readonly string[]): PgxNote[] {
+  const keys = typeof marker === 'string' ? [marker] : marker
+  return notes.filter(n => n.markers.some(m => keys.includes(m)))
 }
 
 /** "TPMT *1/*3A — intermediate metabolizer" */

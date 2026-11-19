@@ -20,6 +20,14 @@
           class="shrink-0 text-nano leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
           :title="`Taken while on ${caveatCompound} — see the note inside`"
         >on {{ caveatCompound }}</span>
+        <!-- A drug-gene note bears on this marker: the gene, as the protocol rows wear it. -->
+        <span
+          v-for="n in geneNotes"
+          :key="n.id"
+          class="shrink-0 text-nano leading-none px-1 py-0.5 border border-warn text-warn uppercase tracking-[0.08em]"
+          :title="`${pgxHeading(n)}: ${n.note}`"
+          data-pgx-chip
+        >{{ n.gene }}</span>
         <!-- Which assay the face is reading, once the history holds both (the estradiol pair). -->
         <span
           v-if="assayChip"
@@ -119,6 +127,16 @@
           class="text-small leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
         >
           † {{ n.dateLabel }} — {{ n.note }}
+        </p>
+
+        <!-- Drug-gene notes that name this marker, worded as on the compound page. -->
+        <p
+          v-for="n in geneNotes"
+          :key="n.id"
+          class="text-small leading-[1.7] text-warn border-l-2 border-warn pl-2.5"
+          data-pgx-marker
+        >
+          <span class="text-hi">{{ pgxHeading(n) }}</span> — {{ n.note }}
         </p>
 
         <p
@@ -294,6 +312,7 @@ import { courseCaveatSpans } from '#shared/utils/accutane'
 import { E2_IMMUNOASSAY, E2_SENSITIVE, ESTRADIOL_ASSAYS, ESTRADIOL_DESCRIPTION, ESTRADIOL_LABEL, estradiolKeyOn, isEstradiolKey } from '#shared/utils/estradiol'
 import { boundKind, boundPhrase, boundValueText, caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import type { ReadingNote } from '#shared/utils/labNotes'
+import { pgxHeading, pgxNotesForMarker } from '#shared/utils/pgx'
 import { readingOn, readingProvenanceText, readingValueText, usualLab, type Readings } from '#shared/utils/labReadings'
 import { PHLEBOTOMY_EFFECT_DAYS, PHLEBOTOMY_MARKERS, RBC_MASS_MARKERS, RBC_TURNOVER_DAYS, readingTags, transitionalWindows } from '#shared/utils/hematocrit'
 import { effectiveRules } from '~/utils/adherence'
@@ -412,6 +431,14 @@ const noteOn = (e: Entry | undefined, key: string) => {
   return n && paired && !n.censored ? null : n
 }
 const readingNote = computed(() => noteOn(withValue.value.at(-1), faceKey.value))
+
+// Drug-gene notes (audit #43 item 78) that name this marker: a standing fact about every reading
+// of it, so it shows whichever draw is on screen. The notes' own form has said since it shipped
+// that they are "shown beside the compounds and markers they bear on", and the marker half was
+// never wired: pgxNotesForMarker had no caller (audit #44 item 27). The estradiol card stands for
+// both assay keys, so a note naming either shows there.
+const { data: pgxData } = usePgxNotes()
+const geneNotes = computed(() => pgxNotesForMarker(pgxData.value ?? [], paired ? [E2_SENSITIVE, E2_IMMUNOASSAY] : props.biomarkerKey))
 
 // The face prints the reading as the report did: "<0.3" for a floor, ">1500" for a ceiling. It
 // used to print the bare figure, so a bound read as a measurement everywhere but the history row

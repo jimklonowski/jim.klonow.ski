@@ -21,6 +21,20 @@ test('a note matches its compound by name, tolerant of salts and case, never by 
   assert.deepEqual(pgxNotesForMarker(notes, 'ldl'), [])
 })
 
+// Audit #44 item 27: the marker card is the caller, and the estradiol card asks for both assays.
+test('a card that stands for several keys gets a note naming any of them, once, in the order entered', () => {
+  const more = [
+    ...notes,
+    { id: 3, gene: 'GENE3', genotype: null, compounds: [], markers: ['estradiol_sensitive', 'estradiol'], note: 'Both assays.' },
+    { id: 4, gene: 'GENE4', genotype: null, compounds: [], markers: ['estradiol'], note: 'One assay.' }
+  ]
+  assert.deepEqual(pgxNotesForMarker(more, ['estradiol_sensitive', 'estradiol']).map(n => n.id), [3, 4])
+  assert.deepEqual(pgxNotesForMarker(more, 'estradiol_sensitive').map(n => n.id), [3])
+  assert.deepEqual(pgxNotesForMarker(more, ['bilirubin']).map(n => n.id), [2])
+  assert.deepEqual(pgxNotesForMarker(more, []), [])
+  assert.deepEqual(pgxNotesForMarker(more, 'bili'), [], 'a key matches whole, never as a fragment')
+})
+
 test('headings, the typed list, and the prompt block', () => {
   assert.equal(pgxHeading(notes[0]), 'GENE1 *1/*9 — slow')
   assert.equal(pgxHeading(notes[1]), 'GENE2')
