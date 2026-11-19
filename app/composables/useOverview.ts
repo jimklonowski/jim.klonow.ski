@@ -6,8 +6,9 @@ import type { Role } from '#shared/utils/access'
 import { BIOMARKERS, countFlags, getStatus, isEchoOnly } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
 import { foldCurrent } from '#shared/utils/estradiol'
-import { isCensored } from '#shared/utils/labNotes'
+import { boundKind, boundValueText, isCensored, type BoundKind } from '#shared/utils/labNotes'
 import { currentReadings } from '#shared/utils/labsTimeline'
+import { fmtMarkerValue } from '#shared/utils/markerValue'
 
 export interface FlaggedMarker {
   key: string
@@ -16,8 +17,13 @@ export interface FlaggedMarker {
   status: 'low' | 'high'
   /** The draw this reading came from — the latest draw's, or an earlier one inside the window. */
   date: string
-  /** Change vs the previous draw that recorded this marker, or null on a first reading. */
+  /** Change vs the previous draw that recorded this marker; null on a first reading, and for a bound. */
   delta: number | null
+  /** The reading is a bound the report printed with < or > (or a censored hand note): a floor, a
+   * ceiling, or a limit of unknown direction. Null for a measurement. */
+  bound: BoundKind | null
+  /** The value as printed: "<0.3" for a floor, the figure alone for a measurement. */
+  valueText: string
 }
 
 // Aggregator behind the mission-control home page, over the complete lists it charts. The site
@@ -96,7 +102,8 @@ export function useOverview(role: Ref<Role | null>) {
       if (!meta) continue
       const status = getStatus(value, meta)
       if (status !== 'high' && status !== 'low') continue
-      out.push({ key, meta, value, status, date, delta: deltaFor(key, date, value) })
+      const draw = draws.value.find(d => d.date === date)
+      out.push({ key, meta, value, status, date, delta: deltaFor(key, date, value), bound: boundKind(draw, key), valueText: boundValueText(fmtMarkerValue(value), draw, key) })
     }
     return out.sort((a, b) =>
       (a.status === b.status ? 0 : a.status === 'high' ? -1 : 1)

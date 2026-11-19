@@ -67,6 +67,12 @@
         class="shrink-0 text-faint"
       >as of {{ formatDate(carriedFrom, 'monthDay') }}</span>
       <span
+        v-else-if="boundNote"
+        class="shrink-0 text-faint"
+        title="A bound, not a measurement: the report printed it with < or >, so no change is computed from it"
+        data-bound-note
+      >{{ boundNote }}</span>
+      <span
         v-else-if="deltaText"
         class="shrink-0"
         :class="deltaClass"
@@ -286,7 +292,7 @@ import { BIOMARKERS, getStatus, statusLabel } from '~/data/biomarkers'
 import type { BiomarkerMeta } from '~/data/biomarkers'
 import { courseCaveatSpans } from '#shared/utils/accutane'
 import { E2_IMMUNOASSAY, E2_SENSITIVE, ESTRADIOL_ASSAYS, ESTRADIOL_DESCRIPTION, ESTRADIOL_LABEL, estradiolKeyOn, isEstradiolKey } from '#shared/utils/estradiol'
-import { caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
+import { boundKind, boundPhrase, boundValueText, caveatCompoundOn, isCensored, readingNoteOn } from '#shared/utils/labNotes'
 import type { ReadingNote } from '#shared/utils/labNotes'
 import { readingOn, readingProvenanceText, readingValueText, usualLab, type Readings } from '#shared/utils/labReadings'
 import { PHLEBOTOMY_EFFECT_DAYS, PHLEBOTOMY_MARKERS, RBC_MASS_MARKERS, RBC_TURNOVER_DAYS, readingTags, transitionalWindows } from '#shared/utils/hematocrit'
@@ -407,10 +413,15 @@ const noteOn = (e: Entry | undefined, key: string) => {
 }
 const readingNote = computed(() => noteOn(withValue.value.at(-1), faceKey.value))
 
+// The face prints the reading as the report did: "<0.3" for a floor, ">1500" for a ceiling. It
+// used to print the bare figure, so a bound read as a measurement everywhere but the history row
+// (audit #44 item 23). A bound has no change to show, so the corner says which bound it is.
+const faceBound = computed(() => boundKind(withValue.value.at(-1), faceKey.value))
 const displayValue = computed(() => {
   const v = current.value
-  return v == null ? '—' : fmtMarkerValue(v)
+  return v == null ? '—' : boundValueText(fmtMarkerValue(v), withValue.value.at(-1), faceKey.value)
 })
+const boundNote = computed(() => (faceBound.value ? `${boundPhrase(faceBound.value)}` : null))
 
 const status = computed(() => getStatus(current.value, meta.value))
 const statusColor = computed(() => STATUS_COLORS[status.value])

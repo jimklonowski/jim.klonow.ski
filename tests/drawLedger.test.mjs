@@ -58,6 +58,22 @@ test('one row per draw, newest first: timing chips, and each marker with its cha
   assert.deepEqual(ledgerRows([], journal, rules), [])
 })
 
+test('a bound cell keeps the sign the report printed: a floor is "<", a ceiling ">" (audit #44 item 23)', () => {
+  const rows = ledgerRows([
+    { date: '2026-08-15', fasting: true, markers: { testosterone_total: 1180, ferritin: 61 } },
+    { date: '2026-09-09', fasting: false, markers: { testosterone_total: 1500, ferritin: 5 }, readings: { testosterone_total: { qualifier: '>' }, ferritin: { qualifier: '<' } } },
+    { date: '2026-10-17', fasting: true, markers: { testosterone_total: 980, ferritin: 48 } }
+  ], [], [])
+  const [oct, sep] = rows
+  assert.equal(cellText(sep.cells.testosterone_total), '>1500†')
+  assert.equal(sep.cells.testosterone_total.bound, 'ceiling')
+  assert.equal(cellText(sep.cells.ferritin), '<5†')
+  assert.equal(sep.cells.ferritin.bound, 'floor')
+  assert.equal(sep.cells.hematocrit.bound, null, 'an empty cell has no bound')
+  assert.equal(oct.cells.ferritin.bound, null)
+  assert.equal(cellText(oct.cells.ferritin), '48 (−13)', 'diffed against the last measurement, never the bound')
+})
+
 test('the estradiol column reads the LC/MS/MS reading when a draw has it, and never diffs one assay against the other (audit #44 item 20)', () => {
   const e2 = (date, markers) => ({ date, fasting: true, markers })
   const rows = ledgerRows([

@@ -62,6 +62,6 @@ test('a printed bound censors the reading: isCensored, and the ledger daggers it
     sep,
     { date: '2026-10-17', markers: { testosterone_total: 980 } }
   ], [], [])
-  assert.equal(cellText(rows[1].cells.testosterone_total), '1500†')
+  assert.equal(cellText(rows[1].cells.testosterone_total), '>1500†', 'printed with its sign (audit #44 item 23)')
   assert.equal(cellText(rows[0].cells.testosterone_total), '980 (−200)', 'Oct diffs against Aug, not the ceiling')
 })

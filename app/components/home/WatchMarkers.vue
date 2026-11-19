@@ -88,7 +88,7 @@ import type { LabsEntry } from '#shared/types/labs'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
 import { E2_IMMUNOASSAY, E2_SENSITIVE, ESTRADIOL_ASSAYS, estradiolKeyOn, isEstradiolKey } from '#shared/utils/estradiol'
-import { isCensored } from '#shared/utils/labNotes'
+import { boundKind, boundValueText, isCensored } from '#shared/utils/labNotes'
 import { CHART_ACCENT, STATUS_COLORS } from '~/utils/chartTheme'
 
 // The four markers the protocol is steered by, each as its whole draw history in one small
@@ -149,7 +149,7 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((slot) => {
   if (!meta) return []
   const series = props.draws
     .filter(d => d.markers[key] != null)
-    .map(d => ({ date: d.date, value: d.markers[key] as number, censored: isCensored(d, key) }))
+    .map(d => ({ date: d.date, value: d.markers[key] as number, censored: isCensored(d, key), bound: boundKind(d, key), text: boundValueText(fmt(d.markers[key] as number), d, key) }))
   if (series.length < 2) return []
 
   const latest = series.at(-1)!
@@ -186,7 +186,10 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((slot) => {
   const label = meta.label.replace(/\s*\(.*\)$/, '')
   const bothAssays = isEstradiolKey(key) && props.draws.some(d => d.markers[E2_SENSITIVE] != null) && props.draws.some(d => d.markers[E2_IMMUNOASSAY] != null)
   const ref = [refLabel(meta.refMin, meta.refMax), bothAssays ? ESTRADIOL_ASSAYS[key]!.short : ''].filter(Boolean).join(' · ')
-  const foot = latest.censored ? `† ${fmt(latest.value)} is a ceiling` : ref
+  // The bound by its own name: a "<" reading is a floor, and was called a ceiling like the one
+  // censored reading this tile was written for (audit #44 item 23).
+  const boundWord = latest.bound === 'floor' ? 'a floor' : latest.bound === 'ceiling' ? 'a ceiling' : 'a bound'
+  const foot = latest.censored ? `† ${latest.text} is ${boundWord}` : ref
   const statusWord = { optimal: 'in range', low: 'low', high: 'high', unknown: 'no reference range' }[status] ?? status
   return [{
     // The slot, not the assay: the link opens the one estradiol card either way.
@@ -194,7 +197,7 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((slot) => {
     // "Testosterone (Total)" → "Testosterone": the parenthetical doesn't fit a quarter-width tile.
     label,
     unit: meta.unit,
-    value: fmt(latest.value),
+    value: latest.text,
     censored: latest.censored,
     color,
     guideY: guideShown ? yOf(guide) : null,
@@ -204,7 +207,7 @@ const tiles = computed(() => WATCH_MARKERS.flatMap((slot) => {
     asOf: `as of ${formatDate(latest.date, 'monthDay')}`,
     // What the tile says (the value, its status, the reference, the date) — a reader used to get
     // only the marker's name and where the link goes.
-    aria: `${label}: ${fmt(latest.value)} ${meta.unit}${latest.censored ? ' (a ceiling)' : ''}, ${statusWord}; ${foot}; as of ${formatDate(latest.date, 'monthDay')} — ${key === 'hematocrit' ? 'open the hematocrit control panel' : 'open its history on the labs page'}`
+    aria: `${label}: ${latest.text} ${meta.unit}${latest.censored ? ` (${boundWord})` : ''}, ${statusWord}; ${foot}; as of ${formatDate(latest.date, 'monthDay')} — ${key === 'hematocrit' ? 'open the hematocrit control panel' : 'open its history on the labs page'}`
   }]
 }))
 </script>

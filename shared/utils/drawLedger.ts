@@ -8,7 +8,7 @@
 import { COMPOUND_SHORT, drawTimingChips, type TimingChip } from './drawTimingView.ts'
 import { E2_IMMUNOASSAY, E2_SENSITIVE, isEstradiolKey, slotKeyOn } from './estradiol.ts'
 import { readingTags, transitionalWindows, type Phlebotomy, type ReadingTag } from './hematocrit.ts'
-import { isCensored, readingNoteOn, type NotedDraw } from './labNotes.ts'
+import { boundKind, isCensored, readingNoteOn, type BoundKind, type NotedDraw } from './labNotes.ts'
 import { PK_MODELS } from './pk.ts'
 import type { pkDosesFor } from './pk.ts'
 import { doseStepOn, ruleActiveOn, type ProtocolRule } from './protocolRules.ts'
@@ -48,6 +48,8 @@ export interface MarkerCell {
   value: number | null
   /** A bound at the assay's limit: shown daggered, never diffed. */
   censored: boolean
+  /** Which bound: a floor ("<"), a ceiling (">"), or a limit of unknown direction; null when measured. */
+  bound: BoundKind | null
   /** A per-reading note (a different assay or lab) rides on this value. */
   noted: boolean
   /** Change from the previous usable reading of this marker; null without one. */
@@ -115,6 +117,7 @@ export function ledgerRows(draws: readonly LedgerDraw[], journal: readonly Logge
         key,
         value,
         censored,
+        bound: value != null ? boundKind(d, key) : null,
         // A note that only says which estradiol assay this is has nothing left to add: the column
         // reads one assay per draw and marks the immunoassay itself. A bound still shows.
         noted: readingNoteOn(d, key) != null && !(isEstradiolKey(key) && !censored),
@@ -142,11 +145,11 @@ export function protocolText(cells: readonly ProtocolCell[]): string {
   return cells.map(c => `${c.short} ${c.text}`).join(' · ')
 }
 
-/** "980 (−200)" / "1500†" / "—" */
+/** "980 (−200)" / ">1500†" / "<0.3†" / "—": a bound keeps the sign the report printed it with. */
 export function cellText(cell: MarkerCell): string {
   if (cell.value == null) return '—'
   const v = Number(cell.value.toFixed(1)).toString()
-  if (cell.censored) return `${v}†`
+  if (cell.censored) return `${cell.bound === 'floor' ? '<' : cell.bound === 'ceiling' ? '>' : ''}${v}†`
   if (cell.delta == null) return v
   const sign = cell.delta > 0 ? '+' : cell.delta < 0 ? '−' : '±'
   return `${v} (${sign}${Math.abs(cell.delta)})`

@@ -28,7 +28,7 @@
         <span
           class="num-display text-stat leading-none whitespace-nowrap text-right lg:text-left"
           :style="{ color: color(f) }"
-        >{{ format(f.value) }}<span
+        >{{ f.valueText }}<span
           v-if="f.meta.unit"
           class="ml-1 text-micro text-muted"
         >{{ f.meta.unit }}</span></span>
@@ -85,9 +85,11 @@ function color(f: FlaggedMarker) {
 const format = fmtMarkerValue
 
 /** e.g. "HIGH ▲ 1782", "HIGH ▼ 172.9", "LOW · first" on a first-ever reading, "HIGH · no change"
- * when the move is under the printed resolution. */
+ * when the move is under the printed resolution. A bound has no change to compute, and says which
+ * bound it is: an LH printed "<0.3" read "LOW · first" on every draw (audit #44 item 23). */
 function tag(f: FlaggedMarker) {
   const label = f.status.toUpperCase()
+  if (f.bound) return `${label} · ${f.bound}`
   if (f.delta == null) return `${label} · first`
   if (Math.abs(f.delta) < 0.05) return `${label} · no change`
   const arrow = f.delta >= 0 ? '▲' : '▼'

@@ -3,7 +3,7 @@
 // (shared/utils/labNotes.ts) read those shapes.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { caveatCompoundOn, isCensored, readingNoteOn } from '../shared/utils/labNotes.ts'
+import { boundKind, boundPhrase, boundValueText, caveatCompoundOn, isCensored, readingNoteOn } from '../shared/utils/labNotes.ts'
 import { eventBands } from '../shared/utils/protocolEvents.ts'
 import { PROTOCOL_EVENTS } from '../server/data/protocolEvents.ts'
 import { MARKER_CAVEATS, READING_NOTES, isCensoredOn, readingNoteFor, readingNotesOn } from '../server/data/markerCaveats.ts'
@@ -36,6 +36,31 @@ test('the client helpers read the notes off the draw — a draw without them, or
   assert.equal(isCensored({ date: '2026-09-09', markers: {} }, 'testosterone_total'), false, 'a demo draw on the same date carries no notes')
   assert.equal(isCensored(undefined, 'testosterone_total'), false)
   assert.equal(readingNoteOn(null, 'estradiol'), null)
+})
+
+test('a bound is a floor, a ceiling or a limit, and is printed with the sign the report gave it (audit #44 item 23)', () => {
+  // LH on a suppressing protocol: the report prints "<0.3", a floor.
+  const floor = { date: '2026-10-17', markers: { lh: 0.3 }, readings: { lh: { qualifier: '<', lab: 'Quest' } } }
+  assert.equal(boundKind(floor, 'lh'), 'floor')
+  assert.equal(boundValueText('0.3', floor, 'lh'), '<0.3')
+  assert.equal(boundPhrase('floor'), 'below the assay\'s floor')
+  // The Sep 9 immunoassay testosterone: ">1500", a ceiling, by the printed qualifier.
+  const ceiling = { date: '2026-09-09', markers: { testosterone_total: 1500 }, readings: { testosterone_total: { qualifier: '>' } }, notes: readingNotesOn('2026-09-09') }
+  assert.equal(boundKind(ceiling, 'testosterone_total'), 'ceiling')
+  assert.equal(boundValueText(1500, ceiling, 'testosterone_total'), '>1500')
+  assert.equal(boundPhrase('ceiling'), 'at the assay\'s ceiling')
+  // The same reading before provenance existed: the hand note says censored, the direction is not on file.
+  const noted = { date: '2026-09-09', markers: { testosterone_total: 1500 }, notes: readingNotesOn('2026-09-09') }
+  assert.equal(boundKind(noted, 'testosterone_total'), 'limit')
+  assert.equal(boundValueText(1500, noted, 'testosterone_total'), '1500', 'no sign is invented')
+  assert.equal(boundPhrase('limit'), 'at the assay\'s limit')
+  // A measurement, a provenance-only note, another marker on the draw, no draw.
+  assert.equal(boundKind({ date: 'd', markers: { lh: 2.1 }, readings: { lh: { lab: 'Quest' } } }, 'lh'), null)
+  assert.equal(boundKind({ date: '2026-10-17', markers: { estradiol: 157 }, notes: readingNotesOn('2026-10-17') }, 'estradiol'), null)
+  assert.equal(boundKind(floor, 'fsh'), null)
+  assert.equal(boundKind(null, 'lh'), null)
+  assert.equal(boundValueText('2.1', null, 'lh'), '2.1')
+  for (const d of [floor, ceiling, noted]) assert.equal(isCensored(d, Object.keys(d.markers)[0]), true, 'every bound is censored')
 })
 
 test('the medication caveat follows the protocol dates, over the caveats the server sent', () => {

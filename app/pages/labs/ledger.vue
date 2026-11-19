@@ -120,7 +120,7 @@
       </UTable>
 
       <p class="px-4 sm:px-6 py-3 text-meta text-faint leading-[1.6] print:break-inside-avoid">
-        Change in parentheses is against the previous usable reading of that marker. † a value at the assay's ceiling, a bound rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). {{ TAG_GLYPH.transitional }} a red-cell reading inside the ~{{ RBC_TURNOVER_DAYS }}-day turnover window after a dose change, which cannot yet show that change's full effect. {{ TAG_GLYPH['post-phlebotomy'] }} a reading within {{ PHLEBOTOMY_EFFECT_DAYS / 7 }} weeks of a blood donation or therapeutic phlebotomy, which reads the blood taken out. <template v-if="mixedEstradiol">
+        Change in parentheses is against the previous usable reading of that marker. † a value the lab printed as a bound (over the assay's ceiling with &gt;, or under its floor with &lt;) rather than a measurement, never diffed. * a reading with an assay or lab note (a different assay or lab from its neighbours). {{ TAG_GLYPH.transitional }} a red-cell reading inside the ~{{ RBC_TURNOVER_DAYS }}-day turnover window after a dose change, which cannot yet show that change's full effect. {{ TAG_GLYPH['post-phlebotomy'] }} a reading within {{ PHLEBOTOMY_EFFECT_DAYS / 7 }} weeks of a blood donation or therapeutic phlebotomy, which reads the blood taken out. <template v-if="mixedEstradiol">
           Estradiol is the ultrasensitive LC/MS/MS reading; {{ IMMUNOASSAY_GLYPH }} marks a draw that only has the standard immunoassay, which is diffed against other immunoassay readings only.
         </template> Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
       </p>
@@ -138,6 +138,7 @@ import { TIMING_CAVEAT } from '#shared/utils/drawTimingView'
 import { E2_IMMUNOASSAY, E2_SENSITIVE, ESTRADIOL_ASSAYS, ESTRADIOL_LABEL, isEstradiolKey } from '#shared/utils/estradiol'
 import { PHLEBOTOMY_EFFECT_DAYS, RBC_TURNOVER_DAYS, type ReadingTag } from '#shared/utils/hematocrit'
 import { BIOMARKERS, getStatus, isEchoOnly } from '~/data/biomarkers'
+import { boundPhrase } from '#shared/utils/labNotes'
 import { GENERAL_DISCLAIMER } from '~/data/compoundInfo'
 
 useSeoMeta({ title: 'Labs · Draw ledger' })
@@ -188,7 +189,7 @@ function cellClass(_column: LedgerMarker, cell: MarkerCell): string {
 function cellTitle(_column: LedgerMarker, cell: MarkerCell): string | undefined {
   if (cell.value == null) return undefined
   const parts = [isEstradiolKey(cell.key) ? `${ESTRADIOL_LABEL}, ${ESTRADIOL_ASSAYS[cell.key]!.name}` : BIOMARKERS[cell.key]?.label ?? cell.key]
-  if (cell.censored) parts.push('at the assay ceiling — a bound, not a measurement')
+  if (cell.censored) parts.push(`${boundPhrase(cell.bound ?? 'limit')} — a bound, not a measurement`)
   else if (cell.since) parts.push(`change since the ${cell.since} draw`)
   for (const t of cell.tags) parts.push(`${t.short}: ${t.text}`)
   return parts.join(' · ')

@@ -10,7 +10,7 @@
 // The helpers below are the pure half, over those shapes.
 //
 // Relative imports carry an explicit .ts: tests load this under Node's native type stripping.
-import { isBoundReading, type ProvenancedDraw } from './labReadings.ts'
+import { isBoundReading, readingOn, readingValueText, type ProvenancedDraw } from './labReadings.ts'
 import type { EventBand } from './protocolEvents.ts'
 import type { ProtocolRule } from './protocolRules.ts'
 import { ruleActiveOn } from './protocolRules.ts'
@@ -82,4 +82,35 @@ export function readingNoteOn(draw: NotedDraw | null | undefined, key: string): 
  */
 export function isCensored(draw: NotedDraw | null | undefined, key: string): boolean {
   return readingNoteOn(draw, key)?.censored === true || isBoundReading(draw, key)
+}
+
+/**
+ * Which way a censored reading is bounded: a `floor` was printed "<X" (the true value is lower —
+ * LH on a suppressing protocol), a `ceiling` ">X" (the true value is higher — the Sep 9
+ * immunoassay testosterone). `limit` is a hand note that says censored on a reading whose report
+ * line carried no qualifier, so the direction is not on file.
+ */
+export type BoundKind = 'floor' | 'ceiling' | 'limit'
+
+/** The reading's bound, or null for a measurement. */
+export function boundKind(draw: NotedDraw | null | undefined, key: string): BoundKind | null {
+  const qualifier = readingOn(draw, key)?.qualifier
+  if (qualifier === '<') return 'floor'
+  if (qualifier === '>') return 'ceiling'
+  return readingNoteOn(draw, key)?.censored === true ? 'limit' : null
+}
+
+/**
+ * The value as the report printed it: "<0.3" / ">1500", or the figure alone for a measurement
+ * (and for a `limit`, whose direction is unknown). Every place a reading is printed uses this —
+ * outside the history row a floor used to lose its "<" and read as a measured 0.3 (audit #44
+ * item 23).
+ */
+export function boundValueText(value: number | string, draw: NotedDraw | null | undefined, key: string): string {
+  return readingValueText(value, readingOn(draw, key))
+}
+
+/** "below the assay's floor" / "at the assay's ceiling" / "at the assay's limit" — then "a bound, not a measurement". */
+export function boundPhrase(kind: BoundKind): string {
+  return kind === 'floor' ? 'below the assay\'s floor' : kind === 'ceiling' ? 'at the assay\'s ceiling' : 'at the assay\'s limit'
 }
