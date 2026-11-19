@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { ASK_TRAILER_MARK, type AskStreamTrailer } from '#shared/types/ask'
-import { checkAskHistory } from '#shared/utils/askHistory'
+import { askEnding, checkAskHistory } from '#shared/utils/askHistory'
 import { localToday } from '#shared/utils/time'
 import { zAsk } from '#shared/utils/schemas'
 import { askSystemPrompt } from '../../utils/askPrompt'
@@ -114,7 +114,8 @@ export default defineEventHandler(async (event) => {
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       let answer = ''
-      let completed = false
+      // The answer as it will be saved; null keeps the exchange out of the thread.
+      let stored: string | null = null
       try {
         while (!step.done) {
           const text = textDelta(step.value)
@@ -126,20 +127,14 @@ export default defineEventHandler(async (event) => {
         }
         const final = await stream.finalMessage()
         logAiUsage('chat', AI_MODELS.chat, final.usage, final.stop_reason, startedAt)
-        if (final.stop_reason === 'refusal') {
-          // Sonnet 5.5 declines in more categories than Sonnet 5, and a decline can land after
-          // part of an answer streamed. Say so in-band and keep the exchange out of the thread,
-          // like a failure: a half-answer shouldn't be replayed as history on the next turn.
-          logWarn('ai', 'chat declined', (final as { stop_details?: unknown }).stop_details ?? null)
-          controller.enqueue(encoder.encode('\n\n*[I can\'t help with that one as asked — try rephrasing it]*'))
-          return
-        }
-        if (final.stop_reason === 'max_tokens') {
-          const note = '\n\n*[answer truncated — ask a narrower question]*'
-          answer += note
-          controller.enqueue(encoder.encode(note))
-        }
-        completed = answer.trim().length > 0
+        // Sonnet 5.5 declines in more categories than Sonnet 5, and a decline can land after
+        // part of an answer streamed: said in-band and kept out of the thread, like a failure — a
+        // half-answer shouldn't be replayed as history on the next turn. A `max_tokens` stop is
+        // kept only when there is an answer to keep (askEnding has the rule and its test).
+        if (final.stop_reason === 'refusal') logWarn('ai', 'chat declined', (final as { stop_details?: unknown }).stop_details ?? null)
+        const ending = askEnding(final.stop_reason, answer)
+        if (ending.note) controller.enqueue(encoder.encode(ending.note))
+        stored = ending.stored
       }
       catch (err) {
         logError('ai', 'chat stream failed', err)
@@ -154,11 +149,11 @@ export default defineEventHandler(async (event) => {
         // The work rides event.waitUntil: a client disconnect cancels this handler, and without
         // it a finished exchange could go unsaved or a just-created thread linger empty.
         const persist = async () => {
-          if (completed) {
+          if (stored != null) {
             const now = new Date().toISOString()
             await db.batch([
               db.prepare('INSERT INTO ask_messages (thread_id, role, content, created_at) VALUES (?1, \'user\', ?2, ?3)').bind(threadId, question, now),
-              db.prepare('INSERT INTO ask_messages (thread_id, role, content, model, created_at) VALUES (?1, \'assistant\', ?2, ?3, ?4)').bind(threadId, answer, AI_MODELS.chat, now),
+              db.prepare('INSERT INTO ask_messages (thread_id, role, content, model, created_at) VALUES (?1, \'assistant\', ?2, ?3, ?4)').bind(threadId, stored, AI_MODELS.chat, now),
               db.prepare('UPDATE ask_threads SET updated_at = ?2 WHERE id = ?1').bind(threadId, now)
             ]).catch(err => logError('ai', 'could not save the exchange', err))
           }
@@ -173,6 +168,7 @@ export default defineEventHandler(async (event) => {
         // and which thread survives. The page strips it from the transcript and, on a failure,
         // un-adopts a thread that no longer exists — adopting the X-Thread-Id header early used
         // to strand the page on a deleted thread after a refused first question.
+        const completed = stored != null
         const trailer: AskStreamTrailer = { ok: completed, threadId: completed || !createdThread ? threadId : null }
         try {
           controller.enqueue(encoder.encode(`\n${ASK_TRAILER_MARK}${JSON.stringify(trailer)}`))

@@ -2,7 +2,27 @@
 // Same plain node:test + native TS type-stripping setup as cycles.test.mjs.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ASK_MAX_CONTENT_CHARS, ASK_MAX_TURNS, checkAskHistory, trimAskHistory } from '../shared/utils/askHistory.ts'
+import { ASK_MAX_CONTENT_CHARS, ASK_MAX_TURNS, ASK_NOTE_NO_ROOM, ASK_NOTE_REFUSED, ASK_NOTE_TRUNCATED, askEnding, checkAskHistory, trimAskHistory } from '../shared/utils/askHistory.ts'
+
+// Audit #44 item 29: what is streamed after the answer and what is saved, per stop reason. The
+// handler saves an exchange exactly when `stored` is not null.
+test('how a generation ended: only an answer the model wrote is kept', () => {
+  assert.deepEqual(askEnding('end_turn', 'Your Hct fell 0.6.'), { note: '', stored: 'Your Hct fell 0.6.' })
+  assert.deepEqual(askEnding('end_turn', '  \n'), { note: '', stored: null }, 'nothing written: nothing kept')
+  assert.deepEqual(askEnding(null, 'text'), { note: '', stored: 'text' })
+  // Out of room mid-answer: kept, with the note, so the thread shows it was cut.
+  const cut = askEnding('max_tokens', 'Part of an answ')
+  assert.equal(cut.note, `\n\n${ASK_NOTE_TRUNCATED}`)
+  assert.equal(cut.stored, `Part of an answ\n\n${ASK_NOTE_TRUNCATED}`)
+  // Out of room before a word of it: the note is all there is, and it is not an answer.
+  const none = askEnding('max_tokens', '')
+  assert.equal(none.note, ASK_NOTE_NO_ROOM)
+  assert.equal(none.stored, null, 'the truncation note alone was being saved as the answer')
+  assert.equal(askEnding('max_tokens', ' \n ').stored, null)
+  // A refusal is never kept, even after part of an answer streamed.
+  assert.deepEqual(askEnding('refusal', 'I started to say'), { note: `\n\n${ASK_NOTE_REFUSED}`, stored: null })
+  assert.deepEqual(askEnding('refusal', ''), { note: `\n\n${ASK_NOTE_REFUSED}`, stored: null })
+})
 
 /** A transcript of `pairs` answered exchanges followed by one fresh question: 2·pairs + 1 messages. */
 function transcript(pairs) {

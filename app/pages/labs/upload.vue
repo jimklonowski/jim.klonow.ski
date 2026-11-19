@@ -19,7 +19,10 @@
         <button
           v-if="result || error"
           type="button"
-          class="tui-btn"
+          class="tui-btn disabled:opacity-50"
+          :disabled="saving"
+          :title="saving ? SAVING_HOLD : undefined"
+          data-upload-reset
           @click="reset"
         >
           ⟳ RESET
@@ -156,8 +159,9 @@
           <button
             v-if="cell.onClick"
             type="button"
-            class="num-display text-hero leading-none mt-1.5 whitespace-nowrap cursor-pointer hover:text-accent transition-colors"
-            :title="cell.hint"
+            class="num-display text-hero leading-none mt-1.5 whitespace-nowrap cursor-pointer hover:text-accent transition-colors disabled:opacity-50 disabled:cursor-default"
+            :title="saving ? SAVING_HOLD : cell.hint"
+            :disabled="saving"
             @click="cell.onClick"
           >
             {{ cell.value }} <span class="text-prose text-muted align-middle">{{ cell.glyph ?? '⇄' }}</span>
@@ -280,7 +284,10 @@
         </button>
         <button
           type="button"
-          class="tui-btn"
+          class="tui-btn disabled:opacity-50"
+          :disabled="saving"
+          :title="saving ? SAVING_HOLD : undefined"
+          data-upload-another
           @click="reset"
         >
           ⟳ UPLOAD ANOTHER
@@ -611,13 +618,14 @@ const resultCells = computed<ResultCell[]>(() => {
 const fastingSetByHand = ref(false)
 
 function toggleFasting() {
-  if (!result.value) return
+  if (!result.value || saving.value) return
   result.value.fasting = !result.value.fasting
   fastingSetByHand.value = true
   editedAfterSave()
 }
 
 function openWeightModal() {
+  if (saving.value) return
   weightModalOpen.value = true
 }
 
@@ -672,10 +680,21 @@ async function upload(file: File) {
   }
 }
 
+// While the save POST is out, the result on screen is the one being written: RESET, UPLOAD
+// ANOTHER and the two editable cells wait for it. Pressed mid-save, RESET asked "discard this
+// unsaved extraction?" about a draw that was a moment from saved, then cleared the page — and the
+// save still landed: it marked whatever PDF came next as "✓ SAVED" (so SAVE was shut on a result
+// that had not been saved, and leaving discarded it without asking), started the paid summary for
+// the old draw, and rendered it under the new one. A fasting flip mid-save was "saved" on screen
+// and missing from the row (audit #44 item 28).
+const SAVING_HOLD = 'Saving — one moment'
+
 /** Clears the page for another PDF — after asking, when the result on screen was never saved. */
 function reset() {
+  if (saving.value) return
   if (!parsedGuard.confirmDiscard()) return
   summaryRun++ // orphan a summary still being written for the result going away
+  afterUnlock = null // and a PIN retry that would have re-run a call for it
   result.value = null
   error.value = ''
   filename.value = ''

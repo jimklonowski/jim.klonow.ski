@@ -88,8 +88,17 @@
         aria-live="polite"
         :aria-busy="streaming"
       >
+        <!-- A ?thread= link still loading: say so, and hold the sample questions back — one sent
+             now would have started a second conversation under the one about to appear. -->
+        <p
+          v-if="!messages.length && opening"
+          class="text-row text-muted"
+          data-ask-opening
+        >
+          Opening the saved conversation…
+        </p>
         <div
-          v-if="!messages.length"
+          v-else-if="!messages.length"
           class="space-y-3"
         >
           <!-- On a phone the rail (and its speech bubble) is hidden, so the greeting moves here. -->
@@ -174,9 +183,10 @@
           <button
             type="submit"
             class="tui-btn tui-btn-accent disabled:opacity-50"
-            :disabled="streaming || !draft.trim()"
+            :disabled="streaming || opening || !draft.trim()"
+            :title="opening ? 'Opening the saved conversation…' : undefined"
           >
-            {{ streaming ? '…' : 'ASK' }}
+            {{ streaming || opening ? '…' : 'ASK' }}
           </button>
         </form>
         <p class="mt-1.5 text-label text-ghost">
@@ -348,18 +358,37 @@ useEventListener('scroll', () => {
 
 // --- saved conversations --------------------------------------------------------------------
 
-watch(threadId, (id) => {
+/** Makes ?thread= name the conversation on screen (or drops it when there is none). */
+function syncUrl() {
   const current = route.query.thread ? Number(route.query.thread) : null
-  if (id !== current) router.replace({ query: { ...route.query, thread: id ?? undefined } })
-})
+  if (threadId.value !== current) router.replace({ query: { ...route.query, thread: threadId.value ?? undefined } })
+}
+watch(threadId, syncUrl)
 
 onMounted(() => {
   const fromUrl = Number(route.query.thread)
-  if (Number.isInteger(fromUrl) && fromUrl > 0 && fromUrl !== threadId.value) openThread(fromUrl)
+  if (Number.isInteger(fromUrl) && fromUrl > 0) {
+    if (fromUrl !== threadId.value) openThread(fromUrl)
+  }
+  // Back on the page with a conversation still in memory: the watcher above only fires when the
+  // id CHANGES, so the address stayed a bare /ask and a reload opened an empty page instead of
+  // the conversation on screen (audit #44 item 29).
+  else syncUrl()
 })
+
+// A saved conversation being fetched. Two things went wrong without this (audit #44 item 29):
+// a question sent before a ?thread= link had loaded started a NEW thread, then the late response
+// replaced the transcript and the id under it, so the page showed one conversation while saving
+// into another; and clicking thread A then thread B let A's slower response land on top of B.
+// So a question waits for the open to finish (`opening` shuts ASK), and only the newest open —
+// one that nothing has superseded since — is applied (`openRun`).
+const opening = ref(false)
+let openRun = 0
 
 function newConversation() {
   if (streaming.value) return
+  openRun++ // an open still in flight is no longer wanted
+  opening.value = false
   messages.value = []
   threadId.value = null
   phase.value = 'idle'
@@ -367,17 +396,27 @@ function newConversation() {
 
 async function openThread(id: number) {
   if (streaming.value) return
+  const run = ++openRun
+  opening.value = true
   try {
-    const thread = await $fetch<AskThread>(`/api/ai/threads/${id}`)
+    // Bounded: ASK stays shut while this is out, and a hung request must not hold it shut.
+    const thread = await $fetch<AskThread>(`/api/ai/threads/${id}`, { timeout: 15_000 })
+    if (run !== openRun || streaming.value) return
     messages.value = thread.messages
     threadId.value = thread.id
     phase.value = 'idle'
     scrollToBottom()
   }
   catch (err) {
+    if (run !== openRun) return
     toast.add({ title: 'Couldn\'t open that conversation', description: extractErrorMessage(err, 'It may have been deleted.'), color: 'error' })
     if (threadId.value === id) newConversation()
+    // A dead ?thread= link: the address goes back to naming what is actually on screen.
+    syncUrl()
     refreshThreads()
+  }
+  finally {
+    if (run === openRun) opening.value = false
   }
 }
 
@@ -400,7 +439,9 @@ function deleteThread(thread: AskThreadSummary) {
 
 async function send(preset?: string) {
   const question = (preset ?? draft.value).trim()
-  if (!question || streaming.value) return
+  // Not while a saved conversation is loading: the question belongs in it, not beside it. The
+  // draft stays in the box.
+  if (!question || streaming.value || opening.value) return
   // UTextarea's autoresize watches the model, so clearing the draft shrinks it back too.
   draft.value = ''
 
