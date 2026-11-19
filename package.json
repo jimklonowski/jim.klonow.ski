@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.11.19",
+  "version": "2026.11.19b",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -51,7 +51,7 @@
     "@iconify-json/lucide": "^1.2.156",
     "@iconify-json/simple-icons": "^1.2.103",
     "@nuxt/eslint": "^1.17.0",
-    "@nuxt/ui": "^4.12.2",
+    "@nuxt/ui": "^4.13.0",
     "@nuxtjs/seo": "6.0.1",
     "@types/node": "^24.19.2",
     "@types/three": "^0.187.0",
