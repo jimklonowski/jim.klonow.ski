@@ -22,103 +22,137 @@
       </button>
     </TuiHeader>
 
-    <!-- The next open plan: the countdown, what and where, what it answers, and the prep. -->
+    <!-- The next open plan: the countdown and what and where, always; what it answers and the
+         prep behind a toggle, closed until asked for — open, the two lists ran the panel past a
+         screen's height above the marker cards (Jim, 2026-11-19). The toggle still says how much
+         is folded away, and when a prep step applies today. -->
     <div
       v-if="next"
-      class="mt-2.5 border border-line-soft bg-raised px-3.5 py-3 grid grid-cols-1 sm:grid-cols-[minmax(150px,auto)_minmax(0,1fr)] gap-x-6 gap-y-3"
+      class="mt-2.5 border border-line-soft bg-raised px-3.5 py-3"
+      data-next-draw
     >
-      <div class="min-w-0">
-        <div class="flex items-baseline gap-2">
-          <span
-            class="num-display text-display leading-none"
-            :class="bigClass"
-          >{{ big.value }}</span>
-          <span
-            v-if="big.unit"
-            class="text-label text-muted"
-          >{{ big.unit }}</span>
-        </div>
-        <p class="text-row text-hi mt-1.5">
-          {{ formatDate(next.plan.date, 'long') }}
-        </p>
-        <p class="text-meta text-muted">
-          {{ drawLabel(next.plan) }}
-        </p>
-        <p
-          v-if="footLine"
-          class="text-meta text-faint mt-1.5"
-        >
-          {{ footLine }}
-        </p>
-      </div>
-
-      <div class="min-w-0 text-small space-y-2.5">
-        <div v-if="questions.length">
-          <p class="tui-label text-micro">
-            answers
+      <div
+        class="grid grid-cols-1 gap-x-6 gap-y-3"
+        :class="detailsOpen && hasDetails ? 'sm:grid-cols-[minmax(150px,auto)_minmax(0,1fr)]' : ''"
+      >
+        <div class="min-w-0">
+          <div class="flex items-baseline gap-2">
+            <span
+              class="num-display text-display leading-none"
+              :class="bigClass"
+            >{{ big.value }}</span>
+            <span
+              v-if="big.unit"
+              class="text-label text-muted"
+            >{{ big.unit }}</span>
+          </div>
+          <p class="text-row text-hi mt-1.5">
+            {{ formatDate(next.plan.date, 'long') }}
           </p>
-          <div class="flex flex-col gap-0.5 mt-1">
-            <div
-              v-for="(q, i) in questions"
-              :key="q"
-              class="flex gap-2.5 min-w-0"
-            >
-              <span class="text-ghost shrink-0">{{ i === questions.length - 1 ? '└' : '├' }}</span>
-              <span class="text-body">{{ q }}</span>
+          <p class="text-meta text-muted">
+            {{ drawLabel(next.plan) }}
+          </p>
+          <p
+            v-if="footLine"
+            class="text-meta text-faint mt-1.5"
+          >
+            {{ footLine }}
+          </p>
+          <!-- Never folded: the one line here that asks for something to be done. -->
+          <p
+            v-if="next.status === 'overdue'"
+            class="text-small text-warn mt-1.5"
+          >
+            No results on file for this draw yet.
+            <NuxtLink
+              v-if="isOwner"
+              to="/labs/upload"
+              class="text-accent hover:text-accent-hover"
+            >upload results →</NuxtLink>
+          </p>
+        </div>
+
+        <div
+          v-if="detailsOpen && hasDetails"
+          id="planned-details"
+          class="min-w-0 text-small space-y-2.5"
+          data-next-draw-details
+        >
+          <div v-if="questions.length">
+            <p class="tui-label text-micro">
+              answers
+            </p>
+            <div class="flex flex-col gap-0.5 mt-1">
+              <div
+                v-for="(q, i) in questions"
+                :key="q"
+                class="flex gap-2.5 min-w-0"
+              >
+                <span class="text-ghost shrink-0">{{ i === questions.length - 1 ? '└' : '├' }}</span>
+                <span class="text-body">{{ q }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="shownPrep.length">
+            <p class="tui-label text-micro">
+              prep
+            </p>
+            <div class="flex flex-col gap-0.5 mt-1">
+              <div
+                v-for="(r, i) in shownPrep"
+                :key="r.key"
+                class="flex gap-2.5 min-w-0"
+              >
+                <span class="text-ghost shrink-0">{{ i === shownPrep.length - 1 ? '└' : '├' }}</span>
+                <span
+                  class="shrink-0 w-14 text-meta"
+                  :class="r.state === 'ahead' ? 'text-faint' : 'text-accent'"
+                >{{ prepWhen(r) }}</span>
+                <span :class="r.state === 'ahead' ? 'text-muted' : 'text-body'">{{ r.text }}</span>
+              </div>
             </div>
           </div>
         </div>
-
-        <div v-if="next.status !== 'overdue'">
-          <p class="tui-label text-micro">
-            prep
-          </p>
-          <div class="flex flex-col gap-0.5 mt-1">
-            <div
-              v-for="(r, i) in prep"
-              :key="r.key"
-              class="flex gap-2.5 min-w-0"
-            >
-              <span class="text-ghost shrink-0">{{ i === prep.length - 1 ? '└' : '├' }}</span>
-              <span
-                class="shrink-0 w-14 text-meta"
-                :class="r.state === 'ahead' ? 'text-faint' : 'text-accent'"
-              >{{ prepWhen(r) }}</span>
-              <span :class="r.state === 'ahead' ? 'text-muted' : 'text-body'">{{ r.text }}</span>
-            </div>
-          </div>
-        </div>
-        <p
-          v-else
-          class="text-warn"
-        >
-          No results on file for this draw yet.
-          <NuxtLink
-            v-if="isOwner"
-            to="/labs/upload"
-            class="text-accent hover:text-accent-hover"
-          >upload results →</NuxtLink>
-        </p>
       </div>
 
       <div
-        v-if="isOwner"
-        class="sm:col-span-2 flex justify-end gap-3 text-meta -mt-1"
+        v-if="hasDetails || isOwner"
+        class="flex items-baseline gap-3 flex-wrap mt-2"
       >
         <button
+          v-if="hasDetails"
           type="button"
-          class="text-faint hover:text-accent cursor-pointer"
-          @click="modal?.open(next.plan)"
+          class="text-label text-faint hover:text-accent cursor-pointer text-left"
+          :aria-expanded="detailsOpen"
+          aria-controls="planned-details"
+          data-next-draw-toggle
+          @click="detailsOpen = !detailsOpen"
         >
-          edit
+          {{ detailsOpen ? '▾' : '▸' }} {{ detailsLabel }}<span
+            v-if="prepNow && !detailsOpen"
+            class="text-accent"
+          > · {{ prepNow }} to do now</span>
         </button>
-        <button
-          type="button"
-          class="text-faint hover:text-danger cursor-pointer"
-          @click="confirmDelete(next.plan)"
+        <span
+          v-if="isOwner"
+          class="ml-auto flex gap-3 text-meta"
         >
-          ✕ delete
-        </button>
+          <button
+            type="button"
+            class="text-faint hover:text-accent cursor-pointer"
+            @click="modal?.open(next.plan)"
+          >
+            edit
+          </button>
+          <button
+            type="button"
+            class="text-faint hover:text-danger cursor-pointer"
+            @click="confirmDelete(next.plan)"
+          >
+            ✕ delete
+          </button>
+        </span>
       </div>
     </div>
     <p
@@ -234,8 +268,8 @@ import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { RETEST_RULES, cadenceText, markersDue, suggestedDrawDate, type RetestDraw } from '#shared/utils/retest'
 import { BIOMARKERS, CATEGORY_LABELS } from '~/data/biomarkers'
 
-// The /labs planned-draws section: the next open plan in full (countdown, what it answers, the
-// dated prep), the rest folded under a count. The page owns the list and the draw dates; this
+// The /labs planned-draws section: the next open plan (the countdown always; what it answers and
+// the dated prep behind a toggle), the rest folded under a count. The page owns the list and the draw dates; this
 // component owns the cycles it needs for the modal's checkpoint picker.
 const props = withDefaults(defineProps<{
   plans: PlannedDraw[]
@@ -267,6 +301,28 @@ const headerLabel = computed(() =>
 )
 const questions = computed(() => next.value ? purposeLines(next.value.plan) : [])
 const prep = computed(() => next.value ? prepReminders(next.value.plan, today.value) : [])
+
+// The fold: what the draw answers and its prep sit behind a toggle, closed on every load. An
+// overdue plan has no prep left to show (its "no results yet" line is never folded).
+const detailsOpen = ref(false)
+// Arriving by the home strip's "prep →" / "details →" link (/labs#planned) is asking for exactly
+// what the fold holds, so it opens. After mount: the hash never reaches the server render.
+const route = useRoute()
+const openForHash = () => {
+  if (route.hash === '#planned') detailsOpen.value = true
+}
+onMounted(openForHash)
+watch(() => route.hash, openForHash)
+const shownPrep = computed(() => (next.value && next.value.status !== 'overdue' ? prep.value : []))
+const hasDetails = computed(() => questions.value.length > 0 || shownPrep.value.length > 0)
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+/** "5 questions it answers · 5 prep steps" — what is folded away, the same text open or shut. */
+const detailsLabel = computed(() => [
+  questions.value.length ? plural(questions.value.length, 'question it answers', 'questions it answers') : '',
+  shownPrep.value.length ? plural(shownPrep.value.length, 'prep step', 'prep steps') : ''
+].filter(Boolean).join(' · '))
+/** Prep steps that apply today, said on the closed toggle so a fold never hides a thing to do. */
+const prepNow = computed(() => shownPrep.value.filter(r => r.state !== 'ahead').length)
 
 /** The big figure: days to go, "today", or days overdue. */
 const big = computed(() => {
