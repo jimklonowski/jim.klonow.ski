@@ -15,6 +15,9 @@ import { mean } from '#shared/utils/stats'
 import { computeTrends, formatTrendLines } from '#shared/utils/trends'
 import { eventContext } from '#shared/utils/protocolEvents'
 import { describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
+import { LAB_FACT_LEGEND, labFactLines, type FactDraw } from '#shared/utils/labNotes'
+import type { Readings } from '#shared/utils/labReadings'
+import { readingNotesOn } from '../data/markerCaveats'
 import { PROTOCOL_EVENTS } from '../data/protocolEvents'
 import type { ProtocolData } from '#shared/utils/protocolStore'
 
@@ -82,18 +85,29 @@ function mealsText(e: JournalRow, estimates: EstimateIndex): string | null {
   return `meals: ${slots.map(s => `${MEAL_SLOT_LABELS[s].toLowerCase()} ${e.food[s]!.trim()}`).join('; ')}${total}`
 }
 
-/** Every lab draw with all recorded markers — the model needs raw values to answer marker questions. */
-async function labLines(db: D1Database): Promise<string[]> {
+/**
+ * Every lab draw with all recorded markers — the model needs raw values to answer marker
+ * questions — each printed as the report printed it ("<0.3", ">1500"), with the notes on the
+ * marked readings (shared/utils/labNotes.ts labFactLines; audit #44 item 32).
+ */
+async function labBlock(db: D1Database): Promise<string> {
   const { results } = await db.prepare(
-    'SELECT date, fasting, markers FROM labs_entries ORDER BY date ASC'
+    'SELECT date, fasting, markers, readings FROM labs_entries ORDER BY date ASC'
   ).all()
-  return (results ?? []).map((r) => {
-    const markers = JSON.parse((r.markers as string) || '{}') as Record<string, number | null>
-    const parts = Object.entries(markers)
-      .filter(([, v]) => v != null)
-      .map(([k, v]) => `${k} ${v}`)
-    return `${r.date}${r.fasting ? ' (fasting)' : ''}: ${parts.join(', ')}`
-  })
+  const draws: FactDraw[] = (results ?? []).map(r => ({
+    date: r.date as string,
+    fasting: !!r.fasting,
+    markers: JSON.parse((r.markers as string) || '{}') as Record<string, number | null>,
+    readings: JSON.parse((r.readings as string) || '{}') as Readings,
+    // The hand notes for this date (a censored ceiling, a different assay), as /api/labs/list attaches them.
+    notes: readingNotesOn(r.date as string)
+  }))
+  const { lines, notes } = labFactLines(draws)
+  return [
+    `Lab draws (every draw on file; marker keys are snake_case, standard US lab units). ${LAB_FACT_LEGEND} estradiol is the standard immunoassay and estradiol_sensitive the LC/MS/MS reading of the same blood: compare each only with its own earlier readings.`,
+    lines.join('\n') || 'none',
+    ...(notes.length ? [`Notes on the marked readings:\n${notes.join('\n')}`] : [])
+  ].join('\n')
 }
 
 async function dexaLines(db: D1Database): Promise<string[]> {
@@ -259,7 +273,7 @@ const WEEKLY_WINDOW_WEEKS = 20
 export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData): Promise<string> {
   const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates, goals, accutane, protocolChange, pgx] = await Promise.all([
     journalRows(db),
-    labLines(db),
+    labBlock(db),
     dexaLines(db),
     vialLines(db),
     db.prepare('SELECT date, recovery_score, strain, sleep_total_min FROM health_metrics ORDER BY date ASC').all(),
@@ -323,7 +337,7 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     eventContext(today, PROTOCOL_EVENTS),
     plannedDraws,
     phlebotomies,
-    `Lab draws (every draw on file; marker keys are snake_case, standard US lab units):\n${labs.join('\n') || 'none'}`,
+    labs,
     `DEXA scans:\n${dexa.join('\n') || 'none'}`,
     `Compound history (all-time, from the dose log):\n${compoundLines(journal).join('\n') || 'none'}`,
     `Reconstitutions (every vial mixed, from the journal; concentration is vial content over BAC water):\n${reconstitutionLines(journal).join('\n') || 'none logged'}`,

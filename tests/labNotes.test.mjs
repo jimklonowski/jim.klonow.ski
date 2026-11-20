@@ -3,7 +3,7 @@
 // (shared/utils/labNotes.ts) read those shapes.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { boundKind, boundPhrase, boundValueText, caveatCompoundOn, isCensored, readingNoteOn } from '../shared/utils/labNotes.ts'
+import { LAB_FACT_LEGEND, boundKind, boundPhrase, boundValueText, caveatCompoundOn, isCensored, labFactLines, readingNoteOn } from '../shared/utils/labNotes.ts'
 import { eventBands } from '../shared/utils/protocolEvents.ts'
 import { PROTOCOL_EVENTS } from '../server/data/protocolEvents.ts'
 import { MARKER_CAVEATS, READING_NOTES, isCensoredOn, readingNoteFor, readingNotesOn } from '../server/data/markerCaveats.ts'
@@ -61,6 +61,41 @@ test('a bound is a floor, a ceiling or a limit, and is printed with the sign the
   assert.equal(boundKind(null, 'lh'), null)
   assert.equal(boundValueText('2.1', null, 'lh'), '2.1')
   for (const d of [floor, ceiling, noted]) assert.equal(isCensored(d, Object.keys(d.markers)[0]), true, 'every bound is censored')
+})
+
+// Audit #44 item 32: the /ask fact sheet printed `testosterone_total 1500` for a ceiling. The
+// fixtures are made up; the last check runs the real hand notes through the same function.
+test('the fact sheet prints a reading as the report did, daggers the marked ones and lists their notes', () => {
+  const { lines, notes } = labFactLines([
+    { date: '2031-01-05', fasting: true, markers: { testosterone_total: 900, lh: 0.3, hdl: null }, readings: { testosterone_total: { lab: 'Quest' }, lh: { qualifier: '<', lab: 'Quest', assay: 'immunoassay' } } },
+    { date: '2031-02-06', fasting: false, markers: { testosterone_total: 1500, hematocrit: 50.1 }, readings: { testosterone_total: { qualifier: '>', lab: 'CHW' } }, notes: { testosterone_total: { date: '2031-02-06', note: 'Reported at the ceiling.', censored: true } } },
+    { date: '2031-03-07', markers: { estradiol: 30, ferritin: 60 }, notes: { estradiol: { date: '2031-03-07', note: 'A different assay.' }, ferritin: { date: '2031-03-07', note: 'Censored by hand, direction unknown.', censored: true } } },
+    { date: '2031-04-08', markers: {} }
+  ])
+  assert.deepEqual(lines, [
+    '2031-01-05 (fasting, Quest): testosterone_total 900, lh <0.3†',
+    '2031-02-06 (CHW): testosterone_total >1500†, hematocrit 50.1',
+    '2031-03-07: estradiol 30†, ferritin 60†',
+    '2031-04-08: '
+  ])
+  assert.deepEqual(notes, [
+    '† lh on 2031-01-05 (below the assay\'s floor: a bound, not a measurement): the report printed it as <0.3, Quest immunoassay.',
+    '† testosterone_total on 2031-02-06 (at the assay\'s ceiling: a bound, not a measurement): Reported at the ceiling.',
+    '† estradiol on 2031-03-07: A different assay.',
+    '† ferritin on 2031-03-07 (at the assay\'s limit: a bound, not a measurement): Censored by hand, direction unknown.'
+  ])
+  assert.match(LAB_FACT_LEGEND, /not a measurement/)
+  assert.deepEqual(labFactLines([]), { lines: [], notes: [] })
+  // Every hand note on file reaches the sheet, each censored one called a bound.
+  for (const [key, list] of Object.entries(READING_NOTES)) {
+    for (const n of list) {
+      const out = labFactLines([{ date: n.date, markers: { [key]: 1 }, notes: readingNotesOn(n.date) }])
+      assert.ok(out.lines[0].includes(`${key} 1†`), `${key} ${n.date} is daggered`)
+      const line = out.notes.find(l => l.startsWith(`† ${key} on ${n.date}`))
+      assert.ok(line, `${key} ${n.date} has its note`)
+      assert.equal(/a bound, not a measurement/.test(line), n.censored === true, `${key} ${n.date}: called a bound exactly when censored`)
+    }
+  }
 })
 
 test('the medication caveat follows the protocol dates, over the caveats the server sent', () => {

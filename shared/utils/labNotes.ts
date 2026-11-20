@@ -114,3 +114,49 @@ export function boundValueText(value: number | string, draw: NotedDraw | null | 
 export function boundPhrase(kind: BoundKind): string {
   return kind === 'floor' ? 'below the assay\'s floor' : kind === 'ceiling' ? 'at the assay\'s ceiling' : 'at the assay\'s limit'
 }
+
+// --- the draws as a prompt's fact sheet reads them ---
+
+/** A draw with what a fact line needs: its values, and the notes and provenance riding on it. */
+export interface FactDraw extends NotedDraw {
+  date: string
+  fasting?: boolean | null
+  markers: Record<string, number | null | undefined>
+}
+
+/** What `labFactLines` puts above its lines: how to read a dagger and a "<" or ">". */
+export const LAB_FACT_LEGEND = 'A value marked † has a note under the draws. A value printed with < or >, or noted as censored, is a bound at the assay\'s limit and not a measurement: do not report it as the level, and do not compute a change to or from it.'
+
+/**
+ * Every draw as one line of `key value` pairs — the /ask fact sheet's lab block — with each
+ * reading printed as the report printed it and its notes listed after. The sheet used to select
+ * the values alone, so the Sep 9 immunoassay ceiling reached the model as a plain
+ * `testosterone_total 1500`, a measurement to quote and to diff (audit #44 item 32), though the
+ * labs summary had daggered the same reading for months. A draw's line names its lab when the
+ * provenance does. `notes` is one line per marked reading, in draw order: the hand note, or for a
+ * printed bound with none, what the report printed.
+ */
+export function labFactLines(draws: readonly FactDraw[]): { lines: string[], notes: string[] } {
+  const lines: string[] = []
+  const notes: string[] = []
+  for (const d of draws) {
+    const parts: string[] = []
+    const labs = new Set<string>()
+    for (const [key, value] of Object.entries(d.markers)) {
+      if (value == null) continue
+      const prov = readingOn(d, key)
+      if (prov?.lab) labs.add(prov.lab)
+      const note = readingNoteOn(d, key)
+      const bound = boundKind(d, key)
+      const text = boundValueText(value, d, key)
+      parts.push(`${key} ${text}${note || bound ? '†' : ''}`)
+      const what = bound ? ` (${boundPhrase(bound)}: a bound, not a measurement)` : ''
+      const source = [prov?.lab, prov?.assay].filter(Boolean).join(' ')
+      if (note) notes.push(`† ${key} on ${d.date}${what}: ${note.note}`)
+      else if (bound) notes.push(`† ${key} on ${d.date}${what}: the report printed it as ${text}${source ? `, ${source}` : ''}.`)
+    }
+    const tags = [d.fasting ? 'fasting' : '', [...labs].join(' + ')].filter(Boolean)
+    lines.push(`${d.date}${tags.length ? ` (${tags.join(', ')})` : ''}: ${parts.join(', ')}`)
+  }
+  return { lines, notes }
+}
