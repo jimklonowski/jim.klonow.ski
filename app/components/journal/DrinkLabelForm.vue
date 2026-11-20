@@ -245,6 +245,9 @@ watch(open, (isOpen) => {
   if (!isOpen) return
   resetBarcode()
   const l = existing.value
+  // The saved barcode goes back in the field: the save stores what the field holds, so it stays
+  // unless it is changed or cleared here.
+  barcode.value = l?.barcode ?? ''
   draft.serving_oz = l?.serving_oz ?? sodaOunces(props.size) ?? 12
   draft.kcal = l?.kcal ?? ''
   draft.sugar_g = l?.sugar_g ?? ''

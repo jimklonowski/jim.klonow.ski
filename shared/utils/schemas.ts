@@ -35,6 +35,12 @@ const zText = (max: number) => z.string().trim().max(max)
 /** Bounded free text that stores NULL when blank or absent. */
 const zOptText = (max: number) => zText(max).nullish().transform(v => v || null)
 
+/**
+ * Optional text that is CUT to `max` (the last character an ellipsis) instead of refused. Still
+ * bounded on the way in — ten times `max` — so it is no way around the row-size rule.
+ */
+const zClippedText = (max: number) => zText(max * 10).nullish().transform(v => (v ? (v.length > max ? `${v.slice(0, max - 1).trimEnd()}…` : v) : null))
+
 // Clearing a number input leaves `''`, not null: Vue's `v-model.number` only converts when
 // parseFloat succeeds, and hands back the raw string when it doesn't. Every numeric field below
 // is fed by such an input, so a blank one has to read as "absent" rather than as a type error —
@@ -203,7 +209,9 @@ export const zMealCorrect = z.object({
   // Set together when a barcode lookup filled the form (migration 0025): the digits, and the
   // product with the servings counted ("Open Food Facts: … — 2 × 0.25 pizza (137 g)").
   barcode: z.string().trim().regex(/^(\d{8}|\d{12,14})$/).nullish().transform(v => v || null),
-  from: zOptText(300)
+  // A line the form composes from the looked-up product, not something typed: cut to fit rather
+  // than refused, so a long product name can never fail the save of the figures beside it.
+  from: zClippedText(300)
 })
 
 // The owner's label figures for a drink (drink_labels): all four figures are required — a label

@@ -2,6 +2,7 @@ import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSigna
 import { activeSignals, protocolChangeWatch, signalShorthand } from '#shared/utils/cycleSignals'
 import { shiftDays } from '#shared/utils/dates'
 import type { ProtocolRule } from '#shared/utils/protocolRules'
+import { isMissingTable } from './db'
 
 // The passive vitals watch since the latest core protocol change (audit #43 item 67), as one
 // prompt line — the cycle watch's model anchored on the change, so between cycles the digests
@@ -25,8 +26,10 @@ export async function protocolChangeContext(db: D1Database, asOf: string, rules:
     journal = (jRes.results ?? []) as unknown as SignalJournalRow[]
     health = (hRes.results ?? []) as unknown as SignalHealthRow[]
   }
-  catch {
-    return ''
+  catch (err) {
+    // Only a missing table reads as "nothing to watch" (see loadPgxNotes in pgxContext.ts).
+    if (isMissingTable(err)) return ''
+    throw err
   }
   const watch = protocolChangeWatch(rules, asOf, journal, health)
   if (!watch) return ''

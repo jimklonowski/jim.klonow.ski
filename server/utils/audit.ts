@@ -55,9 +55,6 @@ const AUDIT_CHILDREN: Partial<Record<AuditTable, { table: AuditTable, fk: string
   protocol_items: { table: 'protocol_versions', fk: 'item_id' }
 }
 
-function isForeignKeyError(err: unknown): boolean {
-  return /FOREIGN KEY constraint failed/i.test(err instanceof Error ? err.message : String(err))
-}
 export type AuditAction = AuditEntry['action']
 
 type Row = Record<string, unknown>

@@ -14,8 +14,11 @@ export default defineEventHandler(async (event) => {
 
   if (id != null) {
     const before = await auditBefore(event, 'pgx_notes', id)
-    await db.prepare('UPDATE pgx_notes SET gene = ?2, genotype = ?3, compounds = ?4, markers = ?5, note = ?6 WHERE id = ?1')
+    const res = await db.prepare('UPDATE pgx_notes SET gene = ?2, genotype = ?3, compounds = ?4, markers = ?5, note = ?6 WHERE id = ?1')
       .bind(id, n.gene, n.genotype, compounds, markers, n.note).run()
+    // No row by that id (deleted in another tab): the save changed nothing, so it must not say
+    // ok and leave the form showing a note that is not there (audit #44 item 38).
+    if (!res.meta.changes) throw createError({ statusCode: 404, message: 'That note no longer exists. Reload the page.' })
     await recordAudit(event, { table: 'pgx_notes', key: id, before, summary })
     return { ok: true, id }
   }

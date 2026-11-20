@@ -20,12 +20,15 @@ export default defineEventHandler(async (event) => {
 
   if (body.id != null) {
     const before = await auditBefore(event, 'planned_draws', body.id)
-    await db.prepare(`
+    const res = await db.prepare(`
       UPDATE planned_draws SET
         date = ?2, lab = ?3, panel = ?4, fasting = ?5, purpose = ?6,
         cycle_id = ?7, checkpoint_key = ?8, labs_date = ?9
       WHERE id = ?1
     `).bind(body.id, body.date, body.lab, body.panel, fasting, body.purpose, body.cycle_id, body.checkpoint_key, body.labs_date).run()
+    // No row by that id (deleted in another tab): the save changed nothing, so it must not say
+    // ok — the same answer as the goal and note saves (audit #44 item 38).
+    if (!res.meta.changes) throw createError({ statusCode: 404, message: 'That planned draw no longer exists. Reload the page.' })
     await recordAudit(event, { table: 'planned_draws', key: body.id, before, summary })
     return { ok: true, id: body.id }
   }

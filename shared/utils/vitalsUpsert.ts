@@ -23,6 +23,17 @@ export const VITALS_UPSERT_SQL = `
   RETURNING ${VITALS_SELECT}
 `
 
+/**
+ * The one overwrite the webhook makes: a blood pressure an earlier, shorter delivery of the same
+ * cuff session left behind, replaced by the full session's mean (shared/utils/healthExport.ts
+ * bpRefinement decides when). `?1` date, `?2`/`?3` the new pair, `?4`/`?5` the pair as it was
+ * read — so a value typed in the meantime is not touched.
+ */
+export const BP_REFINE_SQL = `
+  UPDATE journal_entries SET bp_systolic = ?2, bp_diastolic = ?3
+  WHERE date = ?1 AND bp_systolic = ?4 AND bp_diastolic = ?5
+`
+
 export function vitalsBindings(date: string, vitals: Vitals): [string, ...Array<number | null>] {
   return [date, ...VITAL_FIELDS.map(f => vitals[f] ?? null)]
 }

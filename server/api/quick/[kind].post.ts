@@ -4,7 +4,7 @@ import { zQuickMeal, zQuickWater, zSodaAdd } from '#shared/utils/schemas'
 import { appendTapSql } from '#shared/utils/journalRemove'
 import { hydrationOz, isSodaEntry, sodasOnly } from '#shared/utils/drinks'
 import { isLabelFigure, lookupEstimate, type MealSlot } from '#shared/utils/nutrition'
-import { isQuickKind, quickMealMessage, quickMealPlan, quickSodaMessage, quickWaterMessage } from '#shared/utils/quickLog'
+import { QUICK_MEAL_ATTEMPTS, QUICK_MEAL_SQL, isQuickKind, quickMealMessage, quickMealPlan, quickSodaMessage, quickWaterMessage } from '#shared/utils/quickLog'
 import { lastSoda } from '#shared/utils/soda'
 import { localTimeNow, localToday } from '#shared/utils/time'
 import { WATER_DEFAULT_CUP_OZ, WATER_DEFAULT_GOAL_OZ, waterSetting } from '#shared/utils/water'
@@ -25,6 +25,19 @@ import type { SodaEntry, WaterEntry } from '#shared/types/journal'
 
 /** How far back the last soda is looked for. */
 const LAST_SODA_DAYS = 60
+
+/**
+ * The day's row as it stands, or null when the day has none yet — read directly, so a failed
+ * read fails the tap before anything is written. The three writes used to take their
+ * before-image from auditBefore, which answers null for a read error as well as for a missing
+ * row: a D1 blip then looked like an empty day. The meal plan saw an empty slot and replaced
+ * what was typed there instead of joining it; a water or soda tap counted the day as holding
+ * nothing; and all three logged the write as the day's CREATION, whose undo on /tools/data
+ * deletes the whole day (audit #44 item 35).
+ */
+function dayRow(db: D1Database, date: string): Promise<Record<string, unknown> | null> {
+  return db.prepare('SELECT * FROM journal_entries WHERE date = ?1').bind(date).first<Record<string, unknown>>()
+}
 
 async function quickBody<S extends z.ZodTypeAny>(event: H3Event, schema: S): Promise<z.infer<S>> {
   // An NFC tap may send no body, or an empty one: both are "all defaults".
@@ -69,7 +82,7 @@ export default defineEventHandler(async (event) => {
     const profile = Object.fromEntries((results ?? []).map(r => [r.key, r.value]))
     const oz = body.oz ?? waterSetting(profile, 'cup_oz', WATER_DEFAULT_CUP_OZ)
 
-    const before = await auditBefore(event, 'journal_entries', date)
+    const before = await dayRow(db, date)
     const held = (JSON.parse((before?.water as string | null | undefined) ?? '[]') as unknown[]).length
     await db.prepare(appendTapSql('water')).bind(date, JSON.stringify({ time, oz, id: body.id }), body.id ?? null).run()
     const row = await db.prepare('SELECT water, sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ water: string | null, sodas: string | null }>()
@@ -96,7 +109,7 @@ export default defineEventHandler(async (event) => {
       size = size ?? (last?.size || undefined)
     }
 
-    const before = await auditBefore(event, 'journal_entries', date)
+    const before = await dayRow(db, date)
     const held = (JSON.parse((before?.sodas as string | null | undefined) ?? '[]') as unknown[]).length
     await db.prepare(appendTapSql('sodas')).bind(date, JSON.stringify({ time, drink, size, id: body.id }), body.id ?? null).run()
     const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
@@ -115,16 +128,20 @@ export default defineEventHandler(async (event) => {
   if (!estimate || !isLabelFigure(estimate)) {
     throw createError({ statusCode: 422, message: `"${body.text}" has no label figures. Quick-log takes meals from the library and ones whose figures you entered by hand; log anything else on the site.` })
   }
-  const before = await auditBefore(event, 'journal_entries', date)
-  const food = JSON.parse((before?.food as string | null | undefined) || '{}') as Partial<Record<MealSlot, string>>
-  const plan = quickMealPlan(food, time, body.text, body.slot)
-  if (!plan.unchanged) {
-    // The slot is a validated enum or slotForTime's own value, so the JSON path is safe.
-    await db.prepare(`
-      INSERT INTO journal_entries (date, food) VALUES (?1, json_object(?2, ?3))
-      ON CONFLICT(date) DO UPDATE SET food = json_set(COALESCE(food, '{}'), '$.' || ?2, ?3)
-    `).bind(date, plan.slot, plan.text).run()
-    await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `${plan.slot} on ${date}: ${plan.text} (quick-log)` })
+  // Read, plan, write only if the slot still reads as planned; otherwise read and plan again
+  // (QUICK_MEAL_SQL). A meal typed on the site in between is joined, never replaced.
+  for (let attempt = 1; ; attempt++) {
+    const before = await dayRow(db, date)
+    const food = JSON.parse((before?.food as string | null | undefined) || '{}') as Partial<Record<MealSlot, string | null>>
+    const plan = quickMealPlan(food, time, body.text, body.slot)
+    if (!plan.unchanged) {
+      const res = await db.prepare(QUICK_MEAL_SQL).bind(date, plan.slot, plan.text, food[plan.slot] ?? '').run()
+      if (!res.meta.changes) {
+        if (attempt < QUICK_MEAL_ATTEMPTS) continue
+        throw createError({ statusCode: 409, message: 'That meal slot kept changing while this was being logged. Nothing was written; try again.' })
+      }
+      await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `${plan.slot} on ${date}: ${plan.text} (quick-log)` })
+    }
+    return { ok: true, kind, date, slot: plan.slot, text: plan.text, appended: !plan.unchanged, kcal: estimate.kcal, protein_g: estimate.protein_g, message: quickMealMessage(plan, body.text, estimate) }
   }
-  return { ok: true, kind, date, slot: plan.slot, text: plan.text, appended: !plan.unchanged, kcal: estimate.kcal, protein_g: estimate.protein_g, message: quickMealMessage(plan, body.text, estimate) }
 })

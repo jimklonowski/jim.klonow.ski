@@ -42,6 +42,24 @@ export function quickMealPlan(food: Partial<Record<MealSlot, string | null | und
   return { slot: target, text: `${held} + ${typed}`, unchanged: false, joined: true }
 }
 
+/**
+ * The meal write: `?1` date, `?2` slot, `?3` the slot's new text, `?4` the slot's text AS THE PLAN
+ * READ IT ('' for an empty slot). The plan is made from a read, and the write used to follow it
+ * unconditionally, so a meal typed on the site between the two was replaced by the plan's text —
+ * the join was against a slot that no longer read that way. Here the slot is written only while
+ * it still holds what the plan saw; no row changed means it moved, and the caller reads and plans
+ * again (audit #44 item 35). The slot is a validated enum or slotForTime's own value, so the
+ * JSON path is safe.
+ */
+export const QUICK_MEAL_SQL = `
+  INSERT INTO journal_entries (date, food) VALUES (?1, json_object(?2, ?3))
+  ON CONFLICT(date) DO UPDATE SET food = json_set(COALESCE(journal_entries.food, '{}'), '$.' || ?2, ?3)
+  WHERE COALESCE(json_extract(journal_entries.food, '$.' || ?2), '') = ?4
+`
+
+/** How many times the meal write re-reads and re-plans before giving up. */
+export const QUICK_MEAL_ATTEMPTS = 3
+
 // --- the one line a Shortcut shows back ---
 
 export function quickWaterMessage(oz: number, totalOz: number, goalOz: number): string {

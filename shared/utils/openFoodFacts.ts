@@ -84,6 +84,15 @@ export function servingFlOz(product: OffProduct | null | undefined): number | nu
   return null
 }
 
+/** The longest product name and serving text kept from a record. */
+export const OFF_NAME_MAX = 140
+export const OFF_SERVING_MAX = 60
+
+/** `text` cut to `max` characters, the last an ellipsis when it was cut. */
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
+}
+
 /**
  * The product's figures per serving when it has them, else per 100 g; null when it has no
  * energy figure at all (a product page with only a name). Sodium comes in grams (× 1000), or
@@ -106,10 +115,13 @@ export function offFigures(product: OffProduct | null | undefined): OffFigures |
   const sugar = num(`sugars${s}`)
   // Open Food Facts keeps caffeine in grams, like sodium.
   const caffeineG = num(`caffeine${s}`)
-  const name = [product?.product_name?.trim(), product?.brands?.split(',')[0]?.trim()].filter(Boolean).join(' — ') || `barcode ${product?.code ?? ''}`.trim()
+  // Both strings are a contributor's free text and go into the saved "where these figures came
+  // from" line, which is bounded: a product name of a few hundred characters made the whole
+  // figures save a 400 (audit #44 item 38). Cut here, where they enter.
+  const name = clip([product?.product_name?.trim(), product?.brands?.split(',')[0]?.trim()].filter(Boolean).join(' — ') || `barcode ${product?.code ?? ''}`.trim(), OFF_NAME_MAX)
   return {
     name,
-    per: basis === 'serving' ? (product?.serving_size?.trim() || '1 serving') : '100 g',
+    per: basis === 'serving' ? clip(product?.serving_size?.trim() || '1 serving', OFF_SERVING_MAX) : '100 g',
     basis,
     kcal: Math.round(kcal),
     protein_g: round1(num(`proteins${s}`) ?? 0),

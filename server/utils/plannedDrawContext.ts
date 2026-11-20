@@ -7,6 +7,7 @@
 import type { PlannedDraw } from '#shared/utils/plannedDraws'
 import { activePrep, countdownLabel, drawLabel, plannedDrawStates, purposeLines } from '#shared/utils/plannedDraws'
 import { isEchoOnly } from '../../app/data/biomarkers'
+import { isMissingTable } from './db'
 
 // Three weeks: the biotin hold starts three days out, and a booked draw further off than this
 // changes nothing about how the period's data should read.
@@ -18,8 +19,10 @@ export async function loadPlannedDraws(db: D1Database): Promise<PlannedDraw[]> {
     const { results } = await db.prepare('SELECT * FROM planned_draws ORDER BY date ASC, id ASC').all()
     return ((results ?? []) as Array<Record<string, unknown>>).map(parsePlannedDrawRow)
   }
-  catch {
-    return []
+  catch (err) {
+    // Only a missing table reads as "nothing booked" (see loadPgxNotes).
+    if (isMissingTable(err)) return []
+    throw err
   }
 }
 
@@ -41,8 +44,9 @@ export async function plannedDrawContext(db: D1Database, asOf: string, preloaded
       .filter(r => !isEchoOnly({ markers: JSON.parse(r.markers || '{}'), qualitative: JSON.parse(r.qualitative || '[]') }))
       .map(r => r.date)
   }
-  catch {
-    return ''
+  catch (err) {
+    if (isMissingTable(err)) return ''
+    throw err
   }
   if (!plans.length) return ''
 

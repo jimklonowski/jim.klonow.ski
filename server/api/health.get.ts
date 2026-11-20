@@ -1,5 +1,5 @@
 import { SCHEDULED_TASKS, TASK_STALE_AFTER_HOURS } from '../schedule'
-import { FEED_STALE_AFTER_DAYS, feedCheck, isHealthy, taskCheck, type HealthCheck, type TaskHistory } from '#shared/utils/health'
+import { FEED_LATEST_SQL, FEED_STALE_AFTER_DAYS, feedCheck, isHealthy, taskCheck, type HealthCheck, type TaskHistory } from '#shared/utils/health'
 import { localToday } from '#shared/utils/time'
 import type { HealthReport } from '#shared/types/health'
 
@@ -78,12 +78,7 @@ async function taskChecks(db: D1Database, now: number): Promise<HealthCheck[]> {
 async function feedChecks(db: D1Database, today: string): Promise<HealthCheck[]> {
   let row: { sleep: string | null, weight: string | null, recovery: string | null } | null
   try {
-    row = await db.prepare(`
-      SELECT
-        (SELECT MAX(date) FROM health_metrics WHERE sleep_total_min IS NOT NULL) AS sleep,
-        (SELECT MAX(date) FROM journal_entries WHERE weight_lbs IS NOT NULL) AS weight,
-        (SELECT MAX(date) FROM health_metrics WHERE recovery_score IS NOT NULL) AS recovery
-    `).first<{ sleep: string | null, weight: string | null, recovery: string | null }>()
+    row = await db.prepare(FEED_LATEST_SQL).first<{ sleep: string | null, weight: string | null, recovery: string | null }>()
   }
   catch (err) {
     // One failing check, not a bare 500 the monitor can't read. Named outside the `feed:` family

@@ -1,7 +1,9 @@
 // The quick-log endpoint's decisions (shared/utils/quickLog.ts) — audit #43 item 69.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isQuickKind, quickMealMessage, quickMealPlan, quickSodaMessage, quickWaterMessage } from '../shared/utils/quickLog.ts'
+import { readFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
+import { QUICK_MEAL_ATTEMPTS, QUICK_MEAL_SQL, isQuickKind, quickMealMessage, quickMealPlan, quickSodaMessage, quickWaterMessage } from '../shared/utils/quickLog.ts'
 import { zQuickMeal, zQuickWater, zSodaAdd } from '../shared/utils/schemas.ts'
 
 test('the three kinds, and nothing else', () => {
@@ -58,4 +60,33 @@ test('a Shortcut\'s Text field for ounces is read as a number', () => {
   assert.equal(zQuickWater.parse({ oz: '' }).oz, undefined, 'a blank field is the cup')
   assert.equal(zQuickWater.safeParse({ oz: 'a lot' }).success, false)
   assert.equal(zQuickWater.safeParse({ oz: '-4' }).success, false)
+})
+
+// Audit #44 item 35: the meal write against the REAL schema in node:sqlite. It lands only while
+// the slot still holds what the plan read; otherwise nothing changes and the endpoint plans again.
+test('the meal write joins what the plan saw and refuses a slot that moved under it', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec(readFileSync(new URL('../server/database/schema.sql', import.meta.url), 'utf8'))
+  const write = (date, slot, text, held) => Number(db.prepare(QUICK_MEAL_SQL).run(date, slot, text, held).changes)
+  const food = date => JSON.parse(db.prepare('SELECT food FROM journal_entries WHERE date = ?').get(date).food)
+  const D = '2031-01-05'
+  // No row yet: created with the one slot.
+  assert.equal(write(D, 'lunch', 'chicken bowl', ''), 1)
+  assert.deepEqual(food(D), { lunch: 'chicken bowl' })
+  // Another slot on the same day, empty as planned: set, the first kept.
+  assert.equal(write(D, 'dinner', 'salmon', ''), 1)
+  assert.deepEqual(food(D), { lunch: 'chicken bowl', dinner: 'salmon' })
+  // The plan read lunch as empty, but a meal was typed there since: nothing is written.
+  assert.equal(write(D, 'lunch', 'apple', ''), 0, 'the old unconditional write replaced "chicken bowl" here')
+  assert.deepEqual(food(D), { lunch: 'chicken bowl', dinner: 'salmon' })
+  // Planned again against what is there: joined.
+  const plan = quickMealPlan(food(D), '12:30', 'apple', 'lunch')
+  assert.deepEqual([plan.text, plan.joined], ['chicken bowl + apple', true])
+  assert.equal(write(D, plan.slot, plan.text, food(D).lunch), 1)
+  assert.deepEqual(food(D), { lunch: 'chicken bowl + apple', dinner: 'salmon' })
+  // A row created by a soda tap (food defaults to '{}'): the empty slot is still '' to the guard.
+  db.prepare('INSERT INTO journal_entries (date, sodas) VALUES (?1, json_array(json(?2)))').run('2031-01-06', '{"time":"09:10"}')
+  assert.equal(write('2031-01-06', 'breakfast', 'eggs', ''), 1)
+  assert.deepEqual(food('2031-01-06'), { breakfast: 'eggs' })
+  assert.ok(QUICK_MEAL_ATTEMPTS >= 2, 'at least one re-plan before giving up')
 })

@@ -2,7 +2,7 @@
 // the digest prompts that read them (server/utils/digestPrompts.ts) — audit #44 item 33.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { intakeTargetsFor, proteinTargetDayFact, proteinTargetWeekFact, waterGoalDayFact, waterGoalWeekFact } from '../shared/utils/intakeTargets.ts'
+import { caffeineDayFact, intakeTargetsFor, proteinTargetDayFact, proteinTargetWeekFact, sodiumFibreFact, waterGoalDayFact, waterGoalWeekFact } from '../shared/utils/intakeTargets.ts'
 import { dailyDigestPrompt, readerContext, weeklyDigestPrompt } from '../server/utils/digestPrompts.ts'
 import { labsSummaryPrompt } from '../server/utils/summaryPrompts.ts'
 import { AS_NEEDED, RULES, STANDING } from './_fixtures/protocol.mjs'
@@ -86,4 +86,30 @@ test('the prompts read the lines the fact sheet emits, and the reader paragraph 
   assert.match(readerContext('2026-11-19', protocol), /Intended dosing schedule/, 'the schedule still follows it')
   assert.match(readerContext('2026-11-19', protocol), /Current goals \(stated 2026-10-23\)/, 'and the dated goals')
   assert.doesNotMatch(readerContext('2026-10-01', protocol), /Current goals/, 'a prompt for a day before the goals were stated has none')
+})
+
+// Audit #44 item 34: the sodium line called half a day complete, and the caffeine line could
+// print "last at null".
+test('sodium and fibre are complete only on a day logged through to dinner with every figure', () => {
+  const full = { sodium_mg: 1840.4, sodiumMissing: 0, fiber_g: 21.6, fiberMissing: 0 }
+  assert.equal(sodiumFibreFact(full, true), 'Sodium and fibre: sodium ≈ 1840 mg; fibre ≈ 22 g. The 2,300 mg/day sodium guideline is the reference for this complete figure.')
+  const partial = sodiumFibreFact(full, false)
+  assert.match(partial, /sodium ≈ 1840 mg \(a floor: the day is not logged through to dinner\)/, 'breakfast and lunch with full figures are still not the day')
+  assert.match(partial, /fibre ≈ 22 g \(a floor: the day is not logged through to dinner\)/)
+  assert.match(partial, /The sodium figure is a floor: do not compare it with the 2,300 mg\/day guideline/)
+  assert.doesNotMatch(partial, /complete figure/)
+  const missing = sodiumFibreFact({ sodium_mg: 900, sodiumMissing: 2, fiber_g: 10, fiberMissing: 1 }, true)
+  assert.match(missing, /sodium ≈ 900 mg \(a floor: 2 meals without a sodium figure\)/)
+  assert.match(missing, /fibre ≈ 10 g \(a floor: 1 meal without a fibre figure\)/)
+  assert.match(sodiumFibreFact({ sodium_mg: 900, sodiumMissing: 1, fiber_g: 0, fiberMissing: 0 }, false), /\(a floor: 1 meal without a sodium figure, and the day is not logged through to dinner\)/)
+  assert.equal(sodiumFibreFact({ sodium_mg: 0, sodiumMissing: 0, fiber_g: 12, fiberMissing: 0 }, true), 'Sodium and fibre: fibre ≈ 12 g.', 'no sodium figure, no guideline sentence')
+  assert.equal(sodiumFibreFact({ sodium_mg: 0, sodiumMissing: 3, fiber_g: 0, fiberMissing: 3 }, true), '')
+})
+
+test('the caffeine line names the last drink\'s time only when one was logged', () => {
+  assert.equal(caffeineDayFact(150, '16:20', 109, 14), 'Caffeine: 150 mg from logged drinks, last at 16:20, 109 mg of it after 14:00 (late caffeine costs sleep)')
+  assert.equal(caffeineDayFact(95, null, 0, 14), 'Caffeine: 95 mg from logged drinks', 'a drink saved without a time: no "last at null"')
+  assert.equal(caffeineDayFact(95, '', 0, 14), 'Caffeine: 95 mg from logged drinks')
+  assert.equal(caffeineDayFact(95, '09:05', 0, 14), 'Caffeine: 95 mg from logged drinks, last at 09:05')
+  assert.equal(caffeineDayFact(0, '09:05', 0, 14), '')
 })

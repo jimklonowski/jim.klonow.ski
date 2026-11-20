@@ -12,11 +12,14 @@ export default defineEventHandler(async (event) => {
 
   const db = getDb(event)
   const before = await auditBefore(event, 'drink_labels', key)
+  // The barcode is saved as sent, null included. It used to be kept whenever the save carried
+  // none, and the form opened with the field blank, so a wrong barcode on a label could never be
+  // taken off it (audit #44 item 38). The form now opens with the saved barcode in the field.
   await db.prepare(`INSERT INTO drink_labels (key, name, serving_oz, kcal, caffeine_mg, sodium_mg, sugar_g, barcode, updated_at)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
     ON CONFLICT(key) DO UPDATE SET name = excluded.name, serving_oz = excluded.serving_oz, kcal = excluded.kcal,
       caffeine_mg = excluded.caffeine_mg, sodium_mg = excluded.sodium_mg, sugar_g = excluded.sugar_g,
-      barcode = COALESCE(excluded.barcode, drink_labels.barcode), updated_at = excluded.updated_at`)
+      barcode = excluded.barcode, updated_at = excluded.updated_at`)
     .bind(key, body.name, body.serving_oz, body.kcal, body.caffeine_mg, body.sodium_mg, body.sugar_g, body.barcode, new Date().toISOString()).run()
   await recordAudit(event, {
     table: 'drink_labels',

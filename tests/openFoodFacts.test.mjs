@@ -1,7 +1,8 @@
 // Open Food Facts → figures (shared/utils/openFoodFacts.ts) — audit #43 item 81.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeBarcode, offFigures, servingFlOz } from '../shared/utils/openFoodFacts.ts'
+import { OFF_NAME_MAX, OFF_SERVING_MAX, normalizeBarcode, offFigures, servingFlOz } from '../shared/utils/openFoodFacts.ts'
+import { zMealCorrect } from '../shared/utils/schemas.ts'
 
 test('a barcode is 8, 12, 13 or 14 digits; spaces and dashes are tolerated', () => {
   assert.equal(normalizeBarcode('0 85000-23104 6'), '085000231046')
@@ -70,4 +71,32 @@ test('junk sodium is no figure, and a record scaled from per-100 g says so (the 
   assert.equal(offFigures({ nutriments: { 'energy-kcal_serving': 5, 'salt_serving': 1e-30 } }).sodium_mg, null)
   assert.equal(offFigures({ nutrition_data_per: 'serving', nutriments: { 'energy-kcal_serving': 5 } }).scaled, false)
   assert.equal(offFigures({ nutrition_data_per: '100g', nutriments: { 'energy-kcal_100g': 5 } }).scaled, false, 'per-100 figures shown as per-100 are not scaled')
+})
+
+// Audit #44 item 38: a product name of a few hundred characters made the figures save a 400,
+// because the "where these came from" line built from it ran past its bound.
+test('a long product name or serving text is cut where it enters, and the saved line is cut rather than refused', () => {
+  const f = offFigures({
+    product_name: 'Word '.repeat(120), brands: 'Brand', serving_size: 'about one cup '.repeat(20),
+    nutriments: { 'energy-kcal_serving': 100 }
+  })
+  assert.equal(f.name.length, OFF_NAME_MAX)
+  assert.ok(f.name.endsWith('…'))
+  assert.equal(f.per.length <= OFF_SERVING_MAX, true)
+  assert.ok(f.per.endsWith('…'))
+  const short = offFigures({ product_name: 'Greek Yogurt', brands: 'Brand, Other', serving_size: '170 g', nutriments: { 'energy-kcal_serving': 100 } })
+  assert.deepEqual([short.name, short.per], ['Greek Yogurt — Brand', '170 g'], 'ordinary text is untouched')
+  // The line the form builds from them fits the schema with room to spare.
+  const from = `Open Food Facts: ${f.name} — 12 × ${f.per}`
+  assert.ok(from.length <= 300, String(from.length))
+  const figures = { text: 'yogurt', kcal: 100, protein_g: 17, carbs_g: 6, fat_g: 0, barcode: '012345678905' }
+  assert.equal(zMealCorrect.parse({ ...figures, from }).from, from)
+  // And an older client's over-long line is still a save: cut to 300, not a 400.
+  const long = zMealCorrect.safeParse({ ...figures, from: `Open Food Facts: ${'x'.repeat(900)} — 2 × 170 g` })
+  assert.equal(long.success, true)
+  assert.equal(long.data.from.length, 300)
+  assert.ok(long.data.from.endsWith('…'))
+  assert.equal(zMealCorrect.safeParse({ ...figures, from: 'x'.repeat(3001) }).success, false, 'still bounded on the way in')
+  assert.equal(zMealCorrect.parse({ ...figures, from: '  ' }).from, null)
+  assert.equal(zMealCorrect.parse(figures).from, null)
 })

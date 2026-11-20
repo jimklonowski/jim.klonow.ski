@@ -1,4 +1,5 @@
 import { pgxPromptBlock, type PgxNote } from '#shared/utils/pgx'
+import { isMissingTable } from './db'
 
 // The drug-gene notes (audit #43 item 78) for the server: the row parser the list endpoint
 // shares, the loader, and the prompt block the digests, the ask chat and the labs summary read.
@@ -25,14 +26,22 @@ export function parsePgxRow(row: Record<string, unknown>): PgxNote {
   }
 }
 
-/** Every note on file; empty before migration 0022. */
+/**
+ * Every note on file; empty before migration 0022 — and only then. This and the other prompt
+ * loaders (goals, phlebotomies, cycles, planned draws, vaccinations) used to answer "nothing on
+ * file" for ANY failure, so one D1 blip while a digest was being built stored a recap written
+ * without the donation deferral, the marker goals or a drug-gene note, with nothing to show it
+ * (audit #44 item 36). A missing table still reads as empty; anything else fails the build, and
+ * the digest is generated again instead of being stored short.
+ */
 export async function loadPgxNotes(db: D1Database): Promise<PgxNote[]> {
   try {
     const { results } = await db.prepare('SELECT * FROM pgx_notes ORDER BY id ASC').all()
     return ((results ?? []) as Array<Record<string, unknown>>).map(parsePgxRow)
   }
-  catch {
-    return []
+  catch (err) {
+    if (isMissingTable(err)) return []
+    throw err
   }
 }
 

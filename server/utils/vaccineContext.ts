@@ -2,6 +2,7 @@
 import { diffDays } from '#shared/utils/dates'
 import type { Vaccination } from '#shared/utils/vaccines'
 import { VACCINE_EFFECT_DAYS, recentVaccinations, vaccineCoverage, vaccineFamily } from '#shared/utils/vaccines'
+import { isMissingTable } from './db'
 
 // Vaccinations as they bear on `asOf`. Shots within VACCINE_EFFECT_DAYS get the acute-response
 // caveat (vitals for a few days, acute-phase blood markers for a couple of weeks); scope 'all'
@@ -15,8 +16,10 @@ export async function vaccineContext(db: D1Database, asOf: string, scope: 'recen
     ).bind(asOf).all()
     rows = (results ?? []) as unknown as Vaccination[]
   }
-  catch {
-    return ''
+  catch (err) {
+    // Only a missing table reads as "no shots on file" (see loadPgxNotes).
+    if (isMissingTable(err)) return ''
+    throw err
   }
   if (!rows.length) return ''
 

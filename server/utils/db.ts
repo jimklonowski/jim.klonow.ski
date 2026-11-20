@@ -45,6 +45,14 @@ export function isMissingTable(err: unknown): boolean {
 }
 
 /**
+ * True when a write was refused because a row it points at does not exist — a goal saved against
+ * a cycle that was deleted in another tab. The caller's mistake to report (a 409), not a 500.
+ */
+export function isForeignKeyError(err: unknown): boolean {
+  return /FOREIGN KEY constraint failed/i.test(err instanceof Error ? err.message : String(err))
+}
+
+/**
  * The read every list endpoint does: run one SELECT on the role's database and map the rows.
  * The handler still owns its auth check (who may read what differs per table) and anything
  * role-specific it does to the result.

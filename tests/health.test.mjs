@@ -1,7 +1,9 @@
 // The /api/health rules (shared/utils/health.ts): when a task or a data feed counts as healthy.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { feedCheck, isHealthy, taskCheck } from '../shared/utils/health.ts'
+import { readFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
+import { FEED_LATEST_SQL, FEED_STALE_AFTER_DAYS, feedCheck, isHealthy, taskCheck } from '../shared/utils/health.ts'
 
 const NOW = Date.parse('2026-09-24T15:00:00Z')
 const ago = h => new Date(NOW - h * 3_600_000).toISOString()
@@ -45,4 +47,22 @@ test('pending keeps the site healthy; stale and failing do not', () => {
   assert.equal(isHealthy([{ status: 'ok' }, { status: 'pending' }]), true)
   assert.equal(isHealthy([{ status: 'ok' }, { status: 'stale' }]), false)
   assert.equal(isHealthy([{ status: 'failing' }]), false)
+})
+
+// Audit #44 item 37: the Apple sleep feed is Apple's nights only, on the REAL schema.
+test('a Whoop night does not keep the Apple sleep feed green', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec(readFileSync(new URL('../server/database/schema.sql', import.meta.url), 'utf8'))
+  const night = (date, source, total = 420) => db.prepare('INSERT INTO health_metrics (date, sleep_total_min, sleep_source) VALUES (?, ?, ?)').run(date, total, source)
+  const latest = () => ({ ...db.prepare(FEED_LATEST_SQL).get() })
+  assert.deepEqual(latest(), { sleep: null, weight: null, recovery: null })
+  night('2026-11-01', null) // a row from before the column: Apple Health's
+  night('2026-11-05', 'health')
+  night('2026-11-08', 'whoop')
+  night('2026-11-09', 'whoop')
+  db.prepare('INSERT INTO health_metrics (date, recovery_score) VALUES (?, ?)').run('2026-11-10', 61)
+  db.prepare('INSERT INTO journal_entries (date, weight_lbs) VALUES (?, ?)').run('2026-11-09', 170)
+  assert.deepEqual(latest(), { sleep: '2026-11-05', weight: '2026-11-09', recovery: '2026-11-10' })
+  const check = feedCheck({ name: 'apple:sleep', latest: latest().sleep, staleAfterDays: FEED_STALE_AFTER_DAYS['apple:sleep'] }, '2026-11-10')
+  assert.equal(check.status, 'stale', 'five days without an Apple night, whatever Whoop sent')
 })

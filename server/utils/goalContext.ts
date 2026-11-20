@@ -9,6 +9,7 @@ import { transitionalWindows } from '#shared/utils/hematocrit'
 import { BIOMARKERS, computeMarkers, isEchoOnly } from '../../app/data/biomarkers'
 import { MARKER_CAVEATS, readingNotesOn } from '../data/markerCaveats'
 import { loadCycles } from './cycleContext'
+import { isMissingTable } from './db'
 import { loadPhlebotomies } from './phlebotomyContext'
 
 // The dated marker goals as AI-prompt context (audit #43 item 60): each goal's deterministic
@@ -26,8 +27,10 @@ export async function loadMarkerGoals(db: D1Database): Promise<MarkerGoal[]> {
     const { results } = await db.prepare('SELECT * FROM marker_goals ORDER BY stated ASC, id ASC').all()
     return (results ?? []) as unknown as MarkerGoal[]
   }
-  catch {
-    return []
+  catch (err) {
+    // Only a missing table reads as "no goals" (see loadPgxNotes).
+    if (isMissingTable(err)) return []
+    throw err
   }
 }
 

@@ -5,7 +5,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { VITALS_SELECT, VITALS_UPSERT_SQL, VITAL_FIELDS, vitalsBindings, vitalsOutcome } from '../shared/utils/vitalsUpsert.ts'
+import { BP_REFINE_SQL, VITALS_SELECT, VITALS_UPSERT_SQL, VITAL_FIELDS, vitalsBindings, vitalsOutcome } from '../shared/utils/vitalsUpsert.ts'
 
 const schema = readFileSync(new URL('../server/database/schema.sql', import.meta.url), 'utf8')
 function fresh() {
@@ -70,4 +70,18 @@ test('the same date written twice in one batch is fine (two points for one day i
   const a = upsert(db, '2026-10-17', { rhr: 57 })
   const b = upsert(db, '2026-10-17', { hrv: 58 })
   assert.deepEqual(b, { ...a, hrv: 58 })
+})
+
+// Audit #44 item 37: the one overwrite, guarded by the pair it read.
+test('the blood-pressure correction replaces exactly the pair it read, and nothing typed since', () => {
+  const db = fresh()
+  db.prepare('INSERT INTO journal_entries (date, bp_systolic, bp_diastolic, weight_lbs) VALUES (?, ?, ?, ?)').run('2026-11-12', 128, 82, 171)
+  const refine = (sys, dia, wasSys, wasDia) => Number(db.prepare(BP_REFINE_SQL).run('2026-11-12', sys, dia, wasSys, wasDia).changes)
+  assert.equal(refine(123, 79, 128, 82), 1)
+  assert.deepEqual(plain(db.prepare(`SELECT ${VITALS_SELECT} FROM journal_entries WHERE date = ?`).get('2026-11-12')), { date: '2026-11-12', weight_lbs: 171, rhr: null, hrv: null, bp_systolic: 123, bp_diastolic: 79 })
+  // A value typed between the read and the write: the guard no longer matches.
+  db.prepare('UPDATE journal_entries SET bp_systolic = 118 WHERE date = ?').run('2026-11-12')
+  assert.equal(refine(130, 85, 123, 79), 0)
+  assert.equal(db.prepare('SELECT bp_systolic FROM journal_entries WHERE date = ?').get('2026-11-12').bp_systolic, 118)
+  assert.equal(Number(db.prepare(BP_REFINE_SQL).run('2026-11-13', 120, 80, 121, 81).changes), 0, 'a day with no row is not created')
 })

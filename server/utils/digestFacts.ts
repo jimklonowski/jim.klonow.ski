@@ -7,7 +7,7 @@ import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/util
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { LATE_CAFFEINE_HOUR, drinkTotals, hydrationOz, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
-import { intakeTargetsFor, proteinTargetDayFact, proteinTargetWeekFact, waterGoalDayFact, waterGoalWeekFact, type IntakeTargets } from '#shared/utils/intakeTargets'
+import { caffeineDayFact, intakeTargetsFor, proteinTargetDayFact, proteinTargetWeekFact, sodiumFibreFact, waterGoalDayFact, waterGoalWeekFact, type IntakeTargets } from '#shared/utils/intakeTargets'
 import type { LeanScan } from '#shared/utils/proteinTarget'
 import { bpGoal, bpLabel, bpWeekAverage, type BpReading, type BpWeek } from '#shared/utils/bloodPressure'
 import { TREND_LOOKBACK_DAYS, describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
@@ -197,7 +197,7 @@ function caffeineLine(entries: JournalRow[], estimates: EstimateIndex): string {
   if (!days.length) return ''
   if (entries.length === 1) {
     const { t, late } = days[0]!
-    return `Caffeine: ${t.caffeine_mg} mg from logged drinks, last at ${t.lastCaffeine}${late ? `, ${late} mg of it after ${LATE_CAFFEINE_HOUR}:00 (late caffeine costs sleep)` : ''}`
+    return caffeineDayFact(t.caffeine_mg, t.lastCaffeine, late, LATE_CAFFEINE_HOUR)
   }
   const total = days.reduce((s, d) => s + d.t.caffeine_mg, 0)
   const lateDays = days.filter(d => d.late > 0).length
@@ -365,13 +365,9 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   }
   // Sodium and fibre (item 71): meals that carry a figure plus the drinks' sodium; a floor
   // while any logged meal has none.
-  if (nutrition.sodium_mg || nutrition.fiber_g) {
-    const parts = [
-      nutrition.sodium_mg ? `sodium ≈ ${nutrition.sodium_mg} mg${nutrition.sodiumMissing ? ` (a floor: ${nutrition.sodiumMissing} meal${nutrition.sodiumMissing === 1 ? '' : 's'} without a sodium figure)` : ''}` : '',
-      nutrition.fiber_g ? `fibre ≈ ${Math.round(nutrition.fiber_g)} g${nutrition.fiberMissing ? ' (a floor)' : ''}` : ''
-    ].filter(Boolean)
-    lines.push(`Sodium and fibre: ${parts.join('; ')}. The 2,300 mg/day sodium guideline is the reference; only compare a complete figure against it.`)
-  }
+  // Complete only on a day logged through to dinner (audit #44 item 34).
+  const sodiumFibre = sodiumFibreFact(nutrition, entry != null && isWholeDay(entry))
+  if (sodiumFibre) lines.push(sodiumFibre)
 
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your note for the day — ${notes.join('; ')}`)

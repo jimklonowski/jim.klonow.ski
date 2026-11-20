@@ -10,6 +10,7 @@ import type { SignalHealthRow, SignalJournalRow } from '#shared/utils/cycleSigna
 import { activeSignals, computeCycleSignals, signalShorthand } from '#shared/utils/cycleSignals'
 import { cadenceOf } from '#shared/utils/protocolRules'
 import { isEchoOnly } from '../../app/data/biomarkers'
+import { isMissingTable } from './db'
 
 function itemLine(item: CyclePlanItem, plannedWeeks: number): string {
   const to = item.toWeek ?? plannedWeeks
@@ -36,8 +37,11 @@ export async function loadCycles(db: D1Database): Promise<Cycle[]> {
     const { results } = await db.prepare('SELECT * FROM cycles ORDER BY start_date ASC').all()
     rows = (results ?? []) as Array<Record<string, unknown>>
   }
-  catch {
-    return []
+  catch (err) {
+    // Only a missing table reads as "no cycles" (see loadPgxNotes): the donation deferral and
+    // the schedule check both hang off this list.
+    if (isMissingTable(err)) return []
+    throw err
   }
   return rows.map(row => ({
     id: row.id as number,
@@ -72,8 +76,9 @@ export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cyc
       .filter(r => !isEchoOnly({ markers: JSON.parse(r.markers || '{}'), qualitative: JSON.parse(r.qualitative || '[]') }))
       .map(r => r.date)
   }
-  catch {
-    return ''
+  catch (err) {
+    if (isMissingTable(err)) return ''
+    throw err
   }
   if (!cycles.length) return ''
 

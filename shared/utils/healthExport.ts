@@ -46,6 +46,8 @@ export interface HealthMetricsIn {
 export interface ParsedHealthExport {
   byDate: Record<string, Vitals>
   healthByDate: Record<string, HealthMetricsIn>
+  /** Each date's first blood-pressure session, reading by reading (see bpRefinement). */
+  bpSessions: Record<string, BpSessionReadings>
 }
 
 const LBS_PER_KG = 2.20462
@@ -133,12 +135,55 @@ const BP_SESSION_MS = 15 * 60_000
  * out, so the figure stays the morning's. Points with no readable time all count.
  */
 function bpSession(points: BpPoint[]): number | null {
-  if (!points.length) return null
+  const values = bpSessionValues(points)
+  return values.length ? meanOf(values) : null
+}
+
+const meanOf = (values: readonly number[]) => Math.round(values.reduce((s, v) => s + v, 0) / values.length)
+
+/** The first session's readings, earliest first; ones with no readable time follow in the order sent. */
+function bpSessionValues(points: BpPoint[]): number[] {
   const timed = points.map(p => ({ value: p.value, t: instantOf(p.at) }))
   const known = timed.filter(p => p.t != null)
   const first = known.length ? Math.min(...known.map(p => p.t!)) : null
   const session = first == null ? timed : timed.filter(p => p.t == null || p.t - first <= BP_SESSION_MS)
-  return Math.round(session.reduce((s, p) => s + p.value, 0) / session.length)
+  return [
+    ...session.filter(p => p.t != null).sort((a, b) => a.t! - b.t!),
+    ...session.filter(p => p.t == null)
+  ].map(p => p.value)
+}
+
+/** A day's first blood-pressure session as the readings it was averaged from. */
+export interface BpSessionReadings {
+  sys: number[]
+  dia: number[]
+}
+
+/**
+ * The pair a day's stored blood pressure should be CORRECTED to, or null to leave it alone.
+ *
+ * The webhook fills blanks and never overwrites, so that a typed reading always wins. But a
+ * delivery can arrive part-way through a cuff's triple measurement — one or two of the three
+ * readings in Apple Health so far — and it then stored the mean of what it had; the next
+ * delivery carried all three and changed nothing, because the field was no longer blank. The
+ * day kept the first reading where the mean of three was the measurement (audit #44 item 37).
+ *
+ * No column says who wrote a value, so this recognises the case by its arithmetic: the stored
+ * pair is replaced only when it is EXACTLY what a delivery of the session's first k readings
+ * (k short of all of them) would have written, systolic and diastolic both. A typed value
+ * matches that by coincidence only when it is the same as an early reading, and then it becomes
+ * the session's mean; anything else typed is left as it is.
+ */
+export function bpRefinement(stored: { bp_systolic: number | null, bp_diastolic: number | null } | null | undefined, session: BpSessionReadings | null | undefined): { bp_systolic: number, bp_diastolic: number } | null {
+  if (!stored || !session || stored.bp_systolic == null || stored.bp_diastolic == null) return null
+  const n = session.sys.length
+  if (n < 2 || session.dia.length !== n) return null
+  const full = { bp_systolic: meanOf(session.sys), bp_diastolic: meanOf(session.dia) }
+  if (full.bp_systolic === stored.bp_systolic && full.bp_diastolic === stored.bp_diastolic) return null
+  for (let k = 1; k < n; k++) {
+    if (meanOf(session.sys.slice(0, k)) === stored.bp_systolic && meanOf(session.dia.slice(0, k)) === stored.bp_diastolic) return full
+  }
+  return null
 }
 
 /** Epoch ms of a point's date ("2026-10-21 07:00:00 -0500" or ISO), or null. */
@@ -275,13 +320,16 @@ export function parseHealthExport(metrics: HealthExportMetric[]): ParsedHealthEx
     if (h.basal_kcal != null) h.basal_kcal = round1(h.basal_kcal)
     if (h.dietary_water_oz != null) h.dietary_water_oz = round1(h.dietary_water_oz)
   }
-  // Each date's blood pressure: the mean of its first session.
+  // Each date's blood pressure: the mean of its first session, and the readings behind it for
+  // the webhook's correction of a value an earlier, shorter delivery left (bpRefinement).
+  const bpSessions: Record<string, BpSessionReadings> = {}
   for (const [date, points] of Object.entries(bpPoints)) {
     const v = (byDate[date] ??= {})
     const sys = bpSession(points.sys)
     const dia = bpSession(points.dia)
     if (sys != null) v.bp_systolic = sys
     if (dia != null) v.bp_diastolic = dia
+    bpSessions[date] = { sys: bpSessionValues(points.sys), dia: bpSessionValues(points.dia) }
   }
-  return { byDate, healthByDate }
+  return { byDate, healthByDate, bpSessions }
 }

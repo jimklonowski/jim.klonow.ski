@@ -1,7 +1,7 @@
 import { zHealthWebhook } from '#shared/utils/schemas'
-import { VITALS_SELECT, VITALS_UPSERT_SQL, vitalsBindings, vitalsOutcome } from '#shared/utils/vitalsUpsert'
+import { BP_REFINE_SQL, VITALS_SELECT, VITALS_UPSERT_SQL, vitalsBindings, vitalsOutcome } from '#shared/utils/vitalsUpsert'
 import type { VitalsRow } from '#shared/utils/vitalsUpsert'
-import { parseHealthExport } from '#shared/utils/healthExport'
+import { bpRefinement, parseHealthExport } from '#shared/utils/healthExport'
 import { workoutStartMs } from '#shared/utils/time'
 
 /** Only a session from the last few days warrants a Whoop strain re-read; a backfill of old workouts doesn't. */
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
   // The per-date vitals and health metrics, every unit converted (shared/utils/healthExport.ts,
   // tested) — including the steps, energies, respiratory rate, SpO2, waist, water and the sleep
   // start/end stamps the webhook used to drop (audit #43 item 56).
-  const { byDate, healthByDate } = parseHealthExport(metrics)
+  const { byDate, healthByDate, bpSessions } = parseHealthExport(metrics)
 
   const workouts: Workout[] = []
   for (const w of workoutsIn) {
@@ -103,7 +103,9 @@ export default defineEventHandler(async (event) => {
     .filter((s): s is D1PreparedStatement => s != null)
 
   // Refused whole, before anything is written, rather than failing partway through every retry.
-  const statementCount = vitalDates.length + Math.ceil(vitalDates.length / 90) + metricStatements.length + workouts.length * 2
+  // A date with a multi-reading cuff session may cost one more statement (the BP correction).
+  const bpCorrections = Object.values(bpSessions).filter(s => s.sys.length > 1).length
+  const statementCount = vitalDates.length + Math.ceil(vitalDates.length / 90) + bpCorrections + metricStatements.length + workouts.length * 2
   if (statementCount > MAX_DELIVERY_STATEMENTS) {
     throw createError({
       statusCode: 413,
@@ -132,6 +134,17 @@ export default defineEventHandler(async (event) => {
         if (outcome === 'created') created.push(date)
         else if (outcome === 'updated') updated.push(date)
       })
+    }
+    // A blood pressure a shorter delivery of the same cuff session left on the row is corrected
+    // to the whole session's mean (bpRefinement); every other stored reading stays as it is.
+    const refinements = vitalDates.flatMap(([date]) => {
+      const was = before.get(date)
+      const fix = bpRefinement(was, bpSessions[date])
+      return fix && was ? [{ date, stmt: db.prepare(BP_REFINE_SQL).bind(date, fix.bp_systolic, fix.bp_diastolic, was.bp_systolic, was.bp_diastolic) }] : []
+    })
+    if (refinements.length) {
+      await runBatched(db, refinements.map(r => r.stmt), BATCH_SIZE)
+      for (const { date } of refinements) if (!created.includes(date) && !updated.includes(date)) updated.push(date)
     }
   }
 

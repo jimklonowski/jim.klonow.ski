@@ -2,7 +2,7 @@
 // metrics the webhook used to drop, with their units, and the sum-vs-last rule per metric.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseHealthExport } from '../shared/utils/healthExport.ts'
+import { bpRefinement, parseHealthExport } from '../shared/utils/healthExport.ts'
 
 const metric = (name, units, ...data) => ({ name, units, data })
 const on = (date, qty, extra = {}) => ({ date: `${date} 08:00:00 -0500`, qty, ...extra })
@@ -116,4 +116,29 @@ test('blood pressure is the mean of the morning\'s session, not the last reading
   assert.deepEqual(split['2026-11-09'], { bp_systolic: 110 })
   // A date with no clock time (a daily aggregate) still counts every point.
   assert.deepEqual(parseHealthExport([{ name: 'blood_pressure', data: [{ date: '2026-11-08', systolic: 120, diastolic: 80 }, { date: '2026-11-08', systolic: 110, diastolic: 70 }] }]).byDate['2026-11-08'], { bp_systolic: 115, bp_diastolic: 75 })
+})
+
+// Audit #44 item 37: a delivery that arrived part-way through the cuff's triple measurement
+// stored the mean of what it had, and the full session could never replace it.
+test('a blood pressure left by a shorter delivery of the same session is corrected to the full mean; anything else is left', () => {
+  const at = (hhmm, sys, dia) => ({ date: `2026-11-12 ${hhmm}:00 -0600`, systolic: sys, diastolic: dia })
+  const three = [at('07:00', 128, 82), at('07:01', 122, 78), at('07:02', 119, 77)]
+  const first = parseHealthExport([metric('blood_pressure', 'mmHg', three[0])])
+  assert.deepEqual([first.byDate['2026-11-12'].bp_systolic, first.byDate['2026-11-12'].bp_diastolic], [128, 82], 'the partial delivery wrote reading one')
+  // The readings arrive out of order in the full delivery; the session is read earliest first.
+  const full = parseHealthExport([metric('blood_pressure', 'mmHg', three[2], three[0], three[1])])
+  assert.deepEqual(full.bpSessions['2026-11-12'], { sys: [128, 122, 119], dia: [82, 78, 77] })
+  assert.deepEqual([full.byDate['2026-11-12'].bp_systolic, full.byDate['2026-11-12'].bp_diastolic], [123, 79])
+  const session = full.bpSessions['2026-11-12']
+  assert.deepEqual(bpRefinement({ bp_systolic: 128, bp_diastolic: 82 }, session), { bp_systolic: 123, bp_diastolic: 79 }, 'stored = the first reading')
+  assert.deepEqual(bpRefinement({ bp_systolic: 125, bp_diastolic: 80 }, session), { bp_systolic: 123, bp_diastolic: 79 }, 'stored = the mean of the first two')
+  assert.equal(bpRefinement({ bp_systolic: 123, bp_diastolic: 79 }, session), null, 'already the full mean')
+  assert.equal(bpRefinement({ bp_systolic: 121, bp_diastolic: 80 }, session), null, 'a typed value that is no partial mean stays')
+  assert.equal(bpRefinement({ bp_systolic: 128, bp_diastolic: 80 }, session), null, 'both numbers must match the same partial delivery')
+  assert.equal(bpRefinement({ bp_systolic: 128, bp_diastolic: null }, session), null)
+  assert.equal(bpRefinement(undefined, session), null, 'no row yet: the blank-fill writes the mean itself')
+  assert.equal(bpRefinement({ bp_systolic: 128, bp_diastolic: 82 }, first.bpSessions['2026-11-12']), null, 'one reading refines nothing')
+  // An afternoon reading sent on its own is its own session and matches nothing the morning stored.
+  const afternoon = parseHealthExport([metric('blood_pressure', 'mmHg', at('16:30', 131, 84), at('16:31', 127, 80))])
+  assert.equal(bpRefinement({ bp_systolic: 123, bp_diastolic: 79 }, afternoon.bpSessions['2026-11-12']), null)
 })

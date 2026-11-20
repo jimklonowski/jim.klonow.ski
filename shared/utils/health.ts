@@ -71,6 +71,20 @@ export const FEED_STALE_AFTER_DAYS = {
   'whoop:recovery': 2
 } as const
 
+/**
+ * The latest day each feed delivered, one row: `sleep`, `weight`, `recovery`. The sleep feed is
+ * Apple Health's, so only a night that came from it counts — one whose source is 'health', or
+ * unset on a row from before the column. Since Whoop's night became the fallback (migration
+ * 0019) any night satisfied this check, so `apple:sleep` stayed green on Whoop's data with the
+ * Apple export dead (audit #44 item 37). tests/health.test.mjs runs it on the real schema.
+ */
+export const FEED_LATEST_SQL = `
+  SELECT
+    (SELECT MAX(date) FROM health_metrics WHERE sleep_total_min IS NOT NULL AND (sleep_source IS NULL OR sleep_source = 'health')) AS sleep,
+    (SELECT MAX(date) FROM journal_entries WHERE weight_lbs IS NOT NULL) AS weight,
+    (SELECT MAX(date) FROM health_metrics WHERE recovery_score IS NOT NULL) AS recovery
+`
+
 export function feedCheck(feed: Feed, today: string): HealthCheck {
   const name = `feed:${feed.name}`
   if (!feed.latest) return { name, status: 'stale', detail: 'no data ever received' }

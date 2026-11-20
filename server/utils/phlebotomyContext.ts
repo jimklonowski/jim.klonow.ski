@@ -4,6 +4,7 @@ import { diffDays } from '#shared/utils/dates'
 import type { Phlebotomy } from '#shared/utils/hematocrit'
 import { DEFAULT_DONATION_ML, IRON_MG_PER_ML_BLOOD } from '#shared/utils/hematocrit'
 import { loadCycles } from './cycleContext'
+import { isMissingTable } from './db'
 
 // Phlebotomies as AI-prompt context (the ask chat, the labs summary): blood taken out on purpose
 // is the one thing that moves hematocrit down fast, and a draw after one must be read as such —
@@ -17,8 +18,10 @@ export async function loadPhlebotomies(db: D1Database): Promise<Phlebotomy[]> {
     const { results } = await db.prepare('SELECT * FROM phlebotomies ORDER BY date ASC, id ASC').all()
     return (results ?? []) as unknown as Phlebotomy[]
   }
-  catch {
-    return []
+  catch (err) {
+    // Only a missing table reads as "no visits" (see loadPgxNotes).
+    if (isMissingTable(err)) return []
+    throw err
   }
 }
 
