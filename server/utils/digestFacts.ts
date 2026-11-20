@@ -7,6 +7,8 @@ import { computeTrends, formatTrendLines, type TrendFinding } from '#shared/util
 import { fmtSodaOz, sodaTotals, type SodaTotals } from '#shared/utils/soda'
 import { LATE_CAFFEINE_HOUR, drinkTotals, hydrationOz, isSodaEntry, lateCaffeineMg, sodasOnly } from '#shared/utils/drinks'
 import { fmtWaterOz, waterTotals } from '#shared/utils/water'
+import { intakeTargetsFor, proteinTargetDayFact, proteinTargetWeekFact, waterGoalDayFact, waterGoalWeekFact, type IntakeTargets } from '#shared/utils/intakeTargets'
+import type { LeanScan } from '#shared/utils/proteinTarget'
 import { bpGoal, bpLabel, bpWeekAverage, type BpReading, type BpWeek } from '#shared/utils/bloodPressure'
 import { TREND_LOOKBACK_DAYS, describeTrend, weighInsOf, weightTrend } from '#shared/utils/weightTrend'
 import { MEAL_SLOTS, MEAL_SLOT_LABELS, dayNutrition, hasFullFigures, isWholeDay, mealHistory, type EstimateIndex } from '#shared/utils/nutrition'
@@ -229,6 +231,33 @@ function tallyDoses(entries: JournalRow[]) {
     .sort((a, b) => b.days - a.days)
 }
 
+/**
+ * The water goal and protein target in force on `asOf` (shared/utils/intakeTargets.ts): the
+ * profile's settings, and the DEXA scans the lean-based protein rule reads. A database without
+ * either table yet reads as nothing set; any other failure propagates rather than passing the
+ * tracker's default off as the owner's goal.
+ */
+async function intakeTargetsOn(db: D1Database, asOf: string): Promise<IntakeTargets> {
+  const optional = async <T>(read: () => Promise<T[]>): Promise<T[]> => {
+    try {
+      return await read()
+    }
+    catch (err) {
+      if (isMissingTable(err)) return []
+      throw err
+    }
+  }
+  const [facts, scans] = await Promise.all([
+    optional(async () => (await db.prepare('SELECT key, value FROM profile WHERE key IN (\'water_goal_oz\', \'protein_target_g\', \'protein_per_lb_lean\')').all<{ key: string, value: string }>()).results ?? []),
+    optional(async () => (await db.prepare('SELECT date, total FROM dexa_entries WHERE date <= ?1 ORDER BY date ASC').bind(asOf).all<{ date: string, total: string | null }>()).results ?? [])
+  ])
+  return intakeTargetsFor(
+    Object.fromEntries(facts.map(r => [r.key, r.value])),
+    scans.map(s => ({ date: s.date, total: JSON.parse(s.total || '{}') as LeanScan['total'] })),
+    asOf
+  )
+}
+
 /** The owner's blood-pressure goal (profile `bp_goal`), or the default when unset or unreadable. */
 async function bpGoalOf(db: D1Database): Promise<BpReading> {
   const row = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('bp_goal').first<{ value: string }>().catch(() => null)
@@ -252,7 +281,7 @@ export interface DigestFacts {
 // `rules` is the effective dosing schedule (standing + planned cycles) and `today` the
 // home-timezone date, both for the schedule check — see scheduleContext in protocolProse.ts.
 export async function dailyDigestFacts(db: D1Database, date: string, rules: ProtocolRule[], today: string): Promise<DigestFacts> {
-  const [journal, health, workouts, prev, baseJournal, baseHealth, labDates, estimates, trendJournal] = await Promise.all([
+  const [journal, health, workouts, prev, baseJournal, baseHealth, labDates, estimates, trendJournal, targets] = await Promise.all([
     journalInRange(db, date, date),
     healthInRange(db, date, date),
     workoutsInRange(db, date, date),
@@ -262,7 +291,9 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
     labDatesInRange(db, date, date),
     loadEstimateIndex(db),
     // Six weeks of weigh-ins: enough for the trend to settle and its 14-day rate window to fill.
-    journalInRange(db, shiftDays(date, -TREND_LOOKBACK_DAYS), date)
+    journalInRange(db, shiftDays(date, -TREND_LOOKBACK_DAYS), date),
+    // The "Water goal" and "Protein target" lines the prompt's ground rules read (audit #44 item 33).
+    intakeTargetsOn(db, date)
   ])
   const entry = journal[0] ?? null
   const h = health[0] ?? null
@@ -310,7 +341,11 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
   const pours = waterTotals(entry?.water)
   const water = { count: pours.count, oz: hydrationOz(entry) }
   const sportsOz = drinkTotals(entry?.sodas).hydratingOz
-  if (water.oz) lines.push(`Water: ${fmtWaterOz(water.oz)}${pours.count ? ` over ${pours.count} pour${pours.count === 1 ? '' : 's'}` : ''}${sportsOz ? ` (incl. ${sportsOz} oz of sports drink)` : ''}`)
+  if (water.oz) {
+    lines.push(`Water: ${fmtWaterOz(water.oz)}${pours.count ? ` over ${pours.count} pour${pours.count === 1 ? '' : 's'}` : ''}${sportsOz ? ` (incl. ${sportsOz} oz of sports drink)` : ''}`)
+    // Only beside a water line: a day with none logged is unknown, and gets no goal to miss.
+    lines.push(waterGoalDayFact(targets, water.oz))
+  }
 
   // The meals as typed, then the day's total — a floor while any meal has no figures.
   const mealSlots = MEAL_SLOTS.filter(s => entry?.food?.[s]?.trim())
@@ -325,6 +360,8 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
       + `${missing ? `; ${missing} meal${missing === 1 ? '' : 's'} without figures yet, so this is a floor` : ''}.`
       : ''
     lines.push(`Meals: ${list}.${figures}`)
+    // Judged only on a day logged through to dinner with figures for every meal; else a floor.
+    if (targets.protein && nutrition.estimated) lines.push(proteinTargetDayFact(targets.protein, nutrition.protein_g, isWholeDay(entry!) && hasFullFigures(nutrition)))
   }
   // Sodium and fibre (item 71): meals that carry a figure plus the drinks' sodium; a floor
   // while any logged meal has none.
@@ -390,7 +427,7 @@ export async function dailyDigestFacts(db: D1Database, date: string, rules: Prot
 export async function weeklyDigestFacts(db: D1Database, start: string, end: string, rules: ProtocolRule[], today: string): Promise<DigestFacts> {
   const prevStart = shiftDays(start, -7)
   const prevEnd = shiftDays(start, -1)
-  const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates, estimates, trendJournal] = await Promise.all([
+  const [journal, health, workouts, prevJournal, prevHealth, prevWorkouts, labDates, estimates, trendJournal, targets] = await Promise.all([
     journalInRange(db, start, end),
     healthInRange(db, start, end),
     workoutsInRange(db, start, end),
@@ -399,7 +436,8 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
     workoutsInRange(db, prevStart, prevEnd),
     labDatesInRange(db, start, end),
     loadEstimateIndex(db),
-    journalInRange(db, shiftDays(end, -TREND_LOOKBACK_DAYS), end)
+    journalInRange(db, shiftDays(end, -TREND_LOOKBACK_DAYS), end),
+    intakeTargetsOn(db, end)
   ])
 
   const weights = journal.map(e => e.weight_lbs).filter((v): v is number => v != null)
@@ -480,6 +518,7 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
   lines.push(water.days
     ? `Water: ~${water.perDay} oz/day over the ${water.days} day${water.days === 1 ? '' : 's'} it was logged (${fmtWaterOz(water.oz)} total)`
     : 'Water: none logged')
+  if (water.days) lines.push(waterGoalWeekFact(targets, journal.map(e => hydrationOz(e))))
 
   const food = foodSummary(journal, estimates)
   lines.push(food.daysLogged
@@ -487,6 +526,7 @@ export async function weeklyDigestFacts(db: D1Database, start: string, end: stri
     + `${food.daysCovered ? `; ≈ ${food.kcal} kcal/day and ${food.protein_g} g protein/day over the ${food.daysCovered} day${food.daysCovered === 1 ? '' : 's'} logged through to dinner with figures for every meal` : ''}`
     + `${food.top.length ? `; most logged: ${food.top.join(', ')}` : ''}`
     : 'Food: no meals logged')
+  if (targets.protein && food.daysLogged) lines.push(proteinTargetWeekFact(targets.protein, food.daysCovered ? food.protein_g : null, food.daysCovered))
 
   const notes = noteLines(journal)
   if (notes.length) lines.push(`Your notes this week — ${notes.join('; ')}`)
