@@ -56,7 +56,7 @@ const props = withDefaults(defineProps<{
 }>(), { practice: false })
 
 const emit = defineEmits<{
-  /** The game ended with this score; `cleared` when the whole wall went. */
+  /** The game ended (or was left mid-way with points on the board) at this score; `cleared` when the whole wall went. */
   over: [score: number, cleared: boolean]
   /** The player left (Escape or the page's QUIT); the score is the last game's. */
   quit: [score: number]
@@ -385,7 +385,16 @@ function onPointerMove(e: PointerEvent) {
   if (s && rect) move(s, e.clientX - rect.left)
 }
 
+/** A wall left with points on the board still counts: the record is posted before the stage is handed back. */
+function reportIfLive() {
+  const s = state
+  if (!s || reportedEnd || s.score === 0 || s.status === 'over' || s.status === 'cleared') return
+  reportedEnd = true
+  emit('over', s.score, false)
+}
+
 function quit() {
+  reportIfLive()
   emit('quit', state?.score ?? 0)
 }
 

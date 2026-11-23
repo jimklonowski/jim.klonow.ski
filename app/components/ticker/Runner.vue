@@ -43,7 +43,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** The run ended with this score. */
+  /** The run ended (or was left mid-way with points on the board) at this score. */
   over: [score: number]
   /** The player left (Escape or the page's QUIT); the score is the last run's. */
   quit: [score: number]
@@ -354,7 +354,15 @@ function press() {
   if (state.status === 'running' && (wasOver || announce.value.startsWith('press'))) announce.value = 'running'
 }
 
+/** A run left with points on the board still counts: the record is posted before the stage is handed back. */
+function reportIfLive() {
+  if (reportedOver || state.score === 0 || state.status === 'over') return
+  reportedOver = true
+  emit('over', state.score)
+}
+
 function quit() {
+  reportIfLive()
   emit('quit', state.score)
 }
 
@@ -390,6 +398,13 @@ onMounted(() => {
   window.addEventListener('keydown', onKey)
   document.addEventListener('visibilitychange', onVisibility)
   canvas.value?.focus({ preventScroll: true })
+  if (import.meta.dev) {
+    // Lets a headless check read the run, like the other games' hooks.
+    (window as unknown as Record<string, unknown>).__runnerDebug = {
+      status: () => state.status,
+      score: () => state.score
+    }
+  }
   last = performance.now()
   raf = requestAnimationFrame(frame)
 })
@@ -400,6 +415,7 @@ onUnmounted(() => {
   stopTheme?.()
   window.removeEventListener('keydown', onKey)
   document.removeEventListener('visibilitychange', onVisibility)
+  if (import.meta.dev) delete (window as unknown as Record<string, unknown>).__runnerDebug
 })
 
 // A build or wardrobe change mid-game is rare (the page's data refreshing); redraw the figure.

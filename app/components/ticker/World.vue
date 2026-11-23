@@ -124,7 +124,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** The game ended with this score; `cleared` when the castle was reached; the feats it earned and its figures. */
+  /** The game ended (or was left mid-way with points on the board) at this score; `cleared` when the castle was reached; the feats it earned and its figures. */
   over: [score: number, cleared: boolean, feats: WorldFeat[], summary: WorldSummary]
   /** The player left (Escape or the page's QUIT); the score is the last game's. */
   quit: [score: number]
@@ -938,7 +938,16 @@ function releasePads() {
   syncPads()
 }
 
+/** A month left with points on the board still counts: the record is posted before the stage is handed back (not finished, so no feats). */
+function reportIfLive() {
+  const s = state
+  if (!s || reportedEnd || s.score === 0 || s.status === 'over' || s.status === 'cleared') return
+  reportedEnd = true
+  emit('over', s.score, false, worldFeats(s), worldSummary(s))
+}
+
 function quit() {
+  reportIfLive()
   emit('quit', state?.score ?? 0)
 }
 
