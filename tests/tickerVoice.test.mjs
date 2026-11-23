@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  arrivalLine, dated, doseDoneLine, doseStartLine, drawTile, fedTile, flinchLine, gotLine, helloLine, newsSince, plateLine, playIntroLine,
+  arrivalLine, dated, doseDoneLine, doseStartLine, drawTile, fedTile, flinchLine, gotLine, helloLine, newsSince, outcomeForQuit, plateLine, playIntroLine,
   quitRemark, quoteLines, recordLines, squeakFor, statTiles, todaySummaryLine, visitorsNews, walkEndLine, walkStartLine
 } from '../shared/utils/tickerVoice.ts'
 
@@ -215,6 +215,22 @@ test('the games: the intro by game, the quit remark by what the run earned', () 
   assert.equal(gotLine(summary), 'sep 14 got me — two cans and the pit.')
   assert.equal(gotLine({ ...summary, hits: [], worstDay: null, cleared: true }), 'not a scratch.')
   assert.equal(gotLine({ ...summary, hits: [], worstDay: null }), '')
+})
+
+test('a quit is about the last game reported: a record or a cleared wall is not carried into the next game', () => {
+  const blank = score => ({ score, setRecord: false, beatHouse: false, cleared: false, summary: null })
+  const record = { score: 4100, setRecord: true, beatHouse: false, cleared: true, summary: null }
+  const died = { score: 20, setRecord: false, beatHouse: false, cleared: false, summary: null }
+  assert.equal(outcomeForQuit(record, 4100), record, 'quit right after the game that set it')
+  assert.equal(outcomeForQuit(died, 20), died, 'a second game replaced the first: nothing of the record is left')
+  assert.equal(outcomeForQuit(record, 0), record, 'restarted and left before a point: still about the game before')
+  assert.deepEqual(outcomeForQuit(null, 0), blank(0), 'left before any game')
+  assert.deepEqual(outcomeForQuit(record, 35), blank(35), 'a score no game reported celebrates nothing')
+  // Through the line: the record game, then dying at 20 in the same sitting.
+  const say = (o, best) => quitRemark({ game: 'crusher', score: o.score, best, house: best.score, keeper: true, setRecord: o.setRecord, beatHouse: o.beatHouse, cleared: o.cleared, wallEmpty: false }).line
+  const best = { score: 4100, date: '2026-10-01', cleared: true }
+  assert.equal(say(outcomeForQuit(record, 4100), best), 'wall cleared. new best: 4100 points. ♥')
+  assert.equal(say(outcomeForQuit(died, 20), best), '20 points. best 4100 on Oct 1 — it\'s still catching its breath.')
 })
 
 test('the stats tiles and the day summary', () => {

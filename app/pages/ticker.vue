@@ -406,10 +406,10 @@ import type { Achievement } from '#shared/utils/tickerDay'
 import {
   NO_WORKOUT_LINE, SAT_BACK_LINE, SAT_DOWN_LINE, achievementLine, afterEffectOf, arrivalLine, doseDoneLine, doseLabel, doseStartLine,
   drawTile, fedTile, flinchLine, gotLine, helloLine, maneGoneLine, maneStandingLine, maneThinnedLine, mixDoneLine, mixStartLine, newsSince,
-  plateLine, playIntroLine, quitRemark, quoteLines, recordLines, resultsLandedLine, saluteLine, squeakFor, statTiles, todaySummaryLine,
+  outcomeForQuit, plateLine, playIntroLine, quitRemark, quoteLines, recordLines, resultsLandedLine, saluteLine, squeakFor, statTiles, todaySummaryLine,
   visitorsNews, walkEndLine, walkStartLine
 } from '#shared/utils/tickerVoice'
-import type { News, Snapshot } from '#shared/utils/tickerVoice'
+import type { GameOutcome, News, Snapshot } from '#shared/utils/tickerVoice'
 import type { WorldFeat, WorldSummary } from '#shared/utils/tickerWorld'
 import type { TickerPose, TickerProp } from '#shared/utils/tickerSprite'
 import type { TickerBest, TickerGame, TickerPets, TickerRecord, TickerRunResponse } from '#shared/types/ticker'
@@ -1095,14 +1095,13 @@ const readHiScores = (): Record<TickerGame, TickerRecord | null> => ({
   invaders: recall<TickerRecord>('invaders')
 })
 const hiScores = ref<Record<TickerGame, TickerRecord | null>>(readHiScores())
-/** The last world game's figures, for the remark that names the day that got you. */
-let lastSummary: WorldSummary | null = null
 const visitorsBests = ref<Partial<Record<TickerGame, TickerBest | null>>>(visits.value?.bests ?? { runner: visits.value?.best ?? null })
-let runSetRecord = false
-/** A guest's game that topped the house record — the figure their HUD shows, so the one its NEW BEST and the quit line agree on. */
-let runBeatHouse = false
-/** The crusher's wall went, this game. */
-let lastCleared = false
+/**
+ * How the last game reported on the stage came out — what the quit line is about. Replaced whole
+ * by every game, so a restart in the canvas carries nothing over: a record or a cleared wall
+ * belongs to the game that earned it, not to the sitting.
+ */
+let lastOutcome: GameOutcome | null = null
 onMounted(() => {
   if (!remote) hiScores.value = readHiScores()
 })
@@ -1155,18 +1154,21 @@ function play(game: TickerGame) {
   if (busy.value) return
   wake()
   busy.value = true
-  runSetRecord = false
-  runBeatHouse = false
-  lastCleared = false
+  lastOutcome = null
   playing.value = game
   line.value = playIntroLine(game, crusherWall.value, mazeGhosts.value, dropGerms.value, invadersWave.value)
 }
 
 function onGameOver(game: TickerGame, score: number, cleared: boolean, feats: WorldFeat[] = [], summary: WorldSummary | null = null) {
-  // Read before the server's answer moves the house record up to this very score.
-  runBeatHouse = !keeper && score > 0 && score > houseBestOf(game)
-  if (cleared) lastCleared = true
-  if (game === 'world') lastSummary = summary
+  const outcome: GameOutcome = {
+    score,
+    setRecord: false,
+    // A guest's game that topped the house record — the figure their HUD shows, so the one its NEW BEST and the quit line agree on. Read before the server's answer moves the house record up to this very score.
+    beatHouse: !keeper && score > 0 && score > houseBestOf(game),
+    cleared,
+    summary: game === 'world' ? summary : null
+  }
+  lastOutcome = outcome
   const current = hiScores.value[game]
   const better = score > (current?.score ?? 0)
   // The runner has no end to reach; every other game remembers that it was finished once.
@@ -1183,19 +1185,19 @@ function onGameOver(game: TickerGame, score: number, cleared: boolean, feats: Wo
       }
       hiScores.value = { ...hiScores.value, [game]: next }
       remember(game, next)
-      runSetRecord = better
+      outcome.setRecord = better
     }
     return
   }
   if (keeper && better) {
     hiScores.value = { ...hiScores.value, [game]: { ...current, score, date: today.value } } // the server confirms below
-    runSetRecord = true
+    outcome.setRecord = true
   }
   $fetch<TickerRunResponse>('/api/ticker/run', { method: 'POST', body: { score, game, cleared, ...(feats.length ? { feats } : {}) } })
     .then((r) => {
       hiScores.value = { ...hiScores.value, [game]: r.record }
       visitorsBests.value = { ...visitorsBests.value, [game]: r.visitorsBest }
-      if (!keeper) runSetRecord = r.isRecord
+      if (!keeper) outcome.setRecord = r.isRecord // this game's own outcome, even if another has ended since
     })
     .catch(() => { /* the game still happened; the record just isn't written yet */ })
 }
@@ -1206,23 +1208,24 @@ async function onGameQuit(score: number) {
   busy.value = false
   await nextTick()
   measureFloor()
+  const outcome = outcomeForQuit(lastOutcome, score)
   const remark = quitRemark({
     game,
-    score,
+    score: outcome.score,
     best: hiScores.value[game],
     house: houseBestOf(game),
     keeper,
-    setRecord: runSetRecord,
-    beatHouse: runBeatHouse,
-    cleared: lastCleared,
+    setRecord: outcome.setRecord,
+    beatHouse: outcome.beatHouse,
+    cleared: outcome.cleared,
     wallEmpty: !crusherWall.value.count
   })
   line.value = remark.line
   if (remark.event) pet.value?.trigger(remark.event)
   if (remark.hearts) for (let i = 0; i < 5; i++) timers.push(setTimeout(() => spawnHeart(Math.random() * 120 - 60), i * 150))
   // The world names the day that got you — or admits it never did.
-  if (game === 'world' && lastSummary) {
-    const got = gotLine(lastSummary)
+  if (game === 'world' && outcome.summary) {
+    const got = gotLine(outcome.summary)
     if (got) line.value = `${line.value} ${got}`
   }
 }

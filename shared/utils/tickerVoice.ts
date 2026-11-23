@@ -496,6 +496,31 @@ export function playIntroLine(game: TickerGame, wall: CrusherWall, maze?: MazeGh
               : 'nothing to shoot. good. (esc quits)'
 }
 
+/** How one game on the stage came out — what the line said on quit is about. */
+export interface GameOutcome {
+  score: number
+  /** It set the caller's own record (the owner's, or a guest's own once the server says so). */
+  setRecord: boolean
+  /** A guest's game topped the house record. */
+  beatHouse: boolean
+  /** The wall went / the month was finished / a level was eaten clean, in this game. */
+  cleared: boolean
+  /** The world's figures for the "got me" line. */
+  summary: WorldSummary | null
+}
+
+/**
+ * The outcome a quit is about: the last game reported, and only that one. Every game reports
+ * itself when it ends, and when it is left with points on the board, so a quit carries that
+ * game's score; a quit at nothing after a restart in the canvas is still about the game before
+ * (a restart left before a point is not a game). The flags used to be kept for the whole sitting,
+ * so a record or a cleared wall from the first game was announced again after dying at 20 in the
+ * second.
+ */
+export function outcomeForQuit(last: GameOutcome | null, score: number): GameOutcome {
+  return last && (score === 0 || last.score === score) ? last : { score, setRecord: false, beatHouse: false, cleared: false, summary: null }
+}
+
 export interface QuitInputs {
   game: TickerGame
   score: number
