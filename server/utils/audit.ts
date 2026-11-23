@@ -1,6 +1,8 @@
 import type { H3Event } from 'h3'
 import type { AuditEntry } from '#shared/types/audit'
 import { restoreUpsertSql } from '#shared/utils/auditRestore'
+// Explicit, not auto-imported: tests/auditKeys.test.mjs runs restoreAudit under plain node.
+import { isForeignKeyError } from './db'
 
 // The write audit log (audit_log, migration 0003). Each owner write to a tracked table records
 // the row as it was BEFORE the write, which is what makes deletes and overwrites recoverable:
@@ -17,7 +19,6 @@ export const AUDIT_KEYS = {
   journal_entries: 'date',
   labs_entries: 'date',
   dexa_entries: 'date',
-  supplements: 'id',
   vials: 'id',
   vaccinations: 'id',
   // Blood out, against the hematocrit campaign (audit #43 item 59).
@@ -45,6 +46,17 @@ export const AUDIT_KEYS = {
 } as const
 
 export type AuditTable = keyof typeof AUDIT_KEYS
+
+/**
+ * Tables that were tracked once and no longer exist, with why their old entries cannot be put
+ * back. `supplements` stayed in AUDIT_KEYS after migration 0014 dropped it, so restoring one of
+ * its entries passed the "restorable table" check and then read a table that is not there: a 500
+ * (audit #44 item 40). The entries stay in the history; the reason says where the data lives now.
+ * tests/auditKeys.test.mjs holds AUDIT_KEYS to the schema, so the next dropped table lands here.
+ */
+export const RETIRED_AUDIT_TABLES: Readonly<Record<string, string>> = {
+  supplements: 'supplements moved to the protocol page'
+}
 
 /**
  * Tracked tables whose rows other tracked rows hang off with `ON DELETE CASCADE`. A restore that
@@ -156,7 +168,9 @@ interface AuditRow {
 
 function blockedReason(row: AuditRow, purgedPhotos?: ReadonlySet<string>): string | null {
   if (row.restored_at) return 'already restored'
-  if (!(row.table_name in AUDIT_KEYS)) return 'not a restorable table'
+  // Own keys only: the name comes from a stored row, and `'toString' in {}` is true.
+  if (Object.hasOwn(RETIRED_AUDIT_TABLES, row.table_name)) return RETIRED_AUDIT_TABLES[row.table_name]!
+  if (!Object.hasOwn(AUDIT_KEYS, row.table_name)) return 'not a restorable table'
   // Undoing an upload means removing its files too; the photos page's delete does that.
   if (row.table_name === 'progress_photos' && row.action === 'create') return 'delete it from the photos page'
   // Once ANY entry for a photo is purged its files are gone, so every entry that would put the

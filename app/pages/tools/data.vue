@@ -17,7 +17,7 @@
         </TuiHeader>
         <p class="mt-2 text-small leading-[1.7] text-dim">
           Every table: journal days, labs, DEXA, vitals, workouts, photos (their metadata; the images
-          stay in storage), supplements, vials, vaccines, cycles, digests and this change history.
+          stay in storage), the protocol, vials, vaccines, cycles, digests and this change history.
           It's the same format as the weekly backup, so <code class="text-hi">scripts/restore-backup.mjs</code>
           can load it back. Whoop's sign-in tokens are left out.
         </p>
