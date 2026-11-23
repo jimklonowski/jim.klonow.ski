@@ -1,9 +1,9 @@
 import type { TickerStateResponse } from '#shared/types/ticker'
-import { visitsForGuest, visitsForOwner } from '#shared/utils/tickerVisits'
+import { stateForGuest, visitsForGuest, visitsForOwner } from '#shared/utils/tickerVisits'
 
 // The /ticker pet's memory and the visitors' footprints, in one read. Every authenticated role
 // but demo: the sandbox pet keeps its memory in the browser (see migration 0009). The owner gets
-// everything; a guest gets the house figures only — the pet counter and the records — never the
+// everything; a guest gets the house figures only — the pet counter and every game's record — never the
 // owner's reaction stamps or another guest's name (the leaderboard names its holder only to the
 // owner and to the holder, see shared/utils/tickerVisits.ts).
 export default defineEventHandler(async (event): Promise<TickerStateResponse> => {
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event): Promise<TickerStateResponse> =>
   if (auth.role === 'owner') return withEtag(event, { state, visits: visitsForOwner(visits), me: { role: auth.role, label: null } })
 
   return withEtag(event, {
-    state: { pets: state.pets, runner: state.runner },
+    state: stateForGuest(state),
     visits: visitsForGuest(visits, auth.inviteId),
     me: { role: auth.role, label: await guestLabel(event, auth) }
   })

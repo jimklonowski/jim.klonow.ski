@@ -3,7 +3,20 @@
 // no footprint list, and each leaderboard's holder named only when it is the guest themself.
 // /api/ticker/state used to hand every guest the top scorer's invite label, which is the name
 // the owner gave that person. Kept app-import-free so the plain-node tests can run it.
+import { TICKER_GAMES } from '../types/ticker.ts'
 import type { TickerBest, TickerGame, TickerVisitsRead, TickerVisitsSummary } from '../types/ticker.ts'
+
+/**
+ * The pet's memory as a guest may see it: the pet counter and EVERY game's house record, nothing
+ * else — never the owner's reaction stamps, feed checks or snapshot. It used to hand over the
+ * runner's record alone, so in the five later games a guest's first score read as a new house
+ * record and the owner's game achievements showed unearned.
+ */
+export function stateForGuest(state: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of ['pets', ...TICKER_GAMES]) if (state[key] !== undefined) out[key] = state[key]
+  return out
+}
 
 export function visitsForOwner(visits: TickerVisitsRead): TickerVisitsSummary {
   const { total, pets, recent, best, bests } = visits
