@@ -237,6 +237,25 @@ test('the soda invaders: a can per soda this month sized by the ounces, sorted i
   assert.deepEqual([h.wave.length, h.cans, h.germs, h.sodas, h.title], [40, 40, 0, 54, '40 cans · 54 sodas this month'], 'the newest forty of a heavy month')
 })
 
+test('the games read only the sodas: a sports drink, a tea or a coffee is no can, ghost, invader or patrol', () => {
+  const drink = (name, size = '20oz bottle') => ({ time: '12:00', drink: name, size })
+  const notSodas = [day('2026-10-20', { sodas: [drink('Gatorade'), drink('Peace Tea', '23oz can'), drink('Coffee', '12oz cup')] })]
+  assert.deepEqual(crusherWallOf(notSodas, TODAY), crusherWallOf([], TODAY), 'a clean month has no wall')
+  assert.deepEqual(mazeGhostsOf(notSodas, TODAY), mazeGhostsOf([], TODAY))
+  assert.deepEqual(invadersWaveOf(notSodas, TODAY), invadersWaveOf([], TODAY))
+  assert.equal(dropGermsOf(notSodas, TODAY).title, '4 germs · a clean month')
+  const world = i => worldDaysOf({ entries: i, health: [], workouts: [], draws: [], rules: [], rulesApply: false, doseDates: new Map(), today: TODAY })
+  const dayOf = i => world(i).find(d => d.date === '2026-10-20')
+  assert.deepEqual(dayOf(notSodas).sodas, [])
+  assert.equal(dayOf(notSodas).logged, true, 'still a logged day — no pit')
+  // Beside a soda, only the soda shows up.
+  const mixed = [day('2026-10-20', { sodas: [drink('Gatorade'), drink('Dr Pepper', '12oz can'), drink('Peace Tea', '23oz can')] })]
+  assert.equal(crusherWallOf(mixed, TODAY).title, 'SEP 24 – OCT 23 · 1 CAN · 12 OZ')
+  assert.equal(mazeGhostsOf(mixed, TODAY).title, 'vs dr pepper + 3 germs')
+  assert.equal(invadersWaveOf(mixed, TODAY).title, '1 can + 5 germs · 1 soda this month')
+  assert.deepEqual(dayOf(mixed).sodas, [{ oz: 12 }])
+})
+
 test('the world\'s month: thirty days ending today, pits for unlogged days, a block on a draw day, cardio by family', () => {
   const entries = [day('2026-10-22', { peptides: [{ compound: 'X' }], sodas: [{ size: '12oz can' }] })]
   const days = worldDaysOf({

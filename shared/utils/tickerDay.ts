@@ -395,7 +395,7 @@ export function wallFor(entries: JournalEntry[], endDay: string): { cans: CanInp
   for (const e of entries) {
     if (e.date < from || e.date > endDay) continue
     const week = Math.floor(diffDays(e.date, endDay) / 7)
-    for (const s of e.sodas ?? []) {
+    for (const s of sodasOnly(e.sodas)) {
       const v = sodaOunces(s.size)
       cans.push({ oz: v, week })
       oz += v ?? 0
@@ -452,7 +452,7 @@ export function mazeGhostsOf(entries: JournalEntry[], today: string): MazeGhosts
   const counts = new Map<string, number>()
   for (const e of entries) {
     if (e.date < from || e.date > today) continue
-    for (const s of e.sodas ?? []) {
+    for (const s of sodasOnly(e.sodas)) {
       const name = (s.drink ?? '').trim().toLowerCase() || 'soda'
       counts.set(name, (counts.get(name) ?? 0) + 1)
     }
@@ -514,7 +514,7 @@ export function invadersWaveOf(entries: JournalEntry[], today: string): Invaders
   const all: InvaderInput[] = []
   for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
     if (e.date < from || e.date > today) continue
-    for (const s of e.sodas ?? []) all.push({ kind: invaderKindFor(sodaOunces(s.size)), label: (s.drink ?? '').trim().toUpperCase() || null })
+    for (const s of sodasOnly(e.sodas)) all.push({ kind: invaderKindFor(sodaOunces(s.size)), label: (s.drink ?? '').trim().toUpperCase() || null })
   }
   const recent = all.slice(-INV_MAX)
   const wave = invadersWaveFor(recent)
@@ -564,7 +564,7 @@ export function worldDaysOf(i: WorldInputs): DayInput[] {
       date,
       logged: !!e && isLoggedDay(e),
       doses: e?.peptides?.length ?? 0,
-      sodas: (e?.sodas ?? []).map(s => ({ oz: sodaOunces(s.size) })),
+      sodas: sodasOnly(e?.sodas).map(s => ({ oz: sodaOunces(s.size) })),
       workoutMin,
       cardio: workoutsOn(i.workouts, date).some(w => CARDIO.test(w.workout_type ?? '')),
       recovery: recoveryOn.get(date) ?? null,
