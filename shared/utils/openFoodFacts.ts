@@ -4,6 +4,14 @@
 // unreviewed import. This is the pure half: the barcode's shape and the product → per-serving
 // figures mapping. The fetch lives in server/api/journal/meals/barcode.get.ts.
 
+/**
+ * How the lookup names itself. Open Food Facts asks every client for a User-Agent of its own, and
+ * this one says what kind of client it is and nothing about whose: it used to carry the site's
+ * domain, which filed every scanned barcode — what one person eats — under a named personal site
+ * in a third party's logs (audit #44 item 39). No domain, no name, no contact address.
+ */
+export const OFF_USER_AGENT = 'label-prefill/1.0 (personal food log)'
+
 /** The digits of a UPC/EAN (8, 12, 13 or 14), or null. Spaces and dashes are tolerated. */
 export function normalizeBarcode(text: string | null | undefined): string | null {
   const digits = (text ?? '').replace(/[\s-]/g, '')

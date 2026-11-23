@@ -1,7 +1,8 @@
 // Open Food Facts → figures (shared/utils/openFoodFacts.ts) — audit #43 item 81.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { OFF_NAME_MAX, OFF_SERVING_MAX, normalizeBarcode, offFigures, servingFlOz } from '../shared/utils/openFoodFacts.ts'
+import { readFileSync } from 'node:fs'
+import { OFF_NAME_MAX, OFF_SERVING_MAX, OFF_USER_AGENT, normalizeBarcode, offFigures, servingFlOz } from '../shared/utils/openFoodFacts.ts'
 import { zMealCorrect } from '../shared/utils/schemas.ts'
 
 test('a barcode is 8, 12, 13 or 14 digits; spaces and dashes are tolerated', () => {
@@ -99,4 +100,14 @@ test('a long product name or serving text is cut where it enters, and the saved 
   assert.equal(zMealCorrect.safeParse({ ...figures, from: 'x'.repeat(3001) }).success, false, 'still bounded on the way in')
   assert.equal(zMealCorrect.parse({ ...figures, from: '  ' }).from, null)
   assert.equal(zMealCorrect.parse(figures).from, null)
+})
+
+// Audit #44 item 39: the lookup named the site in its User-Agent, so every scanned barcode was
+// filed under a named personal site in Open Food Facts' logs.
+test('the lookup names what it is, never whose: no domain, no address, and the handler sends only that', () => {
+  assert.match(OFF_USER_AGENT, /^[a-z-]+\/\d+\.\d+ \([a-z ]+\)$/, 'a client name, a version, a plain description')
+  assert.doesNotMatch(OFF_USER_AGENT, /@|https?:|\.[a-z]{2,}\b/i, 'no address, no URL, no domain')
+  const handler = readFileSync(new URL('../server/api/journal/meals/barcode.get.ts', import.meta.url), 'utf8')
+  const agents = [...handler.matchAll(/'User-Agent':\s*([^,}\n]+)/g)].map(m => m[1].trim())
+  assert.deepEqual(agents, ['OFF_USER_AGENT'], 'one User-Agent, and it is the constant')
 })

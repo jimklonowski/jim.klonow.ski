@@ -1,9 +1,11 @@
-import { normalizeBarcode, offFigures, type OffFigures, type OffProduct } from '#shared/utils/openFoodFacts'
+import { OFF_USER_AGENT, normalizeBarcode, offFigures, type OffFigures, type OffProduct } from '#shared/utils/openFoodFacts'
 
 // A barcode → the product's label figures from Open Food Facts (audit #43 item 81), to PREFILL
 // the hand-entry form (a meal's figures, or a drink's label): nothing is stored here, and what the owner saves after checking it is a
 // 'manual' row like any other. Owner-only: it is the owner's form, and it makes an outbound
-// request. Only the barcode leaves the site — no session, no meal text.
+// request. Only the barcode leaves the site — no session, no meal text, and a User-Agent
+// that does not name the site. (Cloudflare still stamps a Worker's outbound request with a
+// `CF-Worker` header carrying the zone; that one is not ours to remove.)
 
 const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product'
 const FIELDS = 'code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutrition_data_per,nutriments'
@@ -17,8 +19,8 @@ export default defineEventHandler(async (event): Promise<{ found: boolean, code:
   try {
     body = await $fetch(`${OFF_URL}/${code}.json`, {
       query: { fields: FIELDS },
-      // Open Food Facts asks every client to name itself.
-      headers: { 'User-Agent': 'jim.klonow.ski/1.0 (personal food log; label prefill)' },
+      // Open Food Facts asks every client to name itself; the name says what, never whose.
+      headers: { 'User-Agent': OFF_USER_AGENT },
       timeout: 8000
     })
   }
