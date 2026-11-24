@@ -239,7 +239,7 @@ const ticks = computed(() => MEAL_SLOTS
 // The clock's meal, re-read each minute so an open tab moves from lunch to dinner. useNow is the
 // reactive trigger; localTimeNow() reads the home-timezone wall clock. Today only: a past day's
 // quick log would land in today's entry.
-const now = useNow({ interval: 60_000 })
+const now = useNow({ scheduler: cb => useIntervalFn(cb, 60_000) })
 const suggested = computed<MainSlot | null>(() => {
   if (!isToday.value) return null
   void now.value
