@@ -36,7 +36,10 @@
             SHARE
           </button>
         </div>
-        <div class="flex-1 min-h-0 overflow-auto overscroll-contain bg-inset">
+        <div
+          ref="scroller"
+          class="flex-1 min-h-0 overflow-auto overscroll-contain bg-inset"
+        >
           <div
             ref="sheet"
             class="flex flex-col gap-2 p-2 mx-auto"
@@ -58,6 +61,7 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { default: false })
 
 const sheet = useTemplateRef<HTMLElement>('sheet')
+const scroller = useTemplateRef<HTMLElement>('scroller')
 const zoomed = ref(false)
 const status = ref('')
 const file = shallowRef<File | null>(null)
@@ -92,9 +96,20 @@ async function load(src: string) {
     // The sheet mounts with the modal; wait for it before measuring.
     await nextTick()
     const el = sheet.value
-    if (!el) return
-    status.value = `${pdf.pages} page${pdf.pages === 1 ? '' : 's'}`
-    await pdf.renderInto(el, Math.max(280, el.clientWidth - 16), () => mine !== run)
+    const box = scroller.value
+    if (!el || !box) return
+    const pages = `${pdf.pages} page${pdf.pages === 1 ? '' : 's'}`
+    status.value = pages
+    // Every page is laid out, and drawn only while it is on or near the screen (pdfRender.ts).
+    await pdf.renderInto({
+      container: el,
+      scroller: box,
+      width: Math.max(280, el.clientWidth - 16),
+      cancelled: () => mine !== run,
+      onError: (page) => {
+        if (mine === run) status.value = `${pages} · page ${page} could not be drawn`
+      }
+    })
   }
   catch (e) {
     if (mine === run) status.value = e instanceof Error && e.message ? e.message : 'The document could not be shown.'

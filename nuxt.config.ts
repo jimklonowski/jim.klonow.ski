@@ -1,5 +1,14 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { SCHEDULED_TASKS } from './server/schedule'
+import { PDF_ASSET_BASE, PDF_ASSET_DIRS } from './shared/utils/pdfLayout'
+
+// pdf.js fetches its image decoders (wasm), character maps, standard fonts and ICC profiles on
+// demand; they are not in its bundle. They are published from the package itself, under its
+// version (see nitro.publicAssets below and shared/utils/pdfLayout.ts pdfAssetUrls).
+const pdfjsPackage = createRequire(import.meta.url).resolve('pdfjs-dist/package.json')
+const pdfjsVersion = (createRequire(import.meta.url)('pdfjs-dist/package.json') as { version: string }).version
 
 export default defineNuxtConfig({
   modules: [
@@ -183,6 +192,13 @@ export default defineNuxtConfig({
     // NOT compressPublicAssets: it writes .gz/.br twins of every public file (278 of them) that
     // Workers static assets never serve — Cloudflare compresses at the edge on its own.
     experimental: { tasks: true },
+    // The in-app PDF viewer's on-demand files: same origin (the CSP allows no other), static, and
+    // safe to cache for good because the path carries the pdf.js version.
+    publicAssets: PDF_ASSET_DIRS.map(dir => ({
+      dir: join(dirname(pdfjsPackage), dir),
+      baseURL: `${PDF_ASSET_BASE}/${pdfjsVersion}/${dir}`,
+      maxAge: 60 * 60 * 24 * 365
+    })),
     // Must match wrangler.jsonc triggers.crons — see server/schedule.ts.
     scheduledTasks: SCHEDULED_TASKS
   },
