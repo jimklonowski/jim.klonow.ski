@@ -93,6 +93,16 @@ export function makeRng(seed: number): () => number {
   }
 }
 
+/**
+ * A game's random source. Given a `seed` it is the game's own stream from that seed, and the game
+ * keeps the seed so a restart begins the same stream again — the day's board is the same on the
+ * second game as on the first. Given only an `rng` (the tests' scripted games) the stream is the
+ * caller's and a restart carries on down it; with neither, Math.random.
+ */
+export function rngFor(o: { seed?: number, rng?: () => number }): () => number {
+  return o.seed != null ? makeRng(o.seed) : o.rng ?? Math.random
+}
+
 export function createRunner(width: number, rng: () => number = Math.random): RunnerState {
   return {
     status: 'ready',

@@ -173,7 +173,7 @@ function prepare() {
 }
 
 function fresh(): InvadersState {
-  return createInvaders({ wave: props.wave, lives: props.lives, rng: makeRng(props.seed) })
+  return createInvaders({ wave: props.wave, lives: props.lives, seed: props.seed })
 }
 
 function seedStars() {

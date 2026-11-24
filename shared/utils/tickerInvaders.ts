@@ -16,7 +16,7 @@
 // Units: cells and seconds. x grows right, y grows DOWN; (x, y) is an entity's centre. The field
 // is INV_W wide and INV_H tall; the figure sits on the row INV_PLAYER_Y. Every export is named
 // apart from the other games' (Nuxt auto-imports shared/utils as one registry).
-import { MAX_DT } from './tickerRunner.ts'
+import { MAX_DT, rngFor } from './tickerRunner.ts'
 
 export const INV_W = 24
 export const INV_H = 26
@@ -171,7 +171,7 @@ export interface InvadersState {
   endedAt: number
   bursts: InvadersBurst[]
   pops: InvadersPop[]
-  source: { wave: InvaderInput[], lives: number }
+  source: { wave: InvaderInput[], lives: number, seed?: number }
   rng: () => number
 }
 
@@ -179,6 +179,8 @@ export interface InvadersOptions {
   wave: InvaderInput[]
   lives?: number
   rng?: () => number
+  /** The day's seed: the game's own source (it wins over `rng`), begun again on a restart — see rngFor. */
+  seed?: number
 }
 
 const KIND_ORDER: Record<InvaderKind, number> = { tall: 0, can: 1, mini: 2, germ: 3 }
@@ -252,7 +254,7 @@ function buildInvaders(wave: InvaderInput[]): Invader[] {
 }
 
 export function createInvaders(o: InvadersOptions): InvadersState {
-  const rng = o.rng ?? Math.random
+  const rng = rngFor(o)
   const wave = invadersWaveFor(o.wave)
   const lives = o.lives ?? 3
   return {
@@ -278,7 +280,7 @@ export function createInvaders(o: InvadersOptions): InvadersState {
     endedAt: -1,
     bursts: [],
     pops: [],
-    source: { wave: o.wave, lives },
+    source: { wave: o.wave, lives, seed: o.seed },
     rng
   }
 }

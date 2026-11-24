@@ -33,7 +33,6 @@
 // walks the capsule a column at a time, a tap turns it, a swipe down holds it down until the
 // finger lifts. The polish — the flash, the germs' wriggle, NEW BEST — is cosmetic and skipped
 // under reduced motion; the short lockout after the end is not.
-import { makeRng } from '#shared/utils/tickerRunner'
 import {
   DROP_COLS, DROP_ROWS, DROP_SPAWN_X, autoDrop, createDrop, dropPieceCells, dropPose, moveDrop, rotateDrop, startDrop, stepDrop
 } from '#shared/utils/tickerDrop'
@@ -156,7 +155,7 @@ function prepare() {
 }
 
 function fresh(): DropState {
-  return createDrop({ germs: props.germs, rng: makeRng(props.seed) })
+  return createDrop({ germs: props.germs, seed: props.seed })
 }
 
 function resize() {
@@ -577,6 +576,8 @@ onMounted(() => {
       level: () => state?.level ?? 0,
       germs: () => state?.germs ?? 0,
       piece: () => (state?.piece ? [state.piece.x, state.piece.y, state.piece.rot] : null),
+      /** The bottle, the capsule in hand and the one after it, as one string: two games on the same board read the same. */
+      board: () => (state ? JSON.stringify([state.grid.map(row => row.map(c => (c ? `${c.kind[0]}${c.color}` : '.')).join('')), state.piece?.colors ?? null, state.next]) : null),
       soft: () => keySoft || pointerSoft,
       tile: () => T
     }

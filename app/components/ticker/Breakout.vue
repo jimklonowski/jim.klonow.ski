@@ -28,7 +28,7 @@
 // The polish — a shake on a lost life, a trail on the ball, a flash on a hit, NEW BEST — is
 // cosmetic and skipped under reduced motion; the short lockout after the end is not (a mashed
 // key must not start another game by accident).
-import { CELL, FIGURE_H, FIGURE_W, makeRng } from '#shared/utils/tickerRunner'
+import { CELL, FIGURE_H, FIGURE_W } from '#shared/utils/tickerRunner'
 import { BALL, CAN_COLS, CAN_ROWS, autoPlay, breakoutPose, createBreakout, launch, move, stepBreakout, wallBottom } from '#shared/utils/tickerBreakout'
 import type { BreakoutState, CanInput } from '#shared/utils/tickerBreakout'
 import { tickerSprite } from '#shared/utils/tickerSprite'
@@ -145,7 +145,7 @@ function fresh(): BreakoutState {
     width: W,
     height: H - GROUND_FROM_BOTTOM,
     cans: props.cans,
-    rng: makeRng(props.seed),
+    seed: props.seed,
     paddleScale: props.paddleScale,
     lives: props.lives
   })

@@ -32,7 +32,6 @@
 // re-anchors, so a thumb can steer without lifting); a tap or space starts. The polish — a
 // shake on a lost life, the scare's flash, NEW BEST — is cosmetic and skipped under reduced
 // motion; the short lockout after the end is not.
-import { makeRng } from '#shared/utils/tickerRunner'
 import {
   MAZE_COLS, MAZE_ROWS, autoMaze, createMaze, mazeFrightFlashing, mazePose, startMaze, steerMaze, stepMaze
 } from '#shared/utils/tickerMaze'
@@ -185,7 +184,7 @@ function prepare() {
 }
 
 function fresh(): MazeState {
-  return createMaze({ ghosts: props.ghosts, rng: makeRng(props.seed), lives: props.lives })
+  return createMaze({ ghosts: props.ghosts, seed: props.seed, lives: props.lives })
 }
 
 function resize() {

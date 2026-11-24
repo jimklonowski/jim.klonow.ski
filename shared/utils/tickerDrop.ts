@@ -13,7 +13,7 @@
 // Units: cells and seconds. x grows right, y grows DOWN; row 0 is the top of the bottle and a
 // capsule may stick up into the neck (y < 0) while it is still falling. Every export is named
 // apart from the other games' (Nuxt auto-imports shared/utils as one registry).
-import { MAX_DT } from './tickerRunner.ts'
+import { MAX_DT, rngFor } from './tickerRunner.ts'
 
 export const DROP_COLS = 8
 export const DROP_ROWS = 16
@@ -98,7 +98,7 @@ export interface DropState {
   pops: DropPop[]
   /** The scripted player's intent for the capsule in hand (autoDrop). */
   plan: { x: number, rot: DropRot, piece: number } | null
-  source: { germs: number }
+  source: { germs: number, seed?: number }
   rng: () => number
 }
 
@@ -106,6 +106,8 @@ export interface DropOptions {
   /** Germs in the first bottle; clamped to what a bottle takes. */
   germs: number
   rng?: () => number
+  /** The day's seed: the game's own source (it wins over `rng`), begun again on a restart — see rngFor. */
+  seed?: number
 }
 
 const OPPOSITE: Record<DropDir, DropDir> = { left: 'right', right: 'left', up: 'down', down: 'up' }
@@ -198,7 +200,7 @@ function freshGrid(germs: number, rng: () => number): { grid: DropGrid, placed: 
 }
 
 export function createDrop(o: DropOptions): DropState {
-  const rng = o.rng ?? Math.random
+  const rng = rngFor(o)
   const germs = dropGermsFor(o.germs, 1)
   const { grid, placed } = freshGrid(germs, rng)
   return {
@@ -222,7 +224,7 @@ export function createDrop(o: DropOptions): DropState {
     endedAt: -1,
     pops: [],
     plan: null,
-    source: { germs: o.germs },
+    source: { germs: o.germs, seed: o.seed },
     rng
   }
 }

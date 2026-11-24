@@ -14,7 +14,7 @@
 // Units: tiles and seconds. x grows right, y grows DOWN; an entity's (x, y) is its centre, and a
 // tile's centre is (col + 0.5, row + 0.5). Every export is named apart from the other games'
 // (Nuxt auto-imports shared/utils as one registry).
-import { MAX_DT } from './tickerRunner.ts'
+import { MAX_DT, rngFor } from './tickerRunner.ts'
 
 export const MAZE_COLS = 19
 export const MAZE_ROWS = 21
@@ -174,7 +174,7 @@ export interface MazeState {
   deadAt: number
   clearedAt: number
   pops: MazePop[]
-  source: { ghosts: MazeGhostInput[], lives: number }
+  source: { ghosts: MazeGhostInput[], lives: number, seed?: number }
   rng: () => number
 }
 
@@ -182,6 +182,8 @@ export interface MazeOptions {
   /** Four slots; fewer are padded with germs, more are cut. */
   ghosts: MazeGhostInput[]
   rng?: () => number
+  /** The day's seed: the game's own source (it wins over `rng`), begun again on a restart — see rngFor. */
+  seed?: number
   lives?: number
 }
 
@@ -288,8 +290,8 @@ export function createMaze(o: MazeOptions): MazeState {
     deadAt: -1,
     clearedAt: -1,
     pops: [],
-    source: { ghosts: o.ghosts, lives },
-    rng: o.rng ?? Math.random
+    source: { ghosts: o.ghosts, lives, seed: o.seed },
+    rng: rngFor(o)
   }
   placeAll(s)
   return s

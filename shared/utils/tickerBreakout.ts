@@ -11,7 +11,7 @@
 //
 // Units: canvas pixels (the runner's 4px cell pitch) and seconds. x grows right, y grows DOWN
 // from the top of the playfield; `height` is the ground line, where the figure stands.
-import { CELL, FIGURE_H, MAX_DT } from './tickerRunner.ts'
+import { CELL, FIGURE_H, MAX_DT, rngFor } from './tickerRunner.ts'
 
 export const CAN_COLS = 4
 export const CAN_ROWS = 7
@@ -78,7 +78,7 @@ export interface BreakoutState {
   /** Paddle travel, for the walk cycle. */
   walked: number
   /** What the game was made from, so a restart rebuilds the same wall. */
-  source: { cans: CanInput[], paddleScale: number, lives: number }
+  source: { cans: CanInput[], paddleScale: number, lives: number, seed?: number }
   rng: () => number
 }
 
@@ -87,6 +87,8 @@ export interface BreakoutOptions {
   height: number
   cans: CanInput[]
   rng?: () => number
+  /** The day's seed: the game's own source (it wins over `rng`), begun again on a restart — see rngFor. */
+  seed?: number
   /** 0.7 (a rough night) to 1.2 (a great recovery). */
   paddleScale?: number
   lives?: number
@@ -150,8 +152,8 @@ export function createBreakout(o: BreakoutOptions): BreakoutState {
     elapsed: 0,
     hitAt: -1,
     walked: 0,
-    source: { cans: o.cans, paddleScale, lives },
-    rng: o.rng ?? Math.random
+    source: { cans: o.cans, paddleScale, lives, seed: o.seed },
+    rng: rngFor(o)
   }
   serve(s)
   return s
