@@ -593,9 +593,9 @@ const workoutsOnShownDay = computed(() => latestWorkouts.value[0]?.date === asOf
 // Every session leads with its age — "1h ago" answers what a clock time makes the reader work
 // out. Ticks once a minute so the label stays right while the page sits open (the PWA comes
 // back from the background hours later). The default ticks every animation frame, far too often
-// for a minute-grained label. VueUse stays on the 14.x line Nuxt UI depends on; 15 replaces
-// `interval` with `scheduler: cb => useIntervalFn(cb, 60_000)` when that day comes.
-const now = useNow({ interval: 60_000 })
+// for a minute-grained label. VueUse 15's form: 14 took `interval: 60_000`, 15 takes a scheduler
+// (Nuxt UI still carries its own 14.x copy; the app's calls are on 15 since 2026-11-24).
+const now = useNow({ scheduler: cb => useIntervalFn(cb, 60_000) })
 // Ages are client-only: the server's `now` and the browser's differ by the request's latency,
 // and a minute boundary between the two rendered "4m ago" against "5m ago" — a hydration
 // mismatch on every load that straddled one. The labels appear right after mount instead.
