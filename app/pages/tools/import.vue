@@ -271,7 +271,7 @@
                 </div>
                 <div class="flex gap-2.5">
                   <span class="shrink-0 w-16 text-label tracking-[0.12em] uppercase text-faint">header</span>
-                  <span class="text-body break-all">Authorization: Bearer <span class="text-muted">[your LABS_SECRET value]</span></span>
+                  <span class="text-body break-all">Authorization: Bearer <span class="text-muted">[your WEBHOOK_TOKEN value]</span></span>
                 </div>
               </div>
             </div>

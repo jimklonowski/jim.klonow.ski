@@ -14,6 +14,9 @@ export default defineEventHandler(async (event): Promise<{ found: boolean, code:
   requireOwner(event)
   const code = normalizeBarcode(String(getQuery(event).code ?? ''))
   if (!code) throw createError({ statusCode: 400, message: 'A barcode is 8, 12, 13 or 14 digits' })
+  // Owner-only, but every call is an outbound request to someone else's free service: a scanner
+  // stuck in a loop (or a leaked session) is held to thirty a minute.
+  await enforceRateLimit(event, 'public', 'barcode')
 
   let body: { status?: number, product?: OffProduct }
   try {

@@ -104,7 +104,11 @@ export default defineEventHandler(async (event) => {
     signature: getHeader(event, 'x-whoop-signature'),
     secret
   })
-  if (!valid) throw createError({ statusCode: 401, message: 'Invalid signature' })
+  if (!valid) {
+    // Only a refused delivery spends the per-IP allowance: Whoop's own, signed, never does.
+    await enforceRateLimit(event, 'credentials', 'whoop-webhook')
+    throw createError({ statusCode: 401, message: 'Invalid signature' })
+  }
 
   let body: unknown
   try {

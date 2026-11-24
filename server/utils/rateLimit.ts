@@ -7,8 +7,11 @@ import type { H3Event } from 'h3'
 // guesses could run far past its count before the counters agreed — and /api/health, built for
 // an uptime monitor, had no limit at all while costing four D1 queries a call.
 //
-//   credentials  5 / minute   sign-in, upload PIN, share-link redemption — one counter per route
-//   public      30 / minute   /api/health (a monitor polls once a minute or so), /demo
+//   credentials  5 / minute   sign-in, upload PIN, share-link redemption — one counter per route;
+//                             and the REFUSALS of the token routes (quick-log, the Apple Health
+//                             webhook, the Whoop webhook): a good token is never counted
+//   public      30 / minute   /api/health (a monitor polls once a minute or so), /demo, the
+//                             calendar feed, the barcode lookup (owner-only, but outbound)
 //
 // Fails OPEN: a missing binding (a local proxy without one) is logged once and not enforced, and
 // a binding that throws lets the request through — a limiter outage must never lock the owner

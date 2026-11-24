@@ -49,6 +49,10 @@ export default defineEventHandler(async (event) => {
   const token = process.env.WEBHOOK_TOKEN
   if (!token) throw createError({ statusCode: 500, message: 'WEBHOOK_TOKEN is not configured' })
   if (!safeEqual(getHeader(event, 'authorization'), `Bearer ${token}`)) {
+    // Only a refused request spends the per-IP allowance (as on the quick-log endpoint): a
+    // guesser is cut off at five a minute, and Health Auto Export's own deliveries never are.
+    // The refusal used to be free — as many guesses a second as the caller could send.
+    await enforceRateLimit(event, 'credentials', 'health-webhook')
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 

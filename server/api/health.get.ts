@@ -9,7 +9,10 @@ import type { HealthReport } from '#shared/types/health'
 // Built for an uptime monitor: anyone gets `{ ok }` with 200 or 503, and nothing else. The feed
 // checks are personal — their ok/503 alone says when the owner last weighed in or wore the
 // strap — so an anonymous caller's answer covers only the task checks. The owner, and a monitor
-// presenting `?token=<HEALTH_TOKEN>`, get the feeds counted in plus the per-check detail.
+// presenting HEALTH_TOKEN, get the feeds counted in plus the per-check detail. The token goes in
+// `Authorization: Bearer <HEALTH_TOKEN>`; `?token=` still works for a monitor that can only be
+// given a URL, but a URL is what request logs keep (Workers Logs' invocation log is the method
+// and the URL), so the header is the one to use.
 // Always the real DB — a demo session's health is not the site's. Public, so per-IP limited
 // (server/utils/rateLimit.ts): a monitor polls once a minute or so; the four D1 queries behind
 // an answer are not for anyone to hammer.
@@ -98,7 +101,9 @@ export default defineEventHandler(async (event): Promise<HealthReport> => {
   const now = Date.now()
   const checks = [...await taskChecks(db, now), ...await feedChecks(db, localToday())]
 
-  const isMonitor = safeEqual(getQuery(event).token, process.env.HEALTH_TOKEN)
+  const token = process.env.HEALTH_TOKEN
+  const isMonitor = safeEqual(getHeader(event, 'authorization'), token ? `Bearer ${token}` : undefined)
+    || safeEqual(getQuery(event).token, token)
   const full = event.context.auth?.role === 'owner' || isMonitor
   const ok = isHealthy(full ? checks : checks.filter(c => !c.name.startsWith('feed:')))
 
