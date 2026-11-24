@@ -17,13 +17,13 @@ export default defineEventHandler(async (event) => {
       INSERT INTO journal_entries (date, food) VALUES (?1, json_object(?2, ?3))
       ON CONFLICT(date) DO UPDATE SET food = json_set(COALESCE(food, '{}'), '$.' || ?2, ?3)
     `).bind(date, slot, text).run()
-    await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `${slot} on ${date}: ${text}` })
+    await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['food'], summary: `${slot} on ${date}: ${text}` })
   }
   else {
     await db.prepare(`
       UPDATE journal_entries SET food = json_remove(COALESCE(food, '{}'), '$.' || ?2) WHERE date = ?1
     `).bind(date, slot).run()
-    if (before) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− ${slot} on ${date}` })
+    if (before) await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['food'], summary: `− ${slot} on ${date}` })
   }
 
   const row = await db.prepare('SELECT food FROM journal_entries WHERE date = ?1').bind(date).first<{ food: string }>()

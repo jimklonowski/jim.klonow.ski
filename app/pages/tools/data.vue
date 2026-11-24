@@ -232,6 +232,9 @@ function when(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: HOME_TZ })
 }
 
+/** What a column-scoped entry's columns are called in the confirmation. */
+const COLUMN_LABELS: Record<string, string> = { water: 'water log', sodas: 'drink list', food: 'meals' }
+
 function confirmText(e: AuditEntry): string {
   const what = `${TABLE_LABELS[e.table] ?? e.table} — ${e.summary ?? e.key}`
   if (e.action === 'delete') return `Put back ${what}?`
@@ -241,6 +244,12 @@ function confirmText(e: AuditEntry): string {
     return e.table === 'journal_entries'
       ? `Remove ${what}? This deletes that day's whole entry — anything added to it since goes too (logged, so it can be undone).`
       : `Remove ${what}, undoing its creation?`
+  }
+  // A tap or a single meal logged only what it changed (server/utils/audit.ts scopedImage):
+  // putting it back touches that part of the day and nothing else.
+  if (e.columns?.length) {
+    const part = e.columns.map(c => COLUMN_LABELS[c] ?? c).join(' and ')
+    return `Undo "${e.summary ?? e.key}"? Only that day's ${part} goes back to how it was before it: later changes to the ${part} are replaced, and the rest of the day is left alone (logged, so it can be undone).`
   }
   return `Put ${what} back the way it was before this change? Anything edited on it since is replaced (that's logged too, so it can be undone).`
 }

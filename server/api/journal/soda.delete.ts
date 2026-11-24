@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     : db.prepare(removeAtSql('sodas')).bind(date, index)
   ).run()
   const removed = (res.meta.changes ?? 0) > 0
-  if (before && removed) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `− soda on ${date}` })
+  if (before && removed) await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['sodas'], summary: `− soda on ${date}` })
 
   const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
   const sodas = JSON.parse(row?.sodas ?? '[]') as Array<{ time: string, drink?: string, size?: string }>

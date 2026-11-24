@@ -181,3 +181,53 @@ test('a stored object that does not read back as the snapshot fails the run', as
   assert.ok(err instanceof TaskFailure)
   assert.match(err.message, /read-back/)
 })
+
+// Audit #44 item 52: the task no longer holds the database as text several times over.
+test('the JSON is written in pieces that are exactly the snapshot, and the restore is counted without being kept', async () => {
+  const { backupJsonChunks, backupToSqlStatements, countRestoreStatements, restoreStatements } = await import('../shared/utils/backup.ts')
+  const { gunzipSync } = await import('node:zlib')
+  const db = seeded(1300) // more than two pieces of five hundred rows
+  // Text the JSON has to escape, and characters outside Latin-1.
+  db.prepare(`UPDATE journal_entries SET notes = ?1 WHERE date = '2026-09-02'`).run('he said "fine" — 5µg\nnext line ♥ 🙂 \\ back')
+  const backup = snapshot(db)
+  const whole = JSON.stringify(backup)
+  const pieces = [...backupJsonChunks(backup)]
+  assert.equal(pieces.join(''), whole)
+  assert.deepEqual(JSON.parse(pieces.join('')), backup)
+  assert.ok(Math.max(...pieces.map(p => p.length)) < whole.length / 2, 'no piece is most of the text')
+  const empty = snapshot(migrated())
+  assert.equal([...backupJsonChunks(empty)].join(''), JSON.stringify(empty), 'tables with no rows')
+
+  const statements = backupToSqlStatements(backup)
+  assert.deepEqual([...restoreStatements(backup)], statements)
+  assert.equal(countRestoreStatements(backup), statements.length)
+  assert.throws(() => countRestoreStatements({ ...backup, version: 2 }), /unsupported backup version/)
+
+  // Through the task: what lands in the bucket decompresses to that same text.
+  source = db
+  const bucket = fakeBucket()
+  const r = await run(bucket)
+  const stored = gunzipSync(Buffer.from(bucket.store.get(TODAY).bytes)).toString('utf8')
+  assert.equal(stored, whole)
+  assert.equal(r.json_chars, whole.length)
+  assert.equal(r.statements, statements.length)
+  assert.equal(r.gzip_bytes, bucket.store.get(TODAY).bytes.length)
+})
+
+test('a stored object of the right length and the wrong bytes fails the read-back', async () => {
+  source = seeded()
+  const bucket = fakeBucket()
+  const { gunzipSync, gzipSync } = await import('node:zlib')
+  // Flip one character of the text behind the stored bytes on every read.
+  const get = bucket.get.bind(bucket)
+  bucket.get = async (key) => {
+    const o = bucket.store.get(key)
+    if (!o) return null
+    const text = gunzipSync(Buffer.from(o.bytes)).toString('utf8').replace('"test"', '"tesT"')
+    return { key, body: new Blob([gzipSync(Buffer.from(text))]).stream() }
+  }
+  const err = await run(bucket).catch(e => e)
+  assert.ok(err instanceof TaskFailure)
+  assert.match(err.message, /read-back: stored object differs from the snapshot/)
+  bucket.get = get
+})

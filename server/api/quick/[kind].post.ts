@@ -88,7 +88,7 @@ export default defineEventHandler(async (event) => {
     const row = await db.prepare('SELECT water, sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ water: string | null, sodas: string | null }>()
     const water = JSON.parse(row?.water ?? '[]') as WaterEntry[]
     const appended = water.length > held
-    if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ ${oz} oz water on ${date} (quick-log)` })
+    if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['water'], summary: `+ ${oz} oz water on ${date} (quick-log)` })
     const total = hydrationOz({ water, sodas: JSON.parse(row?.sodas ?? '[]') as SodaEntry[] })
     const goal = waterSetting(profile, 'water_goal_oz', WATER_DEFAULT_GOAL_OZ)
     return { ok: true, kind, date, appended, oz, totalOz: total, goalOz: goal, message: appended ? quickWaterMessage(oz, total, goal) : `That pour was already logged. ${total} of ${goal} oz today.` }
@@ -115,7 +115,7 @@ export default defineEventHandler(async (event) => {
     const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
     const sodas = JSON.parse(row?.sodas ?? '[]') as SodaEntry[]
     const appended = sodas.length > held
-    if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ ${drink ?? 'soda'} on ${date} (quick-log)` })
+    if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['sodas'], summary: `+ ${drink ?? 'soda'} on ${date} (quick-log)` })
     const count = sodasOnly(sodas).length
     return { ok: true, kind, date, appended, drink: drink ?? null, size: size ?? null, sodasToday: count, message: quickSodaMessage(drink, size, isSodaEntry({ drink }), count, appended) }
   }
@@ -140,7 +140,7 @@ export default defineEventHandler(async (event) => {
         if (attempt < QUICK_MEAL_ATTEMPTS) continue
         throw createError({ statusCode: 409, message: 'That meal slot kept changing while this was being logged. Nothing was written; try again.' })
       }
-      await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `${plan.slot} on ${date}: ${plan.text} (quick-log)` })
+      await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['food'], summary: `${plan.slot} on ${date}: ${plan.text} (quick-log)` })
     }
     return { ok: true, kind, date, slot: plan.slot, text: plan.text, appended: !plan.unchanged, kcal: estimate.kcal, protein_g: estimate.protein_g, message: quickMealMessage(plan, body.text, estimate) }
   }

@@ -97,6 +97,11 @@ interface AuditWrite {
   before: Row | null
   summary: string
   deleted?: boolean
+  /**
+   * The write touched only these columns: the logged before-image is them and the key, not the
+   * whole row (scopedImage). For the single-column writes — a pour, a drink, one meal slot.
+   */
+  columns?: readonly string[]
 }
 
 /**
@@ -123,7 +128,7 @@ export async function recordAudit(event: H3Event, entry: AuditWrite): Promise<vo
 export function auditStatement(event: H3Event, entry: AuditWrite): D1PreparedStatement | null {
   if (!auditing(event)) return null
   const action: AuditAction = entry.deleted ? 'delete' : entry.before ? 'update' : 'create'
-  return insertAudit(getDb(event), action, entry.table, entry.key, entry.before, entry.summary)
+  return insertAudit(getDb(event), action, entry.table, entry.key, scopedImage(entry.table, entry.before, entry.columns), entry.summary)
 }
 
 /**
@@ -145,6 +150,26 @@ export async function auditedDelete(event: H3Event, table: AuditTable, key: stri
   return before
 }
 
+/** The key a column-scoped before-image names its columns under. Not a column of any table, so a restore skips it. */
+export const AUDIT_SCOPE_KEY = '_columns'
+
+/**
+ * The before-image of a write that touched only `columns`: those, the key, and their names under
+ * AUDIT_SCOPE_KEY. Every water tap used to log the whole day row — its meals, doses, notes and
+ * every earlier pour — fifteen or so times a day, kept a year (audit #44 item 52). And the undo is
+ * the better for it: restoreAudit writes back only the columns an image holds, so undoing a pour
+ * from this morning puts the water list back and leaves the meals logged since alone, where the
+ * whole-row image rolled the entire day back.
+ */
+export function scopedImage(table: AuditTable, before: Row | null, columns?: readonly string[]): Row | null {
+  if (!before || !columns?.length) return before
+  const key = AUDIT_KEYS[table]
+  const image: Row = { [key]: before[key] }
+  for (const column of columns) image[column] = before[column] ?? null
+  image[AUDIT_SCOPE_KEY] = [...columns]
+  return image
+}
+
 function insertAudit(db: D1Database, action: AuditAction, table: AuditTable, key: string | number, before: Row | null, summary: string): D1PreparedStatement {
   return db.prepare(`
     INSERT INTO audit_log (at, action, table_name, row_key, summary, before)
@@ -164,6 +189,8 @@ interface AuditRow {
   before: string | null
   restored_at: string | null
   purged_at: string | null
+  /** The listing's read of AUDIT_SCOPE_KEY out of `before`: a JSON array, or null. */
+  scoped?: string | null
 }
 
 function blockedReason(row: AuditRow, purgedPhotos?: ReadonlySet<string>): string | null {
@@ -183,7 +210,19 @@ function blockedReason(row: AuditRow, purgedPhotos?: ReadonlySet<string>): strin
 
 // Explicit columns: `before` is the full row snapshot (a labs row carries its AI summary), and
 // the list reads up to 500 entries only to show metadata.
-const LIST_COLUMNS = 'id, at, action, table_name, row_key, summary, restored_at, purged_at'
+// The scope of a column-scoped image is read out in SQL, so the image itself still stays put.
+const LIST_COLUMNS = `id, at, action, table_name, row_key, summary, restored_at, purged_at, CASE WHEN json_valid(before) THEN json_extract(before, '$.${AUDIT_SCOPE_KEY}') END AS scoped`
+
+function scopeOf(scoped: string | null | undefined): string[] | null {
+  if (!scoped) return null
+  try {
+    const parsed: unknown = JSON.parse(scoped)
+    return Array.isArray(parsed) && parsed.length && parsed.every(c => typeof c === 'string') ? parsed as string[] : null
+  }
+  catch {
+    return null
+  }
+}
 
 export async function listAudit(db: D1Database, limit: number, before?: number): Promise<AuditEntry[]> {
   const [entriesRes, purgedRes] = await db.batch([
@@ -201,6 +240,7 @@ export async function listAudit(db: D1Database, limit: number, before?: number):
     key: r.row_key,
     summary: r.summary,
     restoredAt: r.restored_at,
+    columns: scopeOf(r.scoped),
     blocked: blockedReason(r, purgedPhotos)
   }))
 }

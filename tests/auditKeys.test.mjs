@@ -118,3 +118,60 @@ test('a tracked table still restores: a deleted vial comes back, the restore is 
   assert.notEqual(db.prepare('SELECT restored_at FROM audit_log WHERE id = ?1').get(id).restored_at, null)
   await assert.rejects(() => restoreAudit(d1, id, NO_PHOTOS), err => err.statusCode === 409 && /already restored/.test(err.message))
 })
+
+// Audit #44 item 52: a tap logs the column it changed, not the whole day row.
+test('a tap logs only the column it changed, and putting it back touches only that column', async () => {
+  const { AUDIT_SCOPE_KEY, recordAudit, scopedImage } = await import('../server/utils/audit.ts')
+  const db = fresh()
+  const d1 = fakeD1(db)
+  globalThis.getAuth = () => ({ role: 'owner' })
+  globalThis.getDb = () => d1
+  globalThis.logError = (...args) => {
+    throw new Error(args.join(' '))
+  }
+  const DAY = '2026-11-24'
+  const day = () => plain(db.prepare('SELECT * FROM journal_entries WHERE date = ?1').get(DAY))
+  db.prepare(`INSERT INTO journal_entries (date, weight_lbs, water, food, notes) VALUES (?1, 186.4, ?2, ?3, 'slept badly')`)
+    .run(DAY, JSON.stringify([{ time: '08:00', oz: 12, id: 'tap-aaaaaaaa' }]), JSON.stringify({ breakfast: 'eggs' }))
+  const before = day()
+
+  // The image: the key, the column, and the column's name.
+  const image = scopedImage('journal_entries', before, ['water'])
+  assert.deepEqual(Object.keys(image).sort(), [AUDIT_SCOPE_KEY, 'date', 'water'].sort())
+  assert.equal(image.water, before.water)
+  assert.equal(scopedImage('journal_entries', before), before, 'no columns named: the whole row, as before')
+  assert.equal(scopedImage('journal_entries', null, ['water']), null, 'a row that did not exist has no image')
+
+  // A second pour is logged...
+  await recordAudit({}, { table: 'journal_entries', key: DAY, before, columns: ['water'], summary: `+ 12 oz water on ${DAY}` })
+  const logged = plain(db.prepare('SELECT * FROM audit_log').get())
+  assert.equal(logged.action, 'update')
+  assert.deepEqual(JSON.parse(logged.before), image)
+  assert.ok(logged.before.length < JSON.stringify(before).length / 2, `${logged.before.length} of ${JSON.stringify(before).length} bytes`)
+  // ...then the day moves on: the pour lands, lunch is logged, the notes are edited.
+  db.prepare(`UPDATE journal_entries SET water = ?2, food = ?3, notes = 'slept badly, fine by noon' WHERE date = ?1`)
+    .run(DAY, JSON.stringify([{ time: '08:00', oz: 12, id: 'tap-aaaaaaaa' }, { time: '10:00', oz: 12, id: 'tap-bbbbbbbb' }]), JSON.stringify({ breakfast: 'eggs', lunch: 'gyros' }))
+  const later = day()
+
+  const [entry] = await listAudit(d1, 50)
+  assert.deepEqual(entry.columns, ['water'], 'the list says what it would put back')
+  assert.equal(entry.blocked, null)
+  await restoreAudit(d1, logged.id, NO_PHOTOS)
+  const after = day()
+  assert.equal(after.water, before.water, 'the water list is back to before the pour')
+  assert.equal(after.food, later.food, 'lunch, logged since, is untouched')
+  assert.equal(after.notes, later.notes)
+  assert.equal(after.weight_lbs, later.weight_lbs)
+  // The restore's own entry is a whole-row image (what it replaced), so it can be undone in turn.
+  const undo = plain(db.prepare(`SELECT * FROM audit_log WHERE action = 'restore'`).get())
+  assert.deepEqual(JSON.parse(undo.before), later)
+  assert.equal((await listAudit(d1, 50)).find(e => e.id === undo.id).columns, null)
+
+  // A whole-day save still logs the whole row, and a first tap (no row yet) is still a create.
+  await recordAudit({}, { table: 'journal_entries', key: DAY, before: later, summary: `day ${DAY}` })
+  await recordAudit({}, { table: 'journal_entries', key: '2026-11-25', before: null, columns: ['water'], summary: '+ 12 oz water on 2026-11-25' })
+  const rest = db.prepare('SELECT action, before FROM audit_log ORDER BY id DESC LIMIT 2').all().map(plain)
+  assert.deepEqual(rest.map(r => r.action), ['create', 'update'])
+  assert.equal(rest[0].before, null)
+  assert.deepEqual(JSON.parse(rest[1].before), later)
+})

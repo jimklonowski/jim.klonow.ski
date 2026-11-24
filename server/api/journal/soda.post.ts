@@ -34,6 +34,6 @@ export default defineEventHandler(async (event) => {
   const row = await db.prepare('SELECT sodas FROM journal_entries WHERE date = ?1').bind(date).first<{ sodas: string }>()
   const sodas = JSON.parse(row!.sodas) as Array<{ time: string, drink?: string, size?: string, id?: string }>
   const appended = sodas.length > heldBefore
-  if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, summary: `+ soda on ${date}${body.drink ? ` (${body.drink})` : ''}` })
+  if (appended) await recordAudit(event, { table: 'journal_entries', key: date, before, columns: ['sodas'], summary: `+ soda on ${date}${body.drink ? ` (${body.drink})` : ''}` })
   return { ok: true, date, sodas, appended }
 })

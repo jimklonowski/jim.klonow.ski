@@ -117,22 +117,20 @@ const encoder = new TextEncoder()
  *     row with an AI summary, a digest, or an audit before-image can blow a naive 50-row batch);
  *   - `invites` is merged, never deleted (see MERGE_MAX_COLUMNS).
  */
-export function backupToSqlStatements(backup: Backup, maxStatementBytes = 90_000): string[] {
+export function* restoreStatements(backup: Backup, maxStatementBytes = 90_000): Generator<string> {
   if (backup.version !== BACKUP_VERSION) throw new Error(`unsupported backup version ${backup.version}`)
   for (const [name, table] of Object.entries(backup.tables)) {
     if (!IDENT.test(name) || !table.columns.every(c => IDENT.test(c))) throw new Error(`unsafe identifier in ${name}`)
   }
 
   const names = orderForRestore(Object.keys(backup.tables))
-  const out: string[] = [
-    `-- Restore of ${backup.database}, backed up ${backup.created_at}.`,
-    `-- Schema at backup time: ${backup.migrations.join(', ') || 'unknown'}.`
-  ]
+  yield `-- Restore of ${backup.database}, backed up ${backup.created_at}.`
+  yield `-- Schema at backup time: ${backup.migrations.join(', ') || 'unknown'}.`
 
   // Phase 1: deletes, children first. `invites` keeps its live rows for the merge below.
   for (const name of [...names].reverse()) {
     if (name in MERGE_MAX_COLUMNS && backup.tables[name]!.columns.includes('id')) continue
-    out.push(`DELETE FROM ${name};`)
+    yield `DELETE FROM ${name};`
   }
 
   // Phase 2: inserts, parents first, batched by byte size.
@@ -148,26 +146,77 @@ export function backupToSqlStatements(backup: Backup, maxStatementBytes = 90_000
 
     let batch: string[] = []
     let bytes = 0
-    const flush = () => {
-      if (batch.length) out.push(prefix + batch.join(',\n') + suffix)
-      batch = []
-      bytes = 0
-    }
     for (const row of table.rows) {
       const tuple = `(${row.map(sqlLiteral).join(', ')})`
       const tupleBytes = encoder.encode(tuple).length + 2 // its ',\n' separator
       if (tupleBytes > budget) throw new Error(`a ${name} row alone exceeds ${maxStatementBytes} bytes of SQL`)
-      if (bytes + tupleBytes > budget) flush()
+      if (bytes + tupleBytes > budget && batch.length) {
+        yield prefix + batch.join(',\n') + suffix
+        batch = []
+        bytes = 0
+      }
       batch.push(tuple)
       bytes += tupleBytes
     }
-    flush()
+    if (batch.length) yield prefix + batch.join(',\n') + suffix
   }
-  return out
+}
+
+/** The whole restore as a list (scripts/restore-backup.mjs writes it to a .sql file). */
+export function backupToSqlStatements(backup: Backup, maxStatementBytes = 90_000): string[] {
+  return [...restoreStatements(backup, maxStatementBytes)]
+}
+
+/**
+ * How many statements the restore would be — and that it can be built at all — without keeping
+ * them: the weekly task only needs to know the snapshot is restorable, and the list is the whole
+ * database over again as SQL text.
+ */
+export function countRestoreStatements(backup: Backup, maxStatementBytes = 90_000): number {
+  let n = 0
+  for (const statement of restoreStatements(backup, maxStatementBytes)) n += statement ? 1 : 0
+  return n
 }
 
 export function backupToSql(backup: Backup, maxStatementBytes = 90_000): string {
   return backupToSqlStatements(backup, maxStatementBytes).join('\n') + '\n'
+}
+
+/** Rows per piece of a table's JSON: a piece is all that is held as text at one time. */
+const JSON_ROWS_PER_PIECE = 500
+
+/**
+ * The backup as JSON text, in pieces: joined, they are exactly `JSON.stringify(backup)` (a test
+ * holds them to it). The weekly task gzips and hashes them as they come, so the whole text never
+ * exists at once. As one string it was held twice over — written, then read back to compare —
+ * beside the snapshot itself, a blob copy of it and the restore SQL, and the audit log makes
+ * that text grow by megabytes a year against a Worker's 128 MB (audit #44 item 52).
+ */
+export function* backupJsonChunks(backup: Backup): Generator<string> {
+  yield '{'
+  let first = true
+  for (const [key, value] of Object.entries(backup)) {
+    if (value === undefined) continue
+    yield `${first ? '' : ','}${JSON.stringify(key)}:`
+    first = false
+    if (key !== 'tables') {
+      yield JSON.stringify(value)
+      continue
+    }
+    yield '{'
+    let firstTable = true
+    for (const [name, table] of Object.entries(value as Backup['tables'])) {
+      yield `${firstTable ? '' : ','}${JSON.stringify(name)}:{"columns":${JSON.stringify(table.columns)},"rows":[`
+      firstTable = false
+      for (let i = 0; i < table.rows.length; i += JSON_ROWS_PER_PIECE) {
+        // "[[…],[…]]" without its outer brackets: the pieces share one array.
+        yield `${i ? ',' : ''}${JSON.stringify(table.rows.slice(i, i + JSON_ROWS_PER_PIECE)).slice(1, -1)}`
+      }
+      yield ']}'
+    }
+    yield '}'
+  }
+  yield '}'
 }
 
 // Verification (audit #43 item 46): what the weekly task checks a fresh snapshot against before

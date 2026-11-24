@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto'
 import { localToday } from '#shared/utils/time'
-import { backupToSqlStatements, baselineFrom, collapseReport, tableCounts } from '#shared/utils/backup'
+import { backupJsonChunks, baselineFrom, collapseReport, countRestoreStatements, tableCounts } from '#shared/utils/backup'
 
 // Weekly snapshot of the main D1 database into R2 — see shared/utils/backup.ts for the format
 // and why Time Travel alone isn't enough. Restore: download the object and run
@@ -13,7 +14,8 @@ import { backupToSqlStatements, baselineFrom, collapseReport, tableCounts } from
 //  - its per-table row counts are compared with the previous backup's: a table gone or halved is
 //    a collapse (shared/utils/backup.ts), and that copy is stored under suspect/ — never the
 //    next week's baseline, never counted or pruned;
-//  - the stored object is read back and must decompress to the exact JSON that was written.
+//  - the stored object is read back and must decompress to the exact JSON that was written
+//    (same length, same SHA-256 — the text itself is never held, see gzipJson).
 // Any of those fails the run (TaskFailure, so /api/health and the footer glyph show it, with
 // the key in the result) and skips the prune, so a broken week cannot age good copies out. A
 // collapse that was deliberate (rows really removed): copy the suspect object to the top level
@@ -27,13 +29,47 @@ const KEEP = 12
 /** R2 caps customMetadata at 2 KB; 21 tables of counts are ~500 B, so counts go only while they fit. */
 const MAX_COUNTS_CHARS = 1500
 
-async function gzip(text: string): Promise<ArrayBuffer> {
-  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))
-  return new Response(stream).arrayBuffer()
+/**
+ * The snapshot's JSON, gzipped a piece at a time (backupJsonChunks), with the length and hash of
+ * what went in. Only the compressed bytes are kept. It used to be one JSON.stringify of the whole
+ * database, a Blob copy of that for the compressor, and — for the read-back — the stored object
+ * decompressed to a second full string to compare: three copies of the text beside the snapshot
+ * and the restore SQL, all alive at once in a Worker with 128 MB (audit #44 item 52).
+ */
+async function gzipJson(pieces: Iterable<string>): Promise<{ body: ArrayBuffer, chars: number, bytes: number, sha256: string }> {
+  const encoder = new TextEncoder()
+  const hash = createHash('sha256')
+  const iterator = pieces[Symbol.iterator]()
+  let chars = 0
+  let bytes = 0
+  const source = new ReadableStream<BufferSource>({
+    // Pulled, so a piece is made only when the compressor is ready for it.
+    pull(controller) {
+      const next = iterator.next()
+      if (next.done) return controller.close()
+      const encoded = encoder.encode(next.value)
+      hash.update(encoded)
+      chars += next.value.length
+      bytes += encoded.byteLength
+      controller.enqueue(encoded)
+    }
+  })
+  const body = await new Response(source.pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
+  return { body, chars, bytes, sha256: hash.digest('hex') }
 }
 
-async function gunzip(body: ReadableStream): Promise<string> {
-  return new Response(body.pipeThrough(new DecompressionStream('gzip'))).text()
+/** What a stored object decompresses to, as a length and a hash, read as a stream. */
+async function gunzipDigest(body: ReadableStream): Promise<{ bytes: number, sha256: string }> {
+  const hash = createHash('sha256')
+  const reader = body.pipeThrough(new DecompressionStream('gzip')).getReader()
+  let bytes = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    hash.update(value)
+    bytes += value.byteLength
+  }
+  return { bytes, sha256: hash.digest('hex') }
 }
 
 /** The dated top-level backups, oldest first. Keys are dated, so name order is age order; the
@@ -51,9 +87,10 @@ async function backupDatabase(env: Env) {
   const problems: string[] = []
 
   // Restorable: the very SQL the restore script would write, so an unsplittable row fails now.
+  // Counted as it is generated, not kept — it is the whole database again as text.
   let statements = 0
   try {
-    statements = backupToSqlStatements(backup).length
+    statements = countRestoreStatements(backup)
   }
   catch (err) {
     problems.push(`not restorable: ${errorMessage(err)}`)
@@ -66,8 +103,8 @@ async function backupDatabase(env: Env) {
   const collapsed = collapseReport(baselineFrom(previous?.customMetadata), counts)
   problems.push(...collapsed)
 
-  const json = JSON.stringify(backup)
-  const body = await gzip(json)
+  const written = await gzipJson(backupJsonChunks(backup))
+  const body = written.body
   const key = `${collapsed.length ? SUSPECT : PREFIX}${localToday()}.json.gz`
   const countsJson = JSON.stringify(counts)
   await bucket.put(key, body, {
@@ -85,13 +122,14 @@ async function backupDatabase(env: Env) {
   try {
     const stored = await bucket.get(key)
     if (!stored) throw new Error('object missing after put')
-    if (await gunzip(stored.body) !== json) throw new Error('stored object differs from the snapshot')
+    const read = await gunzipDigest(stored.body)
+    if (read.bytes !== written.bytes || read.sha256 !== written.sha256) throw new Error('stored object differs from the snapshot')
   }
   catch (err) {
     problems.push(`read-back: ${errorMessage(err)}`)
   }
 
-  const result = { key, tables, rows, gzip_bytes: body.byteLength, json_chars: json.length, statements, previous: previousKey, pruned: 0 }
+  const result = { key, tables, rows, gzip_bytes: body.byteLength, json_chars: written.chars, statements, previous: previousKey, pruned: 0 }
   if (problems.length) throw new TaskFailure(`backup written to ${key} but not verified: ${problems.join('; ')}`, result)
 
   // Prune to the newest KEEP, only now that this one is verified.

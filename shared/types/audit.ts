@@ -7,6 +7,12 @@ export interface AuditEntry {
   key: string
   summary: string | null
   restoredAt: string | null
+  /**
+   * The columns this entry's before-image holds, when the write touched only those (a water or
+   * drink tap, one meal): putting it back changes them and nothing else on the row. Null for a
+   * whole-row image.
+   */
+  columns: string[] | null
   /** Why this entry can't be restored, or null when it can. */
   blocked: string | null
 }
