@@ -8,6 +8,9 @@
           size="lg"
           :rhr="rhr"
           :mood="mood"
+          :sluggish="tickerSluggish && !mood"
+          :accessories="tickerAccessories"
+          :build="tickerBuild"
           aria-label="TICKER"
           @open="nudge"
         />
@@ -52,6 +55,9 @@
           class="lg:hidden -my-1"
           :rhr="rhr"
           :mood="mood"
+          :sluggish="tickerSluggish && !mood"
+          :accessories="tickerAccessories"
+          :build="tickerBuild"
           aria-label="TICKER"
           @open="nudge"
         />
@@ -247,6 +253,11 @@ const router = useRouter()
 const { role } = await useAuth()
 const { data: overview } = useOverviewSummary(role)
 const rhr = computed(() => overview.value?.latestRhr ?? null)
+// The same pet as on the home page and /ticker: its wardrobe, its build and its short-sleep slump.
+// It was a bare default heart here. Not awaited — the page does not wait for its pet — and the
+// slump gives way while it thinks or talks (the phone header's heart is the face alone, so there
+// it shows in the eyes and the beat only).
+const { accessories: tickerAccessories, build: tickerBuild, sluggish: tickerSluggish } = useTickerOutfit()
 
 const { data: threadData, error: threadsError, refresh: refreshThreads } = await useAsyncData('ask-threads',
   () => useRequestFetch()<AskThreadSummary[]>('/api/ai/threads'))
