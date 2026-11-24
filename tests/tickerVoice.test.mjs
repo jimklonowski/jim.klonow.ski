@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  arrivalLine, dated, doseDoneLine, doseStartLine, drawTile, fedTile, flinchLine, gotLine, helloLine, newsSince, outcomeForQuit, plateLine, playIntroLine,
+  arrivalLine, dated, doseDoneLine, doseStartLine, drawTile, fedTile, flinchLine, gameHints, gotLine, helloLine, newsSince, outcomeForQuit, plateLine, playIntroLine,
   quitRemark, quoteLines, recordLines, squeakFor, statTiles, todaySummaryLine, visitorsNews, walkEndLine, walkStartLine
 } from '../shared/utils/tickerVoice.ts'
 
@@ -194,7 +194,17 @@ test('the one-shots\' lines', () => {
 test('the games: the intro by game, the quit remark by what the run earned', () => {
   const wall = { cans: [{ oz: 12, week: 0 }], count: 1, title: 'X', practice: true, monthsBack: 1 }
   assert.equal(playIntroLine('runner', wall), 'space or tap to run. esc quits.')
-  assert.equal(playIntroLine('crusher', wall), '1 cans on the wall (last month\'s — this one is clean). space or tap to launch; arrows or the pointer move. esc quits.')
+  assert.equal(playIntroLine('crusher', wall), '1 can on the wall (last month\'s — this one is clean). space or tap to launch; arrows or the pointer move. esc quits.')
+  // On a touch screen the keys are left out: no space bar or escape on a phone, and QUIT is the way out.
+  const onTouch = game => playIntroLine(game, { ...wall, count: 9, practice: false }, { ghosts: [], cans: 0, title: 'vs 4 germs' }, { germs: 4, sodas: 0, title: '4 germs · a clean month' }, { wave: [], cans: 0, germs: 6, sodas: 0, title: '6 germs · a clean month' }, true)
+  assert.equal(onTouch('runner'), 'tap to run. QUIT leaves.')
+  assert.equal(onTouch('crusher'), '9 cans on the wall. tap to launch; a finger moves it. QUIT leaves.')
+  assert.equal(onTouch('world'), 'the month, left to right — home is today. ◀ ▶ run, ▲ jumps (hold for height). QUIT leaves.')
+  assert.equal(onTouch('maze'), 'every capsule in the maze, vs 4 germs. a swipe steers; a tap starts. QUIT leaves.')
+  assert.equal(onTouch('drop'), '4 germs · a clean month. a drag moves, a tap turns, a swipe down drops; a tap starts. QUIT leaves.')
+  assert.equal(onTouch('invaders'), '6 germs · a clean month, in formation. hold a finger: it follows and fires; a tap starts. QUIT leaves.')
+  assert.equal(playIntroLine('crusher', { ...wall, count: 0 }, undefined, undefined, undefined, true), 'nothing to shoot. good. (QUIT leaves)')
+  for (const game of ['runner', 'crusher', 'world', 'maze', 'drop', 'invaders']) assert.doesNotMatch(onTouch(game), /space|esc|arrows|wasd|←|↑|↓/, game)
   assert.equal(playIntroLine('crusher', { ...wall, count: 9, monthsBack: 4 }), '9 cans on the wall (from 4 months back — clean ever since). space or tap to launch; arrows or the pointer move. esc quits.')
   assert.equal(playIntroLine('crusher', { ...wall, count: 0 }), 'nothing to shoot. good. (esc quits)')
   assert.equal(playIntroLine('maze', wall, { ghosts: [], cans: 2, title: 'vs coke, dr pepper + 2 germs' }), 'every capsule in the maze, vs coke, dr pepper + 2 germs. arrows, wasd or a swipe steer; space or tap starts. esc quits.')
@@ -216,6 +226,36 @@ test('the games: the intro by game, the quit remark by what the run earned', () 
   assert.equal(gotLine(summary), 'sep 14 got me — two cans and the pit.')
   assert.equal(gotLine({ ...summary, hits: [], worstDay: null, cleared: true }), 'not a scratch.')
   assert.equal(gotLine({ ...summary, hits: [], worstDay: null }), '')
+})
+
+test('the games\' own prompts: keys on a desktop, taps and QUIT on a touch screen', () => {
+  const keys = gameHints(false)
+  assert.deepEqual(
+    [keys.tap, keys.press('to run'), keys.quit, keys.again(), keys.again('to run again')],
+    ['space · tap', 'space · tap to run', 'esc quits', 'space · tap for another go   esc quits', 'space · tap to run again   esc quits']
+  )
+  const touch = gameHints(true)
+  assert.deepEqual([touch.tap, touch.press('to run'), touch.quit, touch.again(), touch.again('to run again')], ['tap', 'tap to run', 'QUIT leaves', 'tap for another go', 'tap to run again'])
+  assert.equal(keys.touch, false)
+  assert.equal(touch.touch, true)
+})
+
+test('one of a thing is one: a point, a day, a due dose', () => {
+  const quit = { game: 'runner', score: 1, best: { score: 1, date: TODAY }, house: 1, keeper: true, setRecord: true, beatHouse: false, cleared: false, wallEmpty: false }
+  assert.equal(quitRemark(quit).line, 'new best: 1 point. ♥')
+  assert.equal(quitRemark({ ...quit, setRecord: false, best: { score: 300, date: '2026-10-01' } }).line, '1 point. best 300 on Oct 1 — it\'s still catching its breath.')
+  assert.equal(quitRemark({ ...quit, keeper: false, setRecord: false, beatHouse: true }).line, 'new house record: 1 point. ♥')
+  assert.equal(quitRemark({ ...quit, keeper: false, setRecord: false, best: null, house: 300 }).line, '1 point. the house record is 300.')
+  const day = { doses: 1, rulesApply: true, due: 1, missing: 0, eaten: 1, missingNames: '', workoutMinutes: 0, sodasToday: 0 }
+  assert.equal(todaySummaryLine(day), 'the one due dose down, no walk yet, no sodas (it approves).')
+  assert.equal(todaySummaryLine({ ...day, missing: 1, eaten: 0, missingNames: 'HGH' }), '0 of 1 due dose down (HGH to come), no walk yet, no sodas (it approves).')
+  assert.equal(todaySummaryLine({ ...day, due: 3, eaten: 3 }), 'all 3 due doses down, no walk yet, no sodas (it approves).')
+  const said = quoteLines({ ...quoteBase, rulesApply: true, due: 1, missing: 0, eaten: 1, weekTally: { hit: 1, missed: [] }, ageDays: 1, oldestOpen: { compound: 'HGH', days: 1 } })
+  for (const line of ['the one due dose down today. it\'s full.', '1 of 1 due dose this week. a clean week — hence the star.', '1 day since the first logged day. it remembers it.', 'the HGH vial has been open 1 day.']) {
+    assert.ok(said.includes(line), `${line}\n  in: ${said.join(' | ')}`)
+  }
+  const wrong = said.filter(l => /\b1 (days|points|doses|due doses)\b/.test(l))
+  assert.deepEqual(wrong, [])
 })
 
 test('a quit is about the last game reported: a record or a cleared wall is not carried into the next game', () => {

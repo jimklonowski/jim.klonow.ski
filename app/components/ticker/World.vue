@@ -109,6 +109,7 @@ import {
 import type { DayInput, Enemy, Item, PlayerSize, WorldFeat, WorldInput, WorldState, WorldSummary } from '#shared/utils/tickerWorld'
 import { CAN, CAN_CRUMPLED, CAN_DENTED, FLAG, renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
+import { gameHints } from '#shared/utils/tickerVoice'
 
 const props = defineProps<{
   build: TickerBuild
@@ -175,6 +176,8 @@ let last = 0
 let now = 0
 let paused = false
 let reducedMotion = false
+/** The prompts' wording: keys on a desktop; taps, and the page's QUIT, on a touch screen. */
+let hints = gameHints(false)
 let reportedEnd = false
 let endedAt = -1
 let lostAt = -1
@@ -666,10 +669,10 @@ function draw() {
     g.fillText(`${first ? dayLabel(first) : ''} – ${lastDay ? dayLabel(lastDay) : ''} · ${level.days.length} DAYS · ${level.capsules.length} CAPSULES${cans ? ` · ${cans} CAN${cans === 1 ? '' : 'S'}` : ''}`, W / 2, promptY - 18)
     g.globalAlpha = pulse
     g.fillStyle = colors.text
-    g.fillText('space · tap to start', W / 2, promptY + 4)
+    g.fillText(hints.press('to start'), W / 2, promptY + 4)
     g.globalAlpha = 1
     g.fillStyle = colors.faint
-    g.fillText(touch.value ? '◀ ▶ run · ▲ jump (hold for height) · esc quits' : '← → run · space jumps (hold for height) · esc quits', W / 2, promptY + 20)
+    g.fillText(touch.value ? `◀ ▶ run · ▲ jump (hold for height) · ${hints.quit}` : '← → run · space jumps (hold for height) · esc quits', W / 2, promptY + 20)
     g.fillText(W < 520 ? 'stomp the cans · a side touch shrinks you' : 'land on a can to crush it · a touch from the side shrinks you', W / 2, promptY + 34)
   }
   else if (s.status === 'over' || s.status === 'cleared') {
@@ -678,7 +681,7 @@ function draw() {
     g.fillText(s.status === 'cleared' ? `MADE IT HOME · ${s.score}${best}` : `GAME OVER · ${s.score}${best}`, W / 2, promptY)
     if (now - endedAt >= RESTART_LOCKOUT) {
       g.fillStyle = colors.faint
-      g.fillText('space · tap for another go   esc quits', W / 2, promptY + 16)
+      g.fillText(hints.again(), W / 2, promptY + 16)
     }
   }
 }
@@ -996,6 +999,7 @@ function onVisibility() {
 
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  hints = gameHints(window.matchMedia('(pointer: coarse)').matches)
   touch.value = window.matchMedia('(pointer: coarse)').matches
   prepare()
   // A preset picked mid-game re-reads the palette and rebakes the sprites.

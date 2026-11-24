@@ -52,6 +52,14 @@ export function isAsleep(hour: number | null): boolean {
   return hour != null && (hour >= BEDTIME_HOUR || hour < WAKE_HOUR)
 }
 
+/**
+ * Dusk to midnight: the part of the night that still belongs to today. The small hours are dark
+ * too, but they are the NEXT day's morning — nothing on that day's plate is overdue at 12:05 am.
+ */
+export function isEvening(hour: number | null): boolean {
+  return hour != null && hour >= DUSK_HOUR
+}
+
 /** What the window shows: the sun by day, amber around dawn and dusk, the moon and stars at night. */
 export function skyFor(hour: number | null): Sky {
   if (hour == null) return 'day'
@@ -189,14 +197,15 @@ export interface HungerInputs {
   logged: number
   /** Doses on the plate (the meal day's, which may be yesterday's). */
   doses: number
-  night: boolean
+  /** Dusk to midnight (isEvening) — not the small hours, which are the next day's morning. */
+  evening: boolean
 }
 
 export function hungerOf(i: HungerInputs): Hunger {
   if (!i.rulesApply) return i.doses ? 'fed' : 'waiting'
   if (!i.due) return i.logged ? 'fed' : 'rest'
   if (!i.missing) return 'fed'
-  return i.night ? 'hungry' : 'waiting'
+  return i.evening ? 'hungry' : 'waiting'
 }
 
 // --- housekeeping: unlogged days gather cobwebs -----------------------------------------------
@@ -566,6 +575,8 @@ export interface WorldInputs {
   rules: ProtocolRule[]
   rulesApply: boolean
   doseDates: Map<string, Set<string>>
+  /** The daily meds taken but never logged (useProtocol().standing): capsules on a logged day all the same. */
+  standing: StandingCompound[]
   today: string
 }
 
@@ -583,10 +594,13 @@ export function worldDaysOf(i: WorldInputs): DayInput[] {
   return trailingDays(i.today, WORLD_DAYS).map((date) => {
     const e = byDate.get(date)
     const workoutMin = minutesOn(i.workouts, date)
+    const logged = !!e && isLoggedDay(e)
     return {
       date,
-      logged: !!e && isLoggedDay(e),
-      doses: e?.peptides?.length ?? 0,
+      logged,
+      // The doses logged, plus the daily meds in force that day: taken, never logged, capsules all
+      // the same. A compound that moved to the standing list used to take its capsule with it.
+      doses: (e?.peptides?.length ?? 0) + (logged ? standingPlateOf(i.standing, date).length : 0),
       sodas: sodasOnly(e?.sodas).map(s => ({ oz: sodaOunces(s.size) })),
       workoutMin,
       cardio: workoutsOn(i.workouts, date).some(w => CARDIO.test(w.workout_type ?? '')),

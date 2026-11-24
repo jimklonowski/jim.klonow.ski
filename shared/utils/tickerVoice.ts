@@ -25,6 +25,10 @@ export function dated(d: string, today: string): string {
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+const points = (n: number) => plural(n, 'point')
+/** "1 due dose" / "3 due doses", and the whole plate: "the one due dose" / "all 3 due doses". */
+const dueDoses = (n: number) => `${n} due ${n === 1 ? 'dose' : 'doses'}`
+const allDue = (n: number) => (n === 1 ? 'the one due dose' : `all ${n} due doses`)
 
 // --- the record book --------------------------------------------------------------------------
 
@@ -44,7 +48,7 @@ export function recordLines(i: RecordInputs): string[] {
   const rec = best(i.health, h => h.recovery_score, 'max')
   if (rec) lines.push(`best recovery: ${rec.value}% on ${when(rec.item.date)}.`)
   const run = longestLoggedStreak(i.entries)
-  if (run.days) lines.push(run.days === i.streak ? `longest streak: ${run.days} days — this one, still going.` : `longest streak: ${run.days} days, ending ${when(run.end!)}.`)
+  if (run.days) lines.push(run.days === i.streak ? `longest streak: ${plural(run.days, 'day')} — this one, still going.` : `longest streak: ${plural(run.days, 'day')}, ending ${when(run.end!)}.`)
   const light = best(i.entries, e => e.weight_lbs, 'min')
   if (light) lines.push(`lightest: ${light.value} lb on ${when(light.item.date)}.`)
   const long = best(i.workouts, w => w.duration_min, 'max')
@@ -54,12 +58,12 @@ export function recordLines(i: RecordInputs): string[] {
   const calm = best(i.entries, e => e.rhr, 'min')
   if (calm) lines.push(`lowest resting HR: ${calm.value} bpm on ${when(calm.item.date)}.`)
   const { runner, crusher, world, maze, drop, invaders } = i.hiScores
-  if (runner) lines.push(`best run: ${runner.score} points on ${when(runner.date)}.`)
-  if (crusher) lines.push(`best crush: ${crusher.score} points on ${when(crusher.date)}${crusher.cleared ? ' — and a whole wall cleared, once.' : '.'}`)
-  if (world) lines.push(`best month: ${world.score} points on ${when(world.date)}${world.cleared ? ' — and made it all the way home, once.' : '.'}`)
-  if (maze) lines.push(`best maze: ${maze.score} points on ${when(maze.date)}${maze.cleared ? ' — and every capsule eaten, once.' : '.'}`)
-  if (drop) lines.push(`best drop: ${drop.score} points on ${when(drop.date)}${drop.cleared ? ' — and a bottle scrubbed clean, once.' : '.'}`)
-  if (invaders) lines.push(`best wave: ${invaders.score} points on ${when(invaders.date)}${invaders.cleared ? ' — and the sky cleared, once.' : '.'}`)
+  if (runner) lines.push(`best run: ${points(runner.score)} on ${when(runner.date)}.`)
+  if (crusher) lines.push(`best crush: ${points(crusher.score)} on ${when(crusher.date)}${crusher.cleared ? ' — and a whole wall cleared, once.' : '.'}`)
+  if (world) lines.push(`best month: ${points(world.score)} on ${when(world.date)}${world.cleared ? ' — and made it all the way home, once.' : '.'}`)
+  if (maze) lines.push(`best maze: ${points(maze.score)} on ${when(maze.date)}${maze.cleared ? ' — and every capsule eaten, once.' : '.'}`)
+  if (drop) lines.push(`best drop: ${points(drop.score)} on ${when(drop.date)}${drop.cleared ? ' — and a bottle scrubbed clean, once.' : '.'}`)
+  if (invaders) lines.push(`best wave: ${points(invaders.score)} on ${when(invaders.date)}${invaders.cleared ? ' — and the sky cleared, once.' : '.'}`)
   return lines
 }
 
@@ -133,28 +137,28 @@ export function quoteLines(i: QuoteInputs): string[] {
     draw ? `${draw.status === 'overdue' ? 'the' : 'next'} draw ${countdownLabel(draw.inDays)} — ${drawLabel(draw.plan)}.` : null,
     i.rulesApply && i.due
       ? i.missing
-        ? `${i.eaten} of ${i.due} due doses down. still waiting on ${i.missingNames}.`
-        : `all ${i.due} due doses down today. it's full.`
+        ? `${i.eaten} of ${dueDoses(i.due)} down. still waiting on ${i.missingNames}.`
+        : `${allDue(i.due)} down today. it's full.`
       : null,
     `${plural(i.streak, 'day')} logged in a row. it's keeping count.`,
     i.sodasThisWeek
       ? `${plural(i.sodasThisWeek, 'soda')} this week. it noticed every one.`
       : 'no sodas this week. it\'s proud of you.',
-    i.oldestOpen ? `the ${i.oldestOpen.compound} vial has been open ${i.oldestOpen.days} days.` : null,
+    i.oldestOpen ? `the ${i.oldestOpen.compound} vial has been open ${plural(i.oldestOpen.days, 'day')}.` : null,
     i.mixes.length
       ? `reconstituted ${i.mixes.map(m => `${m.compound} (${recipeOf(m)})`).join(', ')}${i.mealIsYesterday ? ' yesterday' : ' today'}. FEED mixes it again.`
       : null,
     i.finasterideStreak
       ? i.maneTier
-        ? `the mane: ${MANE_TIERS[i.maneTier - 1]!.name} — ${i.finasterideStreak} days of finasteride${i.nextMane ? `; ${i.nextMane.name} at ${i.nextMane.days}` : '. it combs it.'}`
+        ? `the mane: ${MANE_TIERS[i.maneTier - 1]!.name} — ${plural(i.finasterideStreak, 'day')} of finasteride${i.nextMane ? `; ${i.nextMane.name} at ${i.nextMane.days}` : '. it combs it.'}`
         : `finasteride, day ${i.finasterideStreak}. the mane shows at ${MANE_TIERS[0]!.days}.`
       : null,
-    i.ageDays != null ? `${i.ageDays.toLocaleString('en-US')} days since the first logged day. it remembers all of them.` : null,
+    i.ageDays != null ? `${i.ageDays.toLocaleString('en-US')} ${i.ageDays === 1 ? 'day' : 'days'} since the first logged day. it remembers ${i.ageDays === 1 ? 'it' : 'all of them'}.` : null,
     i.weekTally
       ? i.weekTally.missed.length
-        ? `${i.weekTally.hit} of ${i.weekTally.hit + i.weekTally.missed.length} due doses this week — missed ${i.weekTally.missed.map(m => `${m.compound} ${new Date(`${m.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}`).join(', ')}${i.cycleClause}.`
+        ? `${i.weekTally.hit} of ${dueDoses(i.weekTally.hit + i.weekTally.missed.length)} this week — missed ${i.weekTally.missed.map(m => `${m.compound} ${new Date(`${m.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}`).join(', ')}${i.cycleClause}.`
         : i.weekTally.hit
-          ? `${i.weekTally.hit} of ${i.weekTally.hit} due doses this week. a clean week — hence the star${i.cycleClause}.`
+          ? `${i.weekTally.hit} of ${dueDoses(i.weekTally.hit)} this week. a clean week — hence the star${i.cycleClause}.`
           : null
       : null,
     i.tier === 'elder'
@@ -179,7 +183,7 @@ export function quoteLines(i: QuoteInputs): string[] {
     ...(['runner', 'crusher', 'world', 'maze', 'drop', 'invaders'] as TickerGame[]).map((g) => {
       const b = i.visitorsBests[g]
       const noun = g === 'runner' ? 'run' : g === 'crusher' ? 'crush' : g === 'world' ? 'month' : g === 'maze' ? 'maze' : g === 'drop' ? 'drop' : 'wave'
-      return b ? `visitors' best ${noun}: ${!i.keeper && b.label ? 'you' : b.label ?? 'a friend'}, ${b.score} points.` : null
+      return b ? `visitors' best ${noun}: ${!i.keeper && b.label ? 'you' : b.label ?? 'a friend'}, ${points(b.score)}.` : null
     }),
     !i.keeper ? `you're on file as ${i.visitorLabel ?? 'a friend'}. it's keeping a footprint.` : null,
     ...i.records.map(r => `for the record — ${r}`)
@@ -373,7 +377,7 @@ export function resultsLandedLine(drawDate: string, flags: number): string {
 }
 
 export function saluteLine(hit: number, cycleClause: string): string {
-  return `clean week — ${hit} of ${hit} due doses logged${cycleClause}. (salute)`
+  return `clean week — ${hit} of ${dueDoses(hit)} logged${cycleClause}. (salute)`
 }
 
 /** Newly completed achievements, and the wearables they put on. */
@@ -384,6 +388,26 @@ export function achievementLine(fresh: Achievement[], rewards: string[]): string
 export const SAT_DOWN_LINE = '(TICKER sat down to wait.)'
 /** Said in place of the greeting when the journal, the health metrics or the workouts didn't load: it has no figures to read. */
 export const LOG_UNREAD_LINE = 'the log won\'t open. it has nothing to read yet.'
+/** Said when a game's code didn't load (a new release swapped the files under an open tab, or the signal dropped): the stage is handed back. */
+export const GAME_UNLOADED_LINE = 'the game wouldn\'t load. try PLAY again — or reload the page.'
+
+/**
+ * The words on a game's own prompts. A desktop is told its keys; a touch screen (a coarse pointer)
+ * has no space bar and no escape, so it is told to tap, and that the page's QUIT button leaves.
+ */
+export function gameHints(touch: boolean) {
+  const tap = touch ? 'tap' : 'space · tap'
+  const quit = touch ? 'QUIT leaves' : 'esc quits'
+  return {
+    touch,
+    tap,
+    quit,
+    /** "space · tap to run" / "tap to run" */
+    press: (what: string) => `${tap} ${what}`,
+    /** Under GAME OVER: "space · tap for another go   esc quits" / "tap for another go" */
+    again: (what = 'for another go') => (touch ? `tap ${what}` : `${tap} ${what}   ${quit}`)
+  }
+}
 
 // --- the plate --------------------------------------------------------------------------------
 
@@ -436,7 +460,7 @@ export function afterEffectOf(compound: string): { kind: AfterEffect, line: stri
 
 /** The mane as it stands: "the mane: stubble. 9 days of finasteride — mane at 30." */
 export function maneStandingLine(tier: number, days: number, next: { name: string, days: number } | null): string {
-  return tier ? `the mane: ${MANE_TIERS[tier - 1]!.name}. ${days} days of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.` : ''
+  return tier ? `the mane: ${MANE_TIERS[tier - 1]!.name}. ${plural(days, 'day')} of finasteride${next ? ` — ${next.name} at ${next.days}` : ''}.` : ''
 }
 
 /** No mane yet: the streak broke since it last showed one, or it is simply early days. */
@@ -447,7 +471,7 @@ export function maneGoneLine(shownBefore: boolean, days: number): string {
 }
 
 export function maneThinnedLine(tier: number, days: number): string {
-  return `the mane thinned to ${MANE_TIERS[tier - 1]!.name} — the streak broke. ${days} days on the new one.`
+  return `the mane thinned to ${MANE_TIERS[tier - 1]!.name} — the streak broke. ${plural(days, 'day')} on the new one.`
 }
 
 export interface PlateInputs {
@@ -482,20 +506,29 @@ export function walkEndLine(minutes: number): string {
 
 // --- the games ----------------------------------------------------------------------------------
 
-export function playIntroLine(game: TickerGame, wall: CrusherWall, maze?: MazeGhosts, drop?: DropGerms, invaders?: InvadersWave): string {
-  return game === 'runner'
-    ? 'space or tap to run. esc quits.'
-    : game === 'world'
-      ? 'the month, left to right — home is today. ← → run, space jumps (hold for height). esc quits.'
-      : game === 'maze'
-        ? `every capsule in the maze, ${maze?.title ?? 'vs the ghosts'}. arrows, wasd or a swipe steer; space or tap starts. esc quits.`
-        : game === 'drop'
-          ? `${drop?.title ?? 'germs in the bottle'}. ← → move, ↑ turns, ↓ drops; space or tap starts. esc quits.`
-          : game === 'invaders'
-            ? `${invaders?.title ?? 'the formation'}, in formation. ← → move, space fires — or a finger held; space or tap starts. esc quits.`
-            : wall.count
-              ? `${wall.count} cans on the wall${wall.practice ? ` (${practiceWords(wall.monthsBack).aside})` : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
-              : 'nothing to shoot. good. (esc quits)'
+/**
+ * What it says as a game takes the stage: the board, then how to play. On a touch screen (`touch`:
+ * a coarse pointer) the keys are left out — there is no space bar or escape on a phone, and the
+ * page's QUIT button is how to leave.
+ */
+export function playIntroLine(game: TickerGame, wall: CrusherWall, maze?: MazeGhosts, drop?: DropGerms, invaders?: InvadersWave, touch = false): string {
+  const leave = touch ? 'QUIT leaves.' : 'esc quits.'
+  if (game === 'runner') return touch ? `tap to run. ${leave}` : `space or tap to run. ${leave}`
+  if (game === 'world') {
+    return `the month, left to right — home is today. ${touch ? '◀ ▶ run, ▲ jumps (hold for height)' : '← → run, space jumps (hold for height)'}. ${leave}`
+  }
+  if (game === 'maze') {
+    return `every capsule in the maze, ${maze?.title ?? 'vs the ghosts'}. ${touch ? 'a swipe steers; a tap starts' : 'arrows, wasd or a swipe steer; space or tap starts'}. ${leave}`
+  }
+  if (game === 'drop') {
+    return `${drop?.title ?? 'germs in the bottle'}. ${touch ? 'a drag moves, a tap turns, a swipe down drops; a tap starts' : '← → move, ↑ turns, ↓ drops; space or tap starts'}. ${leave}`
+  }
+  if (game === 'invaders') {
+    return `${invaders?.title ?? 'the formation'}, in formation. ${touch ? 'hold a finger: it follows and fires; a tap starts' : '← → move, space fires — or a finger held; space or tap starts'}. ${leave}`
+  }
+  if (!wall.count) return touch ? 'nothing to shoot. good. (QUIT leaves)' : 'nothing to shoot. good. (esc quits)'
+  const aside = wall.practice ? ` (${practiceWords(wall.monthsBack).aside})` : ''
+  return `${plural(wall.count, 'can')} on the wall${aside}. ${touch ? 'tap to launch; a finger moves it' : 'space or tap to launch; arrows or the pointer move'}. ${leave}`
 }
 
 /** How one game on the stage came out — what the line said on quit is about. */
@@ -554,20 +587,20 @@ export function quitRemark(i: QuitInputs): QuitRemark {
   // The keeper's record, or a guest topping the house: the celebration the HUD's NEW BEST promised.
   if (i.keeper ? i.setRecord : i.beatHouse) {
     return {
-      line: i.keeper ? `${swept}new best: ${i.best?.score ?? i.score} points. ♥` : `${swept}new house record: ${i.score} points. ♥`,
+      line: i.keeper ? `${swept}new best: ${points(i.best?.score ?? i.score)}. ♥` : `${swept}new house record: ${points(i.score)}. ♥`,
       event: 'celebrate',
       hearts: true
     }
   }
   if (!i.keeper && i.setRecord) {
     // Their own best (the server's word), short of the house: a nod, not a party.
-    return { line: `${swept}${i.score} points — your best yet. the house record is ${i.house}.`, event: 'bigbeat', hearts: false }
+    return { line: `${swept}${points(i.score)} — your best yet. the house record is ${i.house}.`, event: 'bigbeat', hearts: false }
   }
-  if (swept) return { line: `${swept}${i.score} points. ♥`, event: 'celebrate', hearts: false }
+  if (swept) return { line: `${swept}${points(i.score)}. ♥`, event: 'celebrate', hearts: false }
   if (i.score > 0 && i.keeper && i.best) {
-    return { line: `${i.score} points. best ${i.best.score} on ${monthDay(i.best.date)} — it's still catching its breath.`, event: null, hearts: false }
+    return { line: `${points(i.score)}. best ${i.best.score} on ${monthDay(i.best.date)} — it's still catching its breath.`, event: null, hearts: false }
   }
-  if (i.score > 0 && i.house) return { line: `${i.score} points. the house record is ${i.house}.`, event: null, hearts: false }
+  if (i.score > 0 && i.house) return { line: `${points(i.score)}. the house record is ${i.house}.`, event: null, hearts: false }
   return { line: i.game === 'crusher' && i.wallEmpty ? 'nothing to shoot. good.' : 'next time.', event: null, hearts: false }
 }
 
@@ -685,8 +718,8 @@ export function todaySummaryLine(i: SummaryInputs): string {
   const parts = [
     i.rulesApply && i.due
       ? i.missing
-        ? `${i.eaten} of ${i.due} due doses down (${i.missingNames} to come)`
-        : `all ${i.due} due doses down`
+        ? `${i.eaten} of ${dueDoses(i.due)} down (${i.missingNames} to come)`
+        : `${allDue(i.due)} down`
       : plate,
     i.workoutMinutes ? `${i.workoutMinutes} min walked` : 'no walk yet',
     i.sodasToday ? `${plural(i.sodasToday, 'soda')} (it noticed)` : 'no sodas (it approves)'

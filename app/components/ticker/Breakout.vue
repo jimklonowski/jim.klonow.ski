@@ -35,6 +35,7 @@ import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
 import { CAN, CAN_CRUMPLED, CAN_DENTED, renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
+import { gameHints } from '#shared/utils/tickerVoice'
 
 const props = withDefaults(defineProps<{
   build: TickerBuild
@@ -93,6 +94,8 @@ let last = 0
 let now = 0
 let paused = false
 let reducedMotion = false
+/** The prompts' wording: keys on a desktop; taps, and the page's QUIT, on a touch screen. */
+let hints = gameHints(false)
 let reportedEnd = false
 let endedAt = -1
 let lostAt = -1
@@ -278,7 +281,7 @@ function draw() {
     g.fillStyle = colors.text
     g.fillText('nothing to shoot. good.', W / 2, promptY)
     g.fillStyle = colors.faint
-    g.fillText('esc quits', W / 2, promptY + 16)
+    g.fillText(hints.quit, W / 2, promptY + 16)
   }
   else if (s.status === 'ready' && s.score === 0 && s.lives === props.lives) {
     g.fillStyle = colors.faint
@@ -286,15 +289,15 @@ function draw() {
     if (props.practiceNote) g.fillText(props.practiceNote, W / 2, promptY - 4)
     g.globalAlpha = pulse
     g.fillStyle = colors.text
-    g.fillText('space · tap to launch', W / 2, promptY + 12)
+    g.fillText(hints.press('to launch'), W / 2, promptY + 12)
     g.globalAlpha = 1
     g.fillStyle = colors.faint
-    g.fillText('arrows or the pointer move · esc quits', W / 2, promptY + 28)
+    g.fillText(hints.touch ? `a finger moves it · ${hints.quit}` : `arrows or the pointer move · ${hints.quit}`, W / 2, promptY + 28)
   }
   else if (s.status === 'ready') {
     g.globalAlpha = pulse
     g.fillStyle = colors.text
-    g.fillText(`${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left · space · tap to serve`, W / 2, promptY)
+    g.fillText(`${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left · ${hints.press('to serve')}`, W / 2, promptY)
     g.globalAlpha = 1
   }
   else if (s.status === 'over' || s.status === 'cleared') {
@@ -303,7 +306,7 @@ function draw() {
     g.fillText(s.status === 'cleared' ? `WALL CLEARED · ${s.score}${best}` : `GAME OVER · ${s.score}${best}`, W / 2, promptY)
     if (now - endedAt >= RESTART_LOCKOUT) {
       g.fillStyle = colors.faint
-      g.fillText('space · tap for another go   esc quits', W / 2, promptY + 16)
+      g.fillText(hints.again(), W / 2, promptY + 16)
     }
   }
 }
@@ -428,6 +431,7 @@ function onVisibility() {
 
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  hints = gameHints(window.matchMedia('(pointer: coarse)').matches)
   prepare()
   // A preset picked mid-game re-reads the palette and rebakes the sprites.
   stopTheme = onThemeChange(prepare)

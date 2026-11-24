@@ -41,6 +41,7 @@ import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerProp } from '#shared/utils/tickerSprite'
 import { renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
+import { gameHints } from '#shared/utils/tickerVoice'
 
 const props = defineProps<{
   build: TickerBuild
@@ -105,6 +106,8 @@ let last = 0
 let now = 0
 let paused = false
 let reducedMotion = false
+/** The prompts' wording: keys on a desktop; taps, and the page's QUIT, on a touch screen. */
+let hints = gameHints(false)
 let coarse = false
 let reportedEnd = false
 let endedAt = -1
@@ -121,7 +124,10 @@ const held: Partial<Record<'left' | 'right', { since: number, last: number }>> =
 let keySoft = false
 let pointerSoft = false
 let autoSoft = false
-let drag: { x: number, y: number, moved: boolean } | null = null
+/** A finger down: where the drag is measured from, whether it has done anything, and where the finger is now. */
+let drag: { x: number, y: number, moved: boolean, cx: number, cy: number } | null = null
+/** The capsule count when the frame last looked: a new capsule lets go of a swipe down. */
+let piecesSeen = 0
 let ro: ResizeObserver | undefined
 let stopTheme: (() => void) | undefined
 
@@ -358,10 +364,10 @@ function draw() {
   const blink = reducedMotion ? 1 : 0.65 + 0.35 * Math.sin(now * 3)
   const help = coarse ? 'drag moves · tap turns · swipe down drops' : '← → move · ↑ turns · ↓ drops · esc quits'
   if (s.status === 'ready' && s.level === 1) {
-    lines.push(['space · tap to start', colors.text, blink], [help, colors.faint, 1])
+    lines.push([hints.press('to start'), colors.text, blink], [help, colors.faint, 1])
   }
   else if (s.status === 'ready') {
-    lines.push([`LEVEL ${s.level} · ${s.germs} germs · space · tap`, colors.text, blink])
+    lines.push([`LEVEL ${s.level} · ${s.germs} germs · ${hints.tap}`, colors.text, blink])
   }
   else if (s.status === 'cleared') {
     lines.push([`BOTTLE CLEAN · level ${s.level + 1} next`, colors.accent, 1])
@@ -369,7 +375,7 @@ function draw() {
   else if (s.status === 'over') {
     const best = s.score > 0 && s.score >= props.hi ? ' · NEW BEST' : ''
     lines.push([`GAME OVER · ${s.score}${best}`, colors.text, 1])
-    if (now - endedAt >= RESTART_LOCKOUT) lines.push(['space · tap for another go   esc quits', colors.faint, 1])
+    if (now - endedAt >= RESTART_LOCKOUT) lines.push([hints.again(), colors.faint, 1])
   }
   if (lines.length) {
     g.font = `11px ${font}`
@@ -409,6 +415,18 @@ function frame(ts: number) {
     const before = s.levelsCleared
     stepDrop(s, dt, keySoft || pointerSoft || autoSoft)
     autoSoft = false
+    // A swipe down drops the capsule in hand, not the one after it as well: a new capsule lets go
+    // of the swipe. The finger may stay down — the drag starts over from where it is now.
+    if (s.pieces !== piecesSeen) {
+      piecesSeen = s.pieces
+      if (pointerSoft) {
+        pointerSoft = false
+        if (drag) {
+          drag.x = drag.cx
+          drag.y = drag.cy
+        }
+      }
+    }
     if (s.levelsCleared > before) announce.value = `bottle clean. level ${s.level}, ${s.germs} germs; space or tap to pour`
     if (!bestShown && props.hi > 0 && s.score > props.hi && s.status !== 'over') {
       bestShown = true
@@ -453,11 +471,15 @@ function pressOrTurn() {
 
 function onPointerDown(e: PointerEvent) {
   canvas.value?.setPointerCapture?.(e.pointerId)
-  drag = { x: e.clientX, y: e.clientY, moved: false }
+  drag = { x: e.clientX, y: e.clientY, moved: false, cx: e.clientX, cy: e.clientY }
 }
 
 function onPointerMove(e: PointerEvent) {
   const s = state
+  if (drag) {
+    drag.cx = e.clientX
+    drag.cy = e.clientY
+  }
   if (!drag || !s || pointerSoft) return
   const dx = e.clientX - drag.x
   const dy = e.clientY - drag.y
@@ -552,6 +574,7 @@ function onVisibility() {
 
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  hints = gameHints(window.matchMedia('(pointer: coarse)').matches)
   coarse = window.matchMedia('(pointer: coarse)').matches
   state = fresh()
   resize()

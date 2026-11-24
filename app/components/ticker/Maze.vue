@@ -40,6 +40,7 @@ import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerProp } from '#shared/utils/tickerSprite'
 import { CAN, renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
+import { gameHints } from '#shared/utils/tickerVoice'
 
 const props = defineProps<{
   build: TickerBuild
@@ -118,6 +119,8 @@ let last = 0
 let now = 0
 let paused = false
 let reducedMotion = false
+/** The prompts' wording: keys on a desktop; taps, and the page's QUIT, on a touch screen. */
+let hints = gameHints(false)
 let reportedEnd = false
 let endedAt = -1
 let lostAt = -1
@@ -375,10 +378,10 @@ function draw() {
   const lines: Array<[string, string, number]> = []
   const blink = reducedMotion ? 1 : 0.65 + 0.35 * Math.sin(now * 3)
   if (s.status === 'ready' && s.score === 0 && s.level === 1) {
-    lines.push(['space · tap to start', colors.text, blink], ['arrows · wasd · swipe steer · esc quits', colors.faint, 1])
+    lines.push([hints.press('to start'), colors.text, blink], [hints.touch ? `swipe to steer · ${hints.quit}` : 'arrows · wasd · swipe steer · esc quits', colors.faint, 1])
   }
   else if (s.status === 'ready') {
-    lines.push([s.level > 1 && s.dotsEaten === 0 && s.lives === livesSeen ? `LEVEL ${s.level} · space · tap` : `${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left · space · tap`, colors.text, blink])
+    lines.push([s.level > 1 && s.dotsEaten === 0 && s.lives === livesSeen ? `LEVEL ${s.level} · ${hints.tap}` : `${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left · ${hints.tap}`, colors.text, blink])
   }
   else if (s.status === 'cleared') {
     lines.push([`MAZE CLEARED · level ${s.level + 1} next`, colors.accent, 1])
@@ -386,7 +389,7 @@ function draw() {
   else if (s.status === 'over') {
     const best = s.score > 0 && s.score >= props.hi ? ' · NEW BEST' : ''
     lines.push([`GAME OVER · ${s.score}${best}`, colors.text, 1])
-    if (now - endedAt >= RESTART_LOCKOUT) lines.push(['space · tap for another go   esc quits', colors.faint, 1])
+    if (now - endedAt >= RESTART_LOCKOUT) lines.push([hints.again(), colors.faint, 1])
   }
   if (lines.length) {
     g.font = `11px ${font}`
@@ -528,6 +531,7 @@ function onVisibility() {
 
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  hints = gameHints(window.matchMedia('(pointer: coarse)').matches)
   state = fresh()
   livesSeen = state.lives
   resize()

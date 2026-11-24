@@ -1,4 +1,4 @@
-import { clockLabel, hourOf, isAsleep, isNight, skyFor } from '#shared/utils/tickerDay'
+import { clockLabel, hourOf, isAsleep, isEvening, isNight, skyFor } from '#shared/utils/tickerDay'
 import { localTimeNow } from '#shared/utils/time'
 
 /**
@@ -13,6 +13,8 @@ export function useTickerClock() {
   const now = ref<string | null>(null)
   const hour = computed(() => hourOf(now.value))
   const night = computed(() => isNight(hour.value))
+  /** Dusk to midnight: today's doses are overdue by now (the small hours belong to the next day). */
+  const evening = computed(() => isEvening(hour.value))
   const asleep = computed(() => isAsleep(hour.value))
   /** What the window shows: the sun by day, amber around dawn and dusk, the moon and stars at night. */
   const sky = computed(() => skyFor(hour.value))
@@ -37,5 +39,5 @@ export function useTickerClock() {
     clearInterval(interval)
   })
 
-  return { now, hour, night, asleep, sky, clock }
+  return { now, hour, night, evening, asleep, sky, clock }
 }

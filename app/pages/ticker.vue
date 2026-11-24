@@ -255,7 +255,7 @@
         v-if="playing"
         type="button"
         class="tui-btn"
-        @click="runner?.quit()"
+        @click="quitGame"
       >
         ■ QUIT
       </button>
@@ -404,7 +404,7 @@ import { MANE_TIERS } from '#shared/utils/tickerWardrobe'
 import { WEARABLE_META, accessoriesFor, achievementsOf, heldPoseOf, moodWordOf, practiceWords, reachableAchievements, recipeOf } from '#shared/utils/tickerDay'
 import type { Achievement } from '#shared/utils/tickerDay'
 import {
-  LOG_UNREAD_LINE, NO_WORKOUT_LINE, SAT_BACK_LINE, SAT_DOWN_LINE, achievementLine, afterEffectOf, arrivalLine, doseDoneLine, doseLabel, doseStartLine,
+  GAME_UNLOADED_LINE, LOG_UNREAD_LINE, NO_WORKOUT_LINE, SAT_BACK_LINE, SAT_DOWN_LINE, achievementLine, afterEffectOf, arrivalLine, doseDoneLine, doseLabel, doseStartLine,
   drawTile, fedTile, flinchLine, gotLine, helloLine, maneGoneLine, maneStandingLine, maneThinnedLine, mixDoneLine, mixStartLine, newsSince,
   outcomeForQuit, plateLine, playIntroLine, quitRemark, quoteLines, recordLines, resultsLandedLine, saluteLine, squeakFor, statTiles, todaySummaryLine,
   visitorsNews, walkEndLine, walkStartLine
@@ -449,7 +449,7 @@ const rhr = computed(() => overview.value?.latestRhr ?? null)
 const { keeper, remote, visits, visitorLabel, recall, remember } = await useTickerMemory(role)
 
 // --- the clock on the wall (app/composables/useTickerClock.ts) ---------------------------------
-const { night, asleep, sky, clock } = useTickerClock()
+const { night, evening, asleep, sky, clock } = useTickerClock()
 
 // --- the day, as the pet experiences it (app/composables/useTickerDay.ts) ----------------------
 // Whether a schedule applies: it does whenever the session has rules — the demo sandbox has its
@@ -476,7 +476,7 @@ const {
   rules: protocolRules,
   standing: protocolStanding,
   rulesApply,
-  night
+  evening
 })
 
 // --- the record book --------------------------------------------------------------------------
@@ -881,6 +881,7 @@ const plateRemark = () => plateLine({
   missingNames: missingNames.value
 })
 
+/** Said with the first logged dose or mix served off yesterday's plate — never with a daily med, which is today's. */
 const servedNote = () => mealIsYesterday.value && !fedThisVisit.value.size ? ' (yesterday\'s plate)' : ''
 
 /** The menu's "feed all": every mix, then every dose, then the daily meds, in order. */
@@ -891,7 +892,7 @@ async function feed() {
   const note = servedNote()
   for (let i = 0; i < mixesToday.value.length; i++) await mixOne(i, i === 0 ? note : '')
   for (let i = 0; i < dosesToday.value.length; i++) await doseOne(i, i === 0 && !mixesToday.value.length ? note : '')
-  for (let i = 0; i < standingToday.value.length; i++) await standingOne(i, i === 0 && !mixesToday.value.length && !dosesToday.value.length ? note : '')
+  for (let i = 0; i < standingToday.value.length; i++) await standingOne(i)
   actionPose.value = null
   line.value = plateRemark()
   busy.value = false
@@ -903,7 +904,7 @@ async function feedOne(kind: 'dose' | 'standing' | 'mix', i: number) {
   busy.value = true
   wake()
   if (kind === 'mix') await mixOne(i, servedNote())
-  else if (kind === 'standing') await standingOne(i, servedNote())
+  else if (kind === 'standing') await standingOne(i)
   else await doseOne(i, servedNote())
   actionPose.value = null
   if (kind !== 'mix') line.value = plateRemark()
@@ -934,7 +935,8 @@ const feedItems = computed<DropdownMenuItem[][]>(() => {
     onSelect: () => feedOne('standing', i)
   }))
   const all: DropdownMenuItem[] = [{
-    label: `feed all · ${plateCount.value}${mealIsYesterday.value ? ' (yesterday\'s plate)' : ''}`,
+    // Yesterday's doses when nothing is logged yet today; the daily meds beside them are always today's.
+    label: `feed all · ${plateCount.value}${mealIsYesterday.value ? (standingToday.value.length ? ' (yesterday\'s doses, today\'s dailies)' : ' (yesterday\'s plate)') : ''}`,
     icon: 'i-lucide-utensils',
     onSelect: feed
   }]
@@ -1085,6 +1087,11 @@ async function talk() {
 const runner = useTemplateRef('runner')
 /** The game on the stage, or none. */
 const playing = ref<TickerGame | null>(null)
+/** A touch screen: the games are introduced by their taps and the QUIT button, not by keys it doesn't have. */
+const touch = ref(false)
+onMounted(() => {
+  touch.value = window.matchMedia('(pointer: coarse)').matches
+})
 /** The house records, one per game, under memory keys of the same names. */
 const readHiScores = (): Record<TickerGame, TickerRecord | null> => ({
   runner: recall<TickerRecord>('runner'),
@@ -1156,7 +1163,7 @@ function play(game: TickerGame) {
   busy.value = true
   lastOutcome = null
   playing.value = game
-  line.value = playIntroLine(game, crusherWall.value, mazeGhosts.value, dropGerms.value, invadersWave.value)
+  line.value = playIntroLine(game, crusherWall.value, mazeGhosts.value, dropGerms.value, invadersWave.value, touch.value)
 }
 
 function onGameOver(game: TickerGame, score: number, cleared: boolean, feats: WorldFeat[] = [], summary: WorldSummary | null = null) {
@@ -1201,6 +1208,28 @@ function onGameOver(game: TickerGame, score: number, cleared: boolean, feats: Wo
     })
     .catch(() => { /* the game still happened; the record just isn't written yet */ })
 }
+
+// A game is a lazy chunk. If it fails to load — a new release swapped the files under an open
+// tab, or the signal dropped — nothing mounts: the figure is off the stage, the pet counts as busy
+// and QUIT has no game to tell, so the stage was stuck until a reload. Hand it back instead.
+function abandonGame() {
+  playing.value = null
+  busy.value = false
+  lastOutcome = null
+  line.value = GAME_UNLOADED_LINE
+  nextTick(measureFloor)
+}
+/** The page's QUIT: the game's own quit, or the way out when no game ever mounted. */
+function quitGame() {
+  if (runner.value) runner.value.quit()
+  else abandonGame()
+}
+const CHUNK_ERROR = /dynamically imported module|importing a module script|failed to fetch|loading chunk|unable to preload|error loading/i
+onErrorCaptured((err) => {
+  if (!playing.value || runner.value || !CHUNK_ERROR.test(String((err as Error | null)?.message ?? err))) return
+  abandonGame()
+  return false
+})
 
 async function onGameQuit(score: number) {
   const game = playing.value ?? 'runner'

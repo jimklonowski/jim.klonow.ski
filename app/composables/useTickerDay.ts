@@ -38,8 +38,8 @@ export interface TickerDaySources {
   standing: Ref<StandingCompound[]>
   /** The schedule applies — false for a session with no rules at all (an unseeded sandbox). */
   rulesApply: boolean
-  /** The stage has gone dark (useTickerClock) — due doses still unlogged then make it hungry. */
-  night: Ref<boolean>
+  /** Dusk to midnight on the home clock (useTickerClock) — due doses still unlogged then make it hungry. */
+  evening: Ref<boolean>
 }
 
 /**
@@ -61,8 +61,12 @@ export function useTickerDay(s: TickerDaySources) {
   const mealDay = computed(() => mealDayOf(entries.value, today.value))
   const mealIsYesterday = computed(() => mealDay.value !== today.value)
   const dosesToday = computed(() => entryOn(entries.value, mealDay.value)?.peptides ?? [])
-  /** The standing meds of the meal day: taken daily, never logged, on the plate after the doses. */
-  const standingToday = computed(() => standingPlateOf(s.standing.value, mealDay.value))
+  /**
+   * The standing meds in force TODAY: taken daily, never logged, on the plate after the doses.
+   * Today's, whichever day the doses are from — they used to follow the meal day, so every morning
+   * (before the first dose is logged) the dailies were served as "yesterday's plate".
+   */
+  const standingToday = computed(() => standingPlateOf(s.standing.value, today.value))
   /** The vials reconstituted on the meal day — mixed before anything is eaten. */
   const mixesToday = computed(() => entryOn(entries.value, mealDay.value)?.reconstitutions ?? [])
 
@@ -111,7 +115,7 @@ export function useTickerDay(s: TickerDaySources) {
     missing: missing.value.length,
     logged: loggedCompounds.value.size,
     doses: dosesToday.value.length,
-    night: s.night.value
+    evening: s.evening.value
   }))
 
   // --- housekeeping: unlogged days gather cobwebs -------------------------------------------
@@ -188,6 +192,7 @@ export function useTickerDay(s: TickerDaySources) {
     rules: rules.value,
     rulesApply,
     doseDates: doseDates.value,
+    standing: s.standing.value,
     today: today.value
   }))
 

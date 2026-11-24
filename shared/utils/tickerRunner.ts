@@ -19,6 +19,8 @@ export const FIGURE_W = FIGURE_COLS * CELL
 export const FIGURE_H = FIGURE_ROWS * CELL
 /** Where the figure's canvas starts; it never moves — the world does. */
 export const PLAYER_X = 48
+/** The stage width the speeds were tuned on; a stage narrower than this is drawn at half size. */
+export const NARROW_STAGE_PX = 600
 
 /** The hitbox: the heart's trunk, not the whole canvas (the arms and a hat reach past it). */
 export const HITBOX = { dx: 26, w: 48, dy: 4, h: 60 }
@@ -101,6 +103,21 @@ export function makeRng(seed: number): () => number {
  */
 export function rngFor(o: { seed?: number, rng?: () => number }): () => number {
   return o.seed != null ? makeRng(o.seed) : o.rng ?? Math.random
+}
+
+/**
+ * The scale the world is drawn at on a stage this wide. An obstacle appears at the right edge, so
+ * the width is the warning: at full speed a phone's 340px stage left 0.4 s to see a can coming, a
+ * desktop's over a second. A narrow stage shows the world at half size — twice as much ground —
+ * and the game itself is unchanged: same speeds, same jump, comparable scores.
+ */
+export function runnerZoom(stageWidth: number): number {
+  return stageWidth < NARROW_STAGE_PX ? 0.5 : 1
+}
+
+/** Seconds between an obstacle appearing at the edge of a world this wide and reaching the figure, at a speed. */
+export function warningSeconds(worldWidth: number, speed: number): number {
+  return (worldWidth - (PLAYER_X + HITBOX.dx + HITBOX.w)) / speed
 }
 
 export function createRunner(width: number, rng: () => number = Math.random): RunnerState {

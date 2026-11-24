@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   BARE_EYED, DEMO_UNREACHABLE, FEVER_BPM, WORLD_DAYS, accessoriesFor, achievementsOf, best, birthdayOf, bowlFor, clockLabel, cobwebsFor,
-  crusherWallOf, doseDatesOf, doseKeysOf, dropGermsOf, feverOf, heldPoseOf, hourOf, hungerOf, invaderKindFor, invadersWaveOf, isAsleep, isCleanWeek, isInjected, isNight, mazeGhostsOf, mealDayOf,
+  crusherWallOf, doseDatesOf, doseKeysOf, dropGermsOf, feverOf, heldPoseOf, hourOf, hungerOf, invaderKindFor, invadersWaveOf, isAsleep, isCleanWeek, isEvening, isInjected, isNight, mazeGhostsOf, mealDayOf,
   moodWordOf, oldestOpenVial, paddleScaleFor, practiceWords, reachableAchievements, skyFor, sodasInWeek, unloggedInWeek, walkDayOf, walkPropFor,
   weekTallyOf, workoutHrOf, worldDaysOf
 } from '../shared/utils/tickerDay.ts'
@@ -55,13 +55,18 @@ test('fever: the newest RHR against a two-week baseline with enough readings, on
 })
 
 test('hunger: without rules it is fed by anything logged; with them, due doses unlogged after dark make it hungry', () => {
-  assert.equal(hungerOf({ rulesApply: false, due: 0, missing: 0, logged: 0, doses: 2, night: false }), 'fed')
-  assert.equal(hungerOf({ rulesApply: false, due: 0, missing: 0, logged: 0, doses: 0, night: true }), 'waiting')
-  assert.equal(hungerOf({ rulesApply: true, due: 0, missing: 0, logged: 0, doses: 0, night: false }), 'rest')
-  assert.equal(hungerOf({ rulesApply: true, due: 0, missing: 0, logged: 1, doses: 1, night: false }), 'fed')
-  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 0, logged: 2, doses: 2, night: true }), 'fed')
-  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 1, logged: 1, doses: 1, night: false }), 'waiting')
-  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 1, logged: 1, doses: 1, night: true }), 'hungry')
+  assert.equal(hungerOf({ rulesApply: false, due: 0, missing: 0, logged: 0, doses: 2, evening: false }), 'fed')
+  assert.equal(hungerOf({ rulesApply: false, due: 0, missing: 0, logged: 0, doses: 0, evening: true }), 'waiting')
+  assert.equal(hungerOf({ rulesApply: true, due: 0, missing: 0, logged: 0, doses: 0, evening: false }), 'rest')
+  assert.equal(hungerOf({ rulesApply: true, due: 0, missing: 0, logged: 1, doses: 1, evening: false }), 'fed')
+  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 0, logged: 2, doses: 2, evening: true }), 'fed')
+  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 1, logged: 1, doses: 1, evening: false }), 'waiting')
+  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 1, logged: 1, doses: 1, evening: true }), 'hungry')
+  // Hungry is an evening thing: five past midnight is dark, but it is the new day's morning and nothing on its plate is late.
+  assert.deepEqual([0, 5, 6, 18, 19, 23].map(isEvening), [false, false, false, false, true, true])
+  assert.equal(isEvening(null), false)
+  assert.equal(isNight(0) && !isEvening(0), true)
+  assert.equal(hungerOf({ rulesApply: true, due: 2, missing: 2, logged: 0, doses: 0, evening: isEvening(0) }), 'waiting', '12:05 am')
 })
 
 test('cobwebs gather on unlogged days of the last week (yesterday back, never today)', () => {
@@ -251,7 +256,7 @@ test('the games read only the sodas: a sports drink, a tea or a coffee is no can
   assert.deepEqual(mazeGhostsOf(notSodas, TODAY), mazeGhostsOf([], TODAY))
   assert.deepEqual(invadersWaveOf(notSodas, TODAY), invadersWaveOf([], TODAY))
   assert.equal(dropGermsOf(notSodas, TODAY).title, '4 germs · a clean month')
-  const world = i => worldDaysOf({ entries: i, health: [], workouts: [], draws: [], rules: [], rulesApply: false, doseDates: new Map(), today: TODAY })
+  const world = i => worldDaysOf({ entries: i, health: [], workouts: [], draws: [], rules: [], rulesApply: false, doseDates: new Map(), standing: [], today: TODAY })
   const dayOf = i => world(i).find(d => d.date === '2026-10-20')
   assert.deepEqual(dayOf(notSodas).sodas, [])
   assert.equal(dayOf(notSodas).logged, true, 'still a logged day — no pit')
@@ -273,6 +278,7 @@ test('the world\'s month: thirty days ending today, pits for unlogged days, a bl
     rules: [],
     rulesApply: false,
     doseDates: new Map(),
+    standing: [],
     today: TODAY
   })
   assert.equal(days.length, WORLD_DAYS)
@@ -283,6 +289,26 @@ test('the world\'s month: thirty days ending today, pits for unlogged days, a bl
     date: '2026-10-22', logged: true, doses: 1, sodas: [{ oz: 12 }], workoutMin: 40, cardio: true, recovery: 70, sleepMin: 400,
     draw: true, drawLabel: 'Quest · 2 markers', goldStar: false
   })
+})
+
+test('the world\'s capsules: the daily meds count on a logged day, though they are never logged', () => {
+  const standing = [
+    { compound: 'Finasteride', label: '1 mg', from: '2026-10-21', to: null },
+    { compound: 'Tadalafil', label: '5 mg', from: '2026-01-01', to: '2026-10-21' }
+  ]
+  const entries = [
+    day('2026-10-20', { peptides: [{ compound: 'X' }] }),
+    day('2026-10-21', { peptides: [{ compound: 'X' }] }),
+    day('2026-10-22', { sodas: [{ size: '12oz can' }] })
+  ]
+  const days = worldDaysOf({ entries, health: [], workouts: [], draws: [], rules: [], rulesApply: false, doseDates: new Map(), standing, today: TODAY })
+  const doses = date => days.find(d => d.date === date).doses
+  assert.equal(doses('2026-10-20'), 2, 'the logged dose and the tadalafil')
+  assert.equal(doses('2026-10-21'), 3, 'the day one ended and the other began: both in force')
+  assert.equal(doses('2026-10-22'), 1, 'a logged day with no dose still has the finasteride')
+  assert.equal(doses('2026-10-19'), 0, 'an unlogged day is a pit: nothing on it')
+  const without = worldDaysOf({ entries, health: [], workouts: [], draws: [], rules: [], rulesApply: false, doseDates: new Map(), standing: [], today: TODAY })
+  assert.deepEqual(['2026-10-20', '2026-10-21', '2026-10-22'].map(date => without.find(d => d.date === date).doses), [1, 1, 0], 'the log alone, as it used to count')
 })
 
 test('achievements: the fixed list behind the wearables, and the three the demo can never reach', () => {

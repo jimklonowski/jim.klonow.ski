@@ -27,12 +27,13 @@
 // The polish — a shake and debris on the crash, a blink every hundred, a landing squash, slow
 // clouds, a pulsing prompt — is cosmetic and skipped under reduced motion; the short lockout
 // after a crash is not (a mashed key must not restart the run by accident).
-import { CELL, FIGURE_H, PLAYER_X, createRunner, jump, runnerPose, step } from '#shared/utils/tickerRunner'
+import { CELL, FIGURE_H, PLAYER_X, createRunner, jump, runnerPose, runnerZoom, step } from '#shared/utils/tickerRunner'
 import type { Obstacle, ObstacleKind, RunnerState } from '#shared/utils/tickerRunner'
 import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerPose, TickerProp } from '#shared/utils/tickerSprite'
 import { FLAG, cansRow, renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
+import { gameHints } from '#shared/utils/tickerVoice'
 
 const props = defineProps<{
   build: TickerBuild
@@ -86,11 +87,18 @@ let ctx: CanvasRenderingContext2D | null = null
 let W = 0
 let H = 0
 let state: RunnerState = createRunner(600)
+/**
+ * The world's scale on the canvas: 1, or a half on a narrow stage, so a phone sees as far ahead as
+ * a desktop (tickerRunner.ts runnerZoom). The HUD and the prompts are never scaled.
+ */
+let zoom = 1
 let raf = 0
 let last = 0
 let now = 0
 let paused = false
 let reducedMotion = false
+/** The prompts' wording: keys on a desktop; taps, and the page's QUIT, on a touch screen. */
+let hints = gameHints(false)
 let reportedOver = false
 let overAt = -1
 let landedAt = -1
@@ -150,7 +158,9 @@ function resize() {
   if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.imageSmoothingEnabled = false
-  state.width = W
+  zoom = runnerZoom(W)
+  // The engine works in the world's own units: twice the stage's width at half size.
+  state.width = W / zoom
 }
 
 // --- the crash ----------------------------------------------------------------------------------
@@ -159,7 +169,7 @@ function resize() {
 function crash() {
   overAt = now
   if (reducedMotion) return
-  const ground = H - GROUND_FROM_BOTTOM
+  const ground = (H - GROUND_FROM_BOTTOM) / zoom
   const x = PLAYER_X + 70
   const y = ground - 30
   const inksOut: TickerInk[] = ['bowl', 'flag', 'red', 'bowl', 'glove', 'red', 'bowl']
@@ -174,7 +184,7 @@ function crash() {
 
 function stepDebris(dt: number) {
   if (!debris.length) return
-  const ground = H - GROUND_FROM_BOTTOM
+  const ground = (H - GROUND_FROM_BOTTOM) / zoom
   for (const d of debris) {
     d.vy += 900 * dt
     d.x += d.vx * dt
@@ -209,33 +219,40 @@ function draw() {
     g.globalAlpha = 1
   }
 
+  // The world, in its own units (see `zoom`): LW wide, its ground line at lg.
+  const LW = W / zoom
+  const lg = ground / zoom
+  const half = 0.5 / zoom
+  g.save()
+  g.scale(zoom, zoom)
+
   // Clouds, far off and slow; the ground, a dashed line that scrolls with the world; pebbles.
   g.strokeStyle = colors.ground
-  g.lineWidth = 1
+  g.lineWidth = 1 / zoom
   g.setLineDash([4, 3])
-  const span = W + 200
+  const span = LW + 200
   for (const c of CLOUDS) {
     const x = (((c.x - state.distance * 0.25) % span) + span) % span - 100
     g.beginPath()
-    g.moveTo(Math.round(x), ground - c.above + 0.5)
-    g.lineTo(Math.round(x + c.w), ground - c.above + 0.5)
+    g.moveTo(Math.round(x), lg - c.above + half)
+    g.lineTo(Math.round(x + c.w), lg - c.above + half)
     g.stroke()
   }
   g.setLineDash([6, 6])
   g.lineDashOffset = -(state.distance % 12)
   g.beginPath()
-  g.moveTo(0, ground + 0.5)
-  g.lineTo(W, ground + 0.5)
+  g.moveTo(0, lg + half)
+  g.lineTo(LW, lg + half)
   g.stroke()
   g.setLineDash([])
   g.fillStyle = colors.ground
-  const pebbleSpan = W + 120
+  const pebbleSpan = LW + 120
   for (let k = 0; k < 9; k++) {
     const x = (((k * 137 + 40) - state.distance * 0.9) % pebbleSpan + pebbleSpan) % pebbleSpan - 60
-    g.fillRect(Math.round(x), ground + 8 + (k % 3) * 4, 2, 2)
+    g.fillRect(Math.round(x), lg + 8 + (k % 3) * 4, 2, 2)
   }
 
-  for (const o of state.obstacles) drawObstacle(o, ground)
+  for (const o of state.obstacles) drawObstacle(o, lg)
 
   // The figure, with a squash for a frame or two after landing.
   const pose = runnerPose(state)
@@ -247,10 +264,10 @@ function draw() {
     if (squash) {
       const dw = Math.round(w * 1.08)
       const dh = Math.round(h * 0.92)
-      g.drawImage(sprite.image, PLAYER_X - (dw - w) / 2, Math.round(ground - dh - state.y), dw, dh)
+      g.drawImage(sprite.image, PLAYER_X - (dw - w) / 2, Math.round(lg - dh - state.y), dw, dh)
     }
     else {
-      g.drawImage(sprite.image, PLAYER_X, Math.round(ground - sprite.rows * CELL - state.y))
+      g.drawImage(sprite.image, PLAYER_X, Math.round(lg - sprite.rows * CELL - state.y))
     }
   }
 
@@ -258,6 +275,7 @@ function draw() {
     g.fillStyle = inks[d.ink]
     g.fillRect(Math.round(d.x), Math.round(d.y), CELL - 1, CELL - 1)
   }
+  g.restore()
 
   // HUD, top right: the score blinks for half a second at every hundred, and NEW BEST shows the
   // moment the live score passes the record. The prompts sit above the figure's head.
@@ -272,21 +290,23 @@ function draw() {
     g.fillText('NEW BEST', W - 12, 26)
   }
   g.textAlign = 'center'
-  const promptY = ground - FIGURE_H - 48
+  // Above the figure's head — and at half size above the clouds too, which come down with the world
+  // (the highest sits 160 world px over the ground).
+  const promptY = ground - (zoom < 1 ? 160 * zoom + 36 : FIGURE_H + 48)
   if (state.status === 'ready') {
     g.globalAlpha = reducedMotion ? 1 : 0.65 + 0.35 * Math.sin(now * 3)
     g.fillStyle = colors.text
-    g.fillText('space · tap to run', W / 2, promptY)
+    g.fillText(hints.press('to run'), W / 2, promptY)
     g.globalAlpha = 1
     g.fillStyle = colors.faint
-    g.fillText('esc quits', W / 2, promptY + 16)
+    g.fillText(hints.quit, W / 2, promptY + 16)
   }
   else if (state.status === 'over') {
     g.fillStyle = colors.text
     g.fillText(state.score > 0 && state.score >= props.hi ? `GAME OVER · ${state.score} · NEW BEST` : `GAME OVER · ${state.score}`, W / 2, promptY)
     if (now - overAt >= RESTART_LOCKOUT) {
       g.fillStyle = colors.faint
-      g.fillText('space · tap to run again   esc quits', W / 2, promptY + 16)
+      g.fillText(hints.again('to run again'), W / 2, promptY + 16)
     }
   }
 }
@@ -388,6 +408,7 @@ function onVisibility() {
 
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  hints = gameHints(window.matchMedia('(pointer: coarse)').matches)
   prepare()
   // A preset picked mid-game re-reads the palette and rebakes the sprites.
   stopTheme = onThemeChange(prepare)

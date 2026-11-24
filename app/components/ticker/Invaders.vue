@@ -43,6 +43,7 @@ import { tickerSprite } from '#shared/utils/tickerSprite'
 import type { TickerBuild, TickerInk, TickerProp } from '#shared/utils/tickerSprite'
 import { CAN, CAN_DENTED, renderCells } from '~/utils/tickerArt'
 import type { Cells } from '~/utils/tickerArt'
+import { gameHints } from '#shared/utils/tickerVoice'
 
 const props = defineProps<{
   build: TickerBuild
@@ -107,6 +108,8 @@ let last = 0
 let now = 0
 let paused = false
 let reducedMotion = false
+/** The prompts' wording: keys on a desktop; taps, and the page's QUIT, on a touch screen. */
+let hints = gameHints(false)
 let coarse = false
 let reportedEnd = false
 let endedAt = -1
@@ -231,8 +234,10 @@ function drawInvader(v: Invader) {
   // Divers lean into the turn; the germs wriggle.
   const flip = v.kind === 'germ' && !reducedMotion && Math.floor(now * 2 + v.id) % 2 === 1
   drawImageAt(image, v.x, v.y, flip)
-  if (v.kind !== 'germ' && v.label && T >= 16) {
-    g.font = `bold ${T >= 18 ? 9 : 8}px ${font}`
+  // The can's first letter, down to the smallest tile: under 16px (a phone) it used to be left off,
+  // and the formation was a wall of blank cans.
+  if (v.kind !== 'germ' && v.label) {
+    g.font = `bold ${T >= 18 ? 9 : T >= 16 ? 8 : 7}px ${font}`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.fillStyle = inks.spec
@@ -391,10 +396,10 @@ function draw() {
   const blink = reducedMotion ? 1 : 0.65 + 0.35 * Math.sin(now * 3)
   const help = coarse ? 'hold a finger: it follows and fires' : '← → move · space fires · esc quits'
   if (s.status === 'ready' && s.level === 1) {
-    lines.push(['space · tap to start', colors.text, blink], [help, colors.faint, 1])
+    lines.push([hints.press('to start'), colors.text, blink], [help, colors.faint, 1])
   }
   else if (s.status === 'ready') {
-    lines.push([`WAVE ${s.level} · ${s.alive} coming · space · tap`, colors.text, blink])
+    lines.push([`WAVE ${s.level} · ${s.alive} coming · ${hints.tap}`, colors.text, blink])
   }
   else if (s.status === 'cleared') {
     lines.push([`SKY CLEAR · wave ${s.level + 1} next`, colors.accent, 1])
@@ -402,7 +407,7 @@ function draw() {
   else if (s.status === 'over') {
     const best = s.score > 0 && s.score >= props.hi ? ' · NEW BEST' : ''
     lines.push([`GAME OVER · ${s.score}${best}`, colors.text, 1])
-    if (now - endedAt >= RESTART_LOCKOUT) lines.push(['space · tap for another go   esc quits', colors.faint, 1])
+    if (now - endedAt >= RESTART_LOCKOUT) lines.push([hints.again(), colors.faint, 1])
   }
   if (lines.length) {
     g.font = `11px ${font}`
@@ -583,6 +588,7 @@ function onVisibility() {
 
 onMounted(() => {
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  hints = gameHints(window.matchMedia('(pointer: coarse)').matches)
   coarse = window.matchMedia('(pointer: coarse)').matches
   state = fresh()
   livesSeen = state.lives

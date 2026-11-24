@@ -98,3 +98,19 @@ test('the world: a restart is the same month, germ for germ', () => {
   startWorld(s)
   assert.equal(things(s), first)
 })
+
+test('the runner on a narrow stage: half size, so a phone sees a can coming as early as a desktop does', async () => {
+  const { MAX_SPEED, NARROW_STAGE_PX, START_SPEED, createRunner, runnerZoom, warningSeconds } = await import('../shared/utils/tickerRunner.ts')
+  assert.deepEqual([320, 366, 430, NARROW_STAGE_PX - 1].map(runnerZoom), [0.5, 0.5, 0.5, 0.5])
+  assert.deepEqual([NARROW_STAGE_PX, 800, 1280].map(runnerZoom), [1, 1, 1])
+  // What it was: the stage's own width at full speed.
+  assert.ok(warningSeconds(366, MAX_SPEED) < 0.5, `${warningSeconds(366, MAX_SPEED)}`)
+  // What it is: the world's width, twice the stage's. Every phone gets at least what a 600px desktop gets.
+  const desktop = warningSeconds(NARROW_STAGE_PX, MAX_SPEED)
+  for (const stage of [320, 366, 430]) {
+    const world = stage / runnerZoom(stage)
+    assert.ok(warningSeconds(world, MAX_SPEED) >= desktop, `${stage}px: ${warningSeconds(world, MAX_SPEED).toFixed(2)} s`)
+    assert.equal(createRunner(world).width, world)
+  }
+  assert.ok(warningSeconds(366 / runnerZoom(366), START_SPEED) > 2)
+})
