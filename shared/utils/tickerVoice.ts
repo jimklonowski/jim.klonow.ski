@@ -12,7 +12,7 @@ import type { PlannedDraw, PlannedDrawState } from './plannedDraws.ts'
 import { isPeakRecovery, recoveryZone } from './recovery.ts'
 import { LEAN_GAIN_LBS, MANE_TIERS, TIER_DAYS } from './tickerWardrobe.ts'
 import type { Milestone } from './tickerWardrobe.ts'
-import { WAKE_HOUR, best, recipeOf, unitLabel } from './tickerDay.ts'
+import { WAKE_HOUR, best, practiceWords, recipeOf, unitLabel } from './tickerDay.ts'
 import type { Achievement, CrusherWall, DayHealth, DayWorkout, DropGerms, Fever, Hunger, InvadersWave, MazeGhosts, WeekTally } from './tickerDay.ts'
 import type { TickerBelly, TickerPose, TickerTier } from './tickerSprite.ts'
 import type { HitBy, WorldSummary } from './tickerWorld.ts'
@@ -494,7 +494,7 @@ export function playIntroLine(game: TickerGame, wall: CrusherWall, maze?: MazeGh
           : game === 'invaders'
             ? `${invaders?.title ?? 'the formation'}, in formation. ← → move, space fires — or a finger held; space or tap starts. esc quits.`
             : wall.count
-              ? `${wall.count} cans on the wall${wall.practice ? ' (last month\'s — this one is clean)' : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
+              ? `${wall.count} cans on the wall${wall.practice ? ` (${practiceWords(wall.monthsBack).aside})` : ''}. space or tap to launch; arrows or the pointer move. esc quits.`
               : 'nothing to shoot. good. (esc quits)'
 }
 

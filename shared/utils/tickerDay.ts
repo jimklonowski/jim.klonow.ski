@@ -384,7 +384,7 @@ export function doseKeysOf(doses: Array<{ compound: string, dose: number | strin
 
 // --- the can crusher's wall ----------------------------------------------------------------------
 // One can per soda logged in the trailing month, in rows by week, each as sturdy as its size. A
-// clean month is the good ending — nothing to shoot — and offers last month's wall for practice.
+// clean month is the good ending — nothing to shoot — and offers the last wall there was for practice.
 
 export const CRUSHER_WINDOW_DAYS = 30
 
@@ -409,18 +409,41 @@ export interface CrusherWall {
   count: number
   /** "OCT 1 – OCT 30 · 5 CANS · 60 OZ" */
   title: string
-  /** Last month's wall, because this one is clean. */
+  /** An older wall, because this month is clean. */
   practice: boolean
+  /** How many thirty-day windows back the wall is from: 0 for this month's. */
+  monthsBack: number
 }
 
+/**
+ * This month's wall, or — a clean month — the most recent one there is to practise on. It used to
+ * look one window back only, so a second clean month left nothing to shoot and Clean Sweep and
+ * the crusher's points out of reach: the cleaner the log, the less there was to earn.
+ */
 export function crusherWallOf(entries: JournalEntry[], today: string): CrusherWall {
   const thisMonth = wallFor(entries, today)
-  const practice = thisMonth.cans.length === 0
-  const end = practice ? shiftDays(today, -CRUSHER_WINDOW_DAYS) : today
-  const wall = practice ? wallFor(entries, end) : thisMonth
+  let monthsBack = 0
+  if (!thisMonth.cans.length) {
+    // The newest soda before this window says which earlier window still holds a wall.
+    let last: string | null = null
+    for (const e of entries) {
+      if (e.date < thisMonth.from && (last == null || e.date > last) && sodasOnly(e.sodas).length) last = e.date
+    }
+    monthsBack = last ? Math.floor(diffDays(last, today) / CRUSHER_WINDOW_DAYS) : 1
+  }
+  const end = shiftDays(today, -CRUSHER_WINDOW_DAYS * monthsBack)
+  const wall = monthsBack ? wallFor(entries, end) : thisMonth
   const count = wall.cans.length
   const title = `${monthDay(wall.from)} – ${monthDay(end)} · ${count} can${count === 1 ? '' : 's'}${wall.oz ? ` · ${wall.oz} oz` : ''}`.toUpperCase()
-  return { cans: wall.cans, count, title, practice: practice && count > 0 }
+  const practice = monthsBack > 0 && count > 0
+  return { cans: wall.cans, count, title, practice, monthsBack: practice ? monthsBack : 0 }
+}
+
+/** How a practice wall is named, by how far back it was found: on the PLAY menu, on the wall itself, and in the intro line. */
+export function practiceWords(monthsBack: number): { label: string, wall: string, aside: string } {
+  return monthsBack <= 1
+    ? { label: 'last month', wall: 'last month\'s wall — this month is clean', aside: 'last month\'s — this one is clean' }
+    : { label: `${monthsBack} months back`, wall: `the wall from ${monthsBack} months back — clean ever since`, aside: `from ${monthsBack} months back — clean ever since` }
 }
 
 /** The paddle is today's recovery: a rough night narrows it, a great one widens it. */
@@ -643,7 +666,7 @@ export function achievementsOf(i: AchievementInputs): Achievement[] {
     { id: 'crusher-300', name: 'Can Crusher', desc: 'three hundred points on the can crusher', icon: 'i-lucide-cup-soda', goal: 300, progress: crusher?.score ?? 0, unit: 'points' },
     { id: 'clean-sweep', name: 'Clean Sweep', desc: 'every can on the wall, cleared', icon: 'i-lucide-check-check', goal: 1, progress: crusher?.cleared ? 1 : 0, unit: 'wall' },
     { id: 'made-it-home', name: 'Made It Home', desc: 'the whole month, left to right, to the castle', icon: 'i-lucide-castle', goal: 1, progress: world?.cleared ? 1 : 0, unit: 'month' },
-    { id: 'clean-month', name: 'Clean Month', desc: 'every soda can in the month, crushed', icon: 'i-lucide-cup-soda', goal: 1, progress: worldFeat('clean-month'), unit: 'month' },
+    { id: 'clean-month', name: 'Clean Month', desc: 'every soda can in the month crushed — or a month with none to crush', icon: 'i-lucide-cup-soda', goal: 1, progress: worldFeat('clean-month'), unit: 'month' },
     { id: 'no-hit-week', name: 'No-Hit Week', desc: 'a whole week of the month without a scratch', icon: 'i-lucide-shield', goal: 1, progress: worldFeat('no-hit-week'), unit: 'week' },
     { id: 'chain-3', name: 'Chain of Three', desc: 'a kicked can that crushed three in a row', icon: 'i-lucide-link', goal: 1, progress: worldFeat('chain-3'), unit: 'chain' },
     { id: 'maze-1000', name: 'Capsule Maze', desc: 'a thousand points in the maze', icon: 'i-lucide-ghost', goal: 1000, progress: maze?.score ?? 0, unit: 'points' },

@@ -51,9 +51,9 @@ const props = withDefaults(defineProps<{
   lives: number
   /** "SEP 12 – OCT 12 · 14 cans · 168 oz" */
   title: string
-  /** The month was clean, so this is last month's wall. */
-  practice?: boolean
-}>(), { practice: false })
+  /** The month was clean, so this is an older wall: what to say about it ("last month's wall — this month is clean"). */
+  practiceNote?: string | null
+}>(), { practiceNote: null })
 
 const emit = defineEmits<{
   /** The game ended (or was left mid-way with points on the board) at this score; `cleared` when the whole wall went. */
@@ -283,7 +283,7 @@ function draw() {
   else if (s.status === 'ready' && s.score === 0 && s.lives === props.lives) {
     g.fillStyle = colors.faint
     g.fillText(props.title, W / 2, promptY - 18)
-    if (props.practice) g.fillText('last month\'s wall — this month is clean', W / 2, promptY - 4)
+    if (props.practiceNote) g.fillText(props.practiceNote, W / 2, promptY - 4)
     g.globalAlpha = pulse
     g.fillStyle = colors.text
     g.fillText('space · tap to launch', W / 2, promptY + 12)

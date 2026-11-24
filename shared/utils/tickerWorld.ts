@@ -7,7 +7,8 @@
 // Session two, the things that fight back. The sodas logged on a day patrol it as cans — a
 // stomp crushes one, a tall boy (20 oz and up) takes two: the first leaves a dented can lying
 // there that a touch kicks sliding, crushing everything in its path until a stomp stops it or a
-// pit swallows it. Germs keep a clean month honest: hopping blobs that walk off ledges, none on
+// pit swallows it. (A month with no tall boy finds one spare dented can lying on its first logged
+// day, so the kick is there to be had in a clean month too.) Germs keep a clean month honest: hopping blobs that walk off ledges, none on
 // a green-recovery day, one on an ordinary one, three on a rough one, and one on any day that
 // would otherwise have nothing in it. A touch from the side shrinks a grown heart to a hatchling
 // (and buys a moment of immunity); a touch while small costs a life. Stomps without landing in
@@ -214,6 +215,8 @@ export interface Enemy {
   beat: number
   /** A sliding shell: how many it has crushed since the kick. */
   chain: number
+  /** The dented can left lying in a month with no tall boy (buildLevel): not one of the month's sodas, so it is in neither can count. */
+  spare?: boolean
 }
 
 export type ItemKind = 'plate' | 'shaker' | 'star' | 'heart'
@@ -391,6 +394,8 @@ const ITEM_BOX: Record<ItemKind, { w: number, h: number }> = {
 
 /** The column within a day where each kind of block sits (past the capsules; the wall is at 17). */
 const BLOCK_COL: Record<BlockKind, number> = { draw: 14, gold: 14, star: 9, heart: 11 }
+/** Where in its day the spare dented can lies: on the flat, between the soda slots (5, 8, 11, 14) and short of the wall (17). */
+const SPARE_COL = 12
 
 export function buildLevel(days: DayInput[], rng: () => number = Math.random): Level {
   const cols = START_TILES + days.length * DAY_TILES + END_TILES
@@ -536,8 +541,20 @@ export function buildLevel(days: DayInput[], rng: () => number = Math.random): L
     }
   })
 
-  // One green day hides a star, one logged day hides a heart.
+  // The kick needs a dented can, and only a tall boy leaves one: a month with no 20 oz soda had
+  // no shell to send sliding and no way to the chain of three, so the cleaner the log the less
+  // there was to earn. Such a month gets one spare, already dented, lying still mid-way through
+  // its first logged day — harmless until it is touched, and not one of the month's sodas. (It
+  // draws nothing from the rng and is spawned last, so the rest of the level is as it was.)
   const logged = days.map((d, i) => (d.logged ? i : -1)).filter(i => i >= 0)
+  if (logged.length && !enemies.some(e => e.kind === 'tall')) {
+    spawn('tall', START_TILES + logged[0]! * DAY_TILES + SPARE_COL, logged[0]!)
+    const spare = enemies.at(-1)!
+    spare.mode = 'shell'
+    spare.spare = true
+  }
+
+  // One green day hides a star, one logged day hides a heart.
   const green = logged.filter(i => (days[i]!.recovery ?? 0) >= RECOVERY_PEAK_MIN)
   if (green.length) block('star', green[Math.floor(rng() * green.length)]!, true)
   if (logged.length) block('heart', logged[Math.floor(rng() * logged.length)]!, true)
@@ -645,7 +662,7 @@ export function createWorld(o: WorldOptions): WorldState {
     hurtAt: -1,
     combo: 0,
     crushed: 0,
-    cansTotal: level.enemies.filter(e => e.kind === 'can' || e.kind === 'tall').length,
+    cansTotal: level.enemies.filter(e => (e.kind === 'can' || e.kind === 'tall') && !e.spare).length,
     cansCrushed: 0,
     hits: [],
     losses: 0,
@@ -793,7 +810,7 @@ function crush(s: WorldState, e: Enemy, points: number) {
   e.at = s.elapsed
   e.vx = 0
   s.crushed += 1
-  if (e.kind === 'can' || e.kind === 'tall') s.cansCrushed += 1
+  if ((e.kind === 'can' || e.kind === 'tall') && !e.spare) s.cansCrushed += 1
   if (points > 0) {
     s.score += points
     pop(s, e.x + e.w / 2, e.y, String(points))
@@ -1395,7 +1412,8 @@ export function enemiesLeft(s: WorldState): number {
 export function worldFeats(s: WorldState): WorldFeat[] {
   const out: WorldFeat[] = []
   if (s.status !== 'cleared') return out
-  if (s.cansTotal > 0 && s.cansCrushed >= s.cansTotal) out.push('clean-month')
+  // A month with no soda in it is the cleanest there is: it used to be the one month that could not earn this.
+  if (s.cansCrushed >= s.cansTotal) out.push('clean-month')
   const weeks = Math.floor(s.level.days.length / 7)
   for (let w = 0; w < weeks; w++) {
     if (!s.hits.some(h => h.day >= w * 7 && h.day < w * 7 + 7)) {

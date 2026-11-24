@@ -102,7 +102,7 @@
         :paddle-scale="paddleScale"
         :lives="crusherLives"
         :title="crusherWall.title"
-        :practice="crusherWall.practice"
+        :practice-note="crusherWall.practice ? practiceWords(crusherWall.monthsBack).wall : null"
         @fit="h => gameHeight = h"
         @over="(score, cleared) => onGameOver('crusher', score, cleared)"
         @quit="onGameQuit"
@@ -401,7 +401,7 @@
 // timing, the games' records, and what the pet remembers having reacted to.
 import { diffDays } from '#shared/utils/dates'
 import { MANE_TIERS } from '#shared/utils/tickerWardrobe'
-import { WEARABLE_META, accessoriesFor, achievementsOf, heldPoseOf, moodWordOf, reachableAchievements, recipeOf } from '#shared/utils/tickerDay'
+import { WEARABLE_META, accessoriesFor, achievementsOf, heldPoseOf, moodWordOf, practiceWords, reachableAchievements, recipeOf } from '#shared/utils/tickerDay'
 import type { Achievement } from '#shared/utils/tickerDay'
 import {
   LOG_UNREAD_LINE, NO_WORKOUT_LINE, SAT_BACK_LINE, SAT_DOWN_LINE, achievementLine, afterEffectOf, arrivalLine, doseDoneLine, doseLabel, doseStartLine,
@@ -1124,7 +1124,7 @@ const playItems = computed<DropdownMenuItem[][]>(() => [[
     onSelect: () => play('runner')
   },
   {
-    label: `can crusher${houseBestOf('crusher') ? ` · HI ${houseBestOf('crusher')}` : ''} · ${crusherWall.value.count} can${crusherWall.value.count === 1 ? '' : 's'}${crusherWall.value.practice ? ' (last month)' : ''}`,
+    label: `can crusher${houseBestOf('crusher') ? ` · HI ${houseBestOf('crusher')}` : ''} · ${crusherWall.value.count} can${crusherWall.value.count === 1 ? '' : 's'}${crusherWall.value.practice ? ` (${practiceWords(crusherWall.value.monthsBack).label})` : ''}`,
     icon: 'i-lucide-cup-soda',
     onSelect: () => play('crusher')
   },

@@ -192,9 +192,10 @@ test('the one-shots\' lines', () => {
 })
 
 test('the games: the intro by game, the quit remark by what the run earned', () => {
-  const wall = { cans: [{ oz: 12, week: 0 }], count: 1, title: 'X', practice: true }
+  const wall = { cans: [{ oz: 12, week: 0 }], count: 1, title: 'X', practice: true, monthsBack: 1 }
   assert.equal(playIntroLine('runner', wall), 'space or tap to run. esc quits.')
   assert.equal(playIntroLine('crusher', wall), '1 cans on the wall (last month\'s — this one is clean). space or tap to launch; arrows or the pointer move. esc quits.')
+  assert.equal(playIntroLine('crusher', { ...wall, count: 9, monthsBack: 4 }), '9 cans on the wall (from 4 months back — clean ever since). space or tap to launch; arrows or the pointer move. esc quits.')
   assert.equal(playIntroLine('crusher', { ...wall, count: 0 }), 'nothing to shoot. good. (esc quits)')
   assert.equal(playIntroLine('maze', wall, { ghosts: [], cans: 2, title: 'vs coke, dr pepper + 2 germs' }), 'every capsule in the maze, vs coke, dr pepper + 2 germs. arrows, wasd or a swipe steer; space or tap starts. esc quits.')
   assert.equal(playIntroLine('drop', wall, undefined, { germs: 7, sodas: 7, title: '7 germs · 7 sodas this month' }), '7 germs · 7 sodas this month. ← → move, ↑ turns, ↓ drops; space or tap starts. esc quits.')

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   BARE_EYED, DEMO_UNREACHABLE, FEVER_BPM, WORLD_DAYS, accessoriesFor, achievementsOf, best, birthdayOf, bowlFor, clockLabel, cobwebsFor,
   crusherWallOf, doseDatesOf, doseKeysOf, dropGermsOf, feverOf, heldPoseOf, hourOf, hungerOf, invaderKindFor, invadersWaveOf, isAsleep, isCleanWeek, isInjected, isNight, mazeGhostsOf, mealDayOf,
-  moodWordOf, oldestOpenVial, paddleScaleFor, reachableAchievements, skyFor, sodasInWeek, unloggedInWeek, walkDayOf, walkPropFor,
+  moodWordOf, oldestOpenVial, paddleScaleFor, practiceWords, reachableAchievements, skyFor, sodasInWeek, unloggedInWeek, walkDayOf, walkPropFor,
   weekTallyOf, workoutHrOf, worldDaysOf
 } from '../shared/utils/tickerDay.ts'
 import { MANE_TIERS } from '../shared/utils/tickerWardrobe.ts'
@@ -157,7 +157,7 @@ test('the schedule: dose dates by compound, the week tally, a clean week', () =>
   assert.equal(isCleanWeek({ hit: 0, missed: [] }), false, 'nothing due is not a clean week')
 })
 
-test('the can crusher: one can per soda in the trailing month; a clean month offers last month for practice', () => {
+test('the can crusher: one can per soda in the trailing month; a clean month offers the most recent wall for practice', () => {
   const entries = [
     day('2026-10-20', { sodas: [{ size: '12oz can' }, { size: '20oz bottle' }] }),
     day('2026-10-01', { sodas: [{ size: '12oz can' }] }),
@@ -170,10 +170,17 @@ test('the can crusher: one can per soda in the trailing month; a clean month off
   assert.equal(wall.practice, false)
   const month = crusherWallOf([day('2026-09-20', { sodas: [{ size: '12oz can' }] })], TODAY)
   assert.equal(month.practice, true, 'nothing this month: last month\'s wall')
+  assert.equal(month.monthsBack, 1)
   assert.equal(month.count, 1)
   assert.match(month.title, /^AUG 25 – SEP 23 · 1 CAN · 12 OZ$/)
-  // Nothing at all: the clean month looks back a month, finds nothing there either, and says so with last month's window.
-  assert.deepEqual(crusherWallOf([], TODAY), { cans: [], count: 0, title: 'AUG 25 – SEP 23 · 0 CANS', practice: false })
+  assert.deepEqual(practiceWords(1), { label: 'last month', wall: 'last month\'s wall — this month is clean', aside: 'last month\'s — this one is clean' })
+  // Clean for longer than that: the most recent window with a soda in it, however far back, so there is always the last wall to practise on.
+  const longClean = crusherWallOf([day('2026-07-10', { sodas: [{ size: '12oz can' }, { drink: 'Gatorade', size: '20oz bottle' }] }), day('2026-03-01', { sodas: [{ size: '20oz bottle' }] })], TODAY)
+  assert.deepEqual([longClean.practice, longClean.monthsBack, longClean.count, longClean.title], [true, 3, 1, 'JUN 26 – JUL 25 · 1 CAN · 12 OZ'], 'Jul 10 is 105 days back: the third window; the Gatorade is no can, March is an older wall')
+  assert.deepEqual(practiceWords(3), { label: '3 months back', wall: 'the wall from 3 months back — clean ever since', aside: 'from 3 months back — clean ever since' })
+  assert.equal(crusherWallOf([day('2026-09-23', { sodas: [{ size: '12oz can' }] })], TODAY).monthsBack, 1, 'thirty days back is last month\'s last day')
+  // No soda ever: nothing to practise on, and it says so with last month's window.
+  assert.deepEqual(crusherWallOf([], TODAY), { cans: [], count: 0, title: 'AUG 25 – SEP 23 · 0 CANS', practice: false, monthsBack: 0 })
   assert.equal(paddleScaleFor(null), 1)
   assert.equal(paddleScaleFor(100), 1.2)
   assert.equal(paddleScaleFor(0), 0.7)

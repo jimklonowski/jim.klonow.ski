@@ -59,6 +59,10 @@ const stand = (s, x) => {
 const noHidden = (s) => {
   s.level.blocks = s.level.blocks.filter(b => !b.hidden)
 }
+/** The spare dented can out of a test that is about something else (a month with no tall boy is given one). */
+const noSpare = (s) => {
+  s.level.enemies = s.level.enemies.filter(e => !e.spare)
+}
 const run = (s, seconds, input) => {
   for (let i = 0; i < Math.round(seconds / DT); i++) stepWorld(s, DT, typeof input === 'function' ? input(s) : input)
   return s
@@ -249,6 +253,7 @@ test('a stomp crushes a can, bounces the player and climbs the combo; landing re
   const s = world(days, 4)
   start(s)
   noHidden(s)
+  noSpare(s)
   const cans = s.level.enemies.filter(e => e.kind === 'can')
   assert.equal(cans.length, 4)
   dropOn(s, cans[0])
@@ -363,6 +368,60 @@ test('a tall boy takes two stomps: the first leaves a shell, a touch kicks it, i
   dropOn(s, tall)
   assert.ok(until(s, () => tall.mode === 'crushed', 1), 'crushed')
   assert.equal(s.crushed, 3)
+})
+
+test('a month with no tall boy finds one spare dented can on its first logged day: the kick and the chain of three are there in a clean month, and it is not one of the sodas', () => {
+  const quiet = { recovery: 90, doses: 0 }
+  // None where a tall boy patrols, and none in a month never logged.
+  assert.equal(buildLevel([day({ sodas: [{ oz: 20 }], ...quiet }), day(quiet)], makeRng(1)).enemies.filter(e => e.spare).length, 0)
+  assert.equal(buildLevel([day({ logged: false }), day({ logged: false })], makeRng(1)).enemies.length, 0)
+  // Cans but no tall boy: one spare, and the soda count is the sodas'.
+  const withCan = world([day({ sodas: [{ oz: 12 }], ...quiet })], 5)
+  assert.equal(withCan.level.enemies.filter(e => e.spare).length, 1)
+  assert.equal(withCan.cansTotal, 1, 'the one soda; the spare is not one')
+
+  // A soda-free month whose first day went unlogged: it lies on the second, still, on the ground.
+  const days = [day({ logged: false }), day(quiet), day(quiet), day(quiet)]
+  const s = world(days, 5, { width: 2400 })
+  start(s)
+  noHidden(s)
+  const spares = s.level.enemies.filter(e => e.spare)
+  assert.equal(spares.length, 1)
+  const spare = spares[0]
+  assert.deepEqual([spare.kind, spare.mode, spare.vx, spare.day], ['tall', 'shell', 0, 1])
+  assert.ok(inDay(spare, 1))
+  assert.equal(spare.y + spare.h, groundRowAt(s.level, Math.floor((spare.x + spare.w / 2) / TILE)) * TILE, 'on the ground')
+  assert.equal(s.cansTotal, 0)
+  // The month's three germs lined up ahead of it; a touch from the left sends it through them.
+  const germs = s.level.enemies.filter(e => e.kind === 'germ')
+  assert.equal(germs.length, 3, 'the floor: one a day')
+  germs.forEach((g, k) => {
+    g.x = spare.x + 70 + k * 50
+    g.y = spare.y + spare.h - g.h
+    g.vy = 0
+    g.onGround = true
+    g.awake = true
+  })
+  const p = s.player
+  stand(s, spare.x - p.w - 30)
+  assert.ok(until(s, () => spare.vx !== 0, 2, RIGHT), 'kicked')
+  assert.equal(spare.vx, SHELL_SPEED)
+  assert.ok(until(s, () => germs.every(g => g.mode === 'crushed' || g.mode === 'gone'), 3), 'it crushes the three ahead')
+  assert.equal(s.bestChain, 3)
+  assert.equal(s.cansCrushed, 0)
+  p.x = s.level.castleX
+  run(s, DT, STILL)
+  assert.equal(s.status, 'cleared')
+  assert.deepEqual(worldFeats(s), ['clean-month', 'chain-3'], 'a soda-free month can earn both')
+
+  // Stomped instead, it is crushed like any dented can — and still no soda.
+  const s2 = world([day(quiet)], 5)
+  start(s2)
+  noHidden(s2)
+  const lone = s2.level.enemies.find(e => e.spare)
+  dropOn(s2, lone)
+  assert.ok(until(s2, () => lone.mode === 'crushed', 1))
+  assert.deepEqual([s2.crushed, s2.cansCrushed, s2.cansTotal], [1, 0, 0])
 })
 
 test('a sliding shell hurts; the player passes through a crushed one', () => {
@@ -961,6 +1020,19 @@ test('walkers pick up the pace with every week into the month', () => {
   assert.ok(Math.abs(speed(7) - CAN_SPEED * (1 + WEEK_PACE)) < 1e-9)
   assert.ok(Math.abs(speed(21) - CAN_SPEED * (1 + 3 * WEEK_PACE)) < 1e-9)
   assert.ok(Math.abs(germ(28) - GERM_SPEED * (1 + 4 * WEEK_PACE)) < 1e-9)
+})
+
+test('a month with no soda in it earns Clean Month by being finished: the cleanest log is not the one that cannot', () => {
+  const days = Array.from({ length: 7 }, (_, i) => day({ date: `2026-10-0${i + 1}`, sodas: [], recovery: 90, doses: 0 }))
+  const s = world(days, 32)
+  start(s)
+  noHidden(s)
+  assert.equal(s.cansTotal, 0)
+  assert.deepEqual(worldFeats(s), [], 'not before the castle')
+  s.player.x = s.level.castleX
+  run(s, DT, STILL)
+  assert.equal(s.status, 'cleared')
+  assert.deepEqual(worldFeats(s), ['clean-month', 'no-hit-week'])
 })
 
 test('the month\'s figures: every hit is kept by day and cause, the worst day is named, and a finished month earns its feats', () => {
