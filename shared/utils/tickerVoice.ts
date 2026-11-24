@@ -382,6 +382,8 @@ export function achievementLine(fresh: Achievement[], rewards: string[]): string
 }
 
 export const SAT_DOWN_LINE = '(TICKER sat down to wait.)'
+/** Said in place of the greeting when the journal, the health metrics or the workouts didn't load: it has no figures to read. */
+export const LOG_UNREAD_LINE = 'the log won\'t open. it has nothing to read yet.'
 
 // --- the plate --------------------------------------------------------------------------------
 

@@ -404,7 +404,7 @@ import { MANE_TIERS } from '#shared/utils/tickerWardrobe'
 import { WEARABLE_META, accessoriesFor, achievementsOf, heldPoseOf, moodWordOf, reachableAchievements, recipeOf } from '#shared/utils/tickerDay'
 import type { Achievement } from '#shared/utils/tickerDay'
 import {
-  NO_WORKOUT_LINE, SAT_BACK_LINE, SAT_DOWN_LINE, achievementLine, afterEffectOf, arrivalLine, doseDoneLine, doseLabel, doseStartLine,
+  LOG_UNREAD_LINE, NO_WORKOUT_LINE, SAT_BACK_LINE, SAT_DOWN_LINE, achievementLine, afterEffectOf, arrivalLine, doseDoneLine, doseLabel, doseStartLine,
   drawTile, fedTile, flinchLine, gotLine, helloLine, maneGoneLine, maneStandingLine, maneThinnedLine, mixDoneLine, mixStartLine, newsSince,
   outcomeForQuit, plateLine, playIntroLine, quitRemark, quoteLines, recordLines, resultsLandedLine, saluteLine, squeakFor, statTiles, todaySummaryLine,
   visitorsNews, walkEndLine, walkStartLine
@@ -430,9 +430,9 @@ useSeoMeta({
 
 const { role, canEdit } = await useAuth()
 const { data: overview, latestDraw, flagCounts } = useOverviewSummary(role)
-const { data: journalData } = await useJournalEntries()
-const { data: healthData } = await useHealthMetricsEntries()
-const { data: workoutsData } = await useWorkoutsEntries()
+const { data: journalData, status: journalStatus } = await useJournalEntries()
+const { data: healthData, status: healthStatus } = await useHealthMetricsEntries()
+const { data: workoutsData, status: workoutsStatus } = await useWorkoutsEntries()
 const { data: labsData } = await useLabsEntries()
 const { data: plannedData } = await usePlannedDraws()
 const { data: cyclesData } = await useCycles()
@@ -1487,11 +1487,74 @@ function announceAchievements() {
   pet.value?.trigger('celebrate')
 }
 
+// The arrival's reactions play in order, a beat apart so each line gets read, and only while the
+// figure has the stage. A game started mid-way holds the rest until it is quit: they used to run
+// on their timers regardless, so a one-shot was said over the game's line and stamped as seen
+// with nothing on the stage to show it.
+const FIRST_REACTION_MS = 800
+const REACTION_GAP_MS = 2200
+const pendingReactions: Array<() => void> = []
+let reactionTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleReaction(ms: number) {
+  if (reactionTimer != null) clearTimeout(reactionTimer)
+  reactionTimer = setTimeout(playReaction, ms)
+}
+function playReaction() {
+  reactionTimer = null
+  // A game has the stage: the watch below takes it up again when the stage is handed back.
+  if (playing.value || !pendingReactions.length) return
+  pendingReactions.shift()!()
+  if (pendingReactions.length) scheduleReaction(REACTION_GAP_MS)
+}
+// Back from a game: a beat for the quit remark, then on with whatever was waiting.
+watch(playing, (game) => {
+  if (!game && pendingReactions.length) scheduleReaction(REACTION_GAP_MS)
+})
+onUnmounted(() => {
+  if (reactionTimer != null) clearTimeout(reactionTimer)
+})
+
+// The journal, the health metrics and the workouts are fetched in the browser, so on a hard load
+// they are not there yet when the page mounts (an in-app visit waits for them in setup). The
+// keeper's arrival reads all three — the streak, the logged days, the weight, the workouts — so
+// it waits for them: it used to greet with empty figures ("7 of the last 7 days unlogged"), tell
+// a streak it had seen that it broke, and store a snapshot of zeros that made the next visit
+// announce every logged day and workout as new.
+const listsIn = computed(() => journalData.value != null && healthData.value != null && workoutsData.value != null)
+const listsFailed = computed(() => !listsIn.value && [journalStatus.value, healthStatus.value, workoutsStatus.value].includes('error'))
+
 // Greet (the clock above has ticked by now, so a late visit finds it asleep), then react to each
-// thing that has happened in turn once it has settled in — the home digest's stagger, then a
-// beat between reactions so each line gets read. The snapshot is written last, so the next
-// visit's news starts from what it saw today. A guest gets a hello and leaves a footprint; the
-// reactions, the news and the stamps are the keeper's.
+// thing that has happened in turn once it has settled in — the home digest's stagger. The
+// snapshot is written with the arrival, so the next visit's news starts from what it saw today.
+function arrive() {
+  lastVisit.value = loadSnapshot()
+  if (awayDays.value >= 3) sitting.value = true // it sat down to wait; any press stands it up
+  // The lists can land after a game was started: the greeting waits its turn like the rest.
+  const greet = () => {
+    line.value = greeting()
+  }
+  if (playing.value) pendingReactions.push(greet)
+  else greet()
+  if (sodasToday.value) pendingReactions.push(flinch)
+  if (lastVisit.value) for (const item of news(lastVisit.value)) pendingReactions.push(() => tell(item))
+  const footprints = visitorsNews(visits.value, recall<number>('visitsSeen') ?? 0)
+  if (footprints) {
+    const seen = visits.value!.total
+    pendingReactions.push(() => {
+      remember('visitsSeen', seen) // counted as seen when it is told, not when it is queued
+      tell(footprints)
+    })
+  }
+  if (birthday.value && firstTime(BIRTHDAY_KEY, today.value)) pendingReactions.push(celebrateBirthday)
+  if (landedPending.value) pendingReactions.push(resultsLanded)
+  if (cleanWeek.value && firstTime(SALUTE_KEY, today.value)) pendingReactions.push(salute)
+  if (freshAchievements.value.length) pendingReactions.push(announceAchievements)
+  scheduleReaction(FIRST_REACTION_MS)
+  remember(SNAPSHOT_KEY, snapshotNow())
+}
+
+// A guest gets a hello and leaves a footprint; the reactions, the news and the stamps are the
+// keeper's.
 onMounted(() => {
   quoteIdx = Math.floor(Math.random() * 1000)
 
@@ -1501,28 +1564,27 @@ onMounted(() => {
     // endpoints still accept the role in case that policy changes.)
     const hello: News = { line: helloLine(visitorLabel.value), event: 'celebrate' }
     line.value = hello.line
-    timers.push(setTimeout(() => tell(hello), 800))
+    pendingReactions.push(() => tell(hello))
+    scheduleReaction(FIRST_REACTION_MS)
     $fetch('/api/ticker/visit', { method: 'POST' }).catch(() => { /* no footprint today, then */ })
     return
   }
 
-  lastVisit.value = loadSnapshot()
-  if (awayDays.value >= 3) sitting.value = true // it sat down to wait; any press stands it up
-  line.value = greeting()
-  const reactions: Array<() => void> = []
-  if (sodasToday.value) reactions.push(flinch)
-  if (lastVisit.value) for (const item of news(lastVisit.value)) reactions.push(() => tell(item))
-  const footprints = visitorsNews(visits.value, recall<number>('visitsSeen') ?? 0)
-  if (footprints) {
-    reactions.push(() => tell(footprints))
-    remember('visitsSeen', visits.value!.total)
+  if (listsIn.value) {
+    arrive()
+    return
   }
-  if (birthday.value && firstTime(BIRTHDAY_KEY, today.value)) reactions.push(celebrateBirthday)
-  if (landedPending.value) reactions.push(resultsLanded)
-  if (cleanWeek.value && firstTime(SALUTE_KEY, today.value)) reactions.push(salute)
-  if (freshAchievements.value.length) reactions.push(announceAchievements)
-  reactions.forEach((react, i) => timers.push(setTimeout(react, 800 + i * 2200)))
-  remember(SNAPSHOT_KEY, snapshotNow())
+  // A hard load: arrive when the lists do. If one fails it says so and remembers nothing — no
+  // news, no stamps, no snapshot — and still arrives should a retry bring the lists in.
+  const stop = watch([listsIn, listsFailed], ([arrived, failed]) => {
+    if (arrived) {
+      stop()
+      arrive()
+    }
+    else if (failed && !playing.value) {
+      line.value = LOG_UNREAD_LINE
+    }
+  }, { immediate: true })
 })
 </script>
 
