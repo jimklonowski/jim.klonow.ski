@@ -40,8 +40,9 @@ export function deferralLine(deferral: DonationDeferral | null, asOf: string): s
   return `An isotretinoin course starts ${deferral.start}; from then until ${deferral.until} blood donation is deferred — ${rule}.`
 }
 
-export async function phlebotomyContext(db: D1Database, asOf: string): Promise<string> {
-  const [all, cycles] = await Promise.all([loadPhlebotomies(db), loadCycles(db)])
+/** `preloadedCycles`: the planned cycles, or the promise of them, when the caller already reads them (see cycleContext). */
+export async function phlebotomyContext(db: D1Database, asOf: string, preloadedCycles?: Cycle[] | Promise<Cycle[]>): Promise<string> {
+  const [all, cycles] = await Promise.all([loadPhlebotomies(db), preloadedCycles ?? loadCycles(db)])
   const deferral = deferralLine(donationDeferral(cycles, asOf), asOf)
   const rows = all.filter(p => p.date <= asOf)
   if (!rows.length) return deferral

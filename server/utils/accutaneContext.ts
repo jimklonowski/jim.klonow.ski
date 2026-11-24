@@ -20,8 +20,8 @@ import { loadPlannedDraws } from './plannedDrawContext'
 /** How long after the course ends it is still worth a paragraph (the deferral, and recovery draws). */
 const DONE_RELEVANCE_DAYS = 90
 
-export async function accutaneContext(db: D1Database, asOf: string, preloadedCycles?: Cycle[]): Promise<string> {
-  const cycles = preloadedCycles ?? await loadCycles(db)
+export async function accutaneContext(db: D1Database, asOf: string, preloadedCycles?: Cycle[] | Promise<Cycle[]>): Promise<string> {
+  const cycles = await (preloadedCycles ?? loadCycles(db))
   const course = isotretinoinCycle(cycles, asOf)
   if (!course) return ''
   const end = cycleEnd(course)

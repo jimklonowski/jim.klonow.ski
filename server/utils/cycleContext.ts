@@ -61,8 +61,9 @@ export async function loadCycles(db: D1Database): Promise<Cycle[]> {
 // supplementContext for the cycles table. asOf matters for the same reason: lab summaries can
 // regenerate for historical draws, and "day 34 of the cycle" must be day 34 as of THAT draw.
 // Returns '' when there's nothing relevant. Callers that already hold the cycles (the digest
-// loads them for its schedule check) pass them in to skip the second read.
-export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cycle[]): Promise<string> {
+// loads them for its schedule check) pass them in to skip the second read — or the promise of
+// them, when several builders are asked at once and share one read (/ask, the labs summary).
+export async function cycleContext(db: D1Database, asOf: string, preloaded?: Cycle[] | Promise<Cycle[]>): Promise<string> {
   let cycles: Cycle[]
   let drawDates: string[]
   try {

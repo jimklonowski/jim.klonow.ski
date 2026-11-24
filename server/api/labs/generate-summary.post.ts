@@ -101,49 +101,58 @@ export default defineEventHandler(async (event) => {
     ? `\nQualitative results on file for this date:\n${qualitative.map(q => `${q.name}: ${q.result}`).join('\n')}\n`
     : ''
 
-  const protocolLines = await protocolContext(db, date)
-  const protocolBlock = protocolLines.length ? `\n${protocolLines.join('\n')}\n` : ''
-  const supplementBlock = await supplementContext(db, date)
-  // Planned-cycle context as of the draw date: an active cycle turns this draw into a
-  // checkpoint (compare gating markers against the pre-cycle baseline), an upcoming one makes
-  // it the baseline itself.
-  const cycleBlock = await cycleContext(db, date)
-  // Shots and dated one-off notes as of the draw date — the difference between "IGF-1 dipped"
-  // and "IGF-1 dipped two days after a travel weekend without HGH".
-  const vaccineBlock = await vaccineContext(db, date)
-  const eventBlock = eventContext(date, PROTOCOL_EVENTS)
-  // A draw booked for this date (or one that landed within a few days of its plan) carries the
-  // questions it was meant to answer, and the summary opens with them.
-  const plannedBlock = await plannedDrawContext(db, date)
-  // Blood removed on purpose before this draw: the reason a hematocrit fell, and iron lost (item 59).
-  const phlebotomyBlock = await phlebotomyContext(db, date)
-
+  // The context blocks are independent reads, so they are asked for together: one after another
+  // they were a dozen round trips to the database in a row before the model was even called
+  // (audit #44 item 51). The planned cycles are read once and shared by the four that want them.
+  const cycles = loadCycles(db)
   // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
   // renders it as of the draw date.
-  const protocol = await protocolFor(event)
+  const protocolLoad = Promise.resolve(protocolFor(event))
+  const [
+    protocolLines, supplementBlock, cycleBlock, vaccineBlock, plannedBlock, phlebotomyBlock,
+    protocol, birthRow, psaHistory, pgxBlock, goalsBlock, accutaneBlock
+  ] = await Promise.all([
+    protocolContext(db, date),
+    supplementContext(db, date),
+    // Planned-cycle context as of the draw date: an active cycle turns this draw into a
+    // checkpoint (compare gating markers against the pre-cycle baseline), an upcoming one makes
+    // it the baseline itself.
+    cycleContext(db, date, cycles),
+    // Shots and dated one-off notes as of the draw date — the difference between "IGF-1 dipped"
+    // and "IGF-1 dipped two days after a travel weekend without HGH".
+    vaccineContext(db, date),
+    // A draw booked for this date (or one that landed within a few days of its plan) carries the
+    // questions it was meant to answer, and the summary opens with them.
+    plannedDrawContext(db, date),
+    // Blood removed on purpose before this draw: the reason a hematocrit fell, and iron lost (item 59).
+    phlebotomyContext(db, date, cycles),
+    protocolLoad,
+    db.prepare('SELECT value FROM profile WHERE key = ?1').bind('birth_date').first<{ value: string }>().catch(() => null),
+    // The PSA velocity reads every PSA on file, not the comparison window above: PSA is drawn about
+    // once a year, so its previous reading is usually older than the last seven draws, and the
+    // summary was told the velocity "needs two PSA readings" while the page beside it printed one
+    // (audit #44 item 21). Only the draws that carry a PSA, and only when this one does.
+    target.markers.psa != null ? psaDrawsBefore(db, date) : [],
+    // The hand-entered drug-gene notes (item 78).
+    pgxContext(db),
+    // The dated marker goals with their verdicts as of this draw (item 60) — the frame the
+    // summary reads the gating markers in, computed here so the model reports it, not re-judges it.
+    protocolLoad.then(schedule => markerGoalsContext(db, date, schedule, cycles)),
+    // The isotretinoin course as of this draw (item 97): cumulative mg, mg/kg, the lipid window.
+    accutaneContext(db, date, cycles)
+  ])
+  const protocolBlock = protocolLines.length ? `\n${protocolLines.join('\n')}\n` : ''
+  const eventBlock = eventContext(date, PROTOCOL_EVENTS)
   // The clinical calculators as of this draw (item 77): the model reports the figures the page
   // shows — PSA doubled on a 5-ARI, FIB-4, the cystatin C eGFR — instead of deriving its own.
-  const birthRow = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('birth_date').first<{ value: string }>().catch(() => null)
   const spans = [...protocol.rules, ...protocol.standing]
-  // The PSA velocity reads every PSA on file, not the comparison window above: PSA is drawn about
-  // once a year, so its previous reading is usually older than the last seven draws, and the
-  // summary was told the velocity "needs two PSA readings" while the page beside it printed one
-  // (audit #44 item 21). Only the draws that carry a PSA, and only when this one does.
-  const psaHistory = target.markers.psa != null ? await psaDrawsBefore(db, date) : []
   const calcs = clinicalCalcs([...psaHistory, target], target, {
     birthDate: birthRow?.value ?? null,
     fiveAri: d => fiveAriOn(spans, d)
   })
-  // The hand-entered drug-gene notes (item 78).
-  const pgxBlock = await pgxContext(db)
   const calcsBlock = calcs.length
     ? `Clinical calculators as of this draw (deterministic — report these figures as given, do not recompute them):\n${calcs.map(c => c.value != null ? `- ${c.label}: ${c.value}${c.unit ? ` ${c.unit}` : ''} — ${c.reading} (${c.inputs})` : `- ${c.label}: not computable — ${c.missing}`).join('\n')}`
     : ''
-  // The dated marker goals with their verdicts as of this draw (item 60) — the frame the
-  // summary reads the gating markers in, computed here so the model reports it, not re-judges it.
-  const goalsBlock = await markerGoalsContext(db, date, protocol)
-  // The isotretinoin course as of this draw (item 97): cumulative mg, mg/kg, the lipid window.
-  const accutaneBlock = await accutaneContext(db, date)
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the DEXA's.
   const prompt = labsSummaryPrompt({

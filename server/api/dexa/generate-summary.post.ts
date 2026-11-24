@@ -112,24 +112,28 @@ export default defineEventHandler(async (event) => {
   }
   const previous = scans.at(-2) ?? null
 
+  // The context reads are independent, so they are asked for together rather than one after
+  // another (audit #44 item 51): each scan's daily context, the training between the scans, and
+  // the schedule blocks.
+  const [dailies, trainingBlock, protocolLines, supplementBlock, cycleBlock, protocol] = await Promise.all([
+    Promise.all(scans.map(row => dailyContext(db, row.date))),
+    trainingContext(db, previous?.date ?? shiftDays(date, -BASELINE_TRAINING_DAYS), date),
+    // Dosing curves explain blood levels, not tissue, so the timing lines stay out of this one.
+    protocolContext(db, date, { noun: 'scan', timing: false }),
+    supplementContext(db, date),
+    cycleContext(db, date),
+    // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
+    // renders it as of the scan date.
+    protocolFor(event)
+  ])
   const scanBlock: string[] = []
-  for (const row of scans) {
+  scans.forEach((row, i) => {
     scanBlock.push(...describeScan(row, row.date === date))
-    const daily = await dailyContext(db, row.date)
+    const daily = dailies[i]
     if (daily) scanBlock.push(daily)
-  }
-  const trainingBlock = await trainingContext(db, previous?.date ?? shiftDays(date, -BASELINE_TRAINING_DAYS), date)
-
-  // Dosing curves explain blood levels, not tissue, so the timing lines stay out of this one.
-  const protocolLines = await protocolContext(db, date, { noun: 'scan', timing: false })
+  })
   const protocolBlock = protocolLines.length ? `\n${protocolLines.join('\n')}\n` : ''
-  const supplementBlock = await supplementContext(db, date)
-  const cycleBlock = await cycleContext(db, date)
   const eventBlock = eventContext(date, PROTOCOL_EVENTS)
-
-  // The standing schedule (the protocol tables, or the code constants until seeded); the prompt
-  // renders it as of the scan date.
-  const protocol = await protocolFor(event)
 
   // The wording lives in server/utils/summaryPrompts.ts beside the digest's and the labs'.
   const prompt = dexaSummaryPrompt({ date, protocol, protocolBlock, supplementBlock, cycleBlock, eventBlock, scanBlock, trainingBlock })

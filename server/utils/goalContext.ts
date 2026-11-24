@@ -56,7 +56,7 @@ export async function loadBloodDraws(db: D1Database, asOf: string): Promise<Goal
     })
 }
 
-export async function markerGoalsContext(db: D1Database, asOf: string, protocol: ProtocolData, preloadedCycles?: Cycle[]): Promise<string> {
+export async function markerGoalsContext(db: D1Database, asOf: string, protocol: ProtocolData, preloadedCycles?: Cycle[] | Promise<Cycle[]>): Promise<string> {
   const goals = await loadMarkerGoals(db)
   if (!goals.length) return ''
   const [draws, cycles, visits, doseRes] = await Promise.all([

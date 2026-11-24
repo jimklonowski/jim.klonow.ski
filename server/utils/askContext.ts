@@ -271,6 +271,9 @@ const WEEKLY_WINDOW_WEEKS = 20
 /** The full fact sheet. `today` as YYYY-MM-DD in the reader's timezone; `protocol` the request's
  * schedule (protocolFor), which decides which compounds count as standing for the trend anchors. */
 export async function buildAskContext(db: D1Database, today: string, protocol: ProtocolData): Promise<string> {
+  // The planned cycles are read once and shared: five of the builders below want them, and each
+  // used to read the table for itself (audit #44 item 51).
+  const cycles = loadCycles(db)
   const [journal, labs, dexa, vials, healthRes, workoutsRes, supplements, cyclesCtx, vaccines, profile, plannedDraws, phlebotomies, estimates, goals, accutane, protocolChange, pgx] = await Promise.all([
     journalRows(db),
     labBlock(db),
@@ -280,24 +283,24 @@ export async function buildAskContext(db: D1Database, today: string, protocol: P
     // Full rows: parseWorkoutRow/mergeWorkouts need external_id and start_time for dedup.
     db.prepare('SELECT * FROM workouts ORDER BY date ASC').all(),
     supplementContext(db, today),
-    cycleContext(db, today),
+    cycleContext(db, today, cycles),
     // Whole immunization record, not just recent shots — "when was my last tetanus?" lives here.
     vaccineContext(db, today, 'all'),
     profileLine(db),
     // The next booked draw and its questions — "when's my next draw?" and "what am I waiting on?".
     plannedDrawContext(db, today),
     // Blood taken out on purpose (audit #43 item 59): the reason a hematocrit fell, and iron lost.
-    phlebotomyContext(db, today),
+    phlebotomyContext(db, today, cycles),
     // Meal figures (library, hand entries, model estimates) for the meals in the day and week lines.
     loadEstimateIndex(db),
     // The dated marker goals and their verdicts (audit #43 item 60): "is Primo a go?" is answered
     // from these, not inferred.
-    markerGoalsContext(db, today, protocol),
+    markerGoalsContext(db, today, protocol, cycles),
     // The isotretinoin course as it stands (item 97): cumulative mg, mg/kg, the lipid window.
-    accutaneContext(db, today),
+    accutaneContext(db, today, cycles),
     // The vitals since the latest core dose change (item 67): "what did the hCG cut do?" is
     // answered from these numbers, not re-derived from the log.
-    loadCycles(db).then(cycles => protocolChangeContext(db, today, mergeRules(protocol.rules, cycles))),
+    cycles.then(list => protocolChangeContext(db, today, mergeRules(protocol.rules, list))),
     // The hand-entered drug-gene notes (item 78): "will tamoxifen work for me?" has its answer here.
     pgxContext(db)
   ])
