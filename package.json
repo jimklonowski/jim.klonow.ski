@@ -1,6 +1,6 @@
 {
   "name": "jim-klonow-ski",
-  "version": "2026.11.24c",
+  "version": "2026.11.24d",
   "author": "Jim Klonowski <jim@jimklonowski.com>",
   "private": true,
   "type": "module",
@@ -64,7 +64,7 @@
     "typescript": "^6.0.3",
     "vue": "catalog:",
     "vue-tsc": "^3.3.14",
-    "wrangler": "^4.166.0"
+    "wrangler": "^4.167.0"
   },
   "packageManager": "pnpm@11.7.0"
 }
