@@ -172,8 +172,9 @@
         >
           <span class="text-accent text-prose leading-[2.2]">❯</span>
           <!-- Grows with the question up to ~7 lines, then scrolls; Enter sends, Shift+Enter breaks.
-               On touch screens the text is never under 16px: iOS Safari zooms the page into any
-               smaller field on focus, and on a phone that pushed the ASK button off the right edge. -->
+               On touch screens the text is never under 16px, like every field's (main.css,
+               "Touch"): iOS Safari zooms the page into any smaller field on focus, and on a
+               phone that pushed the ASK button off the right edge. -->
           <UTextarea
             v-model="draft"
             :rows="1"
@@ -181,7 +182,7 @@
             autoresize
             placeholder="ask ticker about our data…"
             class="flex-1"
-            :ui="{ base: 'resize-none text-row pointer-coarse:text-[max(16px,var(--text-row))] placeholder:text-ghost' }"
+            :ui="{ base: 'resize-none text-row placeholder:text-ghost' }"
             :readonly="streaming"
             aria-label="Your question"
             @keydown.enter.exact.prevent="send()"

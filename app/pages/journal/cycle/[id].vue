@@ -172,7 +172,7 @@
               <span class="text-meta text-muted min-w-0">{{ v.reason }}</span>
               <span
                 v-if="isOwner"
-                class="ml-auto flex items-baseline gap-2 shrink-0"
+                class="ml-auto flex items-baseline gap-2 shrink-0 tap-actions"
               >
                 <button
                   type="button"

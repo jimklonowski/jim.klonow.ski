@@ -45,7 +45,7 @@
               class="text-meta text-faint hidden sm:inline"
             >{{ f.hint }}</span>
 
-            <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
+            <span class="ml-auto flex items-baseline gap-2.5 shrink-0 tap-actions">
               <span
                 v-if="profile[f.key]"
                 class="num-display text-title text-accent"
@@ -137,7 +137,7 @@
 
             <span
               v-if="isOwner"
-              class="ml-auto flex items-baseline gap-2 shrink-0"
+              class="ml-auto flex items-baseline gap-2 shrink-0 tap-actions"
             >
               <button
                 type="button"

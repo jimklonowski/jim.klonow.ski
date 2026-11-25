@@ -56,7 +56,7 @@
                 class="text-small text-muted"
               >{{ c.goal }}</span>
 
-              <span class="ml-auto flex items-baseline gap-3 shrink-0">
+              <span class="ml-auto flex items-baseline gap-3 shrink-0 tap-actions">
                 <span
                   v-if="pctOf(c) != null"
                   class="text-small"

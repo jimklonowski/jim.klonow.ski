@@ -41,7 +41,7 @@
         </button>
         <button
           type="button"
-          class="tui-row-action shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:cursor-default"
+          class="tui-row-action shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:cursor-default tap [--tap-y:0.375rem] [--tap-l:0.5rem] [--tap-r:0.5rem]"
           :aria-label="`Delete conversation: ${t.title}`"
           :disabled="disabled"
           @click="emit('delete', t)"

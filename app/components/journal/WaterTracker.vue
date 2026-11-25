@@ -41,7 +41,7 @@
       <button
         v-if="!readonly"
         type="button"
-        class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer"
+        class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer tap [--tap-l:1rem]"
         :aria-label="panelOpen ? 'Hide water options' : 'Log a different amount, undo a pour, or change the cup and goal'"
         :aria-expanded="panelOpen"
         @click="panelOpen = !panelOpen"
@@ -175,7 +175,7 @@
             >⏳ pending</span>
             <button
               type="button"
-              class="text-faint hover:text-danger cursor-pointer"
+              class="text-faint hover:text-danger cursor-pointer tap [--tap-y:0.25rem]"
               title="Discard — it has not been sent"
               :aria-label="`Discard the unsent ${w.time} pour`"
               data-discard-tap
@@ -187,7 +187,7 @@
           <button
             v-else
             type="button"
-            class="ml-auto shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50"
+            class="ml-auto shrink-0 text-meta text-faint hover:text-danger cursor-pointer disabled:opacity-50 tap [--tap-y:0.25rem]"
             :disabled="removingIndex !== null"
             :aria-label="`Remove the ${w.time} pour`"
             @click="remove(i)"

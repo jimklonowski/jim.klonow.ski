@@ -123,7 +123,7 @@
               </UFormField>
               <button
                 type="button"
-                class="col-span-1 pb-2 text-prose text-faint hover:text-danger cursor-pointer justify-self-end"
+                class="col-span-1 pb-2 text-prose text-faint hover:text-danger cursor-pointer justify-self-end tap [--tap-l:0.5rem] [--tap-r:0.5rem]"
                 :aria-label="`Remove ${row.compound || 'row'}`"
                 @click="rows.splice(i, 1)"
               >

@@ -12,7 +12,7 @@
       <template #label>
         <button
           type="button"
-          class="inline-block w-4 text-center text-prose leading-none tracking-normal cursor-pointer disabled:cursor-default"
+          class="inline-block w-4 text-center text-prose leading-none tracking-normal cursor-pointer disabled:cursor-default tap"
           :class="canBack ? 'text-faint hover:text-accent' : 'text-ghost'"
           :disabled="!canBack"
           :aria-label="`Show ${formatDate(shiftDays(asOf, -1), 'monthDay')}`"
@@ -24,7 +24,7 @@
           :class="isToday ? '' : 'text-dim'"
         >{{ isToday ? 'TODAY' : label }}</span><button
           type="button"
-          class="inline-block w-4 text-center text-prose leading-none tracking-normal cursor-pointer disabled:cursor-default"
+          class="inline-block w-4 text-center text-prose leading-none tracking-normal cursor-pointer disabled:cursor-default tap"
           :class="isToday ? 'text-ghost' : 'text-faint hover:text-accent'"
           :disabled="isToday"
           :aria-label="`Show ${formatDate(shiftDays(asOf, 1), 'monthDay')}`"

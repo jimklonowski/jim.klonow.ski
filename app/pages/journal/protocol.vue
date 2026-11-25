@@ -152,7 +152,7 @@
                 >{{ row.since }}</span>
 
                 <span
-                  class="ml-auto flex items-baseline gap-2 shrink-0 sm:order-3"
+                  class="ml-auto flex items-baseline gap-2 shrink-0 sm:order-3 tap-actions"
                   :class="row.dose ? 'sm:ml-0' : ''"
                 >
                   <!-- A fixed 10ch from sm so "1 version" and "5 versions" don't shift the dose
@@ -219,7 +219,7 @@
               <li
                 v-for="v in [...row.versions].reverse()"
                 :key="v.id"
-                class="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap text-meta text-muted group"
+                class="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap text-meta text-muted group tap-actions"
               >
                 <span class="num">{{ spanOf(v) }}</span>
                 <span

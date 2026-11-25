@@ -134,7 +134,7 @@
                 />
                 <button
                   type="button"
-                  class="ml-auto text-meta text-faint hover:text-danger cursor-pointer"
+                  class="ml-auto text-meta text-faint hover:text-danger cursor-pointer tap [--tap-l:0.5rem]"
                   :aria-label="`Remove ${item.compound || 'compound'}`"
                   @click="form.compounds.splice(i, 1)"
                 >

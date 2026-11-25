@@ -133,7 +133,7 @@
                 <button
                   v-else
                   type="button"
-                  class="text-meta text-faint hover:text-danger cursor-pointer shrink-0 px-1"
+                  class="text-meta text-faint hover:text-danger cursor-pointer shrink-0 px-1 tap [--tap-l:0.5rem]"
                   aria-label="Remove file"
                   @click="removeFile(index)"
                 >

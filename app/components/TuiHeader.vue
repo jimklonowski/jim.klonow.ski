@@ -1,8 +1,11 @@
 <template>
   <div class="tui-label flex items-baseline justify-between gap-3 min-w-0 select-none">
     <!-- `#label` replaces the plain label text when it needs controls inside it (the vitals
-         card's ‹ DAY ›); the ┌ stays put either way. -->
-    <span class="truncate">┌ <slot name="label">{{ label }}</slot>{{ !fill && dashes ? ` ${'─'.repeat(dashes)}` : '' }}</span>
+         card's ‹ DAY ›); the ┌ stays put either way. Truncated, but clipped sideways only
+         (`truncate` clips both ways): those controls answer taps from above and below their
+         glyphs (`tap`, main.css), which a box clipped all round would cut off. `min-w-0`
+         because a box that only clips, unlike one that hides, does not shrink by itself. -->
+    <span class="min-w-0 overflow-x-clip text-ellipsis whitespace-nowrap">┌ <slot name="label">{{ label }}</slot>{{ !fill && dashes ? ` ${'─'.repeat(dashes)}` : '' }}</span>
     <!-- `fill`: the rule runs to the right edge (or to the slot) whatever the panel's width — a
          long run of the same glyph, clipped. Decorative, so hidden from assistive tech. -->
     <span

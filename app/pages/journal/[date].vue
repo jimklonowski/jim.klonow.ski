@@ -11,7 +11,7 @@
         <NuxtLink
           v-if="prevEntry"
           :to="`/journal/${prevEntry.date}`"
-          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent"
+          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent tap [--tap-r:0.25rem]"
           aria-label="Previous entry"
         >‹</NuxtLink>
         <span
@@ -22,7 +22,7 @@
         <NuxtLink
           v-if="nextEntry"
           :to="`/journal/${nextEntry.date}`"
-          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent"
+          class="inline-flex w-4 justify-center text-prose text-faint hover:text-accent tap [--tap-l:0.25rem] [--tap-r:0.25rem]"
           aria-label="Next entry"
         >›</NuxtLink>
         <span
@@ -267,7 +267,7 @@
                 <button
                   v-if="canEdit"
                   type="button"
-                  class="text-small text-faint hover:text-danger cursor-pointer"
+                  class="text-small text-faint hover:text-danger cursor-pointer tap [--tap-l:0.5rem]"
                   :aria-label="`Remove dose ${i + 1}`"
                   @click="removePeptide(i)"
                 >
@@ -380,7 +380,7 @@
                 <button
                   v-if="canEdit"
                   type="button"
-                  class="text-small text-faint hover:text-danger cursor-pointer"
+                  class="text-small text-faint hover:text-danger cursor-pointer tap [--tap-l:0.5rem]"
                   :aria-label="`Remove reconstitution ${i + 1}`"
                   @click="removeReconstitution(i)"
                 >
@@ -536,7 +536,7 @@
                   <button
                     v-if="canEdit"
                     type="button"
-                    class="text-small text-faint hover:text-danger cursor-pointer"
+                    class="text-small text-faint hover:text-danger cursor-pointer tap [--tap-l:0.5rem]"
                     :aria-label="`Remove drink ${i + 1}`"
                     @click="removeSoda(i)"
                   >
@@ -612,7 +612,7 @@
                   <button
                     v-if="canEdit"
                     type="button"
-                    class="text-small text-faint hover:text-danger cursor-pointer"
+                    class="text-small text-faint hover:text-danger cursor-pointer tap [--tap-l:0.5rem]"
                     :aria-label="`Remove pour ${i + 1}`"
                     @click="removeWater(i)"
                   >
@@ -780,7 +780,7 @@
                   <button
                     v-if="isOwner"
                     type="button"
-                    class="absolute top-1 right-1 px-1 text-meta bg-bg/80 text-faint hover:text-danger tui-row-action cursor-pointer"
+                    class="absolute top-1 right-1 px-1 text-meta bg-bg/80 text-faint hover:text-danger tui-row-action cursor-pointer tap [--tap-y:0.375rem] [--tap-l:0.5rem] [--tap-r:0.25rem]"
                     aria-label="Delete photo"
                     @click="deletePhoto(photo.id)"
                   >

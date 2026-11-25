@@ -49,7 +49,7 @@
       <button
         v-if="!readonly"
         type="button"
-        class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer"
+        class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer tap [--tap-l:1rem]"
         :aria-label="customOpen ? 'Hide custom soda form' : 'Log a different drink'"
         @click="customOpen = !customOpen"
       >
@@ -188,7 +188,7 @@
           class="shrink-0 text-nano leading-none px-1 py-0.5 border border-line-soft text-dim uppercase tracking-[0.08em]"
           :title="hydrates(s.drink) ? 'Not counted as a soda; its ounces count toward the water goal' : 'Not counted as a soda'"
         >{{ DRINK_KIND_LABELS[drinkInfo(s.drink).kind] }}</span>
-        <span class="ml-auto shrink-0 flex items-baseline gap-3">
+        <span class="ml-auto shrink-0 flex items-baseline gap-3 tap-actions">
           <!-- The drink's calories and where they come from: "140 kcal ✎" is the owner's own
                label, "≈ 150 kcal" the built-in table (written from memory). The chip opens the
                label form, where the can's figures are typed or scanned. -->

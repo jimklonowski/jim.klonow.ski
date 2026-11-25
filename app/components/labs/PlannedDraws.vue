@@ -90,7 +90,7 @@
         </button>
         <span
           v-if="isOwner"
-          class="ml-auto flex gap-3 text-meta"
+          class="ml-auto flex gap-3 text-meta tap-actions"
         >
           <button
             type="button"
@@ -231,7 +231,7 @@
             v-if="s.plan.panel"
             class="text-small text-muted truncate min-w-0"
           >{{ s.plan.panel }}</span>
-          <span class="ml-auto flex items-baseline gap-2 shrink-0">
+          <span class="ml-auto flex items-baseline gap-2 shrink-0 tap-actions">
             <span
               class="text-meta"
               :class="statusChip(s).class"

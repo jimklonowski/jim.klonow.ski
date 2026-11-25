@@ -311,6 +311,23 @@
   .tui-btn-accent:hover {
     background: var(--color-accent-bg-hover);
   }
+  /* On a touch screen a button answers taps from at least 44px each way, drawn no bigger:
+     a pseudo-element takes them. The `tap` utility below, built in — and held back the same
+     way where a neighbour is close (`[--tap-l:0px]`). */
+  @media (pointer: coarse) {
+    .tui-btn {
+      position: relative;
+    }
+
+    .tui-btn::after {
+      content: '';
+      position: absolute;
+      top: calc(-1 * var(--tap-y, max(0px, (2.75rem - 100%) / 2)));
+      bottom: calc(-1 * var(--tap-y, max(0px, (2.75rem - 100%) / 2)));
+      left: calc(-1 * var(--tap-l, max(0px, (2.75rem - 100%) / 2)));
+      right: calc(-1 * var(--tap-r, max(0px, (2.75rem - 100%) / 2)));
+    }
+  }
 
   /* Nuxt UI's Chart (TanStack Charts). Its SVG sets sizes and opacities as presentation
      attributes, which these rules outrank: labels at the micro size (so they follow the SIZE
@@ -361,6 +378,70 @@
   .digest-prose li::before {
     content: '· ';
     color: var(--color-faint);
+  }
+}
+
+/* ── Touch (audit #44 item 55) ────────────────────────────────────────────────
+   Everything here is keyed on `pointer: coarse`, so nothing changes under a mouse. */
+
+/* A field's text is never under 16px on a touch screen: iOS zooms the whole page into a focused
+   field with smaller text, and leaves it zoomed. Nuxt UI's fields are 16px on a narrow screen
+   already (`text-base sm:text-sm`), but not on a phone turned sideways (that is past `sm`), not
+   at size="sm" or "xs", and not where a call site sets a size of its own (the command palette).
+   Unlayered on purpose: it has to outrank every utility, wherever a field's size came from.
+   `1em` is the parent's size, so a field set in larger text keeps up with it. */
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='button'], [type='submit'], [type='reset'], [type='image']),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable='false']) {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* `tap`: a control drawn smaller than a fingertip (a bare ✕, ▾, ‹) answers taps from a 44px
+   square centred on it, without growing — the dense layout stays as drawn. The area is a
+   pseudo-element. Where 44px would lie over a neighbouring control, the call site says how far
+   it may reach instead: `[--tap-l:0.5rem]` (left), `--tap-r` (right), `--tap-y` (above and
+   below). The rule for choosing: an area never covers a neighbour's drawn box. Not for a control
+   inside an `overflow` box tighter than the area — it would be cut off, or make the box scroll
+   (TuiHeader's label clips sideways only, for the vitals ‹ ›). tests/touch.test.mjs fails when a
+   bare-glyph button has neither this, `tap-actions` on its cluster, nor a real size. */
+@utility tap {
+  @media (pointer: coarse) {
+    &:not(.absolute, .fixed, .sticky) {
+      position: relative;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: calc(-1 * var(--tap-y, max(0px, (2.75rem - 100%) / 2)));
+      bottom: calc(-1 * var(--tap-y, max(0px, (2.75rem - 100%) / 2)));
+      left: calc(-1 * var(--tap-l, max(0px, (2.75rem - 100%) / 2)));
+      right: calc(-1 * var(--tap-r, max(0px, (2.75rem - 100%) / 2)));
+    }
+  }
+}
+
+/* `tap-actions`: on the cluster of small actions that ends a list row ("edit ✕"). Each answers
+   from half the gap around it and a little above and below (rows are stacked, so no more); the
+   last one, at the row's right edge, from the row's padding beside it as well. */
+@utility tap-actions {
+  @media (pointer: coarse) {
+    & > :is(button, a) {
+      position: relative;
+    }
+
+    & > :is(button, a)::after {
+      content: '';
+      position: absolute;
+      inset: calc(-1 * var(--tap-y, 0.3125rem)) -0.25rem;
+    }
+
+    & > :is(button, a):last-child::after {
+      right: -1rem;
+    }
   }
 }
 

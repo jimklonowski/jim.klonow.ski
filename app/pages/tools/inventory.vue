@@ -114,7 +114,7 @@
               >
                 <button
                   type="button"
-                  class="shrink-0 px-1 text-title leading-none text-faint hover:text-accent cursor-pointer"
+                  class="shrink-0 px-1 text-title leading-none text-faint hover:text-accent cursor-pointer tap"
                   :aria-label="`${vial.compound} actions`"
                 >
                   ⋯
@@ -215,7 +215,7 @@
                   class="text-meta text-muted"
                 >{{ row.expiryText }}</span>
 
-                <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
+                <span class="ml-auto flex items-baseline gap-2.5 shrink-0 tap-actions">
                   <button
                     type="button"
                     class="text-meta text-accent hover:text-accent-hover cursor-pointer"
@@ -272,7 +272,7 @@
             <span class="text-small text-dim truncate">{{ vial.compound }}</span>
             <span class="text-meta text-muted">{{ finishedMeta(vial) }}</span>
 
-            <span class="ml-auto flex items-baseline gap-2.5 shrink-0">
+            <span class="ml-auto flex items-baseline gap-2.5 shrink-0 tap-actions">
               <button
                 type="button"
                 class="text-meta text-faint hover:text-accent cursor-pointer tui-row-action"

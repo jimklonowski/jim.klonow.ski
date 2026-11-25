@@ -40,7 +40,7 @@
       <div class="flex items-center gap-1.5 flex-1 min-w-0">
         <button
           type="button"
-          class="tui-btn px-2.5 sm:hidden disabled:opacity-40 disabled:cursor-default"
+          class="tui-btn px-2.5 sm:hidden disabled:opacity-40 disabled:cursor-default [--tap-r:0px]"
           :disabled="viewedIndex === 0"
           aria-label="Previous draw"
           v-on="prevStep"
@@ -128,7 +128,7 @@
 
         <button
           type="button"
-          class="tui-btn px-2.5 sm:hidden disabled:opacity-40 disabled:cursor-default"
+          class="tui-btn px-2.5 sm:hidden disabled:opacity-40 disabled:cursor-default [--tap-l:0px]"
           :disabled="!scrubbed"
           aria-label="Next draw"
           v-on="nextStep"

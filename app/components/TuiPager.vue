@@ -13,7 +13,7 @@ const page = defineModel<number>('page', { required: true })
   >
     <button
       type="button"
-      class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+      class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap"
       :class="page > 1 ? 'text-accent hover:text-accent-hover' : 'text-faint'"
       :disabled="page <= 1"
       @click="page--"
@@ -26,7 +26,7 @@ const page = defineModel<number>('page', { required: true })
     </span>
     <button
       type="button"
-      class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+      class="cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap"
       :class="page < totalPages ? 'text-accent hover:text-accent-hover' : 'text-faint'"
       :disabled="page >= totalPages"
       @click="page++"

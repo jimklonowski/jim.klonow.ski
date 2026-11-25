@@ -61,7 +61,7 @@
             </button>
             <button
               type="button"
-              class="text-meta text-faint hover:text-accent cursor-pointer"
+              class="text-meta text-faint hover:text-accent cursor-pointer tap [--tap-l:0.25rem]"
               aria-label="Cancel"
               @click="editing = null"
             >
@@ -85,7 +85,7 @@
           <button
             v-if="!readonly"
             type="button"
-            class="text-hi text-left hover:text-accent cursor-pointer"
+            class="text-hi text-left hover:text-accent cursor-pointer tap [--tap-y:0.1875rem]"
             :title="`Edit ${row.label.toLowerCase()}`"
             @click="startEdit(row.slot)"
           >
@@ -105,7 +105,7 @@
           <button
             v-if="!readonly && row.snack"
             type="button"
-            class="text-meta text-ghost hover:text-accent cursor-pointer"
+            class="text-meta text-ghost hover:text-accent cursor-pointer tap [--tap-y:0.1875rem]"
             :title="`Log another ${row.fullLabel.toLowerCase()} in this slot`"
             @click="startEdit(row.slot, true)"
           >
@@ -117,7 +117,7 @@
         <button
           v-else-if="!readonly && row.snack"
           type="button"
-          class="text-left text-meta text-ghost hover:text-accent cursor-pointer"
+          class="text-left text-meta text-ghost hover:text-accent cursor-pointer tap [--tap-y:0.1875rem]"
           :aria-label="`Add ${row.fullLabel.toLowerCase()}`"
           @click="startEdit(row.slot)"
         >
@@ -126,7 +126,7 @@
         <button
           v-else-if="!readonly"
           type="button"
-          class="text-left cursor-pointer"
+          class="text-left cursor-pointer tap [--tap-y:0.1875rem]"
           :class="row.slot === suggestedSlot ? 'text-accent hover:text-accent-hover' : 'text-faint hover:text-accent'"
           :aria-label="`Add ${row.fullLabel.toLowerCase()}`"
           @click="startEdit(row.slot)"
@@ -207,7 +207,7 @@
              Owner-only like every profile write; the demo sandbox has no profile to save to. -->
         <button
           type="button"
-          class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer"
+          class="shrink-0 text-micro text-faint hover:text-accent cursor-pointer tap [--tap-l:0.75rem]"
           :aria-label="targetOpen ? 'Hide the protein target' : 'Set the daily protein target'"
           :aria-expanded="targetOpen"
           @click="targetOpen = !targetOpen"

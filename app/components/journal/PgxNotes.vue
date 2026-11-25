@@ -39,7 +39,7 @@
         >{{ BIOMARKERS[m]?.label ?? m }}</span>
         <span
           v-if="canEdit"
-          class="ml-auto flex items-baseline gap-2 shrink-0"
+          class="ml-auto flex items-baseline gap-2 shrink-0 tap-actions"
         >
           <button
             type="button"
