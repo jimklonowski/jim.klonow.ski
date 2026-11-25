@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#070a09">
+<title>No signal | jim.klonow.ski</title>
+<!--
+  What the service worker (/sw.js) shows when a page is asked for and the network does not answer.
+  It is stored on the device when the worker installs, so it must stand alone: no stylesheet, no
+  font, no image and no script from anywhere — everything it needs is in this file. It works
+  without its script too (the link below reloads the page that was asked for); the script only
+  adds the count of taps waiting on this device and the retry when the connection returns.
+-->
+<style>
+  :root {
+    --bg: #070a09; --raised: #0d1310; --line: #24382f; --hi: #e6f2ec; --body: #c7d4cd; --muted: #7a9688; --accent: #2ce8a4; --heart: #e86a5e;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--body);
+    font: 14px/1.6 ui-monospace, 'JetBrains Mono', 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+    display: flex; align-items: center; justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    -webkit-text-size-adjust: 100%;
+  }
+  main { width: 100%; max-width: 30rem; border: 1px solid var(--line); background: var(--raised); padding: 24px 22px; }
+  .row { display: flex; align-items: center; gap: 16px; }
+  svg { flex: none; }
+  .heart { fill: var(--heart); }
+  .flat { stroke: var(--muted); stroke-width: 1; fill: none; }
+  h1 { margin: 0; font-size: 12px; letter-spacing: 0.16em; font-weight: 600; color: var(--hi); }
+  h1 span { color: var(--muted); font-weight: 400; }
+  p { margin: 14px 0 0; }
+  .taps { color: var(--hi); }
+  .small { color: var(--muted); font-size: 12px; }
+  a.btn {
+    display: inline-block; margin-top: 18px; padding: 9px 16px; min-height: 40px;
+    border: 1px solid var(--accent); color: var(--accent); text-decoration: none; letter-spacing: 0.12em; font-size: 12px;
+  }
+  a.btn:active { background: var(--accent); color: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+  <div class="row">
+    <!-- The heart, with a flat line under it: nothing is coming through. -->
+    <svg width="44" height="50" viewBox="0 0 11 12.5" aria-hidden="true">
+      <path class="heart" d="M2 0h2v1h1v1h1V1h1V0h2v1h1v1h1v3h-1v1H9v1H8v1H7v1H6v1H5V9H4V8H3V7H2V6H1V5H0V2h1V1h1z"/>
+      <path class="flat" d="M0 11.75h11"/>
+    </svg>
+    <h1>NO SIGNAL <span>· ticker can't reach the site</span></h1>
+  </div>
+  <p>This page needs the network, and there isn't one right now. Nothing is lost: it is just waiting.</p>
+  <p class="taps" id="taps" hidden></p>
+  <a class="btn" href="">TRY AGAIN</a>
+  <p class="small">It tries again by itself when the connection comes back.</p>
+</main>
+<script>
+(function () {
+  // Taps logged while a page was open are kept on this device (the quick-log outbox) and sent
+  // the next time a page loads. Say how many are waiting, so nobody logs them twice.
+  try {
+    var list = JSON.parse(localStorage.getItem('quicklog:outbox') || '[]');
+    var n = Array.isArray(list) ? list.length : 0;
+    if (n) {
+      var el = document.getElementById('taps');
+      el.textContent = (n === 1 ? '1 tap is' : n + ' taps are') + ' saved on this device and will be sent when a page next loads.';
+      el.hidden = false;
+    }
+  }
+  catch (e) { /* no storage: nothing to count */ }
+  // Back online, or back in front with a connection: ask for the page again.
+  window.addEventListener('online', function () { location.reload(); });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && navigator.onLine) location.reload();
+  });
+})();
+</script>
+</body>
+</html>
