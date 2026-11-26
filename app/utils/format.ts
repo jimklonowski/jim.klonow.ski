@@ -58,18 +58,28 @@ export function pdfLabel(src: string): string {
 // results that name an actual severity/finding — everything else (including full descriptive
 // sentences that merely mention "normal"/"no stenosis"/etc.) reads as reassuring, not alarming.
 /** The text class for a qualitative finding — the one mapping the labs page and the upload preview both had (audit #42 item 41). */
-export function qualitativeClass(result: string): string {
-  return { warning: 'text-warn', success: 'text-accent', neutral: 'text-body' }[qualitativeColor(result)]
+export function qualitativeClass(result: string, name = ''): string {
+  return { warning: 'text-warn', success: 'text-accent', neutral: 'text-body' }[qualitativeColor(result, name)]
 }
 
-export function qualitativeColor(result: string): 'warning' | 'success' | 'neutral' {
+// A blood group is who you are, not a finding: "Rh Factor: Positive" is not a positive test.
+// It was coloured as one until audit #44 item 56 ran this over the results on file.
+const BLOOD_GROUP = /^(abo\b|rh\b|blood (group|type))/i
+// "not detected", "none detected", "no pathogenic variant detected": the reassuring way to
+// say it. Only "not detected" was read that way; the other two were coloured as detections.
+const NOT_DETECTED = /\b(?:not|none|no)\b[^.;]*?\bdetected\b/g
+
+/** `name` is the test the result belongs to, when the caller has it. */
+export function qualitativeColor(result: string, name = ''): 'warning' | 'success' | 'neutral' {
+  if (BLOOD_GROUP.test(name.trim())) return 'neutral'
   const text = result.toLowerCase()
+  const withoutCleared = text.replace(NOT_DETECTED, '')
   const concerning = /\b(mild|moderate|severe|abnormal|elevated|thicken|dilat|enlarg|reduced|decreased|positive|heterozygous|homozygous)\b/.test(text)
-    || /(?<!not )\bdetected\b/.test(text)
+    || /\bdetected\b/.test(withoutCleared)
   if (concerning) {
     return 'warning'
   }
-  if (/\b(normal|no evidence|no significant|no stenosis|no regurgitation|not detected|negative|absent|unremarkable)\b/.test(text)) {
+  if (withoutCleared !== text || /\b(normal|no evidence|no significant|no stenosis|no regurgitation|negative|absent|unremarkable)\b/.test(text)) {
     return 'success'
   }
   return 'neutral'

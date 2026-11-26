@@ -184,7 +184,7 @@
               :key="item.name"
               class="text-muted"
             >
-              {{ item.name }} <span :class="colorClass(item.result)">{{ item.result }}</span>
+              {{ item.name }} <span :class="colorClass(item.result, item.name)">{{ item.result }}</span>
             </span>
           </div>
           <p class="mt-2 text-muted">
@@ -215,7 +215,7 @@
             :key="`${item.date}-${item.name}`"
             class="text-muted"
           >
-            {{ item.name }} <span :class="colorClass(item.result)">{{ item.result }}</span>
+            {{ item.name }} <span :class="colorClass(item.result, item.name)">{{ item.result }}</span>
           </span>
         </div>
       </section>
@@ -286,7 +286,7 @@
             <span class="text-muted shrink-0">{{ item.name }}</span>
             <span
               class="text-right"
-              :class="colorClass(item.result)"
+              :class="colorClass(item.result, item.name)"
             >{{ item.result }}</span>
           </div>
         </div>
@@ -477,10 +477,10 @@ const echoOpen = ref(false)
 
 /** The findings worth surfacing inline: anything that isn't plainly reassuring. */
 const echoHighlights = computed(() =>
-  echoResults.value.filter(r => qualitativeColor(r.result) !== 'success').slice(0, 4)
+  echoResults.value.filter(r => qualitativeColor(r.result, r.name) !== 'success').slice(0, 4)
 )
 const normalCount = computed(() =>
-  echoResults.value.filter(r => qualitativeColor(r.result) === 'success').length
+  echoResults.value.filter(r => qualitativeColor(r.result, r.name) === 'success').length
 )
 /** "9 findings normal · 1 earlier echo on file — scrub back to read it" */
 const echoFooter = computed(() => {

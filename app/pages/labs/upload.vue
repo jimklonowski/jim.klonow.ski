@@ -256,7 +256,7 @@
             <span class="text-muted shrink-0">{{ item.name }}</span>
             <span
               class="text-right"
-              :class="colorClass(item.result)"
+              :class="colorClass(item.result, item.name)"
             >{{ item.result }}</span>
           </div>
         </div>

@@ -258,10 +258,22 @@ async function intakeTargetsOn(db: D1Database, asOf: string): Promise<IntakeTarg
   )
 }
 
-/** The owner's blood-pressure goal (profile `bp_goal`), or the default when unset or unreadable. */
+/**
+ * The owner's blood-pressure goal (profile `bp_goal`), or the default when none is set, the text
+ * is not a reading, or the database has no profile table yet. Any other failure propagates, like
+ * the intake targets above: this used to answer the default for ANY failed read, so one blip
+ * while a recap was being built judged the week against 130/80 instead of the owner's goal
+ * (audit #44 item 56).
+ */
 async function bpGoalOf(db: D1Database): Promise<BpReading> {
-  const row = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('bp_goal').first<{ value: string }>().catch(() => null)
-  return bpGoal(row?.value)
+  try {
+    const row = await db.prepare('SELECT value FROM profile WHERE key = ?1').bind('bp_goal').first<{ value: string }>()
+    return bpGoal(row?.value)
+  }
+  catch (err) {
+    if (isMissingTable(err)) return bpGoal(null)
+    throw err
+  }
 }
 
 /** "7-day average 122/74 over 5 readings: elevated by the AHA categories; goal under 130/80 met" */
