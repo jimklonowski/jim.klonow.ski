@@ -79,8 +79,12 @@
         <div
           v-for="w in group.rows"
           :key="w.id"
-          class="grid grid-cols-[auto_1fr] lg:grid-cols-[90px_minmax(0,1fr)_54px_90px_80px_88px_70px] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-line-row last:border-0 text-small"
+          class="grid grid-cols-[auto_1fr] lg:grid-cols-[12.5ch_minmax(0,1fr)_7.5ch_12.5ch_11ch_8ch_12.5ch_10ch] gap-x-2.5 gap-y-1 items-baseline py-1.5 border-b border-line-row last:border-0 text-small"
         >
+          <!-- The stat columns are sized in `ch`, not px: a character is as wide as the row's text,
+               so the columns grow with the DISPLAY picker's text size. In px, the largest size
+               pushed every figure into its neighbour. Each is as wide as the longest value it
+               can hold ("1134 kcal", "⚡ 15.2", "♥ 174/193", "120.4 min"). -->
           <span class="text-muted uppercase">{{ formatDate(w.date, 'monthDay') }}</span>
           <span class="text-hi truncate">
             {{ w.workout_type ?? 'Workout' }}
@@ -89,19 +93,24 @@
               class="text-micro text-faint"
             >{{ w.sources.join('+') }}</span>
           </span>
-          <!-- Below lg the five stats share one wrapped row spanning both columns. Dealt into
+          <!-- Below lg the six stats share one wrapped row spanning both columns. Dealt into
                the 2-column grid they alternated between the date and type columns, so a
                right-aligned "142 kcal" landed under the date — unreadable on a phone.
-               `lg:contents` dissolves this wrapper again so the 7-column grid gets its cells. -->
+               `lg:contents` dissolves this wrapper again so the 8-column grid gets its cells. -->
           <span class="col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 lg:contents">
             <span class="num-display text-muted text-right whitespace-nowrap">{{ workoutTime(w.start_time) ?? '' }}</span>
             <span class="text-dim text-right whitespace-nowrap">{{ w.duration_min != null ? `${w.duration_min} min` : '' }}</span>
-            <!-- Whoop's session strain rides beside the calories (audit #43 item 57); the zone
-                 minutes it reported sit in the heart-rate cell's tooltip. -->
+            <span class="text-dim text-right whitespace-nowrap">{{ w.calories != null ? `${w.calories} kcal` : '' }}</span>
+            <!-- Whoop's session strain, in a column of its own beside the calories (audit #43
+                 item 57 put the two in one 80px cell, "512 kcal · ⚡ 12.8", which ran into the
+                 heart rate whenever both figures were long — Jim, 2026-11-27). The zone minutes
+                 Whoop reported sit in the heart-rate cell's tooltip. A session without strain
+                 keeps the cell on a wide screen, so the columns line up, and drops it from the
+                 phone's wrapped row, so it leaves no gap there. -->
             <span
-              class="text-dim text-right whitespace-nowrap"
+              class="text-dim text-right whitespace-nowrap max-lg:empty:hidden"
               :title="w.strain != null ? `Whoop strain ${w.strain} for this session` : undefined"
-            >{{ [w.calories != null ? `${w.calories} kcal` : null, w.strain != null ? `⚡ ${w.strain}` : null].filter(Boolean).join(' · ') }}</span>
+            >{{ w.strain != null ? `⚡ ${w.strain}` : '' }}</span>
             <!-- Coloured by avg, not max: max spikes on nearly every session and would light the
                whole column up. The max reads dimmer so the pair stays scannable as avg-first. -->
             <span

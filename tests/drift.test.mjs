@@ -209,3 +209,23 @@ test('the README has a row for every page, and its screenshots are the files on 
     for (const [, major] of line.matchAll(/\b(\d{2})(?:\.\d+)*\+/g)) assert.ok(majors.includes(major), `the README says Node ${major}+; engines says ${engines}`)
   }
 })
+
+// ── a row's columns ──────────────────────────────────────────────────────────
+
+test('the workout row has a column for every figure, each sized by its text', () => {
+  // Two figures once shared one fixed column ("512 kcal · ⚡ 12.8" in 80px) and ran into the
+  // heart rate beside it; and columns in px do not grow with the text-size setting.
+  const path = 'app/pages/journal/workouts.vue'
+  let row
+  eachElement(templateOf(path, read(path)), (node) => {
+    if (/\blg:grid-cols-\[/.test(attr(node, 'class') ?? '')) row = node
+  })
+  assert.ok(row, 'the session row')
+  const tracks = /lg:grid-cols-\[([^\]]+)\]/.exec(attr(row, 'class'))[1].split('_')
+  const cells = row.children.filter(c => c.type === ELEMENT)
+  const wrapper = cells.find(c => hasClass(c, 'lg:contents'))
+  const stats = wrapper.children.filter(c => c.type === ELEMENT)
+  assert.equal(tracks.length, cells.length - 1 + stats.length, `${tracks.length} columns for ${cells.length - 1} leading cells and ${stats.length} figures`)
+  assert.deepEqual(tracks.filter(t => /px$/.test(t)), [], 'sized in ch (or fr), so the columns follow the text size')
+  for (const stat of stats) assert.ok(hasClass(stat, 'whitespace-nowrap'), 'a figure never wraps inside its column')
+})
