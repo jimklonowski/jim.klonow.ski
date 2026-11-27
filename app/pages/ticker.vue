@@ -382,7 +382,7 @@
           class="flex gap-2.5"
           :class="i === 0 ? 'text-dim' : 'text-faint'"
         >
-          <span class="shrink-0 tabular-nums text-ghost">{{ entry.at }}</span>
+          <span class="shrink-0 tabular-nums text-faint">{{ entry.at }}</span>
           <span>{{ entry.text }}</span>
         </li>
       </ol>

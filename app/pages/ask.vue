@@ -149,7 +149,7 @@
                 class="text-muted"
               >
                 <span class="text-accent">{{ spinnerFrame }}</span>
-                thinking<span class="text-ghost">… {{ thinkingSeconds }}s</span>
+                thinking<span class="text-faint">… {{ thinkingSeconds }}s</span>
               </p>
               <template v-else>
                 <Markdown :value="m.content" />
@@ -196,7 +196,7 @@
             {{ streaming || opening ? '…' : 'ASK' }}
           </button>
         </form>
-        <p class="mt-1.5 text-label text-ghost">
+        <p class="mt-1.5 text-label text-faint">
           answers are generated from your logged data · observations, not medical advice<span class="hidden sm:inline"> · enter to send, shift+enter for a new line</span>
         </p>
       </div>

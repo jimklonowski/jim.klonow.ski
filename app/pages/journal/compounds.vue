@@ -156,7 +156,7 @@
             {{ group.label }} {{ group.count }} ▾
           </button>
         </UDropdownMenu>
-        <span class="ml-auto text-label text-ghost">never-used compounds hidden until searched (⌘K)</span>
+        <span class="ml-auto text-label text-faint">never-used compounds hidden until searched (⌘K)</span>
       </section>
     </div>
   </div>

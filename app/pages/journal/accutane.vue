@@ -371,7 +371,7 @@
         </section>
       </div>
 
-      <p class="px-4 sm:px-6 py-3 text-meta text-ghost border-t border-line">
+      <p class="px-4 sm:px-6 py-3 text-meta text-faint border-t border-line">
         {{ GENERAL_DISCLAIMER }}
       </p>
     </template>

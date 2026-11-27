@@ -304,7 +304,7 @@
         </p>
       </section>
 
-      <p class="text-meta text-ghost border-t border-line pt-2">
+      <p class="text-meta text-faint border-t border-line pt-2">
         {{ GENERAL_DISCLAIMER }}
       </p>
     </article>

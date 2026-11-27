@@ -1,7 +1,10 @@
 // The upload path both photo uploaders share: the photos page's bulk queue and a day entry's
 // single-photo drop zone. Their UIs differ (a per-file list vs one preview with a confirm), so
 // only this logic is shared.
-import exifr from 'exifr'
+//
+// exifr is imported where it is used, not here: a static import put the whole EXIF parser
+// (74 KB) on the day-entry page and the photos page at every open, for a file that on most
+// visits is never picked (audit #44 item 57). tests/drift.test.mjs holds it out.
 import type { PhotoCategory } from '#shared/utils/photoCategories'
 import { createPhotoThumbnail } from './photoThumbnail'
 
@@ -20,11 +23,13 @@ export function localDateStr(d: Date): string {
 export async function photoTakenAt(file: File): Promise<Date> {
   let exifDate: unknown
   try {
+    const { default: exifr } = await import('exifr')
     const tags = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])
     exifDate = tags?.DateTimeOriginal ?? tags?.CreateDate
   }
   catch {
-    // Not an image exifr can read (or no EXIF at all): fall through to the file time.
+    // Not an image exifr can read, no EXIF at all, or the parser did not load (offline): fall
+    // through to the file time.
   }
   return exifDate instanceof Date ? exifDate : new Date(file.lastModified)
 }

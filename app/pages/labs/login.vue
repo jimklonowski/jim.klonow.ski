@@ -73,7 +73,7 @@
       </div>
 
       <div class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <p class="text-label text-ghost tracking-widest uppercase">
+        <p class="text-label text-faint tracking-widest uppercase">
           session cookie · read-only share links issued on request
         </p>
         <a

@@ -179,7 +179,7 @@
                   />
                 </span>
 
-                <span class="text-label text-ghost">{{ itemHint(item) }}</span>
+                <span class="text-label text-faint">{{ itemHint(item) }}</span>
               </div>
             </div>
 

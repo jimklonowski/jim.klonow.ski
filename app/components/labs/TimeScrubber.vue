@@ -165,7 +165,7 @@
         >
           ↩ LATEST
         </button>
-        <span class="hidden lg:inline text-micro text-ghost whitespace-nowrap ml-2">← → step draws</span>
+        <span class="hidden lg:inline text-micro text-faint whitespace-nowrap ml-2">← → step draws</span>
       </div>
     </div>
   </div>

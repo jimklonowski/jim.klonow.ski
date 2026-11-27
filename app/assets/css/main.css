@@ -97,7 +97,9 @@
      The bottom of the ramp was raised 2026-09-22 for contrast against --color-bg: `faint` carries
      real content (every .tui-label section header, at 10.5px) and sat at 3.1:1, under the 4.5:1
      AA floor for body text. It now clears it, and `ghost` inherits the old `faint` value since it
-     is only ever rules, separators and disabled text. Previous values, to revert the look:
+     is only ever rules, separators and disabled text — never words (tests/drift.test.mjs
+     fails on a sentence set in it; the footer, the status line and the disclaimers were, until
+     audit #44 item 57). Previous values, to revert the look:
      faint #4a6357 (3.1:1), ghost #3f5449 (2.4:1). */
   --color-hi: #e6f2ec;
   --color-body: #c7d4cd;
@@ -137,21 +139,7 @@
   --color-phosphor-900: #114d3a;
   --color-phosphor-950: #062a1f;
 
-  /* Legacy palette — still referenced by pre-redesign components */
-  --color-green-50: #EFFDF5;
-  --color-green-100: #D9FBE8;
-  --color-green-200: #B3F5D1;
-  --color-green-300: #75EDAE;
-  --color-green-400: #00DC82;
-  --color-green-500: #00C16A;
-  --color-green-600: #00A155;
-  --color-green-700: #007F45;
-  --color-green-800: #016538;
-  --color-green-900: #0A5331;
-  --color-green-950: #052E16;
-
-  --container-10xl: 100rem;
-  --container-11xl: 110rem;
+  /* The page's widest container (--ui-container below). */
   --container-12xl: 120rem;
 }
 

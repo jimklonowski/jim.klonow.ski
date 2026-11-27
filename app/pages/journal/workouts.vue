@@ -86,7 +86,7 @@
             {{ w.workout_type ?? 'Workout' }}
             <span
               v-if="w.sources.length"
-              class="text-micro text-ghost"
+              class="text-micro text-faint"
             >{{ w.sources.join('+') }}</span>
           </span>
           <!-- Below lg the five stats share one wrapped row spanning both columns. Dealt into

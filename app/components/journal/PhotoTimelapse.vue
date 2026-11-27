@@ -56,7 +56,7 @@
         ▸
       </button>
     </div>
-    <p class="mt-1.5 text-label text-ghost text-center hidden sm:block">
+    <p class="mt-1.5 text-label text-faint text-center hidden sm:block">
       ← → step · drag the rail to scrub
     </p>
   </div>

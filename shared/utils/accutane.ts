@@ -61,6 +61,18 @@ export function isotretinoinCycle(cycles: readonly Cycle[], today: string): Cycl
     ?? null
 }
 
+/**
+ * Whether the course page has a course to show on `today`: one planned, running, or ended with
+ * its last ladder rung (procedures OK, PROCEDURE_DEFERRAL_DAYS after the last capsule) still
+ * ahead. The journal's ACCUTANE tab and the command palette's entry both ask this, so the page
+ * is offered in the same weeks by each.
+ */
+export function courseOnFile(cycles: readonly Cycle[], today: string): boolean {
+  const course = isotretinoinCycle(cycles, today)
+  if (!course) return false
+  return cycleStatusOn(course, today) !== 'done' || diffDays(cycleEnd(course), today) <= PROCEDURE_DEFERRAL_DAYS
+}
+
 /** The plan's daily milligrams as written (the dose × days a week ÷ 7), or null without an item. */
 export function plannedMgPerDay(cycle: Cycle): number | null {
   const item = cycle.compounds.find(i => i.compound === ISOTRETINOIN)

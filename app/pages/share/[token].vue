@@ -42,7 +42,7 @@
         </p>
       </div>
 
-      <p class="mt-2.5 text-label text-ghost tracking-widest uppercase">
+      <p class="mt-2.5 text-label text-faint tracking-widest uppercase">
         read-only share link · single redemption per session
       </p>
     </div>

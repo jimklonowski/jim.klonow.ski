@@ -20,9 +20,7 @@
 
 <script setup lang="ts">
 import { canAccessPage } from '#shared/utils/access'
-import { PROCEDURE_DEFERRAL_DAYS, isotretinoinCycle } from '#shared/utils/accutane'
-import { cycleEnd, cycleStatusOn } from '#shared/utils/cycles'
-import { diffDays } from '#shared/utils/dates'
+import { courseOnFile } from '#shared/utils/accutane'
 
 // Sub-nav shared by every /journal/* page. Tabs the current role can't open are dropped
 // rather than rendered dead — the doctor view has no entries or photos.
@@ -34,7 +32,7 @@ const ALL_TABS = [
   { label: 'Cycles', to: '/journal/cycles' },
   // The course page is a tab only while there is a course: planned, running, or ended with its
   // last ladder rung (procedures OK, 180 days after the last capsule) still ahead. Nothing on
-  // file → no eleventh tab.
+  // file → no eleventh tab. (courseOnFile — the command palette lists the page by the same rule.)
   { label: 'Accutane', to: '/journal/accutane', course: true },
   { label: 'Workouts', to: '/journal/workouts' },
   { label: 'Entries', to: '/journal/entries' },
@@ -49,11 +47,7 @@ const today = useToday()
 // The cycles list is already cached by every page that reads it.
 const { data: cyclesData } = await useCycles()
 
-const courseTab = computed(() => {
-  const c = isotretinoinCycle(cyclesData.value ?? [], today.value)
-  if (!c) return false
-  return cycleStatusOn(c, today.value) !== 'done' || diffDays(cycleEnd(c), today.value) <= PROCEDURE_DEFERRAL_DAYS
-})
+const courseTab = computed(() => courseOnFile(cyclesData.value ?? [], today.value))
 
 const tabs = computed(() =>
   ALL_TABS.filter(t => (!t.course || courseTab.value) && (!role.value || canAccessPage(role.value, t.to)))

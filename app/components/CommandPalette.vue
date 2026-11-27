@@ -38,6 +38,8 @@
 
 <script setup lang="ts">
 import { isFullAccessRole } from '#shared/utils/access'
+import { courseOnFile } from '#shared/utils/accutane'
+import type { Cycle } from '#shared/utils/cycles'
 import { E2_IMMUNOASSAY, E2_SENSITIVE, isEstradiolKey, markerSlotLabel } from '#shared/utils/estradiol'
 import { fmtMarkerValue } from '#shared/utils/markerValue'
 import { BIOMARKERS, getStatus } from '~/data/biomarkers'
@@ -59,14 +61,26 @@ defineShortcuts({
 // The dossier file is ~70KB of prose and this component sits in the default layout, so a static
 // import would ride along on every page load. Fetch it the first time the palette opens instead.
 const dossiers = shallowRef<Record<string, CompoundInfo>>({})
+// The planned cycles, for one question: is there an isotretinoin course to offer the course
+// page for? Read the same lazy way and for the same reason — a list on every page load, for
+// a row most sessions never look at. null until the palette has been opened (and for a
+// visitor who may not read it).
+const cycles = shallowRef<Cycle[] | null>(null)
 
-watch(open, async (v) => {
+watch(open, (v) => {
   if (!v) {
     searchTerm.value = ''
     return
   }
   if (!Object.keys(dossiers.value).length) {
-    dossiers.value = (await import('~/data/compoundInfo')).COMPOUND_INFO
+    import('~/data/compoundInfo').then((m) => {
+      dossiers.value = m.COMPOUND_INFO
+    })
+  }
+  if (!cycles.value && role.value) {
+    $fetch<Cycle[]>('/api/journal/cycles/list').then((list) => {
+      cycles.value = list
+    }).catch(() => { /* not readable for this session: no course row, nothing else changes */ })
   }
 })
 
@@ -88,6 +102,11 @@ const isFullAccess = computed(() => isFullAccessRole(role.value))
 
 // Journal sections are real routes since the hub-and-spoke split, so these are plain jumps
 // rather than the scroll-anchors they used to be.
+//
+// Every page the site has is here, in ACTIONS or in MANAGE — tests/drift.test.mjs fails when
+// a page is added and the palette is not told (the ledger, the report, the protocol and the
+// cycle planner all shipped without a row, and the supplements page kept one after it was gone;
+// audit #44 item 57).
 const jumpItems = computed(() => {
   const items = [
     { label: 'home', suffix: '/', onSelect: () => go('/') },
@@ -96,15 +115,23 @@ const jumpItems = computed(() => {
     // Plain words, no middle dot: the search is strict about a contiguous match, and "hematocrit
     // control" is what gets typed.
     { label: 'hematocrit control panel', suffix: '/labs/hematocrit · ladder · phlebotomies · iron', onSelect: () => go('/labs/hematocrit') },
+    { label: 'draw ledger', suffix: '/labs/ledger · protocol + timing per draw', onSelect: () => go('/labs/ledger') },
+    { label: 'clinical summary', suffix: '/labs/report · one page for a visit · print', onSelect: () => go('/labs/report') },
     { label: 'journal · overview', suffix: '/journal', onSelect: () => go('/journal') },
     { label: 'journal · trends', suffix: 'vitals + health charts', onSelect: () => go('/journal/trends') },
     { label: 'journal · compounds', suffix: 'usage + timeline', onSelect: () => go('/journal/compounds') },
+    // "supplements" and "stack" are what this page used to be called, and still what gets typed.
+    { label: 'journal · protocol', suffix: 'schedule · supplements · stack · dated history', onSelect: () => go('/journal/protocol') },
+    { label: 'journal · cycles', suffix: 'cycle planner', onSelect: () => go('/journal/cycles') },
     { label: 'journal · workouts', suffix: 'session log', onSelect: () => go('/journal/workouts') },
     { label: 'calendar', suffix: '/journal/calendar', onSelect: () => go('/journal/calendar') },
-    { label: 'supplements', suffix: '/journal/supplements', onSelect: () => go('/journal/supplements') },
     { label: 'vaccines', suffix: 'immunization record', onSelect: () => go('/journal/vaccines') },
     { label: 'tools · calculator', suffix: '/tools/calculator', onSelect: () => go('/tools/calculator') }
   ]
+  // Only while there is a course, like the journal's ACCUTANE tab (courseOnFile).
+  if (cycles.value && courseOnFile(cycles.value, todayStr.value)) {
+    items.push({ label: 'accutane course', suffix: '/journal/accutane · isotretinoin · cumulative dose', onSelect: () => go('/journal/accutane') })
+  }
   if (isFullAccess.value) {
     items.push(
       { label: 'journal · entries', suffix: 'day log', onSelect: () => go('/journal/entries') },

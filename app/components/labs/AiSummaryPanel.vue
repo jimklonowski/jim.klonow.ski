@@ -105,7 +105,7 @@ async function onPinUnlocked() {
     <!-- Provenance: only summaries written since it was recorded carry it. -->
     <p
       v-if="!regenerating && open && summary?.model"
-      class="mt-2 text-label text-ghost tracking-[0.06em]"
+      class="mt-2 text-label text-faint tracking-[0.06em]"
       :title="summary.promptHash ? `prompt ${summary.promptHash}` : undefined"
     >
       written by {{ summary.model }}{{ summary.at ? ` · ${formatDate(localDayOf(summary.at), 'monthDay').toLowerCase()}` : '' }}

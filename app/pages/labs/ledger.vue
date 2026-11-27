@@ -124,7 +124,7 @@
           Estradiol is the ultrasensitive LC/MS/MS reading; {{ IMMUNOASSAY_GLYPH }} marks a draw that only has the standard immunoassay, which is diffed against other immunoassay readings only.
         </template> Timing is {{ TIMING_CAVEAT.charAt(0).toLowerCase() + TIMING_CAVEAT.slice(1) }}.
       </p>
-      <p class="px-4 sm:px-6 pb-3 text-meta text-ghost">
+      <p class="px-4 sm:px-6 pb-3 text-meta text-faint">
         {{ GENERAL_DISCLAIMER }}
       </p>
     </template>

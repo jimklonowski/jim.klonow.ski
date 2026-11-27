@@ -142,7 +142,7 @@
             class="flex flex-col gap-0.5"
           >
             <div class="flex gap-2.5">
-              <span class="text-ghost shrink-0">{{ row.first.time }}</span>
+              <span class="text-faint shrink-0">{{ row.first.time }}</span>
               <NuxtLink
                 :to="`/journal/compound/${encodeURIComponent(row.first.compound)}`"
                 class="text-body hover:text-accent truncate"
@@ -163,7 +163,7 @@
               class="flex gap-2.5 text-meta"
             >
               <span class="text-ghost shrink-0 invisible">{{ row.first.time }}</span>
-              <span class="text-ghost">{{ row.times.join(' · ') }}</span>
+              <span class="text-faint">{{ row.times.join(' · ') }}</span>
             </div>
           </div>
         </div>
@@ -223,10 +223,10 @@
           </NuxtLink>
           <NuxtLink
             v-else
-            to="/journal/supplements"
+            to="/journal/protocol"
             class="tui-btn flex-1 justify-center"
           >
-            STACK
+            PROTOCOL
           </NuxtLink>
         </div>
       </div>
